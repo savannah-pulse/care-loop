@@ -1,0 +1,23 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Node
+node_modules/
+dist/
+coverage/
+npm-debug.log*
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+
+# Tooling and operating systems
+.vs/
+.idea/
+.DS_Store
+Thumbs.db
