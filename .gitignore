@@ -17,6 +17,7 @@ __pycache__/
 .ruff_cache/
 *.py[cod]
 *.egg-info/
+build/
 
 # Local configuration and secrets
 .env
