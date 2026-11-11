@@ -23,6 +23,7 @@ docs/                       Architecture, workstreams, and development practices
 infra/local/                Local environment notes
 src/
   api/CareLoop.Api/         ASP.NET Core API starter and Dockerfile
+  ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
   web/                      React + TypeScript + Vite starter and Dockerfile
   simulators/
     his/                    Synthetic HIS simulator workstream
@@ -30,12 +31,13 @@ src/
   worker/                   Deadline and escalation workstream
 tests/
   api/                      API smoke tests
+  ai_workflow/              Python workflow scaffold tests
   contracts/                Contract and schema compatibility workstream
   integration/              Synthetic journey test workstream
 .github/workflows/          Pull-request CI and tagged release packaging
 ```
 
-The directories are workstream boundaries, not independent sources of truth. The API currently exposes only a health endpoint; case workflows and simulators remain unimplemented. Once added, the API owns validation, correlation, idempotency, authorization, transitions, and audit.
+The directories are workstream boundaries, not independent sources of truth. The API currently exposes only a health endpoint; Python workflow agents, case workflows, and simulators remain scaffolds. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit. Python will coordinate the end-to-end workflow by proposing actions for the API and authorized people to review.
 
 ## Getting started
 
@@ -56,9 +58,19 @@ npm ci
 npm run dev
 ```
 
-Or build and start both starter services with `docker compose up --build`; open the web starter at `http://localhost:4173` and the API health check at `http://localhost:8080/health`.
+Set up the Python workflow package:
 
-The selected stack is React/TypeScript and ASP.NET Core. The coordination database, cloud host, identity model, and production deployment target remain team decisions; no live integration or clinical workflow is implemented by this scaffold.
+```sh
+cd src/ai_workflow
+python -m venv .venv
+# Activate .venv for your shell, then:
+python -m pip install --editable ".[dev]"
+uvicorn careloop_ai_workflow.main:app --reload --port 8081
+```
+
+Or build and start the starter services with `docker compose up --build`; open the web shell at `http://localhost:4173`, the API health check at `http://localhost:8080/health`, and the workflow service at `http://localhost:8081/health`.
+
+The selected stack is React/TypeScript, ASP.NET Core, and a Python AI workflow service. The coordination database, cloud host, identity model, and production deployment target remain team decisions; no live integration or clinical workflow is implemented by this scaffold. The Python workflow has no model provider configured and cannot make clinical decisions or close a case.
 
 ## Demo acceptance gate
 

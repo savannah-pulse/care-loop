@@ -4,11 +4,16 @@
 
 - .NET 10 SDK (the repository pins the .NET 10 SDK feature band in `global.json`).
 - Node.js 24 and npm for the web app.
+- Python 3.13 for the AI workflow service.
 - Docker Compose v2 for the local container setup.
 
 Run `dotnet test CareLoop.sln` for the API smoke test. Run `dotnet run --project src/api/CareLoop.Api` to start the API at the URL printed by ASP.NET Core; `/health` is the scaffold's only endpoint. In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
 
-`docker compose up --build` runs the API on port 8080 and the static web starter on port 4173. The web starter does not yet call the API. No database or production deployment environment is configured.
+`docker compose up --build` runs the API on port 8080, the static web starter on port 4173, and the Python workflow service on port 8081. The web starter does not yet call the API. No database or production deployment environment is configured.
+
+The Python workflow package is under `src/ai_workflow`. Create and activate a virtual environment there, install `python -m pip install --editable ".[dev]"`, then run `uvicorn careloop_ai_workflow.main:app --reload --port 8081`. Run `ruff check .` and `pytest` from that directory.
+
+The Python service defines stage and agent interfaces but has no model provider or case-write credentials. It coordinates by proposing actions; the .NET API remains the authority for state changes and authorization.
 
 ## Working agreements
 
