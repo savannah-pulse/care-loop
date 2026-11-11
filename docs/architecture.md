@@ -18,7 +18,8 @@ flowchart LR
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
     UI[Demo UI<br/>exception dashboard · patient view · impact view]
-    AI[AI provider interface<br/>reviewable handoff summary]
+    AIWORKFLOW[Python AI workflow<br/>stage agents and task coordination]
+    AIPROVIDER[Optional AI provider interface<br/>reviewable drafts]
     HUMAN[Authorized staff]
 
     HIS --> HISADAPTER --> API
@@ -27,12 +28,16 @@ flowchart LR
     STORE --> WORKER
     WORKER -->|escalation events; stage unchanged| API
     STORE --> UI
-    HUMAN -->|authorized actions and closure evidence| API
-    API -->|structured facts for a draft| AI
-    AI -->|draft for human review| API
+    HUMAN -->|reviewed actions and closure evidence| API
+    API -->|synthetic event references and coordination snapshot| AIWORKFLOW
+    AIWORKFLOW -->|action proposals; no direct case writes| API
+    AIWORKFLOW -->|optional structured facts for a draft| AIPROVIDER
+    AIPROVIDER -->|draft for human review| AIWORKFLOW
 ```
 
 The event log is the source for audit and timeline reconstruction; the case projection supports worklist queries. FHIR-shaped exchange may be used at the adapter boundary, but the prototype's internal coordination model is not a clinical FHIR repository. The choice of relational database and local hosting method is still a team decision.
+
+The Python workflow coordinates the journey across its ten stages through stage-specific agent interfaces. It may propose task creation, approved-template drafts, summaries, and exception follow-up from synthetic coordination facts. All proposals return through the .NET API, which remains the authoritative case-state, authorization, audit, and closure gate. Human review is required for communications and clinical actions. The scaffold does not configure a model provider, persist Python-owned case state, or implement an autonomous clinical agent.
 
 ## Ten-stage case lifecycle
 
@@ -63,6 +68,7 @@ sequenceDiagram
     participant HIS as HIS simulator
     participant API as Orchestration API
     participant Store as Coordination store
+    participant AI as Python AI workflow
     participant Channel as Patient-channel simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
@@ -70,6 +76,12 @@ sequenceDiagram
     HIS->>API: Result event (source, patient, result, reviewed urgency)
     API->>API: Validate, correlate, deduplicate
     API->>Store: Append event, create case, assign owner or queue
+    loop Each accepted event through the ten-stage journey
+        API->>AI: Synthetic references and current coordination snapshot
+        AI-->>API: Human-reviewable task or draft proposal
+        Staff->>API: Review proposal and authorize any permitted action
+        API->>API: Authorize proposal before any state change
+    end
     API-->>Channel: Approved simulated communication request
     Channel->>API: Delivery / failure / acknowledgement / call request
     API->>Store: Append attributed event; update coordination projection
@@ -91,6 +103,7 @@ sequenceDiagram
 - Patient receipt, understanding, help request, and consent are distinct. A caregiver's action is attributed to the caregiver and limited to approved permissions.
 - Clinical records stay in source systems. The coordination store keeps references, evidence references, workflow status, deadlines, and audit events.
 - Only an authorized human can record a clinical disposition or close a case; the API enforces the gate and records the decision.
+- Python agents return constrained proposals only. They cannot diagnose, set urgency, infer consent, send patient messages, accept referrals, change case state, or close cases.
 - Deadline checks are deterministic and configured from approved rules. Missing configuration must surface review work rather than inventing a deadline or urgency.
 - Mark all simulator data, AI drafts, and impact metrics as synthetic. Report cohort denominators and assumptions; do not claim real clinical improvement.
 

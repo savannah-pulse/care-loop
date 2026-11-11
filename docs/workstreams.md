@@ -1,6 +1,6 @@
 # Component workstreams
 
-Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API health check and web placeholder are the only runnable application behavior so far; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned.
+Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API, web UI, and Python workflow service are scaffolds; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned.
 
 | Workstream | Scope and first deliverable | Stories / requirements | Depends on |
 |---|---|---|---|
@@ -10,7 +10,7 @@ Use this register to split implementation into owned components while keeping on
 | Patient-channel simulator | Simulated send, delivery, failure, acknowledgement, clarification/call request, and patient view. Keep receipt, understanding, consent, and caregiver actions separate. First: one success path and one failed/unacknowledged path. | US02–US05; FR04 | API communication events; reviewed English copy |
 | Deadline and escalation worker | Deterministic checks for overdue, rejected, missing, unassigned, and unacknowledged work; append owned escalation events without advancing the case stage. First: a configurable overdue case test. | US03, US05, US08, US10, US13, US14; FR07 | API/store query; approved clocks and escalation recipients |
 | Demo UI | React/TypeScript coordination dashboard, read-only timeline, patient view, exception queues, and synthetic impact view. First: mock-data prototype; replace stubs with API reads as they become available. | US02–US05, US10, US16; FR09, FR10 | Wireframe/data shape; API read contract |
-| AI handoff summary | Provider interface and human-reviewable summary from correlated structured facts; keep a no-op path for offline demo. Message drafting is optional stretch. First: draft output clearly marked for review. | US07, US11; FR11 | Structured case facts; provider/approval decision |
+| Python AI workflow | Python service and stage-specific agent interfaces coordinating the ten-stage journey. Agents propose non-clinical follow-up actions and human-reviewable drafts; the .NET API validates every state change. First: stage map, synthetic-only context/proposal types, service health endpoint, and workflow contract tests. | US01–US16; FR02–FR11 | .NET API event/action contract; approved pathway rules; AI provider decision |
 | Contract and journey tests | Validate envelope compatibility, replay behavior, guarded ownership/closure, and end-to-end synthetic scenarios. First: reusable fixtures for one successful journey and one stalled handoff. | US01, US08–US16; FR01–FR10 | Shared contracts; stable simulator fixtures |
 
 ## Integration milestones

@@ -17,3 +17,10 @@ services:
       - api
     ports:
       - "4173:80"
+
+  ai-workflow:
+    build:
+      context: src/ai_workflow
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"

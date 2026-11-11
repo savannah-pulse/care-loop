@@ -10,6 +10,14 @@ dist/
 coverage/
 npm-debug.log*
 
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+*.egg-info/
+
 # Local configuration and secrets
 .env
 .env.*
