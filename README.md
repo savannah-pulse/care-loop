@@ -2,7 +2,7 @@
 
 CareLoop is a synthetic prototype for coordinating one breast-screening follow-up pathway across existing health systems. It makes ownership, handoffs, deadlines, exceptions, and evidence visible; provider HIS/EMRs and approved patient channels remain the systems of record.
 
-This repository is the shared starting point for the prototype. The detailed [architecture](docs/architecture.md), [component workstreams](docs/workstreams.md), and [development guide](docs/development.md) define how members can work independently while integrating against common contracts.
+This repository contains a runnable API and web scaffold, local container setup, CI and release workflows, and shared workstream documentation. The [architecture](docs/architecture.md), [component register](docs/workstreams.md), and [development guide](docs/development.md) define how members can work independently while integrating against common contracts.
 
 ## Prototype boundaries
 
@@ -14,39 +14,56 @@ This repository is the shared starting point for the prototype. The detailed [ar
 - Only an authorized human can close a case, with pathway evidence or a documented exception.
 - AI output is a reviewable draft. It cannot change source facts, set urgency, close cases, or send messages.
 
-## Planned repository map
-
-The source folders will be created as workstreams begin; this bootstrap does not claim that executable services are already present.
+## Repository map
 
 ```text
-contracts/                 Shared event and API contract guidance
-docs/                      Architecture, workstreams, and development practices
+CareLoop.sln                .NET solution
+contracts/                  Shared event and API contract guidance
+docs/                       Architecture, workstreams, and development practices
+infra/local/                Local environment notes
 src/
-  api/                     ASP.NET Core orchestration and coordination API
-  web/                     React + TypeScript demo UI
+  api/CareLoop.Api/         ASP.NET Core API starter and Dockerfile
+  web/                      React + TypeScript + Vite starter and Dockerfile
   simulators/
-    his/                   Synthetic HIS event producer
-    patient-channel/       Synthetic delivery and response producer
-  worker/                  Deterministic deadline and missing-event checks
+    his/                    Synthetic HIS simulator workstream
+    patient-channel/        Synthetic patient-channel workstream
+  worker/                   Deadline and escalation workstream
 tests/
-  contracts/               Contract and schema compatibility checks
-  integration/             End-to-end synthetic journey checks
-infra/local/               Local-only orchestration when implementation starts
+  api/                      API smoke tests
+  contracts/                Contract and schema compatibility workstream
+  integration/              Synthetic journey test workstream
+.github/workflows/          Pull-request CI and tagged release packaging
 ```
 
-The directories are workstream boundaries, not independent sources of truth. The API owns validation, correlation, idempotency, authorization, transitions, and audit. Dashboards and patient views read the API's case projection; simulators emit events and never write cases directly.
+The directories are workstream boundaries, not independent sources of truth. The API currently exposes only a health endpoint; case workflows and simulators remain unimplemented. Once added, the API owns validation, correlation, idempotency, authorization, transitions, and audit.
 
 ## Getting started
 
-This is the bootstrap phase; executable services and a local run command have not yet been added. Start by:
+The prerequisites are .NET 10 SDK, Node.js 24, npm, and (for containers) Docker Compose.
 
-1. Reviewing [the architecture and open decisions](docs/architecture.md).
-2. Taking or agreeing a workstream in [the component register](docs/workstreams.md).
-3. Agreeing the event envelope and ownership/closure rules before parallel implementations diverge.
-4. Following the [development guide](docs/development.md) when adding code or contracts.
+Run the API and its smoke tests:
 
-The intended MVP stack is React and TypeScript for the demo UI, ASP.NET Core for the orchestration API, a relational coordination store, and a scheduled worker. The team should select the database based on familiarity before implementation; no database, cloud host, or live integration is configured by this bootstrap.
+```sh
+dotnet test CareLoop.sln
+dotnet run --project src/api/CareLoop.Api
+```
+
+In another terminal, run the web starter:
+
+```sh
+cd src/web
+npm ci
+npm run dev
+```
+
+Or build and start both starter services with `docker compose up --build`; open the web starter at `http://localhost:4173` and the API health check at `http://localhost:8080/health`.
+
+The selected stack is React/TypeScript and ASP.NET Core. The coordination database, cloud host, identity model, and production deployment target remain team decisions; no live integration or clinical workflow is implemented by this scaffold.
 
 ## Demo acceptance gate
 
-The prototype should demonstrate one synthetic case traversing all ten stages from `RESULT_RECEIVED` to `CLOSED`, and a separate stalled or rejected handoff that remains open, owned, and escalated. Replaying a source event must not create a duplicate case, and closure must fail without authorized evidence.
+When the prototype is implemented, it should demonstrate one synthetic case traversing all ten stages from `RESULT_RECEIVED` to `CLOSED`, and a separate stalled or rejected handoff that remains open, owned, and escalated. Replaying a source event must not create a duplicate case, and closure must fail without authorized evidence.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

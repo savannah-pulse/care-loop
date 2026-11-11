@@ -1,5 +1,15 @@
 # Development guide
 
+## Prerequisites and first run
+
+- .NET 10 SDK (the repository pins the .NET 10 SDK feature band in `global.json`).
+- Node.js 24 and npm for the web app.
+- Docker Compose v2 for the local container setup.
+
+Run `dotnet test CareLoop.sln` for the API smoke test. Run `dotnet run --project src/api/CareLoop.Api` to start the API at the URL printed by ASP.NET Core; `/health` is the scaffold's only endpoint. In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
+
+`docker compose up --build` runs the API on port 8080 and the static web starter on port 4173. The web starter does not yet call the API. No database or production deployment environment is configured.
+
 ## Working agreements
 
 - Work in the component folders shown in the root README and keep cross-component interfaces in `contracts/`.

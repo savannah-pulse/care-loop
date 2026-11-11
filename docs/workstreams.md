@@ -1,6 +1,6 @@
 # Component workstreams
 
-Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. A component owner should confirm its boundaries and dependencies with the team before implementation; names are intentionally left unassigned.
+Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API health check and web placeholder are the only runnable application behavior so far; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned.
 
 | Workstream | Scope and first deliverable | Stories / requirements | Depends on |
 |---|---|---|---|
