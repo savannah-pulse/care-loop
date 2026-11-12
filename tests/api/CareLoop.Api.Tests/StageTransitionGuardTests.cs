@@ -18,6 +18,18 @@ public sealed class StageTransitionGuardTests
     }
 
     [Fact]
+    public void Stage_drivers_match_the_architecture_diagram()
+    {
+        StageDriver[] expected =
+        [
+            StageDriver.His, StageDriver.Api, StageDriver.Api, StageDriver.PatientChannel, StageDriver.PatientChannel,
+            StageDriver.His, StageDriver.His, StageDriver.His, StageDriver.Clinician, StageDriver.Clinician,
+        ];
+
+        Assert.Equal(expected, StageCatalog.All.Select(s => s.Driver).ToArray());
+    }
+
+    [Fact]
     public void Each_stage_may_only_advance_to_the_next_stage()
     {
         for (var from = 1; from <= 10; from++)

@@ -1,7 +1,8 @@
 namespace CareLoop.Domain.Stages;
 
 /// <summary>Descriptor for one stage; <see cref="Description"/> follows docs/architecture.md.</summary>
-public sealed record StageDefinition(CaseStage Stage, string Code, string EntryEventType, string Description)
+public sealed record StageDefinition(
+    CaseStage Stage, string Code, string EntryEventType, StageDriver Driver, string Description)
 {
     public int Number => (int)Stage;
 }
@@ -11,25 +12,25 @@ public static class StageCatalog
 {
     public static IReadOnlyList<StageDefinition> All { get; } =
     [
-        new(CaseStage.ResultReceived, "RESULT_RECEIVED", Events.CaseEventTypes.ResultReceived,
+        new(CaseStage.ResultReceived, "RESULT_RECEIVED", Events.CaseEventTypes.ResultReceived, StageDriver.His,
             "Synthetic screening result arrives through the HIS adapter."),
-        new(CaseStage.CaseCreated, "CASE_CREATED", Events.CaseEventTypes.CaseCreated,
+        new(CaseStage.CaseCreated, "CASE_CREATED", Events.CaseEventTypes.CaseCreated, StageDriver.Api,
             "Result is validated and deduplicated; one coordination case is opened."),
-        new(CaseStage.OwnerAssigned, "OWNER_ASSIGNED", Events.CaseEventTypes.OwnerAssigned,
+        new(CaseStage.OwnerAssigned, "OWNER_ASSIGNED", Events.CaseEventTypes.OwnerAssigned, StageDriver.Api,
             "A coordinator is assigned or the case enters an accountable facility lead queue."),
-        new(CaseStage.PatientNotified, "PATIENT_NOTIFIED", Events.CaseEventTypes.PatientNotified,
+        new(CaseStage.PatientNotified, "PATIENT_NOTIFIED", Events.CaseEventTypes.PatientNotified, StageDriver.PatientChannel,
             "Channel simulator reports delivery; delivery is not acknowledgement."),
-        new(CaseStage.PatientAcknowledged, "PATIENT_ACKNOWLEDGED", Events.CaseEventTypes.PatientAcknowledged,
+        new(CaseStage.PatientAcknowledged, "PATIENT_ACKNOWLEDGED", Events.CaseEventTypes.PatientAcknowledged, StageDriver.PatientChannel,
             "Patient acknowledgement and any separately recorded understanding are captured."),
-        new(CaseStage.ConsultationPending, "CONSULTATION_PENDING", Events.CaseEventTypes.ConsultationRequested,
+        new(CaseStage.ConsultationPending, "CONSULTATION_PENDING", Events.CaseEventTypes.ConsultationRequested, StageDriver.His,
             "A consultation or handoff request is recorded with its proposed owner."),
-        new(CaseStage.FollowUpInProgress, "FOLLOW_UP_IN_PROGRESS", Events.CaseEventTypes.FollowUpStarted,
+        new(CaseStage.FollowUpInProgress, "FOLLOW_UP_IN_PROGRESS", Events.CaseEventTypes.FollowUpStarted, StageDriver.His,
             "Referral and appointment events are correlated; acceptance is not completed care."),
-        new(CaseStage.CareOutcomeDocumented, "CARE_OUTCOME_DOCUMENTED", Events.CaseEventTypes.OutcomeDocumented,
+        new(CaseStage.CareOutcomeDocumented, "CARE_OUTCOME_DOCUMENTED", Events.CaseEventTypes.OutcomeDocumented, StageDriver.His,
             "An authorized source supplies an outcome event and clinical record reference."),
-        new(CaseStage.ClosureReview, "CLOSURE_REVIEW", Events.CaseEventTypes.ClosureReviewRequested,
+        new(CaseStage.ClosureReview, "CLOSURE_REVIEW", Events.CaseEventTypes.ClosureReviewRequested, StageDriver.Clinician,
             "Evidence or an authorized exception is awaiting a human closure decision."),
-        new(CaseStage.Closed, "CLOSED", Events.CaseEventTypes.ClosureAuthorised,
+        new(CaseStage.Closed, "CLOSED", Events.CaseEventTypes.ClosureAuthorised, StageDriver.Clinician,
             "An authorized closure event with typed reason and evidence is accepted and audited."),
     ];
 

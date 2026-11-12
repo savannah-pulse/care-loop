@@ -16,4 +16,7 @@ public static class CaseEventTypes
     public const string OutcomeDocumented = "OutcomeDocumented";
     public const string ClosureReviewRequested = "ClosureReviewRequested";
     public const string ClosureAuthorised = "ClosureAuthorised";
+
+    /// <summary>Supporting event raised by the deadline worker; it never changes the stage.</summary>
+    public const string EscalationRaised = "EscalationRaised";
 }
