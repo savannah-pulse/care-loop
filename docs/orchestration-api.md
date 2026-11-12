@@ -68,6 +68,8 @@ Keep one engineer per stage folder to avoid merge conflicts. Shared files (`Stag
 
 OpenAPI is served at `/openapi/v1.json` in Development. Sample calls are in `src/api/CareLoop.Api/CareLoop.Api.http`.
 
+For a guided walkthrough (for example at stand-up), run `pwsh ./scripts/demo-orchestration-api.ps1` (PowerShell 7+, .NET 10 SDK). It builds the API, starts two throwaway instances, and steps through the flow with talking points, pausing for Enter between steps. Add `-NoPause` to run it straight through as a smoke test.
+
 ## Known gaps and open decisions
 
 - **Database:** the architecture diagram names PostgreSQL or Azure SQL for the event log and coordination store; that choice is still open. SQLite is a local placeholder. When the team chooses, change the `UseSqlite` call and `UnitOfWork` error codes, add migrations, and drop the SQLite `DateTimeOffset` convention in `CareLoopDbContext`. The schema is created with `EnsureCreated` only when `CareLoop:Database:EnsureCreated` is true.
