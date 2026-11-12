@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>CareLoop UI designs</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}
-:root{--ink:#1B2430;--ink2:#4A5565;--ink3:#5F6B79;--line:#DCE1E7;--line2:#EEF1F4;--bg:#F6F7F9;--soft:#F1F3F6;--white:#FFFFFF;
+:root{--ink:#1B2430;--ink2:#4A5565;--ink3:#5F6B79;--line:#DCE1E7;--line2:#EEF1F4;--field:#7A8594;--bg:#F6F7F9;--soft:#F1F3F6;--white:#FFFFFF;
 --accent:#1D5FA8;--accent-ink:#164C86;--accent-soft:#EAF2FB;--accent-line:#BCD3EE;
 --red:#B42318;--red-soft:#FDEEEC;--red-line:#F4C7C1;--amber:#9A4A06;--amber-soft:#FEF4E5;--amber-line:#F2D2A6;
 --green:#17663A;--green-soft:#EAF6EF;--green-line:#BFE3CC;--grey:#6B7684;--his:#27313D;--board:#E7EBF0;
@@ -10,81 +10,81 @@ body{font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);font-size:15px
 svg.i{width:18px;height:18px;flex:none}
 .board{background:var(--board);padding:36px 44px 48px}
 .cap{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;max-width:1440px}
-.cap .n{flex:none;min-width:40px;height:40px;padding:0 12px;border-radius:999px;background:var(--ink);color:var(--white);display:grid;place-items:center;font-weight:700;font-size:17px}
-.cap h2{font-size:25px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
-.cap p{color:var(--ink2);font-size:15.5px;margin-top:4px}
-.cap .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.cap .meta span{font-size:13px;color:var(--ink2);background:var(--white);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.cap .n{flex:none;min-width:40px;height:40px;padding:0 12px;border-radius:999px;background:var(--ink);color:var(--white);display:grid;place-items:center;font-weight:700;font-size:18px}
+.cap h2{font-size:24px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.cap p{color:var(--ink2);font-size:16px;margin-top:4px}
+.cap .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cap .meta span{font-size:13px;color:var(--ink2);background:var(--white);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
 /* window and app bar */
 .frame{width:1440px;background:var(--bg);border:1px solid #D3D9E1;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
-.win{height:30px;background:#EEF1F4;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 14px}
+.win{height:30px;background:#EEF1F4;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 16px}
 .win i{width:11px;height:11px;border-radius:50%;background:#D3D8DF;display:block}
 .appbar{height:62px;background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:32px;padding:0 28px}
-.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.01em}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:18px;letter-spacing:-.01em}
 .brand svg{width:26px;height:26px}
 .nav{display:flex;align-self:stretch;gap:4px}
-.nav span{display:flex;align-items:center;padding:0 14px;font-weight:600;color:var(--ink2);border-bottom:3px solid transparent}
+.nav span{display:flex;align-items:center;padding:0 16px;font-weight:600;color:var(--ink2);border-bottom:3px solid transparent}
 .nav .on{color:var(--accent);border-bottom-color:var(--accent)}
 .grow{flex:1}
-.pill{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
-.me{display:flex;align-items:center;gap:10px}
+.pill{font-size:13px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:4px 8px;white-space:nowrap}
+.me{display:flex;align-items:center;gap:8px}
 .av{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
-.me b{display:block;font-size:14px;line-height:1.2}.me small{display:block;font-size:12.5px;color:var(--ink3)}
+.me b{display:block;font-size:14px;line-height:1.2}.me small{display:block;font-size:13px;color:var(--ink3)}
 .appbar.his{background:var(--his);border-bottom-color:var(--his);color:var(--white)}
-.sys{display:flex;flex-direction:column;line-height:1.25}.sys b{font-size:16px}.sys small{color:#B8C2CE;font-size:12.5px}
+.sys{display:flex;flex-direction:column;line-height:1.25}.sys b{font-size:16px}.sys small{color:#B8C2CE;font-size:13px}
 .his .pill{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);color:#E6EBF1}
 .his .me small{color:#B8C2CE}.his .av{background:#3A4757;color:var(--white)}
 /* page */
-.page{padding:26px 32px 32px;display:flex;flex-direction:column;gap:18px}
+.page{padding:24px 32px 32px;display:flex;flex-direction:column;gap:16px}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
-h1{font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-.015em}
-.sub{color:var(--ink2);margin-top:6px}
-.muted{color:var(--ink3)}.small{font-size:13px}.note{color:var(--ink3);font-size:13.5px}
-.crumb{display:flex;align-items:center;gap:6px;color:var(--accent);font-weight:600;font-size:14px}
+h1{font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-.015em}
+.sub{color:var(--ink2);margin-top:8px}
+.muted{color:var(--ink3)}.small{font-size:13px}.note{color:var(--ink3);font-size:14px}
+.crumb{display:flex;align-items:center;gap:8px;color:var(--accent);font-weight:600;font-size:14px}
 .crumb .sep{color:var(--ink3);font-weight:400}
 .filters{display:flex;gap:8px}
-.field{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--white);font-size:14px;color:var(--ink2);white-space:nowrap}
+.field{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 12px;border:1px solid var(--field);border-radius:8px;background:var(--white);font-size:14px;color:var(--ink2);white-space:nowrap}
 .field svg{width:16px;height:16px;color:var(--ink3)}
 .field.search{width:240px}
 .chips{display:flex;gap:8px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--white);font-weight:600;font-size:14px;color:var(--ink2)}
+.chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--white);font-weight:600;font-size:14px;color:var(--ink2)}
 .chip b{color:var(--ink);font-weight:700}
 .chip.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}.chip.on b{color:var(--accent-ink)}
 .chip .d{width:8px;height:8px;border-radius:50%;background:currentColor;display:block}
 /* tables */
 .tablecard{background:var(--white);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-th{font-size:12.5px;font-weight:600;color:var(--ink3);text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);background:#FAFBFC}
-td{padding:13px 16px;border-bottom:1px solid var(--line2);vertical-align:top;font-size:14.5px}
+th{font-size:13px;font-weight:600;color:var(--ink3);text-align:start;padding:12px 16px;border-bottom:1px solid var(--line);background:#FAFBFC}
+td{padding:12px 16px;border-bottom:1px solid var(--line2);vertical-align:top;font-size:15px}
 tr:last-child td{border-bottom:0}
 td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .name{font-weight:600}
 .more{padding:12px 16px;color:var(--accent);font-weight:600;font-size:14px;background:#FAFBFC;border-top:1px solid var(--line2)}
 /* status */
-.st{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14px;white-space:nowrap}
+.st{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;white-space:nowrap}
 .st::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
 .red{color:var(--red)}.amber{color:var(--amber)}.green{color:var(--green)}.blue{color:var(--accent)}.grey{color:var(--grey)}
-.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap}
 .badge.red{background:var(--red-soft);border-color:var(--red-line)}.badge.amber{background:var(--amber-soft);border-color:var(--amber-line)}
 .badge.green{background:var(--green-soft);border-color:var(--green-line)}.badge.blue{background:var(--accent-soft);border-color:var(--accent-line)}
 .badge.grey{background:var(--soft);border-color:var(--line);color:var(--ink2)}
-.ai{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.ai{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:2px 8px;white-space:nowrap}
 .ai svg{width:13px;height:13px}
 /* cards and layout */
-.card{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
-.card h3{font-size:15.5px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.card h3 .r{margin-left:auto;font-weight:400}
-.lbl{font-size:12.5px;font-weight:600;color:var(--ink3)}
-.grid2{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
-.stack{display:flex;flex-direction:column;gap:18px}
-.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.kv small{display:block;font-size:12.5px;color:var(--ink3);margin-bottom:3px}
+.card{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:20px 24px}
+.card h3{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card h3 .r{margin-inline-start:auto;font-weight:400}
+.lbl{font-size:13px;font-weight:600;color:var(--ink3)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:16px}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.kv small{display:block;font-size:13px;color:var(--ink3);margin-bottom:4px}
 .kv b{display:block;font-weight:600}
-.kv span{display:block;color:var(--ink2);font-size:13.5px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:8px;font-weight:600;font-size:14.5px;border:1px solid var(--line);background:var(--white);color:var(--ink);white-space:nowrap}
+.kv span{display:block;color:var(--ink2);font-size:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 16px;border-radius:8px;font-weight:600;font-size:15px;border:1px solid var(--line);background:var(--white);color:var(--ink);white-space:nowrap}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--white)}
 .btn svg{width:16px;height:16px}
-.btns{display:flex;gap:10px}
+.btns{display:flex;gap:8px}
 /* patient banner */
 .pbanner{display:flex;align-items:center;gap:16px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
 .pbanner .av{width:48px;height:48px;font-size:16px}
@@ -92,15 +92,15 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .pbanner .nm{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
 .pbanner .id{color:var(--ink2);font-size:14px;margin-top:2px}
 .pbanner .id span+span::before{content:"·";margin:0 8px;color:var(--ink3)}
-.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.tag{font-size:12.5px;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px}
-.pbanner.compact{padding:12px 18px}.pbanner.compact .av{width:40px;height:40px;font-size:14px}.pbanner.compact .nm{font-size:17px}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:13px;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px}
+.pbanner.compact{padding:12px 16px}.pbanner.compact .av{width:40px;height:40px;font-size:14px}.pbanner.compact .nm{font-size:18px}
 /* stepper */
-.casebar{display:flex;gap:28px;font-size:14px;color:var(--ink2);margin-bottom:18px;flex-wrap:wrap}
+.casebar{display:flex;gap:28px;font-size:14px;color:var(--ink2);margin-bottom:16px;flex-wrap:wrap}
 .casebar b{color:var(--ink);font-weight:600}
 .stepper{display:grid;grid-template-columns:repeat(10,minmax(0,1fr))}
-.stepper .s{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;font-size:12.5px;color:var(--ink3);text-align:center;line-height:1.25}
-.stepper .s::before{content:"";position:absolute;top:10px;right:50%;width:100%;height:2px;background:var(--line)}
+.stepper .s{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;font-size:13px;color:var(--ink3);text-align:center;line-height:1.25}
+.stepper .s::before{content:"";position:absolute;top:10px;inset-inline-end:50%;width:100%;height:2px;background:var(--line)}
 .stepper .s:first-child::before{display:none}
 .stepper .done::before,.stepper .now::before{background:var(--accent)}
 .stepper .dot{position:relative;width:22px;height:22px;border-radius:50%;border:2px solid #C9D1DA;background:var(--white);display:grid;place-items:center;color:var(--white)}
@@ -110,198 +110,198 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .stepper .now .dot::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .stepper .now{color:var(--ink);font-weight:700}.stepper .done{color:var(--ink2)}
 /* next action, ladder, checks, timeline, tracks */
-.next h2{font-size:21px;line-height:1.3;letter-spacing:-.01em;margin:6px 0 4px}
-.next .why{color:var(--ink2);margin-bottom:18px}
-.next .top{display:flex;align-items:center;gap:10px}
-.ladder{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.ladder>div{padding:12px 14px;border-left:1px solid var(--line);font-size:13.5px;color:var(--ink2)}
-.ladder>div:first-child{border-left:0}
-.ladder .k{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin-bottom:3px}
-.ladder .num{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--soft);color:var(--ink2);flex:none}
+.next h2{font-size:20px;line-height:1.3;letter-spacing:-.01em;margin:8px 0 4px}
+.next .why{color:var(--ink2);margin-bottom:16px}
+.next .top{display:flex;align-items:center;gap:8px}
+.ladder{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:16px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ladder>div{padding:12px 16px;border-inline-start:1px solid var(--line);font-size:14px;color:var(--ink2)}
+.ladder>div:first-child{border-inline-start:0}
+.ladder .k{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.ladder .num{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;background:var(--soft);color:var(--ink2);flex:none}
 .ladder .done .num,.ladder .now .num{background:var(--accent);color:var(--white)}
 .ladder .now{background:var(--accent-soft)}
 .check{list-style:none}
-.check li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;padding:11px 0;border-top:1px solid var(--line2);align-items:start}
+.check li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;padding:12px 0;border-top:1px solid var(--line2);align-items:start}
 .check li:first-child{border-top:0;padding-top:0}
 .mk{width:22px;height:22px;border-radius:50%;display:grid;place-items:center}
 .mk svg{width:13px;height:13px}
 .mk.ok{background:var(--green-soft);color:var(--green)}.mk.no{background:var(--red-soft);color:var(--red)}.mk.todo{border:2px solid #C9D1DA}
 .check b{font-weight:600;display:block}
-.check span{color:var(--ink2);font-size:13.5px}
+.check span{color:var(--ink2);font-size:14px}
 .check .r{font-size:13px;color:var(--ink3);white-space:nowrap}
 .tl{list-style:none}
-.tl li{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:14px;padding:10px 0;border-top:1px solid var(--line2);font-size:14px}
+.tl li{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:16px;padding:8px 0;border-top:1px solid var(--line2);font-size:14px}
 .tl li:first-child{border-top:0;padding-top:0}
 .tl time{color:var(--ink3);font-size:13px}
 .tl b{font-weight:600}.tl .by{display:block;color:var(--ink2);font-size:13px}
-.src{font-size:12px;font-weight:600;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px;height:fit-content;white-space:nowrap}
+.src{font-size:13px;font-weight:600;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px;height:fit-content;white-space:nowrap}
 .tracks{list-style:none}
-.tracks li{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 0;border-top:1px solid var(--line2)}
+.tracks li{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 0;border-top:1px solid var(--line2)}
 .tracks li:first-child{border-top:0;padding-top:0}
-.tracks b{display:block;font-weight:600;font-size:14px}.tracks span{color:var(--ink2);font-size:13.5px}
+.tracks b{display:block;font-weight:600;font-size:14px}.tracks span{color:var(--ink2);font-size:14px}
 .reach{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px}
-.reach li{display:flex;gap:10px;align-items:flex-start}.reach svg{color:var(--ink3);margin-top:1px}
+.reach li{display:flex;gap:8px;align-items:flex-start}.reach svg{color:var(--ink3);margin-top:1px}
 .linkrow{color:var(--accent);font-weight:600;font-size:14px;margin-top:12px}
 /* options, summaries, action bar */
 .opts{display:flex;flex-direction:column;gap:12px}
-.opt{display:grid;grid-template-columns:22px minmax(0,1fr);gap:14px;border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--white)}
+.opt{display:grid;grid-template-columns:22px minmax(0,1fr);gap:16px;border:1px solid var(--line);border-radius:12px;padding:16px 16px;background:var(--white)}
 .opt.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.radio{width:20px;height:20px;border-radius:50%;border:2px solid #AEB7C2;margin-top:2px;display:grid;place-items:center;background:var(--white)}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--field);margin-top:2px;display:grid;place-items:center;background:var(--white)}
 .sel .radio,.radio.on{border-color:var(--accent)}
 .sel .radio::after,.radio.on::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
 .opt.dim{background:#FAFBFC;color:var(--ink3)}
-.opt h4{font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:10px}
-.opt p{font-size:14px;color:var(--ink2);margin-top:3px}
-.ticks{list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13.5px;color:var(--ink2)}
-.ticks li{display:flex;align-items:center;gap:6px}.ticks svg{width:14px;height:14px;color:var(--green)}
+.opt h4{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+.opt p{font-size:14px;color:var(--ink2);margin-top:4px}
+.ticks{list-style:none;display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:8px;font-size:14px;color:var(--ink2)}
+.ticks li{display:flex;align-items:center;gap:8px}.ticks svg{width:14px;height:14px;color:var(--green)}
 .ticks .x svg{color:var(--ink3)}
-.sbar{display:flex;flex-direction:column;gap:12px;font-size:14.5px}
-.sbar small{display:block;font-size:12.5px;font-weight:700;color:var(--ink3)}
-.approved{display:flex;align-items:center;gap:8px;color:var(--green);font-weight:600;font-size:14px;background:var(--green-soft);border-radius:8px;padding:10px 12px}
+.sbar{display:flex;flex-direction:column;gap:12px;font-size:15px}
+.sbar small{display:block;font-size:13px;font-weight:700;color:var(--ink3)}
+.approved{display:flex;align-items:center;gap:8px;color:var(--green);font-weight:600;font-size:14px;background:var(--green-soft);border-radius:8px;padding:8px 12px}
 .approved svg{width:16px;height:16px}
 .actionbar{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--white);border-top:1px solid var(--line);padding:16px 32px}
 .events{font-size:13px;color:var(--ink3)}
-.events code{font-family:Consolas,monospace;font-size:12.5px;color:var(--ink2);background:var(--soft);padding:1px 6px;border-radius:4px;margin-left:4px}
-.selectbox{display:flex;align-items:center;justify-content:space-between;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:14px;color:var(--ink3);background:var(--white);margin-top:10px;max-width:320px}
-.formrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
-.formrow small{display:block;font-size:12.5px;color:var(--ink3);margin-bottom:3px}
+.events code{font-family:Consolas,monospace;font-size:13px;color:var(--ink2);background:var(--soft);padding:1px 8px;border-radius:4px;margin-inline-start:4px}
+.selectbox{display:flex;align-items:center;justify-content:space-between;height:40px;border:1px solid var(--field);border-radius:8px;padding:0 12px;font-size:14px;color:var(--ink3);background:var(--white);margin-top:8px;max-width:320px}
+.formrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:12px}
+.formrow small{display:block;font-size:13px;color:var(--ink3);margin-bottom:4px}
 .formrow b{display:block;font-weight:600;font-size:14px}
 .inbox{list-style:none;display:flex;flex-direction:column}
-.inbox li{padding:14px 16px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:3px;font-size:13.5px;color:var(--ink2)}
+.inbox li{padding:16px 16px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--ink2)}
 .inbox li:first-child{border-top:0}
 .inbox li b{font-size:15px;color:var(--ink)}
-.inbox li.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.inbox li.sel{background:var(--accent-soft);border-inline-start:4px solid var(--accent);padding-inline-start:12px}
 .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 12px}
-.tabs span{padding:12px 10px;font-weight:600;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs span{padding:12px 8px;font-weight:600;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1px}
 .tabs .on{color:var(--accent);border-bottom-color:var(--accent)}
-.docs{display:flex;gap:10px;margin-top:14px}
-.doc{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13.5px;font-weight:600;color:var(--accent-ink)}
+.docs{display:flex;gap:8px;margin-top:16px}
+.doc{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px;font-weight:600;color:var(--accent-ink)}
 .doc svg{color:var(--ink3);width:16px;height:16px}
-.box{display:flex;align-items:center;gap:10px;font-size:14px}
+.box{display:flex;align-items:center;gap:8px;font-size:14px}
 .cbox{width:20px;height:20px;border-radius:5px;background:var(--accent);color:var(--white);display:grid;place-items:center;flex:none}
 .cbox svg{width:13px;height:13px}
 
 /* impact */
-.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
-.kpi .big{font-size:42px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:8px 0 2px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.kpi .big{font-size:40px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:8px 0 2px}
 .kpi .of{color:var(--ink2);font-size:14px}
-.kpi .vs{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:13.5px;color:var(--ink2)}
+.kpi .vs{margin-top:16px;padding-top:12px;border-top:1px solid var(--line2);font-size:14px;color:var(--ink2)}
 .kpi .vs b{color:var(--ink);font-weight:600}
-.bars{list-style:none;display:flex;flex-direction:column;gap:10px}
-.bars li{display:grid;grid-template-columns:150px minmax(0,1fr) 40px;gap:12px;align-items:center;font-size:13.5px}
+.bars{list-style:none;display:flex;flex-direction:column;gap:8px}
+.bars li{display:grid;grid-template-columns:150px minmax(0,1fr) 40px;gap:12px;align-items:center;font-size:14px}
 .bar{height:14px;border-radius:4px;background:var(--soft);overflow:hidden}
 .bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
 .bar.amberbar i{background:#B7752A}
-.bars .v{text-align:right;font-weight:600}
-.grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+.bars .v{text-align:end;font-weight:600}
+.grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
 .mini{width:100%;border-collapse:collapse}
-.mini th{background:none;padding:0 0 8px;border-bottom:1px solid var(--line);font-size:12.5px}
-.mini td{padding:9px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.mini th{background:none;padding:0 0 8px;border-bottom:1px solid var(--line);font-size:13px}
+.mini td{padding:8px 0;border-bottom:1px solid var(--line2);font-size:14px}
 .mini tr:last-child td{border-bottom:0}
-.mini .num{text-align:right;font-weight:600}
-.mini th.num{text-align:right}
-.aitext{font-size:14.5px;line-height:1.55}
+.mini .num{text-align:end;font-weight:600}
+.mini th.num{text-align:end}
+.aitext{font-size:15px;line-height:1.55}
 .aitext p+p{margin-top:8px}
 /* phones */
 .phones{display:flex;gap:44px;align-items:flex-start}
-.pcol{display:flex;flex-direction:column;align-items:center;gap:14px}
+.pcol{display:flex;flex-direction:column;align-items:center;gap:16px}
 .pcol .pcap{font-size:14px;color:var(--ink2);text-align:center;max-width:360px}
 .pcol .pcap b{display:block;color:var(--ink);font-size:15px}
 .phone{width:390px;height:844px;border-radius:54px;background:#10151B;padding:12px;box-shadow:var(--shadow);flex:none;position:relative}
 .scr{width:100%;height:100%;border-radius:43px;background:var(--bg);overflow:hidden;position:relative;display:flex;flex-direction:column}
 .notch{position:absolute;top:22px;left:50%;transform:translateX(-50%);width:112px;height:32px;border-radius:20px;background:#10151B;z-index:2}
-.sb{height:54px;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0;font-weight:600;font-size:15px;flex:none}
+.sb{height:54px;display:flex;align-items:center;justify-content:space-between;padding:8px 32px 0;font-weight:600;font-size:16px;flex:none}
 .sb .bat{width:26px;height:12px;border:2px solid var(--ink);border-radius:4px;position:relative}
 .sb .bat::after{content:"";position:absolute;inset:1px 5px 1px 1px;background:var(--ink);border-radius:1px}
-.papp{padding:6px 18px 18px;display:flex;flex-direction:column;gap:14px;font-size:16px;flex:1}
-.apptop{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--ink3)}
-.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;font-size:13px;background:var(--white)}
-.lang span{padding:3px 11px}.lang .on{background:var(--ink);color:var(--white)}
-.hello{font-size:27px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
-.pcard{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:18px}
+.papp{padding:8px 16px 16px;display:flex;flex-direction:column;gap:16px;font-size:16px;flex:1}
+.apptop{display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--ink3)}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;font-size:14px;background:var(--white)}
+.lang span{padding:4px 12px}.lang .on{background:var(--ink);color:var(--white)}
+.hello{font-size:28px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.pcard{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:16px}
 .pcard.key{border:2px solid var(--accent)}
-.pcard .lbl{font-size:13.5px}
-.pcard h4{font-size:21px;line-height:1.25;margin:4px 0 8px;letter-spacing:-.01em}
+.pcard .lbl{font-size:14px}
+.pcard h4{font-size:22px;line-height:1.25;margin:4px 0 8px;letter-spacing:-.01em}
 .pcard p{font-size:16px;color:var(--ink2);line-height:1.45}
 .pcard p+p{margin-top:4px}
 .pcard .when{color:var(--ink);font-weight:600}
-.pbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:14px;font-weight:600;font-size:17px;border:1px solid var(--line);background:var(--white);color:var(--ink);margin-top:10px}
+.pbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:14px;font-weight:600;font-size:18px;border:1px solid var(--line);background:var(--white);color:var(--ink);margin-top:8px}
 .pbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--white)}
 .pbtn svg{width:18px;height:18px}
 .prow{display:flex;gap:12px;align-items:center}
-.prow .av{width:44px;height:44px;font-size:15px}
-.prow b{display:block;font-size:17px}.prow small{display:block;color:var(--ink3);font-size:14px}
-.psteps{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:15.5px;margin-top:8px}
+.prow .av{width:44px;height:44px;font-size:16px}
+.prow b{display:block;font-size:18px}.prow small{display:block;color:var(--ink3);font-size:14px}
+.psteps{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:16px;margin-top:8px}
 .psteps li{display:flex;gap:12px;align-items:center;color:var(--ink2)}
 .psteps .mk{width:24px;height:24px}
 .psteps .now{color:var(--ink);font-weight:700}
 .psteps .nowdot{width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);display:grid;place-items:center;flex:none}
 .psteps .nowdot::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
-.pback{display:flex;align-items:center;gap:6px;color:var(--accent);font-weight:600;font-size:16px}
+.pback{display:flex;align-items:center;gap:8px;color:var(--accent);font-weight:600;font-size:16px}
 .ptitle{font-size:24px;font-weight:700;letter-spacing:-.01em}
-.pfine{font-size:13.5px;color:var(--ink3);line-height:1.4}
-.choice{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:13px 14px;font-size:16px;margin-top:10px;line-height:1.35}
+.pfine{font-size:14px;color:var(--ink3);line-height:1.4}
+.choice{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:12px 16px;font-size:16px;margin-top:8px;line-height:1.35}
 .choice.sel{border-color:var(--accent);background:var(--accent-soft)}
 .choice .radio{flex:none;margin-top:1px}
-.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
-.scale span{height:46px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:17px}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+.scale span{height:48px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:18px}
 .scale .on{background:var(--accent);border-color:var(--accent);color:var(--white)}
-.scalelbl{display:flex;justify-content:space-between;font-size:13px;color:var(--ink3);margin-top:6px}
-.done-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:10px 6px 4px}
+.scalelbl{display:flex;justify-content:space-between;font-size:14px;color:var(--ink3);margin-top:8px}
+.done-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:8px 8px 4px}
 .done-hero .big{width:56px;height:56px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center}
 .done-hero .big svg{width:28px;height:28px}
 .done-hero h4{font-size:22px}
 .done-hero p{color:var(--ink2);font-size:16px}
-.helping{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+.helping{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:16px;padding:16px 16px;display:flex;gap:12px;align-items:flex-start}
 .helping svg{color:var(--accent);margin-top:2px}
-.helping b{display:block;font-size:16px}.helping span{font-size:14.5px;color:var(--ink2)}
+.helping b{display:block;font-size:16px}.helping span{font-size:16px;color:var(--ink2)}
 .pcard.locked{background:var(--soft)}
 .pcard.locked .prow svg{color:var(--ink3)}
 /* basic phone */
-.fphone{width:280px;background:#262B31;border-radius:42px 42px 58px 58px;padding:30px 24px 34px;box-shadow:var(--shadow);flex:none}
-.fspk{width:64px;height:6px;border-radius:3px;background:#3B4148;margin:0 auto 18px}
-.fscr{background:#DCE4D2;border-radius:8px;height:318px;padding:12px 13px;font-family:Consolas,"Courier New",monospace;font-size:15px;line-height:1.4;color:#141A12;border:5px solid #151A1F}
-.fhead{display:flex;justify-content:space-between;border-bottom:1px solid #8A9481;padding-bottom:6px;margin-bottom:8px;font-weight:700}
-.fsoft{display:flex;justify-content:space-between;margin-top:16px;padding:0 6px;color:#C9CFD6;font-size:13px;font-weight:600}
-.fkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.fphone{width:280px;background:#262B31;border-radius:42px 42px 58px 58px;padding:32px 24px 32px;box-shadow:var(--shadow);flex:none}
+.fspk{width:64px;height:6px;border-radius:3px;background:#3B4148;margin:0 auto 16px}
+.fscr{background:#DCE4D2;border-radius:8px;height:318px;padding:12px 12px;font-family:Consolas,"Courier New",monospace;font-size:16px;line-height:1.4;color:#141A12;border:5px solid #151A1F}
+.fhead{display:flex;justify-content:space-between;border-bottom:1px solid #8A9481;padding-bottom:8px;margin-bottom:8px;font-weight:700}
+.fsoft{display:flex;justify-content:space-between;margin-top:16px;padding:0 8px;color:#C9CFD6;font-size:14px;font-weight:600}
+.fkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
 .fkeys span{height:36px;border-radius:14px;background:#3A4047;color:#E9EDF1;display:grid;place-items:center;font-weight:600;font-size:16px}
 .cols3{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start;width:1440px}
 .recs{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:16px;width:280px}
 .recs li{display:flex;align-items:center;gap:8px;font-size:14px;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
 .recs .mk{width:20px;height:20px}
-.script{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:6px}
-.script li{background:var(--soft);border-radius:10px;padding:11px 14px;font-size:15px;line-height:1.45}
-.script li small{display:block;font-size:12.5px;font-weight:700;color:var(--ink3);margin-bottom:2px}
+.script{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.script li{background:var(--soft);border-radius:10px;padding:12px 16px;font-size:15px;line-height:1.45}
+.script li small{display:block;font-size:13px;font-weight:700;color:var(--ink3);margin-bottom:2px}
 .keys{display:flex;gap:8px;margin-top:12px}
-.keys span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13.5px;font-weight:600;background:var(--white)}
-.result{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--green-soft);border-radius:10px;padding:11px 14px;font-size:14.5px}
+.keys span{border:1px solid var(--line);border-radius:8px;padding:8px 8px;font-size:14px;font-weight:600;background:var(--white)}
+.result{display:flex;gap:8px;align-items:flex-start;margin-top:16px;background:var(--green-soft);border-radius:10px;padding:12px 16px;font-size:15px}
 .result .mk{background:var(--white);flex:none}
-.rules{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-top:28px;width:1440px}
-.rule{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.rules{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:28px;width:1440px}
+.rule{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:16px 16px;font-size:14px;display:flex;gap:8px;align-items:flex-start}
 .rule svg{color:var(--accent);margin-top:1px}
 /* email */
 .mail{background:var(--white);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;width:600px}
-.mail .mh{padding:16px 22px;border-bottom:1px solid var(--line);font-size:14px;display:flex;flex-direction:column;gap:5px;background:#FAFBFC}
-.mail .mh div{display:flex;gap:10px}.mail .mh b{font-weight:600;color:var(--ink3);width:62px;flex:none}
-.mail .subj{font-size:18px;font-weight:700;padding:18px 22px 0}
-.mail .mb{padding:14px 22px 24px;font-size:15.5px;display:flex;flex-direction:column;gap:12px;line-height:1.5}
+.mail .mh{padding:16px 24px;border-bottom:1px solid var(--line);font-size:14px;display:flex;flex-direction:column;gap:4px;background:#FAFBFC}
+.mail .mh div{display:flex;gap:8px}.mail .mh b{font-weight:600;color:var(--ink3);width:62px;flex:none}
+.mail .subj{font-size:18px;font-weight:700;padding:16px 24px 0}
+.mail .mb{padding:16px 24px 24px;font-size:16px;display:flex;flex-direction:column;gap:12px;line-height:1.5}
 /* flow */
-.flow{width:2380px;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:30px 30px 26px;box-shadow:var(--shadow)}
+.flow{width:2380px;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:32px 32px 24px;box-shadow:var(--shadow)}
 .fgrid{display:grid;grid-template-columns:150px repeat(10,minmax(0,1fr));column-gap:24px;row-gap:12px}
-.lane{font-size:13.5px;font-weight:700;color:var(--ink2);padding-top:12px;line-height:1.3}
-.lane small{display:block;font-weight:400;color:var(--ink3);font-size:12.5px}
-.stage{position:relative;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:12px 14px;min-height:78px}
+.lane{font-size:14px;font-weight:700;color:var(--ink2);padding-top:12px;line-height:1.3}
+.lane small{display:block;font-weight:400;color:var(--ink3);font-size:13px}
+.stage{position:relative;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:12px 16px;min-height:78px}
 .stage .no{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--white);font-weight:700;font-size:13px;margin-bottom:8px}
 .stage b{display:block;font-size:16px;line-height:1.25}
-.stage code{display:block;font-family:Consolas,monospace;font-size:11px;color:var(--accent-ink);margin-top:5px;word-break:break-all}
-.stage::after{content:"";position:absolute;right:-18px;top:50%;width:11px;height:11px;border-top:2px solid var(--accent);border-right:2px solid var(--accent);transform:translateY(-50%) rotate(45deg)}
+.stage code{display:block;font-family:Consolas,monospace;font-size:13px;color:var(--accent-ink);margin-top:4px;word-break:break-all}
+.stage::after{content:"";position:absolute;inset-inline-end:-18px;top:50%;width:11px;height:11px;border-top:2px solid var(--accent);border-inline-end:2px solid var(--accent);transform:translateY(-50%) rotate(45deg)}
 .stage.last::after{display:none}
-.cell{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.38}
-.cell small{display:block;color:var(--ink3);font-size:12.5px;margin-top:3px}
+.cell{background:var(--soft);border-radius:10px;padding:8px 12px;font-size:14px;line-height:1.38}
+.cell small{display:block;color:var(--ink3);font-size:13px;margin-top:4px}
 .cell.e{background:transparent;border:1px dashed var(--line2)}
 .cell.pt{background:var(--white);border:1px solid var(--line)}
-.refs{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding-top:4px}
-.refs span{font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--white);border:1px solid var(--accent-line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.refs{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;padding-top:4px}
+.refs span{font-size:13px;font-weight:600;color:var(--accent-ink);background:var(--white);border:1px solid var(--accent-line);border-radius:999px;padding:2px 8px;white-space:nowrap}
 .band{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:24px;margin-top:20px;align-items:start}
 .band .body{border-radius:12px;padding:16px 20px;font-size:15px}
 .band.exc .body{background:var(--amber-soft);border:1px solid var(--amber-line)}
@@ -309,10 +309,10 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .esc{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
 .esc span{background:var(--white);border:1px solid var(--amber-line);border-radius:10px;padding:8px 12px;font-weight:600;font-size:14px}
 .esc svg{color:var(--amber)}
-.flowfoot{margin-top:18px;color:var(--ink3);font-size:14px}
+.flowfoot{margin-top:16px;color:var(--ink3);font-size:14px}
 /* refinements */
 .btn.off{opacity:.42}
-.plink{display:flex;align-items:center;justify-content:center;height:44px;margin-top:6px;color:var(--accent);font-weight:600;font-size:16.5px}
+.plink{display:flex;align-items:center;justify-content:center;height:44px;margin-top:8px;color:var(--accent);font-weight:600;font-size:16px}
 .bars.wide li{grid-template-columns:205px minmax(0,1fr) 40px}
 .selectbox{max-width:560px}
 .stepper .now .dot::after{width:10px;height:10px}
@@ -320,8 +320,58 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .pcard.locked .prow{align-items:flex-start}
 .pcard.locked .prow svg{margin-top:4px}
 
-.events{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.events .ev{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+.events{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.events .ev{font-size:13px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+/* layout */
+.grid-even{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.mini.cmp td.num,.mini.cmp th.num{width:128px}
+.mini.cmp td b{font-weight:700;color:var(--ink)}
+.mini.cfg td{vertical-align:top}
+.mini.cfg td:first-child{font-weight:600}
+/* consultation thread */
+.thread{display:flex;flex-direction:column;gap:12px}
+.msg{border:1px solid var(--line);border-radius:12px;padding:12px 16px;background:var(--white)}
+.msg.reply{background:var(--accent-soft);border-color:var(--accent-line)}
+.msg-head{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--ink3);margin-bottom:4px}
+.msg-head b{color:var(--ink);font-size:14px}
+.msg p{font-size:15px;line-height:1.5}
+.qtype{display:inline-flex;font-size:13px;font-weight:600;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px;width:fit-content}
+/* states */
+.states{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;width:1440px}
+.state{display:flex;flex-direction:column;gap:12px}
+.state-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.state-head b{font-size:16px}
+.state-head span{font-size:13px;color:var(--ink2);background:var(--white);border:1px solid var(--line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.state .frag{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,.06);min-height:212px;display:flex;flex-direction:column;gap:12px}
+.state .when{font-size:14px;color:var(--ink2)}
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:12px 8px}
+.empty .big{width:48px;height:48px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center}
+.empty .big svg{width:24px;height:24px}
+.empty b{font-size:16px}
+.empty span{font-size:14px;color:var(--ink2)}
+.notice{display:flex;gap:8px;align-items:flex-start;font-size:14px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 12px;color:var(--ink2)}
+.notice svg{width:16px;height:16px;flex:none;margin-top:2px;color:var(--ink3)}
+.textarea{border:1px solid var(--field);border-radius:8px;height:72px;padding:8px 12px;font-size:14px;color:var(--ink3);background:var(--white)}
+.offline{display:flex;gap:8px;align-items:center;background:var(--amber-soft);border:1px solid var(--amber-line);border-radius:12px;padding:8px 12px;font-size:16px;font-weight:600;color:var(--amber)}
+.offline svg{width:18px;height:18px}
+/* Arabic, right to left */
+[dir="rtl"]{font-family:"Segoe UI",Tahoma,sans-serif}
+.fscr.ar{font-family:"Segoe UI",Tahoma,sans-serif;font-size:17px;line-height:1.5}
+.fscr.ar .fhead{font-family:Consolas,"Courier New",monospace;font-size:15px}
+.rules-ar{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:15px}
+.rules-ar li{display:flex;gap:12px;align-items:flex-start}
+.rules-ar svg{color:var(--accent);margin-top:2px}
+.refs.meas span{color:var(--ink2);border-color:var(--line);background:var(--soft)}
+.psteps{gap:8px}
+.sb{height:48px}
+.plink{margin-top:4px}
+.empty .linkrow{color:var(--accent);font-weight:600}
+.badge.red::before,.badge.amber::before,.badge.green::before,.badge.blue::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
+.events .alt{font-size:13px;color:var(--ink3);margin-inline-start:8px}
+.ladder.vert{grid-template-columns:1fr}
+.ladder.vert>div{border-inline-start:0;border-block-start:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ladder.vert>div:first-child{border-block-start:0}
+.ladder.vert .k{margin-bottom:0}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
@@ -357,7 +407,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="stage"><span class="no">2</span><b>Case opened</b></div>
 <div class="stage"><span class="no">3</span><b>Owner assigned</b></div>
 <div class="stage"><span class="no">4</span><b>Patient notified</b></div>
-<div class="stage"><span class="no">5</span><b>Patient confirmed</b></div>
+<div class="stage"><span class="no">5</span><b>Patient acknowledged</b></div>
 <div class="stage"><span class="no">6</span><b>Consultation</b></div>
 <div class="stage"><span class="no">7</span><b>Follow-up</b></div>
 <div class="stage"><span class="no">8</span><b>Outcome recorded</b></div>
@@ -369,7 +419,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="cell">CareLoop<small>Automatic</small></div>
 <div class="cell">Nurse navigator<small>Huda Saleh, or the facility lead if no one is free</small></div>
 <div class="cell">Nurse navigator<small>Huda Saleh</small></div>
-<div class="cell">Hessa, or Saeed for her<small>Saeed: appointments only</small></div>
+<div class="cell">Hessa herself<small>Saeed cannot answer for her</small></div>
 <div class="cell">Referring clinician<small>Dr. Rekha Varghese</small></div>
 <div class="cell">Receiving clinician<small>Dr. Layla Haddad, then each treating team</small></div>
 <div class="cell">Treating clinician<small>Dr. Layla Haddad</small></div>
@@ -394,7 +444,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="cell e"></div>
 <div class="cell e"></div>
 <div class="cell e"></div>
-<div class="cell">Agrees the next step: breast assessment.</div>
+<div class="cell">Agrees the next step: breast assessment. Can ask a specialist first.</div>
 <div class="cell">Chooses a unit and sends the referral. The unit accepts or declines with a reason. Appointment booked, then attended.</div>
 <div class="cell">Diagnosis, treatment plan and first treatment recorded.</div>
 <div class="cell">Checks every required step has evidence.</div>
@@ -405,7 +455,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="cell">Opens one case per result, with the clinician's urgency.</div>
 <div class="cell">Names one owner. Never leaves a case with no one.</div>
 <div class="cell">Records sent, delivered and failed. No answer creates a task.</div>
-<div class="cell">Records "confirmed" and "understood" separately.</div>
+<div class="cell">Records "acknowledged" and "understood" separately.</div>
 <div class="cell">Starts the clock for the next step.</div>
 <div class="cell">Keeps the sender responsible until a unit accepts. AI drafts the handoff summary.</div>
 <div class="cell">Asks for evidence of each care step.</div>
@@ -413,27 +463,39 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="cell">Counts the case on the Impact page. Keeps continuing care visible.</div>
 
 <div class="lane">Screens</div>
-<div class="refs"></div>
+<div class="refs"><span>2 Case</span></div>
 <div class="refs"><span>1 Worklist</span></div>
 <div class="refs"><span>1 Worklist</span><span>2 Case</span></div>
-<div class="refs"><span>7 Basic phone</span><span>8 Patient view</span></div>
-<div class="refs"><span>7 Basic phone</span><span>8 Patient view</span><span>9 Caregiver</span></div>
+<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span><span>11 Arabic</span></div>
+<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span><span>12 Caregiver</span></div>
+<div class="refs"><span>5 Consultation</span></div>
+<div class="refs"><span>6 Refer</span><span>7 Accept</span><span>12 Caregiver</span></div>
 <div class="refs"><span>2 Case</span></div>
-<div class="refs"><span>3 Refer</span><span>4 Accept</span><span>2 Case</span><span>9 Caregiver</span></div>
-<div class="refs"><span>2 Case</span></div>
-<div class="refs"><span>5 Close</span></div>
-<div class="refs"><span>5 Close</span><span>6 Impact</span></div>
+<div class="refs"><span>8 Close</span></div>
+<div class="refs"><span>8 Close</span><span>3 Impact</span></div>
+
+<div class="lane">Measured<small>On screen 3</small></div>
+<div class="refs meas"></div>
+<div class="refs meas"></div>
+<div class="refs meas"></div>
+<div class="refs meas"><span>Time to notification</span></div>
+<div class="refs meas"><span>Patient understanding</span></div>
+<div class="refs meas"><span>Time to consultation</span></div>
+<div class="refs meas"><span>Referral completion</span><span>Time to confirmation</span></div>
+<div class="refs meas"><span>Time to care</span></div>
+<div class="refs meas"></div>
+<div class="refs meas"><span>Documented closure</span></div>
 </div>
 
 <div class="band exc"><div class="lane">When something goes wrong</div><div class="body">
-<b>Late, declined, not reached, not confirmed or no owner:</b> CareLoop creates a task with a named person and a deadline, then escalates until a person acts.
+<b>Late, declined, not reached, not acknowledged or needing a new owner:</b> CareLoop creates a task with a named person and a deadline, then escalates until a person acts. Each one counts towards unresolved results and reasons for delay. Screen 13 shows how these states look.
 <div class="esc"><span>1 Reminder to the owner</span><svg class="i"><use href="#i-arrow"/></svg><span>2 Facility lead, at the deadline</span><svg class="i"><use href="#i-arrow"/></svg><span>3 Programme coordinator</span><span style="border-style:dashed">Urgent cases skip step 1</span><span style="border-style:dashed">Every escalation must be acknowledged by a person</span><span style="border-style:dashed">A case never closes by itself</span></div>
 </div></div>
 
 <div class="band aib"><div class="lane">Where AI helps</div><div class="body">
 <b>AI drafts, people decide.</b> Plain-language explanations and Arabic translations for patients, checked by a clinician. Handoff summaries, approved by the referring clinician. Impact summaries, approved by the programme coordinator. AI never sets urgency, sends a message or closes a case.
 </div></div>
-<p class="flowfoot">The same ten stages work for breast, bowel, cervical and lung screening and for heart, kidney and diabetes checks. Each programme only changes its settings: steps, deadlines and required evidence.</p>
+<p class="flowfoot">The same ten stages work for breast, bowel, cervical and lung screening and for heart, kidney and diabetes checks. Each programme only changes its settings on screen 4: steps, deadlines and required evidence.</p>
 </div>
 </section>
 
@@ -444,7 +506,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span class="on">Worklist</span><span>Impact</span></nav>
+<nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
 <span class="pill">Synthetic data</span>
 <div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
@@ -460,19 +522,19 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <span class="chip"><i class="d red"></i>Overdue <b>1</b></span>
 <span class="chip"><i class="d red"></i>Referral declined <b>1</b></span>
 <span class="chip"><i class="d amber"></i>Not reached <b>1</b></span>
-<span class="chip"><i class="d amber"></i>Not confirmed <b>1</b></span>
-<span class="chip"><i class="d amber"></i>No owner <b>1</b></span>
+<span class="chip"><i class="d amber"></i>Not acknowledged <b>1</b></span>
+<span class="chip"><i class="d amber"></i>Needs a new owner <b>1</b></span>
 </div>
 <div class="tablecard"><table>
-<colgroup><col style="width:200px"><col style="width:150px"><col style="width:165px"><col><col style="width:185px"><col style="width:150px"><col style="width:200px"></colgroup>
+<colgroup><col style="width:168px"><col style="width:160px"><col style="width:180px"><col><col style="width:176px"><col style="width:152px"><col style="width:224px"></colgroup>
 <thead><tr><th>Patient</th><th>Programme</th><th>Stage</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
 <tbody>
 <tr><td><span class="name">Hessa Al Dhaheri</span><span class="l2">66 · MRN 100 245 891</span></td><td>Breast screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Send a new referral<span class="l2">Regional Hospital declined: no capacity</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td><span class="red" style="font-weight:600">18 hours late</span><span class="l2">Was due Wed, 15:00</span></td><td><span class="st red">Overdue</span><span class="l2">Escalated to Joy Bautista</span></td></tr>
 <tr><td><span class="name">Noura Al Shamsi</span><span class="l2">44 · MRN 100 318 402</span></td><td>Breast screening</td><td>Consultation<span class="l2">Stage 6 of 10</span></td><td>Agree the next step with her today<span class="l2">Result marked urgent by Dr. Rekha Varghese</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st red">Urgent</span><span class="l2">Shorter deadlines</span></td></tr>
-<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient confirmed<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">From his health app</span></td></tr>
-<tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">57 · MRN 100 402 233</span></td><td>Bowel screening</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Choose a new owner<span class="l2">Aisha Al Nuaimi is on leave</span></td><td>Joy Bautista<span class="l2">Facility lead</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st amber">No owner</span><span class="l2">In the facility lead queue</span></td></tr>
+<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient acknowledged<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">From his health app</span></td></tr>
+<tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">57 · MRN 100 402 233</span></td><td>Bowel screening</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Choose a new owner<span class="l2">Aisha Al Nuaimi is on leave</span></td><td>Joy Bautista<span class="l2">Facility lead</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st amber">Needs a new owner</span><span class="l2">Joy covers until someone accepts</span></td></tr>
 <tr><td><span class="name">Maricel Reyes</span><span class="l2">46 · MRN 100 455 790</span></td><td>Cervical screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her between 13:00 and 14:00<span class="l2">Two calls not answered; this is her lunch break</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not reached</span><span class="l2">Tried twice</span></td></tr>
-<tr><td><span class="name">Nasreen Akhtar</span><span class="l2">52 · MRN 100 468 104</span></td><td>Breast screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her with an Urdu interpreter<span class="l2">No reply to the text for two working days</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not confirmed</span><span class="l2">Text delivered Tue 10 Nov</span></td></tr>
+<tr><td><span class="name">Nasreen Akhtar</span><span class="l2">52 · MRN 100 468 104</span></td><td>Breast screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her with an Urdu interpreter<span class="l2">No reply to the text for two working days</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not acknowledged</span><span class="l2">Text delivered Tue 10 Nov</span></td></tr>
 <tr><td><span class="name">Rashid Al Hosani</span><span class="l2">61 · MRN 100 512 337</span></td><td>Bowel screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Endoscopy Unit to accept the referral<span class="l2">Sent Wed 11 Nov, 10:00</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 12:00<span class="l2">1 day left</span></td><td><span class="st blue">Waiting for acceptance</span><span class="l2">Sender stays responsible</span></td></tr>
 <tr><td><span class="name">Mohammed Rafiq</span><span class="l2">49 · MRN 100 538 920</span></td><td>Heart, kidney and diabetes check</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Tell him his blood test result<span class="l2">By phone, in Urdu or English</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 17:00<span class="l2">1 day left</span></td><td><span class="st green">On track</span></td></tr>
 </tbody></table>
@@ -490,7 +552,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span class="on">Worklist</span><span>Impact</span></nav>
+<nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
 <span class="pill">Synthetic data</span>
 <div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
@@ -511,7 +573,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Case opened</div>
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Owner assigned</div>
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Patient notified</div>
-<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Patient confirmed</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Patient acknowledged</div>
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Consultation</div>
 <div class="s now"><span class="dot"></span>Follow-up</div>
 <div class="s"><span class="dot"></span>Outcome recorded</div>
@@ -564,7 +626,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="card">
 <h3>Where each part stands</h3>
 <ul class="tracks">
-<li><div><b>Patient contact</b><span>Notified and confirmed, Tue 10 Nov</span></div><span class="badge green">Done</span></li>
+<li><div><b>Patient contact</b><span>Notified and acknowledged, Tue 10 Nov</span></div><span class="badge green">Done</span></li>
 <li><div><b>Consultation</b><span>Refer for breast assessment</span></div><span class="badge green">Done</span></li>
 <li><div><b>Referral</b><span>Regional Hospital: no capacity</span></div><span class="badge red">Declined</span></li>
 <li><div><b>Appointment</b><span>Not booked yet</span></div><span class="badge grey">Not started</span></li>
@@ -590,8 +652,215 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 </section>
 
-<section class="board" id="b03" data-file="03-refer">
-<div class="cap"><span class="n">3</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions. AI drafts the handoff summary; she checks and approves it before the referral is sent.</p>
+<section class="board" id="b03" data-file="03-impact">
+<div class="cap"><span class="n">3</span><div><h2>Impact</h2><p>Programme leads see whether every actionable result led to timely care, using the measures the challenge names. Every number comes from case events and is compared with the same cases replayed with reminders and escalation switched off.</p>
+<div class="meta"><span>For: programme coordinators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US16</span><span>Requirements: FR-09</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar">
+<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
+<nav class="nav"><span>Worklist</span><span class="on">Impact</span><span>Programmes</span></nav>
+<div class="grow"></div>
+<span class="pill">Synthetic data</span>
+<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
+</div>
+<div class="page">
+<div class="head">
+<div><h1>Impact</h1><p class="sub">All screening programmes · 1 September to 12 November 2026 · 240 actionable results</p></div>
+<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">All facilities<svg class="i"><use href="#i-down"/></svg></span></div>
+</div>
+<div class="kpis">
+<div class="card kpi"><span class="lbl">Next care step completed by the agreed deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">With escalation off: <b>61%</b> (122 of 200)</div></div>
+<div class="card kpi"><span class="lbl">Unresolved actionable results</span><div class="big">9</div><span class="of">Past the deadline, out of 56 open cases</span><div class="vs">With escalation off: <b>38</b></div></div>
+<div class="card kpi"><span class="lbl">Understood their next step</span><div class="big">91%</div><span class="of">208 of 228 said it back correctly the first time</span><div class="vs">With escalation off: not measured</div></div>
+</div>
+<div class="grid-even">
+<div class="card">
+<h3>Time to each step<span class="r small muted">Median working days from the result</span></h3>
+<table class="mini cmp"><thead><tr><th>Step</th><th class="num">With escalation</th><th class="num">Escalation off</th></tr></thead><tbody>
+<tr><td>Patient told the result</td><td class="num"><b>0.5</b></td><td class="num">3</td></tr>
+<tr><td>Consultation answered</td><td class="num"><b>1</b></td><td class="num">4</td></tr>
+<tr><td>Confirmatory tests done</td><td class="num"><b>5</b></td><td class="num">11</td></tr>
+<tr><td>Care started: treatment or surveillance</td><td class="num"><b>19</b></td><td class="num">31</td></tr>
+</tbody></table>
+</div>
+<div class="card">
+<h3>Steps completed<span class="r small muted">Each with its denominator</span></h3>
+<table class="mini cmp"><thead><tr><th>Measure</th><th class="num">With escalation</th><th class="num">Escalation off</th></tr></thead><tbody>
+<tr><td>Referral accepted and attended<span class="l2">201 of 214 referrals</span></td><td class="num"><b>94%</b></td><td class="num">78%</td></tr>
+<tr><td>Appointments attended<span class="l2">412 of 429 appointments</span></td><td class="num"><b>96%</b></td><td class="num">84%</td></tr>
+<tr><td>Treatment started by the deadline<span class="l2">22 of 25 people who needed treatment</span></td><td class="num"><b>88%</b></td><td class="num">64%</td></tr>
+<tr><td>Closed with signed evidence<span class="l2">184 of 184 closed cases</span></td><td class="num"><b>100%</b></td><td class="num">Not tracked</td></tr>
+<tr><td>Patient confidence, out of 5<span class="l2">196 answers</span></td><td class="num"><b>4.4</b></td><td class="num">Not measured</td></tr>
+</tbody></table>
+</div>
+</div>
+<div class="grid3">
+<div class="card">
+<h3>Cases that reached each stage<span class="r small muted">Out of 240</span></h3>
+<ul class="bars">
+<li><span>1 Result received</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>2 Case opened</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>3 Owner assigned</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>4 Patient notified</span><span class="bar"><i style="width:98.3%"></i></span><span class="v">236</span></li>
+<li><span>5 Patient acknowledged</span><span class="bar"><i style="width:95%"></i></span><span class="v">228</span></li>
+<li><span>6 Consultation</span><span class="bar"><i style="width:92.1%"></i></span><span class="v">221</span></li>
+<li><span>7 Follow-up</span><span class="bar"><i style="width:89.2%"></i></span><span class="v">214</span></li>
+<li><span>8 Outcome recorded</span><span class="bar"><i style="width:82.5%"></i></span><span class="v">198</span></li>
+<li><span>9 Closure review</span><span class="bar"><i style="width:79.2%"></i></span><span class="v">190</span></li>
+<li><span>10 Closed</span><span class="bar"><i style="width:76.7%"></i></span><span class="v">184</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Still open and moving: 56 cases, each with a named owner.</p>
+</div>
+<div class="stack">
+<div class="card">
+<h3>Why cases were delayed<span class="r small muted">Exceptions raised</span></h3>
+<ul class="bars wide">
+<li><span>Declined: no capacity</span><span class="bar amberbar"><i style="width:100%"></i></span><span class="v">11</span></li>
+<li><span>Not reached</span><span class="bar amberbar"><i style="width:63.6%"></i></span><span class="v">7</span></li>
+<li><span>Appointment missed</span><span class="bar amberbar"><i style="width:54.5%"></i></span><span class="v">6</span></li>
+<li><span>Declined: missing information</span><span class="bar amberbar"><i style="width:36.4%"></i></span><span class="v">4</span></li>
+<li><span>Patient declined care</span><span class="bar amberbar"><i style="width:18.2%"></i></span><span class="v">2</span></li>
+</ul>
+</div>
+<div class="card">
+<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft, approved by Dr. Obaid Al Suwaidi</span></span></h3>
+<div class="aitext"><p>Most delays came from referrals that Regional Hospital declined for lack of capacity (11 cases). Re-referring them to General Hospital took a median of one working day.</p><p>Patients who were not reached at first were usually reached at a second time they chose. No patient is named in this summary.</p></div>
+</div>
+</div>
+</div>
+<p class="note">Simulated on synthetic data: "Escalation off" replays the same 240 cases with reminders and escalation switched off. These numbers show how the design works; they are not evidence of real-world improvement.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b04" data-file="04-programmes">
+<div class="cap"><span class="n">4</span><div><h2>Programmes</h2><p>Each screening programme is a list of steps, each with a deadline, the evidence it needs and an owner. Adding a programme or changing a deadline needs no new code, and a clinician approves every change before it is used.</p>
+<div class="meta"><span>For: programme coordinators and clinical advisers</span><span>Built in: CareLoop web app</span><span>Stories: US13, US14</span><span>Requirements: FR-03, FR-07</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar">
+<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
+<nav class="nav"><span>Worklist</span><span>Impact</span><span class="on">Programmes</span></nav>
+<div class="grow"></div>
+<span class="pill">Synthetic data</span>
+<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
+</div>
+<div class="page">
+<div class="head">
+<div><h1>Programmes</h1><p class="sub">Five programmes share the same ten stages. Each sets its own steps, deadlines and evidence, and the clinical adviser approves every change.</p></div>
+<div class="btns"><span class="btn">View change history</span></div>
+</div>
+<div class="grid2" style="grid-template-columns:320px minmax(0,1fr)">
+<div class="card" style="padding:0;overflow:hidden">
+<ul class="inbox">
+<li class="sel"><b>Breast screening</b><span>Mammogram, ages 40 to 75</span><span class="st green">Deadlines from the DoH standard</span></li>
+<li><b>Bowel screening</b><span>FIT test or colonoscopy, ages 40 to 75</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Cervical screening</b><span>Pap smear 25 to 29, HPV test 30 to 65</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Lung screening</b><span>Low-dose CT scan for heavy smokers</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Heart, kidney and diabetes checks</b><span>Blood pressure, weight and blood tests, ages 18 to 75</span><span class="st amber">Deadlines waiting for approval</span></li>
+</ul>
+</div>
+<div class="stack">
+<div class="card">
+<h3>Breast screening<span class="r"><span class="badge green">In use</span></span></h3>
+<p class="note" style="margin-bottom:16px">Version 1, in use since Tuesday 1 September 2026. Deadlines come from the Department of Health (DoH) standard for breast cancer screening and diagnosis, 2025, unless marked as a placeholder.</p>
+<table class="mini cfg">
+<colgroup><col style="width:200px"><col><col style="width:220px"><col style="width:170px"></colgroup>
+<thead><tr><th>Step</th><th>Deadline</th><th>Evidence needed</th><th>Owner</th></tr></thead>
+<tbody>
+<tr><td>Report ready</td><td>At once, because the result needs more tests<span class="l2">DoH 3.8.1</span></td><td>Screening report</td><td>Screening physician</td></tr>
+<tr><td>Result given</td><td>1 working day after the report<span class="l2">Placeholder; DoH 3.7.1 sets 15 working days as the limit</span></td><td>Teach-back recorded</td><td>Nurse navigator</td></tr>
+<tr><td>Assessment offered</td><td>5 working days after the mammogram<span class="l2">DoH time intervals</span></td><td>Referral accepted and booked</td><td>Referring clinician</td></tr>
+<tr><td>Biopsy result ready</td><td>5 working days after the biopsy<span class="l2">DoH time intervals</span></td><td>Pathology report</td><td>Breast surgeon</td></tr>
+<tr><td>Assessment result given</td><td>5 working days after the assessment<span class="l2">DoH time intervals</span></td><td>Result explained in person</td><td>Breast surgeon</td></tr>
+<tr><td>Referral for treatment</td><td>10 working days after the diagnosis<span class="l2">DoH 3.9.11</span></td><td>Referral accepted</td><td>Breast surgeon</td></tr>
+<tr><td>Case closed</td><td>When treatment starts<span class="l2">Solution design</span></td><td>Treatment record and continuing care accepted</td><td>Authorised clinician</td></tr>
+</tbody>
+</table>
+</div>
+<div class="grid-even">
+<div class="card">
+<h3>When a step is late</h3>
+<div class="ladder vert" style="margin-top:0">
+<div><div class="k"><span class="num">1</span>Owner</div>Reminder before the deadline</div>
+<div><div class="k"><span class="num">2</span>Facility lead</div>At the deadline</div>
+<div><div class="k"><span class="num">3</span>Programme coordinator</div>If still open</div>
+</div>
+<p class="note" style="margin-top:12px">Urgent results skip the reminder and go straight to the facility lead.</p>
+</div>
+<div class="card">
+<h3>Other deadlines<span class="r"><span class="badge amber">Placeholders</span></span></h3>
+<ul class="reach">
+<li><svg class="i"><use href="#i-clock"/></svg><span>Urgent steps: half the routine deadline.</span></li><li><svg class="i"><use href="#i-clock"/></svg><span>Referral replies: 4 working hours, or 2 hours if urgent.</span></li>
+<li><svg class="i"><use href="#i-clock"/></svg><span>Questions between clinicians: 1 working day, or 2 hours if urgent.</span></li>
+<li><svg class="i"><use href="#i-clock"/></svg><span>Patient call-backs and questions for a doctor: 2 working hours.</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Used until the clinical adviser approves them. Each version is kept, so past cases show the rules they followed.</p>
+</div>
+</div>
+</div>
+</div>
+<p class="note">Read-only in the prototype. Each programme is one settings file; the ten stages and the screens stay the same.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b05" data-file="05-consultation">
+<div class="cap"><span class="n">5</span><div><h2>Consultation</h2><p>Clinicians answer questions from colleagues and from patients in one list, each with a reply deadline. Here Dr. Rekha asks a breast surgeon about an urgent result, and a patient's question reaches her through his nurse and is answered by phone.</p>
+<div class="meta"><span>For: clinicians</span><span>Built in: HIS simulator</span><span>Stories: US05, US07</span><span>Requirements: FR-05</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar his">
+<div class="sys"><b>Hospital system</b><small>Family Health Centre, Madinat Zayed</small></div>
+<div class="grow"></div>
+<span class="pill">Simulated for testing</span>
+<div class="me"><span class="av">RV</span><div><b>Dr. Rekha Varghese</b><small>Screening physician</small></div></div>
+</div>
+<div class="page">
+<div class="grid2" style="grid-template-columns:380px minmax(0,1fr)">
+<div class="card" style="padding:0;overflow:hidden">
+<div class="tabs"><span class="on">Today 2</span><span>Earlier 14</span></div>
+<ul class="inbox">
+<li class="sel"><span class="qtype">From you to a colleague</span><b>Noura Al Shamsi</b><span>You asked Dr. Layla Haddad, breast surgeon</span><span><span class="st red">Urgent</span> · Answered at 09:41</span></li>
+<li><span class="qtype">From a patient</span><b>Salem Al Ketbi</b><span>"I would like a doctor to explain my scan result." Passed on by Huda Saleh at 09:30.</span><span><span class="st green">Answered at 10:05</span></span><span>Dr. Rekha called him, and he said the next step back.</span></li>
+</ul>
+</div>
+<div class="stack">
+<div class="pbanner compact">
+<span class="av">NS</span>
+<div class="who"><div class="nm">Noura Al Shamsi</div><div class="id"><span>Female, 44</span><span>Born 14 Mar 1982</span><span>MRN 100 318 402</span><span>Speaks Arabic and English</span></div></div>
+<span class="badge red">Urgent</span>
+</div>
+<div class="card thread">
+<h3>Question to Dr. Layla Haddad<span class="r small muted">Breast surgeon, General Hospital</span></h3>
+<div class="msg"><div class="msg-head"><b>Dr. Rekha Varghese</b><span>Thu 12 Nov, 09:05</span></div><p>Noura's screening mammogram is marked urgent. Can you see her for assessment this week? She prefers mornings.</p></div>
+<div class="msg reply"><div class="msg-head"><b>Dr. Layla Haddad</b><span>Thu 12 Nov, 09:41</span></div><p>Yes. I can see her tomorrow, Friday 13 November, at 08:30 at the Breast Assessment Unit. Send the referral and I will accept it.</p></div>
+<div class="kv" style="margin-top:4px">
+<div><small>Reply needed by</small><b>11:05</b><span>Urgent questions: 2 hours (placeholder)</span></div>
+<div><small>Answered in</small><b class="green">36 minutes</b><span>On time</span></div>
+<div><small>Agreed next step</small><b>Assessment, Fri 13 Nov, 08:30</b><span>General Hospital</span></div>
+</div>
+</div>
+<div class="card">
+<h3>Record the outcome</h3>
+<div class="opts">
+<div class="opt sel"><span class="radio"></span><div><h4>Refer for assessment, as agreed</h4><p>Opens the referral to Dr. Layla Haddad, with this answer attached.</p></div></div>
+<div class="opt"><span class="radio"></span><div><h4>No referral needed</h4><p>Record the reason. The case stays open until Noura has been told.</p></div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="actionbar">
+<span class="events">Sends to CareLoop:<span class="ev">Consultation requested</span><span class="ev">Consultation answered</span><span class="alt">If no referral is needed: Consultation answered, with the reason</span></span>
+<div class="btns"><span class="btn primary">Record and refer</span></div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b06" data-file="06-refer">
+<div class="cap"><span class="n">6</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions. AI drafts the handoff summary; she checks and approves it before the referral is sent.</p>
 <div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05, FR-11</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -628,7 +897,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <p>No capacity until Mon 30 Nov. Declined this referral on Tue 10 Nov.</p>
 </div></div>
 </div>
-<p class="note" style="margin-top:14px">Suggestions come from a synthetic directory. You choose the unit; the unit confirms its own availability.</p>
+<p class="note" style="margin-top:16px">Suggestions come from a synthetic directory. You choose the unit; the unit confirms its own availability.</p>
 </div>
 <div class="card">
 <h3>Handoff summary for Dr. Layla Haddad<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft</span></span></h3>
@@ -638,8 +907,8 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div><small>Assessment</small>See the screening report in the clinical record. AI never writes this part.</div>
 <div><small>Request</small>Please accept her and offer an assessment by Mon 16 Nov.</div>
 </div>
-<div class="btns" style="margin-top:18px"><span class="btn">Edit</span><span class="btn primary">Approve summary</span></div>
-<p class="note" style="margin-top:14px">AI uses only the facts in the case. It cannot send, change urgency or edit the record. Your approval is recorded.</p>
+<div class="btns" style="margin-top:16px"><span class="btn">Edit</span><span class="btn primary">Approve summary</span></div>
+<p class="note" style="margin-top:16px">AI uses only the facts in the case. It cannot send, change urgency or edit the record. Your approval is recorded.</p>
 </div>
 </div>
 </div>
@@ -650,8 +919,8 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 </section>
 
-<section class="board" id="b04" data-file="04-accept-referral">
-<div class="cap"><span class="n">4</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and the approved summary. She accepts responsibility, or declines with a fixed reason. Labs use the same screen for test requests.</p>
+<section class="board" id="b07" data-file="07-accept-referral">
+<div class="cap"><span class="n">7</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and the approved summary. She accepts responsibility, or declines with a fixed reason. Labs use the same screen for test requests.</p>
 <div class="meta"><span>For: receiving clinicians, labs and appointment teams</span><span>Built in: HIS simulator</span><span>Stories: US08, US09, US10</span><span>Requirements: FR-05, FR-06</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -666,7 +935,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="card" style="padding:0;overflow:hidden">
 <div class="tabs"><span class="on">Referrals 2</span><span>Test requests 1</span></div>
 <ul class="inbox">
-<li><b>Shamma Al Mheiri</b><span>Breast assessment · <span class="red" style="font-weight:600">Urgent</span></span><span>From Family Health Centre, Khalifa City, 09:50</span><span>Reply by 11:50</span></li>
+<li><b>Noura Al Shamsi</b><span>Breast assessment · <span class="st red">Urgent</span></span><span>From Family Health Centre, Madinat Zayed, 10:15</span><span>Reply by 12:15</span></li>
 <li class="sel"><b>Hessa Al Dhaheri</b><span>Breast assessment · Routine</span><span>From Family Health Centre, Madinat Zayed, 09:25</span><span>Reply by 13:25</span></li>
 </ul>
 </div>
@@ -716,14 +985,14 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 </div>
 <div class="actionbar">
-<span class="events">Sends to CareLoop:<span class="ev">Referral accepted</span><span class="ev">Appointment booked</span></span>
+<span class="events">Sends to CareLoop:<span class="ev">Referral accepted</span><span class="ev">Appointment booked</span><span class="alt">If you decline: Referral declined, with its reason</span></span>
 <div class="btns"><span class="btn primary">Accept referral</span></div>
 </div>
 </div>
 </section>
 
-<section class="board" id="b05" data-file="05-close-case">
-<div class="cap"><span class="n">5</span><div><h2>Close the case</h2><p>Only an authorised clinician can close a case, and only when every required step has evidence. Continuing care keeps a named owner after closing.</p>
+<section class="board" id="b08" data-file="08-close-case">
+<div class="cap"><span class="n">8</span><div><h2>Close the case</h2><p>Only an authorised clinician can close a case, and only when every required step has evidence. Continuing care keeps a named owner after closing.</p>
 <div class="meta"><span>For: authorised clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12, US14, US15</span><span>Requirements: FR-08</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -742,29 +1011,30 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 <div class="grid2" style="grid-template-columns:minmax(0,1fr) 470px">
 <div class="card">
-<h3>Required before closing<span class="r small muted">Breast screening pathway, version 1</span></h3>
+<h3>Required before closing<span class="r small muted">For "Treatment started" · Breast screening, version 1</span></h3>
 <ul class="check">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Assessment attended</b><span>Clinic attendance record</span></div><span class="r">Mon 16 Nov</span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Diagnosis recorded</b><span>Pathology report</span></div><span class="r">Thu 19 Nov</span></li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Result explained in person</b><span>Dr. Layla Haddad, with Saeed present</span></div><span class="r">Fri 20 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Result explained in person</b><span>Dr. Layla Haddad. Saeed was there at Hessa's request.</span></div><span class="r">Fri 20 Nov</span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Treatment plan agreed by the cancer team</b><span>Cancer team meeting record</span></div><span class="r">Wed 25 Nov</span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood her plan</b><span>Said it back to Mariam Al Kaabi, cancer nurse navigator</span></div><span class="r">Thu 26 Nov</span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Treatment started</b><span>Operation note: surgery</span></div><span class="r">Mon 7 Dec</span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Continuing care accepted</b><span>Dr. Karim Nassar, medical oncologist, Cancer Centre</span></div><span class="r">Tue 8 Dec</span></li>
 </ul>
-<div class="approved" style="margin-top:14px"><svg class="i"><use href="#i-check"/></svg>All seven required steps have evidence</div>
+<div class="approved" style="margin-top:16px"><svg class="i"><use href="#i-check"/></svg>All seven required steps have evidence</div>
 </div>
 <div class="stack">
 <div class="card">
 <h3>Reason for closing</h3>
 <div class="opts" style="gap:8px">
-<div class="box"><span class="radio on"></span><b>Treated, and care continues with a named team</b></div>
+<div class="box"><span class="radio on"></span><b>Treatment started, and continuing care accepted</b></div>
 <div class="box"><span class="radio"></span>On surveillance, with a next date</div>
 <div class="box"><span class="radio"></span>No cancer found on further tests</div>
 <div class="box"><span class="radio"></span>Declined by the patient, after a recorded discussion</div>
 <div class="box"><span class="radio"></span>Moved, and accepted by another provider</div>
-<div class="box"><span class="radio"></span>Not reachable, after recorded attempts</div>
+<div class="box"><span class="radio"></span>Not reachable, after recorded attempts and sign-off</div>
 </div>
+<p class="note" style="margin-top:12px">Each reason has its own evidence list. Declined, moved and not reachable are recorded, but never counted as care received.</p>
 </div>
 <div class="card">
 <h3>Continuing care</h3>
@@ -776,102 +1046,20 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 <div class="card">
 <div class="box"><span class="cbox"><svg class="i"><use href="#i-check"/></svg></span>I have checked the evidence above</div>
-<p class="note" style="margin-top:10px">Signed as Dr. Layla Haddad, authorised to close breast screening cases. AI, timers and messages can never close a case.</p>
+<p class="note" style="margin-top:8px">Signed as Dr. Layla Haddad, authorised to close breast screening cases. AI, timers and messages can never close a case.</p>
 </div>
 </div>
 </div>
 </div>
 <div class="actionbar">
-<span class="events">Sends to CareLoop:<span class="ev">Closure authorised</span><span class="ev">Reason: treated</span></span>
+<span class="events">Sends to CareLoop:<span class="ev">Closure authorised</span><span class="ev">Reason: treatment started</span></span>
 <div class="btns"><span class="btn">Cancel</span><span class="btn primary">Sign and close the case</span></div>
 </div>
 </div>
 </section>
 
-<section class="board" id="b06" data-file="06-impact">
-<div class="cap"><span class="n">6</span><div><h2>Impact</h2><p>Programme leads see whether people got care on time, what is still unresolved and whether patients understood. Every number comes from the case events.</p>
-<div class="meta"><span>For: programme coordinators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US16</span><span>Requirements: FR-09</span></div></div></div>
-<div class="frame">
-<div class="win"><i></i><i></i><i></i></div>
-<div class="appbar">
-<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span>Worklist</span><span class="on">Impact</span></nav>
-<div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
-</div>
-<div class="page">
-<div class="head">
-<div><h1>Impact</h1><p class="sub">All screening programmes · 1 September to 12 November 2026 · 240 cases</p></div>
-<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">All facilities<svg class="i"><use href="#i-down"/></svg></span></div>
-</div>
-<div class="kpis">
-<div class="card kpi"><span class="lbl">Care completed by the agreed deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">Without CareLoop: <b>61%</b> (122 of 200)</div></div>
-<div class="card kpi"><span class="lbl">Unresolved and past the deadline</span><div class="big">9</div><span class="of">Out of 56 open cases, all with a named owner</span><div class="vs">Without CareLoop: <b>38</b></div></div>
-<div class="card kpi"><span class="lbl">Understood their next step</span><div class="big">91%</div><span class="of">208 of 228 said it back correctly the first time</span><div class="vs">The other 20 had a call from their nurse</div></div>
-</div>
-<div class="grid3">
-<div class="card">
-<h3>Cases that reached each stage<span class="r small muted">Out of 240</span></h3>
-<ul class="bars">
-<li><span>1 Result received</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>2 Case opened</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>3 Owner assigned</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>4 Patient notified</span><span class="bar"><i style="width:98.3%"></i></span><span class="v">236</span></li>
-<li><span>5 Patient confirmed</span><span class="bar"><i style="width:95%"></i></span><span class="v">228</span></li>
-<li><span>6 Consultation</span><span class="bar"><i style="width:92.1%"></i></span><span class="v">221</span></li>
-<li><span>7 Follow-up</span><span class="bar"><i style="width:89.2%"></i></span><span class="v">214</span></li>
-<li><span>8 Outcome recorded</span><span class="bar"><i style="width:82.5%"></i></span><span class="v">198</span></li>
-<li><span>9 Closure review</span><span class="bar"><i style="width:79.2%"></i></span><span class="v">190</span></li>
-<li><span>10 Closed</span><span class="bar"><i style="width:76.7%"></i></span><span class="v">184</span></li>
-</ul>
-<p class="note" style="margin-top:12px">Still open and moving: 56 cases, each with a named owner.</p>
-</div>
-<div class="stack">
-<div class="card">
-<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft, approved by Dr. Obaid Al Suwaidi</span></span></h3>
-<div class="aitext"><p>Most delays came from referrals that Regional Hospital declined for lack of capacity (11 cases). Re-referring them to General Hospital took a median of one working day.</p><p>Patients who were not reached at first were usually reached at a second time they chose. No patient is named in this summary.</p></div>
-</div>
-<div class="card">
-<h3>Why cases got stuck<span class="r small muted">Exceptions raised</span></h3>
-<ul class="bars wide">
-<li><span>Declined: no capacity</span><span class="bar amberbar"><i style="width:100%"></i></span><span class="v">11</span></li>
-<li><span>Not reached</span><span class="bar amberbar"><i style="width:63.6%"></i></span><span class="v">7</span></li>
-<li><span>Appointment missed</span><span class="bar amberbar"><i style="width:54.5%"></i></span><span class="v">6</span></li>
-<li><span>Declined: missing information</span><span class="bar amberbar"><i style="width:36.4%"></i></span><span class="v">4</span></li>
-<li><span>Patient declined care</span><span class="bar amberbar"><i style="width:18.2%"></i></span><span class="v">2</span></li>
-</ul>
-</div>
-</div>
-</div>
-<div class="grid3">
-<div class="card">
-<h3>How long each step takes<span class="r small muted">Working days</span></h3>
-<table class="mini"><thead><tr><th>Step</th><th class="num">Median</th><th class="num">9 in 10 cases within</th></tr></thead><tbody>
-<tr><td>Result to patient notified</td><td class="num">0.5</td><td class="num">1.5</td></tr>
-<tr><td>Notified to patient confirmed</td><td class="num">0.5</td><td class="num">2</td></tr>
-<tr><td>Referral sent to accepted</td><td class="num">1</td><td class="num">3</td></tr>
-<tr><td>Accepted to appointment attended</td><td class="num">3</td><td class="num">5</td></tr>
-<tr><td>Result to case closed</td><td class="num">19</td><td class="num">34</td></tr>
-</tbody></table>
-</div>
-<div class="card">
-<h3>Late cases by place</h3>
-<table class="mini"><thead><tr><th>Facility</th><th class="num">Late cases</th></tr></thead><tbody>
-<tr><td>Regional Hospital, Al Dhafra</td><td class="num">4</td></tr>
-<tr><td>General Hospital, Abu Dhabi</td><td class="num">2</td></tr>
-<tr><td>Family Health Centre, Madinat Zayed</td><td class="num">2</td></tr>
-<tr><td>Endoscopy Unit, General Hospital</td><td class="num">1</td></tr>
-</tbody></table>
-</div>
-</div>
-<p class="note">Synthetic data. "Without CareLoop" replays the same 240 cases with reminders and escalation switched off.</p>
-</div>
-</div>
-</section>
-
-<section class="board" id="b07" data-file="07-basic-phone">
-<div class="cap"><span class="n">7</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts and automated calls only carry dates and places, and she confirms by replying or pressing 1.</p>
+<section class="board" id="b09" data-file="09-basic-phone">
+<div class="cap"><span class="n">9</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts and automated calls only carry dates and places, and she confirms by replying or pressing 1.</p>
 <div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
 <div class="cols3" style="grid-template-columns:minmax(0,1fr) 300px minmax(0,1fr)">
 <div class="card">
@@ -885,7 +1073,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <li><small>Teach-back</small>So I know I explained it well, can you tell me what happens next?</li>
 </ul>
 <div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Understood.</b> Hessa said it back in her own words.</span></div>
-<p class="note" style="margin-top:10px">Plain words drafted by AI and approved by Dr. Rekha Varghese.</p>
+<p class="note" style="margin-top:8px">Plain words drafted by AI and approved by Dr. Rekha Varghese.</p>
 </div>
 <div class="pcol">
 <div class="fphone">
@@ -910,7 +1098,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </ul>
 <div class="keys"><span>1 Confirm</span><span>2 Talk to a person</span><span>9 Repeat</span></div>
 <div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Confirmed.</b> Hessa pressed 1 at 10:01.</span></div>
-<p class="note" style="margin-top:10px">No answer after two tries creates a task for Huda to call her.</p>
+<p class="note" style="margin-top:8px">No answer after two tries creates a task for Huda to call her.</p>
 </div>
 </div>
 <div class="rules">
@@ -922,8 +1110,8 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 </section>
 
-<section class="board" id="b08" data-file="08-patient-view">
-<div class="cap"><span class="n">8</span><div><h2>Patient view</h2><p>For people with a smartphone, CareLoop appears inside the health app they already use. There is no new app to install. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
+<section class="board" id="b10" data-file="10-patient-view">
+<div class="cap"><span class="n">10</span><div><h2>Patient view</h2><p>For people with a smartphone, CareLoop appears inside the health app they already use. There is no new app to install. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
 <div class="meta"><span>For: patients with a smartphone</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
 <div class="phones">
 <div class="pcol">
@@ -932,10 +1120,10 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="apptop"><span>Your health app</span><span class="lang"><span class="on">English</span><span>العربية</span></span></div>
 <div class="hello">Hello, Amna</div>
 <div class="pcard key"><span class="lbl">Your next step</span><h4>More tests at the breast clinic</h4><p class="when">Friday 13 November, 9:00 am</p><p>General Hospital, Building 2, Clinic B</p><span class="pbtn primary">I will come</span><span class="plink">I need another time</span></div>
-<div class="pcard"><span class="lbl">Your nurse</span><div class="prow" style="margin-top:10px"><span class="av">LM</span><div style="flex:1"><b>Latifa Al Mazrouei</b><small>Family Health Centre</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
+<div class="pcard"><span class="lbl">Your nurse</span><div class="prow" style="margin-top:8px"><span class="av">LM</span><div style="flex:1"><b>Latifa Al Mazrouei</b><small>Family Health Centre</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
 <div class="pcard"><span class="lbl">Your steps</span><ul class="psteps">
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Screening, Tue 3 Nov</li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Result explained, Thu 5 Nov</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Screening, Fri 6 Nov</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Result explained, Tue 10 Nov</li>
 <li class="now"><span class="nowdot"></span>More tests, Fri 13 Nov</li>
 <li><span class="mk todo"></span>Results, then next care</li>
 </ul></div>
@@ -947,31 +1135,73 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="papp">
 <div class="pback"><svg class="i"><use href="#i-left"/></svg>Home</div>
 <div class="ptitle">Your result</div>
-<div class="pcard"><span class="lbl">Breast screening, Tue 3 Nov 2026</span><h4>Your mammogram needs a closer look</h4><p>The doctors saw an area they want to check more closely. Most women who are asked back for more tests do not have cancer.</p><p class="pfine" style="margin-top:10px">Checked by Dr. Hind Al Mansoori, screening physician</p></div>
-<div class="pcard"><span class="lbl">What happens on Friday</span><p style="margin-top:6px">Another mammogram and an ultrasound scan, and sometimes a small needle test. A doctor gives you the results in person.</p></div>
-<div class="pcard"><span class="lbl">Questions?</span><p style="margin-top:6px">Latifa, your nurse, can explain anything again.</p><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
+<div class="pcard"><span class="lbl">Breast screening, Fri 6 Nov 2026</span><h4>Your mammogram needs a closer look</h4><p>The doctors saw an area they want to check more closely. Most women who are asked back for more tests do not have cancer.</p><p class="pfine" style="margin-top:8px">Checked by Dr. Hind Al Mansoori, screening physician</p></div>
+<div class="pcard"><span class="lbl">What happens on Friday</span><p style="margin-top:8px">Another mammogram and an ultrasound scan, and sometimes a small needle test. A doctor gives you the results in person.</p></div>
+<div class="pcard"><span class="lbl">Questions?</span><p style="margin-top:8px">Latifa, your nurse, can explain anything again.</p><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
 </div></div></div>
-<div class="pcap"><b>Her result, in plain words</b>Drafted by AI from the report and checked by her doctor. Also in Arabic.</div>
+<div class="pcap"><b>Her result, in plain words</b>Drafted by AI from the report and checked by her doctor. Every screen also works in Arabic; see screen 11.</div>
 </div>
 <div class="pcol">
 <div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:42</span><span class="bat"></span></div>
 <div class="papp">
 <div class="done-hero"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><h4>Thank you, Amna</h4><p>We have told the clinic you will come on Friday at 9:00 am.</p></div>
-<div class="pcard"><span class="lbl">One question, so we know we explained it well</span><h4 style="font-size:19px">What will you do next?</h4>
+<div class="pcard"><span class="lbl">One question, so we know we explained it well</span><h4 style="font-size:20px">What will you do next?</h4>
 <div class="choice sel"><span class="radio"></span>Go to General Hospital on Friday at 9:00 am for more tests</div>
 <div class="choice"><span class="radio"></span>Wait for the hospital to call me</div>
 <div class="choice"><span class="radio"></span>I am not sure</div>
 </div>
-<div class="pcard"><h4 style="font-size:17px;margin-top:0">How sure do you feel about what happens next?</h4><div class="scale"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span></div><div class="scalelbl"><span>Not sure</span><span>Very sure</span></div></div>
+<div class="pcard"><h4 style="font-size:18px;margin-top:0">How sure do you feel about what happens next?</h4><div class="scale"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span></div><div class="scalelbl"><span>Not sure</span><span>Very sure</span></div></div>
 <span class="pbtn primary" style="margin-top:0">Send</span>
 </div></div></div>
-<div class="pcap"><b>Confirm, then say it back</b>"Confirmed" and "understood" are recorded separately. "I am not sure" sends her nurse a call-back task.</div>
+<div class="pcap"><b>Confirm, then say it back</b>"Acknowledged" and "understood" are recorded separately. "I am not sure" sends her nurse a call-back task.</div>
 </div>
 </div>
 </section>
 
-<section class="board" id="b09" data-file="09-caregiver-and-email">
-<div class="cap"><span class="n">9</span><div><h2>Caregiver and email</h2><p>Saeed helps his mother with appointments only, as she agreed. He never sees her results, and anything he does is recorded as his own action.</p>
+<section class="board" id="b11" data-file="11-arabic">
+<div class="cap"><span class="n">11</span><div><h2>Arabic, right to left</h2><p>Every patient screen and message also works in Arabic. The layout mirrors, so reading order, steps and buttons run right to left, while numbers stay as 0 to 9.</p>
+<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
+<div class="phones">
+<div class="pcol">
+<div class="phone"><div class="scr" dir="rtl" lang="ar"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
+<div class="papp">
+<div class="apptop"><span>تطبيقك الصحي</span><span class="lang"><span class="on">العربية</span><span lang="en">English</span></span></div>
+<div class="hello">مرحباً، آمنة</div>
+<div class="pcard key"><span class="lbl">خطوتك التالية</span><h4>فحوصات إضافية في عيادة الثدي</h4><p class="when">الجمعة 13 نوفمبر، 9:00 صباحاً</p><p>المستشفى العام، المبنى 2، العيادة ب</p><span class="pbtn primary">سأحضر</span><span class="plink">أحتاج إلى موعد آخر</span></div>
+<div class="pcard"><span class="lbl">ممرضتك</span><div class="prow" style="margin-top:8px"><span class="av">لم</span><div style="flex:1"><b>لطيفة المزروعي</b><small>مركز صحة العائلة</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>اتصلوا بي</span></div>
+<div class="pcard"><span class="lbl">خطواتك</span><ul class="psteps">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>الفحص، الجمعة 6 نوفمبر</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>شرح النتيجة، الثلاثاء 10 نوفمبر</li>
+<li class="now"><span class="nowdot"></span>فحوصات إضافية، الجمعة 13 نوفمبر</li>
+<li><span class="mk todo"></span>النتائج، ثم الرعاية التالية</li>
+</ul></div>
+</div></div></div>
+<div class="pcap"><b>Patient view in Arabic</b>The home screen from screen 10, mirrored.</div>
+</div>
+<div class="pcol">
+<div class="fphone">
+<div class="fspk"></div>
+<div class="fscr ar" dir="rtl" lang="ar"><div class="fhead"><span dir="ltr">02 000 0001</span><span>10:30</span></div>حصة، لديك موعد يوم الاثنين 16 نوفمبر الساعة 10:30 صباحاً في المستشفى العام، المبنى 2. ردّي 1 للتأكيد أو 2 لطلب مكالمة.</div>
+<div class="fsoft" dir="rtl" lang="ar"><span>رد</span><span>رجوع</span></div>
+<div class="fkeys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>*</span><span>0</span><span>#</span></div>
+</div>
+<div class="pcap"><b>Text message in Arabic</b>The reminder from screen 9: 118 characters, sent as two messages.</div>
+</div>
+<div class="card" style="width:440px">
+<h3>Rules for Arabic</h3>
+<ul class="rules-ar">
+<li><svg class="i"><use href="#i-lang"/></svg><span>Each patient chooses a language once, and every call, text, letter and screen follows it.</span></li>
+<li><svg class="i"><use href="#i-arrow"/></svg><span>Set the direction to right to left, and use start and end rather than left and right in every layout.</span></li>
+<li><svg class="i"><use href="#i-key"/></svg><span>Mirror arrows and steps. Never mirror logos, numbers, phone numbers or times.</span></li>
+<li><svg class="i"><use href="#i-msg"/></svg><span>An Arabic text holds 70 characters, so Arabic templates are shorter. This one drops the help number; replying 2 still reaches a person.</span></li>
+<li><svg class="i"><use href="#i-check"/></svg><span>A translator and a clinician approve every Arabic template before use. The wording shown here is a draft.</span></li>
+</ul>
+</div>
+</div>
+</section>
+
+<section class="board" id="b12" data-file="12-caregiver-and-email">
+<div class="cap"><span class="n">12</span><div><h2>Caregiver and email</h2><p>Saeed helps his mother with appointments only, as she agreed. He never sees her results, and anything he does is recorded as his own action.</p>
 <div class="meta"><span>For: authorised caregivers and anyone who prefers email</span><span>Built in: patient-channel simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
 <div class="phones">
 <div class="pcol">
@@ -979,8 +1209,8 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <div class="papp">
 <div class="apptop"><span>Your health app</span><span class="lang"><span class="on">English</span><span>العربية</span></span></div>
 <div class="helping"><svg class="i"><use href="#i-user"/></svg><div><b>You are helping Hessa Al Dhaheri</b><span>With appointments only. Hessa agreed on Tue 10 Nov 2026.</span></div></div>
-<div class="pcard key"><span class="lbl">Her next appointment</span><h4>Monday 16 November<br>10:30 am</h4><p>General Hospital, Building 2, Clinic B</p><p>Please bring her Emirates ID.</p><span class="pbtn primary">Confirm for Hessa</span><span class="pbtn">Ask for another time</span></div>
-<div class="pcard"><span class="lbl">Help</span><p style="margin-top:6px">Her nurse, Huda Saleh: 02 000 0000</p><p>Transport help: 02 000 0001</p></div>
+<div class="pcard key"><span class="lbl">Her next appointment</span><h4>Monday 16 November<br>10:30 am</h4><p>General Hospital, Building 2, Clinic B</p><p>Please bring her Emirates ID.</p><span class="pbtn primary">Confirm for Hessa</span><span class="plink">Ask for another time</span></div>
+<div class="pcard"><span class="lbl">Help</span><p style="margin-top:8px">Her nurse, Huda Saleh: 02 000 0000</p><p>Transport help: 02 000 0001</p></div>
 <div class="pcard locked"><div class="prow"><svg class="i"><use href="#i-lock"/></svg><div><b>Not shared with you</b><small>Results and medical notes. Hessa hears these from her care team.</small></div></div></div>
 </div></div></div>
 <div class="pcap"><b>Saeed's view</b>Only what Hessa agreed to share.</div>
@@ -1007,6 +1237,71 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </ul>
 <p class="note" style="margin-top:12px">If Hessa withdraws her agreement, Saeed's access ends at once.</p>
 </div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b13" data-file="13-empty-and-error-states">
+<div class="cap"><span class="n">13</span><div><h2>Empty and error states</h2><p>Six states every component must handle. In each one, the patient still has a next step and the case still has an owner.</p>
+<div class="meta"><span>For: everyone building or testing CareLoop</span><span>Built in: all components</span><span>Stories: US03, US13, US14, US15</span><span>Requirements: FR-01, FR-04, FR-07, FR-08, FR-11</span></div></div></div>
+<div class="states">
+<div class="state">
+<div class="state-head"><b>Nothing to do</b><span>1 Worklist</span></div>
+<div class="frag"><div class="empty"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><b>Nothing needs you right now</b><span>All 24 of your cases are on track. The next deadline is Fri 13 Nov, 17:00.</span><span class="linkrow" style="margin-top:4px">Show all cases</span></div></div>
+<p class="when">The worklist never shows an empty table. It says what is on track and when the next deadline is. If cases fail to load, it says so instead and shows when it last updated.</p>
+</div>
+<div class="state">
+<div class="state-head"><b>Patient not reached</b><span>2 Case</span></div>
+<div class="frag">
+<div class="top" style="display:flex;gap:8px;align-items:center"><span class="lbl">Next action</span><span class="badge amber">Not reached</span></div>
+<b style="font-size:16px">Call Maricel between 13:00 and 14:00</b>
+<span class="note">Two calls not answered yesterday, at 10:15 and 16:40. She is free in her lunch break.</span>
+<ul class="reach"><li><svg class="i"><use href="#i-user"/></svg><span>Task for Huda Saleh, nurse navigator. Due today, 17:00.</span></li></ul>
+</div>
+<p class="when">A failed or unanswered contact never ends silently. It becomes a task with an owner and a deadline.</p>
+</div>
+<div class="state">
+<div class="state-head"><b>Same result received twice</b><span>2 Case</span></div>
+<div class="frag">
+<ul class="tl">
+<li><time>09:02</time><div><b>Same result received again</b><span class="by">Not added twice</span></div><span class="src">CareLoop</span></li>
+<li><time>09:00</time><div><b>Result received</b><span class="by">From the laboratory</span></div><span class="src">Hospital system</span></li>
+</ul>
+</div>
+<p class="when">Results are matched on their source and result number, so a resent result never opens a second case.</p>
+</div>
+<div class="state">
+<div class="state-head"><b>AI drafts switched off</b><span>6 Refer</span></div>
+<div class="frag">
+<b style="font-size:16px">Handoff summary for Dr. Layla Haddad</b>
+<div class="notice"><svg class="i"><use href="#i-spark"/></svg><span>AI drafts are switched off. Write the summary yourself, then approve it.</span></div>
+<div class="textarea">Situation, background, assessment and request</div>
+<div class="btns"><span class="btn primary off">Approve summary</span></div>
+</div>
+<p class="when">CareLoop works with AI off. A person writes what AI would have drafted, and every step still works.</p>
+</div>
+<div class="state">
+<div class="state-head"><b>Closing blocked</b><span>8 Close</span></div>
+<div class="frag">
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Assessment attended</b></div><span class="r">Done</span></li>
+<li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>Diagnosis recorded</b></div><span class="r red">Missing</span></li>
+<li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>Result explained in person</b></div><span class="r red">Missing</span></li>
+</ul>
+<div class="btns" style="align-items:center"><span class="btn primary off">Sign and close the case</span></div>
+<span class="note">Add evidence for two steps before closing.</span>
+</div>
+<p class="when">The close button stays off until every step has evidence. A timer, AI or message can never close a case.</p>
+</div>
+<div class="state">
+<div class="state-head"><b>No internet</b><span>10 Patient view</span></div>
+<div class="frag">
+<div class="offline"><svg class="i"><use href="#i-alert"/></svg>You are offline</div>
+<span style="font-size:16px"><b>Your next step:</b> Friday 13 November, 9:00 am, General Hospital, Building 2</span>
+<span style="font-size:16px">It may have changed. To check, call 02 000 0001.</span>
+<span class="pfine">Last updated Thursday 12 November, 8:15 am</span>
+</div>
+<p class="when">The app keeps the last next step on the phone, with a number to call, so the patient always knows where to go.</p>
 </div>
 </div>
 </section>
