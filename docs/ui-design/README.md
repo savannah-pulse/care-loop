@@ -1,6 +1,6 @@
 # UI design
 
-One flow, thirteen screens and a guide to who sees what, for CareLoop, ready to build. They follow the ten-stage case lifecycle in [architecture.md](../architecture.md) and together cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
+One flow, a map of each person's path, thirteen screens and a guide to who sees what, for CareLoop, ready to build. They follow the ten-stage case lifecycle in [architecture.md](../architecture.md) and together cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 Screens are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the patient-channel simulator, and 13 across all of them.
 
@@ -44,6 +44,23 @@ Every case, in every screening programme, moves through the same ten stages. A s
 | 8 | Outcome recorded | `CARE_OUTCOME_DOCUMENTED` | `OutcomeDocumented` |
 | 9 | Closure review | `CLOSURE_REVIEW` | `ClosureReviewRequested` |
 | 10 | Closed | `CLOSED` | `ClosureAuthorised` |
+
+## Each person's path
+
+![Each person's path](15-each-persons-path.png)
+
+Hessa's case, one person at a time. Each row is one person's path through their own system, in time order. The same number in two rows is the moment one person's step reaches the other, and CareLoop, in the last row, is what connects them. The prototype opens here: choose a person to follow only their own screens.
+
+| Person | Their path in the prototype |
+|---|---|
+| Hessa, patient, basic phone | Huda's call, her appointment text and the reminder call (screen 9) |
+| Saeed, her son, email | His email (screen 12) |
+| Huda, nurse navigator, CareLoop | Her worklist, Hessa's case, the case after Hessa replies, and her next task (screens 1 and 2) |
+| Dr. Rekha, screening doctor, hospital system | Hessa's referral, then Noura's urgent case (screens 6 and 5) |
+| Dr. Layla, breast surgeon, hospital system | The referral, then closing the case (screens 7 and 8) |
+| Dr. Obaid, programme coordinator, CareLoop | Impact, then Programmes (screens 3 and 4) |
+| Joy, facility lead, CareLoop | The same worklist as Huda, for the whole facility; no separate path yet |
+| Amna, another patient, health app | Her health app, in English and in Arabic (screens 10 and 11) |
 
 ## Who sees what
 

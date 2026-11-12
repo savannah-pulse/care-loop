@@ -379,7 +379,36 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .access td b{display:block;font-weight:600}
 .access-bottom{display:grid;grid-template-columns:560px minmax(0,1fr);gap:24px;margin-top:24px;width:1440px;align-items:start}
 .access-bottom .reach{font-size:15px}
-</style></head><body>
+
+/* 15 Each person's path: one row per person, the same number where two paths meet */
+.paths{width:1440px}
+.pl-top{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;margin-bottom:16px}
+.pl-top h3{font-size:22px;font-weight:700;line-height:1.25}
+.pl-top p{color:var(--ink2);font-size:16px;margin-top:4px;max-width:880px}
+.pl-key{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink2);flex:none}
+.pl{background:var(--white);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.pl-row{position:relative;display:grid;grid-template-columns:272px repeat(5,minmax(0,1fr));gap:12px;padding:14px 20px;border-top:1px solid var(--line2);align-items:center}
+.pl-row:first-child{border-top:0}
+.pl-row::before{content:"";position:absolute;inset-inline:304px 20px;top:50%;height:2px;margin-top:-1px;background:var(--line);z-index:0}
+.pl-head{background:#FAFBFC;padding-block:10px;font-size:13px;font-weight:600;color:var(--ink3)}
+.pl-head::before{display:none}
+.pl-who{display:flex;gap:12px;align-items:flex-start}
+.pl-who b{display:block;font-size:15px;line-height:1.3}
+.pl-who small,.pl-more small{display:block;font-size:13px;color:var(--ink3);margin-top:2px}
+.pl-go{display:inline-flex;align-items:center;gap:2px;margin-top:6px;font-size:14px;font-weight:600;color:var(--accent)}
+.pl-go svg{width:16px;height:16px}
+.pl-nogo{display:block;margin-top:6px;font-size:13px;color:var(--ink3)}
+.pl-step{position:relative;z-index:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:6px;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;line-height:1.4}
+.pl-step p{display:flex;gap:8px;align-items:flex-start}
+.pl-no{flex:none;display:inline-grid;place-items:center;width:22px;height:22px;border-radius:999px;background:var(--accent);color:var(--white);font-size:12px;font-weight:700;line-height:1}
+.pl-nos{flex:none;display:inline-flex;gap:2px}
+.pl-sys{background:var(--soft)}
+.pl-sys .pl-step{background:var(--soft);border-style:dashed}
+.pl-sys .av{background:var(--white)}
+.pl-sys .av svg{width:22px;height:22px}
+.pl-more{display:flex;align-items:center;gap:12px;margin-top:16px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 20px}
+.pl-more b{display:block;font-size:15px}
+.pl-more .pl-go{margin-top:0;margin-inline-start:auto}</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
 <symbol id="logo" viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1D5FA8" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="50 13" transform="rotate(-60 14 14)"/><circle cx="19" cy="5.4" r="2.7" fill="#1D5FA8"/></symbol>
@@ -1356,6 +1385,87 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <li><svg class="i"><use href="#i-lock"/></svg><span>Anything beyond care, such as sharing with family, needs the patient's written consent.</span></li>
 </ul>
 <p class="note" style="margin-top:12px">Based on Abu Dhabi DoH rules, UAE health data law and HIPAA. Each source is listed in the design notes.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b15" data-file="15-each-persons-path">
+<div class="cap"><span class="n">15</span><div><h2>Each person's path</h2><p>Hessa's case, one person at a time. Each row is one person's path, in their own system. A number in two rows is the moment one person's step reaches the other.</p>
+<div class="meta"><span>For: anyone new to CareLoop</span><span>Prototype: the first page</span></div></div></div>
+<div class="paths">
+<div class="pl-top">
+<div><h3>One case, seven people</h3><p>Everyone works in their own place: a phone, email, a hospital system or CareLoop. CareLoop connects them, so nobody has to chase anyone.</p></div>
+<div class="pl-key"><span class="pl-no">4</span>The same number in two rows is the same moment</div>
+</div>
+<div class="pl">
+<div class="pl-row pl-head"><span>Person</span><span>Tue 10 Nov</span><span>Wed 11 Nov</span><span>Thu 12 Nov</span><span>Fri 13 Nov</span><span>16 Nov to 9 Dec</span></div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">HA</span><div><b>Hessa Al Dhaheri</b><small>Patient, 66 · Basic phone</small><span class="pl-go" data-path="hessa">See her path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-step"><p><span class="pl-no">1</span><span>Huda calls her with the result. She says the next step back.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">5</span><span>Gets a text with her appointment.</span></p><p><span class="pl-no">6</span><span>Replies 1 to confirm.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">7</span><span>An automated call checks it is her, then reminds her.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">8</span><span>Tests, then her result in person. Surgery on Mon 7 Dec.</span></p></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">SA</span><div><b>Saeed Al Dhaheri</b><small>Her son, named by her · Email</small><span class="pl-go" data-path="saeed">See his path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">5</span><span>Gets the day, time and place by email, as Hessa asked.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">8</span><span>Goes with her to hear her result, at her request.</span></p></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · CareLoop</small><span class="pl-go" data-path="huda">See her path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-step"><p><span class="pl-no">1</span><span>Calls Hessa in Arabic, and records that she understood.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">6</span><span>Sees the referral accepted and Hessa's reply, without one phone call.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">RV</span><div><b>Dr. Rekha Varghese</b><small>Screening doctor · Hospital system</small><span class="pl-go" data-path="rekha">See her path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-step"><p><span class="pl-no">2</span><span>Refers Hessa. Regional Hospital declines: no capacity.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">3</span><span>Misses the new deadline, so CareLoop tells Joy.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">4</span><span>Sends a new referral to General Hospital.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">JB</span><div><b>Joy Bautista</b><small>Facility lead · CareLoop</small><span class="pl-nogo">Uses the same worklist as Huda</span></div></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">3</span><span>Gets the escalation. On Thursday morning, asks Dr. Rekha to refer by 10:00.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon · Hospital system</small><span class="pl-go" data-path="layla">See her path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">4</span><span>Gets the referral.</span></p><p><span class="pl-no">5</span><span>Accepts it, and books Mon 16 Nov.</span></p></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">8</span><span>Gives Hessa her result in person.</span></p><p><span class="pl-no">9</span><span>Closes the case, with evidence.</span></p></div>
+</div>
+<div class="pl-row">
+<div class="pl-who"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator · CareLoop</small><span class="pl-go" data-path="obaid">See his path<svg class="i"><use href="#i-right"/></svg></span></div></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-gap"></div>
+<div class="pl-step"><p><span class="pl-no">9</span><span>Sees the closed case in the totals, with no names.</span></p></div>
+</div>
+<div class="pl-row pl-sys">
+<div class="pl-who"><span class="av"><svg><use href="#logo"/></svg></span><div><b>CareLoop</b><small>Automatic, in between</small></div></div>
+<div class="pl-step"><p><span>Opens the case, and names Huda as her contact.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">3</span><span>Escalates to Joy when the deadline passes.</span></p></div>
+<div class="pl-step"><p><span class="pl-nos"><span class="pl-no">4</span><span class="pl-no">5</span><span class="pl-no">6</span></span><span>Hears each step, and shows everyone the same case.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">7</span><span>Makes the reminder call.</span></p></div>
+<div class="pl-step"><p><span class="pl-no">9</span><span>Counts the closed case on the Impact page.</span></p></div>
+</div>
+</div>
+<div class="pl-more">
+<span class="av">AA</span><div><b>Another patient: Amna Al Ameri, 48</b><small>She has a smartphone, so she uses the health app she already has.</small></div><span class="pl-go" data-path="amna">See her path<svg class="i"><use href="#i-right"/></svg></span>
 </div>
 </div>
 </section>
