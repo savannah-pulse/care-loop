@@ -4,7 +4,7 @@ One flow and nine screens for CareLoop, ready to build. They follow the ten-stag
 
 The UI component in the architecture lists an exception dashboard, a patient view and an impact view. Here they are the worklist (1), the patient view (8) and impact (6). The case screen (2) adds the read-only case timeline. Screens 3 to 5 belong to the HIS simulator, and screens 7 to 9 to the patient-channel simulator.
 
-To check exact sizes, spacing and colours, open [ui-design.html](ui-design.html) in a browser from a local clone and inspect it.
+On GitHub, open [ui-design.pdf](ui-design.pdf) to see every screen at full size; its text can be copied. GitHub shows HTML files as code rather than as pages, so to inspect exact sizes, spacing and colours, download [ui-design.html](ui-design.html) and open it in a browser.
 
 ## Flow
 
