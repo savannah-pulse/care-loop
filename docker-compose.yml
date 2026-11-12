@@ -6,6 +6,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      # Local demo only: throwaway SQLite file and a synthetic queue; the real database and routing are team decisions.
+      ConnectionStrings__CareLoop: Data Source=/tmp/careloop.db
+      CareLoop__Database__EnsureCreated: "true"
+      CareLoop__OwnerAssignment__DefaultQueueId: synthetic-facility-lead-queue
     ports:
       - "8080:8080"
 

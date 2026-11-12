@@ -7,9 +7,9 @@
 - Python 3.13 for the AI workflow service.
 - Docker Compose v2 for the local container setup.
 
-Run `dotnet test CareLoop.sln` for the API smoke test. Run `dotnet run --project src/api/CareLoop.Api` to start the API at the URL printed by ASP.NET Core; `/health` is the scaffold's only endpoint. In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
+Run `dotnet test CareLoop.sln` for the API tests. Run `dotnet run --project src/api/CareLoop.Api` to start the API at the URL printed by ASP.NET Core; in Development it uses a local SQLite file and a synthetic owner queue, and serves OpenAPI at `/openapi/v1.json`. Sample requests are in `src/api/CareLoop.Api/CareLoop.Api.http`; the API layout and how to add stage work are in [docs/orchestration-api.md](orchestration-api.md). In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
 
-`docker compose up --build` runs the API on port 8080, the static web starter on port 4173, and the Python workflow service on port 8081. The web starter does not yet call the API. No database or production deployment environment is configured.
+`docker compose up --build` runs the API on port 8080, the static web starter on port 4173, and the Python workflow service on port 8081. The web starter does not yet call the API. The API container uses a throwaway SQLite file for local demos; the real database and deployment environment are still undecided.
 
 The Python workflow package is under `src/ai_workflow`. Create and activate a virtual environment there, install `python -m pip install --editable ".[dev]"`, then run `uvicorn careloop_ai_workflow.main:app --reload --port 8081`. Run `ruff check .` and `pytest` from that directory.
 

@@ -22,7 +22,7 @@ contracts/                  Shared event and API contract guidance
 docs/                       Architecture, workstreams, and development practices
 infra/local/                Local environment notes
 src/
-  api/CareLoop.Api/         ASP.NET Core API starter and Dockerfile
+  api/                      Orchestration API: CareLoop.Domain, .Application, .Infrastructure, .Api (+ Dockerfile)
   ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
   web/                      React + TypeScript + Vite starter and Dockerfile
   simulators/
@@ -37,7 +37,7 @@ tests/
 .github/workflows/          Pull-request CI and tagged release packaging
 ```
 
-The directories are workstream boundaries, not independent sources of truth. The API currently exposes only a health endpoint; Python workflow agents, case workflows, and simulators remain scaffolds. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit. Python will coordinate the end-to-end workflow by proposing actions for the API and authorized people to review.
+The directories are workstream boundaries, not independent sources of truth. The orchestration API implements event intake and the ten-stage case engine for stages 1-3 (see [orchestration API](docs/orchestration-api.md)); stages 4-10, the Python workflow agents, and the simulators remain scaffolds. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit. Python will coordinate the end-to-end workflow by proposing actions for the API and authorized people to review.
 
 ## Getting started
 

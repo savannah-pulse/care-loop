@@ -4,3 +4,57 @@ GET {{CareLoop.Api_HostAddress}}/health
 Accept: application/json
 
 ###
+
+# The ten stages and the event that enters each
+GET {{CareLoop.Api_HostAddress}}/api/stages
+
+###
+
+# Stages 1-3: opens a case, creates it, and puts it in the configured queue (Development uses a synthetic queue)
+POST {{CareLoop.Api_HostAddress}}/api/events
+Content-Type: application/json
+
+{
+  "eventType": "ResultReceived",
+  "schemaVersion": "1.0",
+  "sourceSystem": "his-simulator",
+  "sourceEventId": "evt-0001",
+  "occurredAt": "2026-01-05T08:00:00Z",
+  "synthetic": true,
+  "patientRef": "SYN-PAT-0001",
+  "resultRef": "SYN-RES-0001",
+  "payload": { "reviewedUrgency": "routine" }
+}
+
+###
+
+# Sending the same body again returns 200 with the original event and case IDs
+GET {{CareLoop.Api_HostAddress}}/api/cases?stage=OWNER_ASSIGNED
+
+###
+
+# Replace {caseId} with an ID from the worklist
+GET {{CareLoop.Api_HostAddress}}/api/cases/{caseId}/timeline
+
+###
+
+# Open review work (missing owner, missing urgency, conflicting source events)
+GET {{CareLoop.Api_HostAddress}}/api/exceptions
+
+###
+
+# Manual owner assignment for a case waiting at CASE_CREATED
+POST {{CareLoop.Api_HostAddress}}/api/events
+Content-Type: application/json
+
+{
+  "eventType": "OwnerAssigned",
+  "schemaVersion": "1.0",
+  "sourceSystem": "careloop-ui",
+  "sourceEventId": "assign-0001",
+  "occurredAt": "2026-01-05T09:00:00Z",
+  "synthetic": true,
+  "caseId": "{caseId}",
+  "actor": { "kind": "human", "id": "staff-1", "role": "coordinator" },
+  "payload": { "ownerKind": "person", "ownerId": "coordinator-1" }
+}

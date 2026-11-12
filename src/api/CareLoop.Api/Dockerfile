@@ -1,11 +1,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 
-COPY CareLoop.sln ./
+COPY CareLoop.sln Directory.Build.props Directory.Packages.props global.json ./
+COPY src/api/CareLoop.Domain/CareLoop.Domain.csproj src/api/CareLoop.Domain/
+COPY src/api/CareLoop.Application/CareLoop.Application.csproj src/api/CareLoop.Application/
+COPY src/api/CareLoop.Infrastructure/CareLoop.Infrastructure.csproj src/api/CareLoop.Infrastructure/
 COPY src/api/CareLoop.Api/CareLoop.Api.csproj src/api/CareLoop.Api/
 RUN dotnet restore src/api/CareLoop.Api/CareLoop.Api.csproj
 
-COPY src/api/CareLoop.Api/ src/api/CareLoop.Api/
+COPY src/api/ src/api/
 RUN dotnet publish src/api/CareLoop.Api/CareLoop.Api.csproj \
     --configuration Release \
     --no-restore \

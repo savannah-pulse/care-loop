@@ -25,6 +25,11 @@ build/
 !.env.example
 appsettings.Local.json
 
+# Local SQLite coordination store (development placeholder)
+*.db
+*.db-shm
+*.db-wal
+
 # Tooling and operating systems
 .vs/
 .idea/

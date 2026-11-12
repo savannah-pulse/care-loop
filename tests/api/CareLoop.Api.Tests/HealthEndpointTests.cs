@@ -1,11 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace CareLoop.Api.Tests;
 
-public sealed class HealthEndpointTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+public sealed class HealthEndpointTests(CareLoopApiFactory factory)
+    : IClassFixture<CareLoopApiFactory>
 {
     [Fact]
     public async Task Health_endpoint_returns_ok()
