@@ -60,7 +60,7 @@ Every case, in every screening programme, moves through the same ten stages. A s
 | 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | `src/simulators/patient-channel` | US02, US03 | FR-04 |
 | 10 | [Patient view](#10-patient-view) | Patients with a smartphone | `src/simulators/patient-channel` | US02, US03, US05 | FR-04 |
 | 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | `src/simulators/patient-channel` | US02, US03 | FR-04 |
-| 12 | [Caregiver and email](#12-caregiver-and-email) | Authorised caregivers and email users | `src/simulators/patient-channel` | US04, US10 | FR-04, FR-10 |
+| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named, and email users | `src/simulators/patient-channel` | US04, US10 | FR-04, FR-10 |
 | 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-11 |
 
 Event and endpoint names marked \* are proposed and not yet in the solution design. Agree them in [contracts](../../contracts/README.md) before building.
@@ -161,8 +161,9 @@ Event and endpoint names marked \* are proposed and not yet in the solution desi
 
 ![Caregiver and email](12-caregiver-and-email.png)
 
-- Shows only what the patient agreed to share; here, appointments only.
-- A caregiver's confirmation is sent as `AppointmentConfirmed`\* with the caregiver as the actor. It never counts as the patient's own acknowledgement or understanding. Emails carry no medical details and no links.
+- Only the patient confirms, changes or cancels an appointment. A family member never does this for them, so the email asks for no reply and sends no event that changes the case.
+- A family member gets appointment details only if the patient named them in writing, as DoH requires (Standard on Patient Healthcare Data Privacy, 4.2.3; Federal Law No. 2 of 2019, Article 16). They get the day, time and place only: no results, no reason for the visit and no links.
+- CareLoop records the consent and each email sent. If the patient withdraws consent, the emails stop at once.
 
 ### 13. Empty and error states
 
@@ -240,3 +241,5 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Who checks the Arabic wording that AI drafts?
 - The case closes when treatment starts, as in the solution design, and later care keeps a named owner. Confirm this with the clinical adviser.
 - Deadlines other than the Department of Health (DoH) targets, including reply times for consultations, are placeholders until a clinical adviser approves them.
+- The user stories (US04) let a caregiver act within approved permissions. These designs give a caregiver one permission only: getting appointment details. Agree this as a team.
+- A patient who cannot decide for themselves is represented by a legal guardian. That needs its own design and a legal review.
