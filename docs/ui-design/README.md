@@ -1,6 +1,6 @@
 # UI design
 
-One flow and thirteen screens for CareLoop, ready to build. They follow the ten-stage case lifecycle in [architecture.md](../architecture.md) and together cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
+One flow, thirteen screens and a guide to who sees what, for CareLoop, ready to build. They follow the ten-stage case lifecycle in [architecture.md](../architecture.md) and together cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 Screens are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the patient-channel simulator, and 13 across all of them.
 
@@ -22,7 +22,7 @@ On GitHub, open [ui-design.pdf](ui-design.pdf) to see every screen at full size;
 | Health impact and clinical relevance | Impact reports the measures the challenge names, against the same cases replayed with escalation off. Deadlines come from the DoH breast screening standard. |
 | Technical depth and architecture | Every screen maps to the ten stages, the events it sends and the endpoints it reads. |
 | Working solution and demonstration quality | One continuous story runs through screens 1 to 12, with real dates and named people. |
-| Responsible AI, safety and data governance | AI only drafts, and a named person approves. Access is limited by consent, and screen 13 shows the safety states. |
+| Responsible AI, safety and data governance | AI only drafts, and a named person approves. Each person sees only what their part of the care needs ([Who sees what](#who-sees-what)), and screen 13 shows the safety states. |
 | Scalability and deployment readiness | A new programme is a settings file, not new code (screen 4). Arabic works from the start (screen 11). |
 | Commercial viability and path to pilot | CareLoop works with existing hospital systems, basic phones and the health app patients already use. |
 
@@ -44,6 +44,35 @@ Every case, in every screening programme, moves through the same ten stages. A s
 | 8 | Outcome recorded | `CARE_OUTCOME_DOCUMENTED` | `OutcomeDocumented` |
 | 9 | Closure review | `CLOSURE_REVIEW` | `ClosureReviewRequested` |
 | 10 | Closed | `CLOSED` | `ClosureAuthorised` |
+
+## Who sees what
+
+![Who sees what](14-who-sees-what.png)
+
+Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines, who is responsible and links to records. Reports, images and notes stay in each hospital system, under that system's own access rules.
+
+| Person | Sees | Can do | Cannot |
+|---|---|---|---|
+| Patient: Hessa by basic phone, Amna in her health app | Her own next step, appointments and named nurse. A person gives her the result. | Confirm, ask for a call and say the next step back. Name a family member to get her appointment details, or stop it. | See anyone else's information |
+| Family member the patient named in writing: Saeed | The day, time and place of her appointments, by email | Help her get there. Nothing in CareLoop. | See results or the reason for the visit. Confirm or change anything. |
+| Nurse navigator: Huda | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved | Call patients, record what they understood, hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
+| Screening doctor: Dr. Rekha | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, approve what AI drafts, ask a specialist and send referrals. She stays responsible until a unit accepts. | See patients she does not care for |
+| Receiving doctor: Dr. Layla | Referrals sent to her unit: the request, the approved summary, the screening report and images | Accept or decline with a reason, book, record the outcome and close the case with evidence | See referrals sent to other units, or other cases at the Family Health Centre |
+| Lab and test teams | Test requests sent to them, and what each test needs | Accept a request, record that the test was done and send the report to the doctor who asked | See the rest of the patient's case |
+| Facility lead: Joy | Every case at her facility, to cover gaps and escalations | Choose or change who is responsible, and acknowledge escalations | See reports, images or notes, or cases at other facilities |
+| Programme coordinator: Dr. Obaid | Totals for every programme, with no names. One case only when it is escalated to him. | Approve the impact summary and act on escalations | See named lists of patients |
+| AI drafting, inside CareLoop | The facts of one case, only while drafting | Draft plain words and summaries for a person to approve | Send, decide, set urgency or close anything. Keep data, or learn from it. |
+| Engineers and support | Synthetic data only | Build, test and fix CareLoop | See real patient data, unless it is approved and recorded |
+
+The rules behind the table:
+
+- **Need to know.** Access depends on your role and the patients you care for, with the least access that does the job (DoH Standard on Patient Healthcare Data Privacy, 5.1 to 5.4; Federal Law No. 2 of 2019, Article 4; HIPAA, 45 CFR 164.502(b) and 164.514(d)). The API refuses any read that the role does not allow; hiding it on screen is not enough.
+- **Everything is recorded.** Every view and action is logged with who, when and why, and the logs are checked (ADHICS; HIPAA, 45 CFR 164.312(b)).
+- **Outside your team needs a reason.** Opening a case you do not care for asks for a reason, which is logged and checked by the facility lead. In the DoH standard, an authorised user looking at data for an unauthorised purpose is a privacy breach.
+- **Access ends with your part of the care.** When Hessa moves to the Cancer Centre, Mariam Al Kaabi and Dr. Karim Nassar see her case, and Huda no longer does.
+- **Data stays in the UAE.** All patient data, backups and AI processing stay in the UAE (DoH Standard, 4.1.4; Federal Law No. 2 of 2019, Article 13).
+- **Written consent for anything beyond care.** Sharing with family, or research that names patients, needs the patient's written consent (DoH Standard, 4.2.3; Federal Law No. 2 of 2019, Article 16; HIPAA, 45 CFR 164.510(b)).
+- **Automated calls check who answered.** The call gives no details until the person says they are the patient.
 
 ## Screens
 
@@ -69,7 +98,7 @@ Event and endpoint names marked \* are proposed and not yet in the solution desi
 
 ![Worklist](01-worklist.png)
 
-- The exception dashboard in the solution design. Read-only; reads `GET /cases` and `GET /exceptions`.
+- The exception dashboard in the solution design. Read-only; reads `GET /cases` and `GET /exceptions`, which return only the cases of the signed-in person's team.
 - Sorted by risk: urgent and overdue first, then by time left.
 - Each row shows one next action, one responsible person and one due time. Status is always a word with a coloured dot.
 - The filter chips are the exception queues in the solution design: urgent, overdue, rejected (shown as "Referral declined"), unreachable ("Not reached"), unacknowledged ("Not acknowledged") and unassigned ("Needs a new owner"). A case that needs a new owner stays with the facility lead until someone accepts it.
@@ -78,7 +107,7 @@ Event and endpoint names marked \* are proposed and not yet in the solution desi
 
 ![Case](02-case.png)
 
-- Read-only; reads `GET /cases/{id}` and `GET /cases/{id}/timeline`.
+- Read-only; reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged. Reports, images and notes are links into the hospital system, never copies.
 - The next action shows its escalation ladder and who has acknowledged it.
 - The checklist shows what must happen before the next stage. Missing evidence blocks progress.
 - The four tracks (patient contact, consultation, referral and appointment) each show their own status, and every timeline entry names its source system.
@@ -139,7 +168,7 @@ Event and endpoint names marked \* are proposed and not yet in the solution desi
 ![Basic phone, no internet](09-basic-phone.png)
 
 - Sends `PatientNotified` on delivery and `NotificationFailed`\* on failure. The nurse's call records `PatientAcknowledged` and `TeachBackSubmitted`\*. Replying or pressing 1 sends `AppointmentConfirmed`\*, and 2 sends `CallbackRequested`\*.
-- A person gives results. Texts and automated calls carry only dates and places, with no links, and come from a number the patient can reply to.
+- A person gives results. Texts and automated calls carry only dates and places, with no links, and come from a number the patient can reply to. The automated call gives no details until the person who answers says they are the patient.
 
 ### 10. Patient view
 
@@ -243,3 +272,6 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Deadlines other than the Department of Health (DoH) targets, including reply times for consultations, are placeholders until a clinical adviser approves them.
 - The user stories (US04) let a caregiver act within approved permissions. These designs give a caregiver one permission only: getting appointment details. Agree this as a team.
 - A patient who cannot decide for themselves is represented by a legal guardian. That needs its own design and a legal review.
+- How long does CareLoop keep case records? Health records must be kept for at least 25 years after the last procedure (Federal Law No. 2 of 2019, Article 20).
+- Who checks the access records, and how often: the facility lead or a privacy officer?
+- The text, call and email providers need data agreements, and must keep data in the UAE.

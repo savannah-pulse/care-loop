@@ -372,6 +372,13 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .ladder.vert>div{border-inline-start:0;border-block-start:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .ladder.vert>div:first-child{border-block-start:0}
 .ladder.vert .k{margin-bottom:0}
+
+/* 14 Who sees what */
+.access{width:1440px}
+.access tr.grp td{background:var(--soft);font-size:13px;font-weight:600;color:var(--ink2);padding:8px 16px}
+.access td b{display:block;font-weight:600}
+.access-bottom{display:grid;grid-template-columns:560px minmax(0,1fr);gap:24px;margin-top:24px;width:1440px;align-items:start}
+.access-bottom .reach{font-size:15px}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
@@ -500,7 +507,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </section>
 
 <section class="board" id="b01" data-file="01-worklist">
-<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case across all screening programmes, sorted by risk, with one next action and one person responsible. In the solution design, this is the exception dashboard.</p>
+<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case for her team, across all screening programmes, sorted by risk, with one next action and one person responsible. In the solution design, this is the exception dashboard.</p>
 <div class="meta"><span>For: care coordinators, nurse navigators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US05, US13, US16</span><span>Requirements: FR-07, FR-09, FR-10</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -513,7 +520,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 <div class="page">
 <div class="head">
-<div><h1>Worklist</h1><p class="sub">Thursday 12 November 2026, 09:00 · 24 open cases. Each case has one next action and one person responsible.</p></div>
+<div><h1>Worklist</h1><p class="sub">Thursday 12 November 2026, 09:00 · 24 open cases for your team. Each case has one next action and one person responsible.</p></div>
 <div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">My team<svg class="i"><use href="#i-down"/></svg></span><span class="field search"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span></div>
 </div>
 <div class="chips">
@@ -648,6 +655,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 </div>
 </div>
 </div>
+<p class="note">Only Hessa's care team can open this case, and every view is recorded. Reports, images and notes stay in the hospital system.</p>
 </div>
 </div>
 </section>
@@ -1092,8 +1100,8 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <h3><svg class="i"><use href="#i-phone"/></svg>Automated reminder call<span class="r small muted">Fri 13 Nov, 10:00</span></h3>
 <p class="note">In Arabic, shown here in English. No reading needed.</p>
 <ul class="script">
-<li>Hello. This is an automated call from General Hospital for Hessa Al Dhaheri.</li>
-<li>You have an appointment on Monday the 16th of November, at half past ten in the morning, in Building 2.</li>
+<li>Hello. This call is for Hessa Al Dhaheri. If you are Hessa, press 1. If not, please ask her to call 02 000 0000.</li>
+<li>Thank you. This is General Hospital. You have an appointment on Monday the 16th of November, at half past ten in the morning, in Building 2.</li>
 <li>Press 1 to confirm. Press 2 to talk to a person. Press 9 to hear this again.</li>
 </ul>
 <div class="keys"><span>1 Confirm</span><span>2 Talk to a person</span><span>9 Repeat</span></div>
@@ -1297,6 +1305,57 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 <span class="pfine">Last updated Thursday 12 November, 8:15 am</span>
 </div>
 <p class="when">The app keeps the last next step on the phone, with a number to call, so the patient always knows where to go.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b14" data-file="14-who-sees-what">
+<div class="cap"><span class="n">14</span><div><h2>Who sees what</h2><p>Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines and who is responsible. Reports, images and notes stay in each hospital system.</p>
+<div class="meta"><span>For: everyone building, testing or approving CareLoop</span><span>Applies to: every screen, message and report</span></div></div></div>
+<div class="tablecard access">
+<table>
+<colgroup><col style="width:264px"><col><col><col></colgroup>
+<thead><tr><th>Person</th><th>Sees</th><th>Can do</th><th>Cannot</th></tr></thead>
+<tbody>
+<tr class="grp"><td colspan="4">The patient and her family</td></tr>
+<tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by basic phone. Amna uses her health app.</span></td><td>Her own next step, appointments and named nurse. A person gives her the result.</td><td>Confirm, ask for a call and say the next step back. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
+<tr><td><b>Saeed Al Dhaheri</b><span class="l2">Her son, named by Hessa in writing</span></td><td>The day, time and place of her appointments, by email</td><td>Help her get there. Nothing in CareLoop.</td><td>See results or the reason for the visit. Confirm or change anything.</td></tr>
+<tr class="grp"><td colspan="4">Care team</td></tr>
+<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved</td><td>Call patients, record what they understood, hand over tasks and ask a doctor to call a patient back</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
+<tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, approve what AI drafts, ask a specialist and send referrals. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
+<tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span></td><td>Referrals sent to her unit: the request, the approved summary, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
+<tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span></td><td>Test requests sent to them, and what each test needs</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
+<tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, and acknowledge escalations</td><td>See reports, images or notes, or cases at other facilities</td></tr>
+<tr class="grp"><td colspan="4">Oversight and systems</td></tr>
+<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span></td><td>Totals for every programme, with no names. One case only when it is escalated to him.</td><td>Approve the impact summary and act on escalations</td><td>See named lists of patients</td></tr>
+<tr><td><b>AI drafting</b><span class="l2">Part of CareLoop</span></td><td>The facts of one case, only while drafting</td><td>Draft plain words and summaries for a person to approve</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
+<tr><td><b>Engineers and support</b><span class="l2">The CareLoop team</span></td><td>Synthetic data only</td><td>Build, test and fix CareLoop</td><td>See real patient data, unless it is approved and recorded</td></tr>
+</tbody></table>
+</div>
+<div class="access-bottom">
+<div class="card">
+<h3>Opening a case outside your team</h3>
+<div class="stack" style="gap:12px">
+<b>Fatima Al Zaabi is cared for by another team</b>
+<p class="note">Say why you need her case. Your reason and everything you open are recorded, and your facility lead checks them.</p>
+<div class="opts" style="gap:8px">
+<div class="box"><span class="radio on"></span>She called me and needs help now</div>
+<div class="box"><span class="radio"></span>I am covering for her nurse today</div>
+<div class="box"><span class="radio"></span>Another reason, which I will write</div>
+</div>
+<div class="btns"><span class="btn">Cancel</span><span class="btn primary">Open her case</span></div>
+</div>
+</div>
+<div class="card">
+<h3>Rules for everyone</h3>
+<ul class="reach">
+<li><svg class="i"><use href="#i-user"/></svg><span>You see only the cases you care for, and only what your work needs.</span></li>
+<li><svg class="i"><use href="#i-doc"/></svg><span>Every view and every action is recorded: who, when and why.</span></li>
+<li><svg class="i"><use href="#i-clock"/></svg><span>Access ends when your part of the care ends. When Hessa moves to the Cancer Centre, her new team sees her case and Huda no longer does.</span></li>
+<li><svg class="i"><use href="#i-lang"/></svg><span>All patient data, backups and AI stay in the UAE.</span></li>
+<li><svg class="i"><use href="#i-lock"/></svg><span>Anything beyond care, such as sharing with family, needs the patient's written consent.</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Based on Abu Dhabi DoH rules, UAE health data law and HIPAA. Each source is listed in the design notes.</p>
 </div>
 </div>
 </section>
