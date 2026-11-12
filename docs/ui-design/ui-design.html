@@ -1,0 +1,1014 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>CareLoop UI designs</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}
+:root{--ink:#1B2430;--ink2:#4A5565;--ink3:#5F6B79;--line:#DCE1E7;--line2:#EEF1F4;--bg:#F6F7F9;--soft:#F1F3F6;--white:#FFFFFF;
+--accent:#1D5FA8;--accent-ink:#164C86;--accent-soft:#EAF2FB;--accent-line:#BCD3EE;
+--red:#B42318;--red-soft:#FDEEEC;--red-line:#F4C7C1;--amber:#9A4A06;--amber-soft:#FEF4E5;--amber-line:#F2D2A6;
+--green:#17663A;--green-soft:#EAF6EF;--green-line:#BFE3CC;--grey:#6B7684;--his:#27313D;--board:#E7EBF0;
+--shadow:0 1px 2px rgba(16,24,40,.06),0 16px 40px rgba(16,24,40,.10)}
+html{background:var(--board)}
+body{font-family:"Segoe UI",system-ui,sans-serif;color:var(--ink);font-size:15px;line-height:1.45;padding:24px;display:flex;flex-direction:column;gap:60px;align-items:flex-start;-webkit-font-smoothing:antialiased}
+svg.i{width:18px;height:18px;flex:none}
+.board{background:var(--board);padding:36px 44px 48px}
+.cap{display:flex;align-items:flex-start;gap:16px;margin-bottom:24px;max-width:1440px}
+.cap .n{flex:none;min-width:40px;height:40px;padding:0 12px;border-radius:999px;background:var(--ink);color:var(--white);display:grid;place-items:center;font-weight:700;font-size:17px}
+.cap h2{font-size:25px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.cap p{color:var(--ink2);font-size:15.5px;margin-top:4px}
+.cap .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.cap .meta span{font-size:13px;color:var(--ink2);background:var(--white);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+/* window and app bar */
+.frame{width:1440px;background:var(--bg);border:1px solid #D3D9E1;border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+.win{height:30px;background:#EEF1F4;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 14px}
+.win i{width:11px;height:11px;border-radius:50%;background:#D3D8DF;display:block}
+.appbar{height:62px;background:var(--white);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:32px;padding:0 28px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:-.01em}
+.brand svg{width:26px;height:26px}
+.nav{display:flex;align-self:stretch;gap:4px}
+.nav span{display:flex;align-items:center;padding:0 14px;font-weight:600;color:var(--ink2);border-bottom:3px solid transparent}
+.nav .on{color:var(--accent);border-bottom-color:var(--accent)}
+.grow{flex:1}
+.pill{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.me{display:flex;align-items:center;gap:10px}
+.av{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:13px;flex:none}
+.me b{display:block;font-size:14px;line-height:1.2}.me small{display:block;font-size:12.5px;color:var(--ink3)}
+.appbar.his{background:var(--his);border-bottom-color:var(--his);color:var(--white)}
+.sys{display:flex;flex-direction:column;line-height:1.25}.sys b{font-size:16px}.sys small{color:#B8C2CE;font-size:12.5px}
+.his .pill{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);color:#E6EBF1}
+.his .me small{color:#B8C2CE}.his .av{background:#3A4757;color:var(--white)}
+/* page */
+.page{padding:26px 32px 32px;display:flex;flex-direction:column;gap:18px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+h1{font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-.015em}
+.sub{color:var(--ink2);margin-top:6px}
+.muted{color:var(--ink3)}.small{font-size:13px}.note{color:var(--ink3);font-size:13.5px}
+.crumb{display:flex;align-items:center;gap:6px;color:var(--accent);font-weight:600;font-size:14px}
+.crumb .sep{color:var(--ink3);font-weight:400}
+.filters{display:flex;gap:8px}
+.field{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:8px;background:var(--white);font-size:14px;color:var(--ink2);white-space:nowrap}
+.field svg{width:16px;height:16px;color:var(--ink3)}
+.field.search{width:240px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:var(--white);font-weight:600;font-size:14px;color:var(--ink2)}
+.chip b{color:var(--ink);font-weight:700}
+.chip.on{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}.chip.on b{color:var(--accent-ink)}
+.chip .d{width:8px;height:8px;border-radius:50%;background:currentColor;display:block}
+/* tables */
+.tablecard{background:var(--white);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{font-size:12.5px;font-weight:600;color:var(--ink3);text-align:left;padding:11px 16px;border-bottom:1px solid var(--line);background:#FAFBFC}
+td{padding:13px 16px;border-bottom:1px solid var(--line2);vertical-align:top;font-size:14.5px}
+tr:last-child td{border-bottom:0}
+td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
+.name{font-weight:600}
+.more{padding:12px 16px;color:var(--accent);font-weight:600;font-size:14px;background:#FAFBFC;border-top:1px solid var(--line2)}
+/* status */
+.st{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14px;white-space:nowrap}
+.st::before{content:"";width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+.red{color:var(--red)}.amber{color:var(--amber)}.green{color:var(--green)}.blue{color:var(--accent)}.grey{color:var(--grey)}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+.badge.red{background:var(--red-soft);border-color:var(--red-line)}.badge.amber{background:var(--amber-soft);border-color:var(--amber-line)}
+.badge.green{background:var(--green-soft);border-color:var(--green-line)}.badge.blue{background:var(--accent-soft);border-color:var(--accent-line)}
+.badge.grey{background:var(--soft);border-color:var(--line);color:var(--ink2)}
+.ai{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.ai svg{width:13px;height:13px}
+/* cards and layout */
+.card{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.card h3{font-size:15.5px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3 .r{margin-left:auto;font-weight:400}
+.lbl{font-size:12.5px;font-weight:600;color:var(--ink3)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:18px}
+.kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.kv small{display:block;font-size:12.5px;color:var(--ink3);margin-bottom:3px}
+.kv b{display:block;font-weight:600}
+.kv span{display:block;color:var(--ink2);font-size:13.5px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:40px;padding:0 18px;border-radius:8px;font-weight:600;font-size:14.5px;border:1px solid var(--line);background:var(--white);color:var(--ink);white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--white)}
+.btn svg{width:16px;height:16px}
+.btns{display:flex;gap:10px}
+/* patient banner */
+.pbanner{display:flex;align-items:center;gap:16px;background:var(--white);border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+.pbanner .av{width:48px;height:48px;font-size:16px}
+.pbanner .who{flex:1;min-width:0}
+.pbanner .nm{font-size:20px;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.pbanner .id{color:var(--ink2);font-size:14px;margin-top:2px}
+.pbanner .id span+span::before{content:"·";margin:0 8px;color:var(--ink3)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{font-size:12.5px;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px}
+.pbanner.compact{padding:12px 18px}.pbanner.compact .av{width:40px;height:40px;font-size:14px}.pbanner.compact .nm{font-size:17px}
+/* stepper */
+.casebar{display:flex;gap:28px;font-size:14px;color:var(--ink2);margin-bottom:18px;flex-wrap:wrap}
+.casebar b{color:var(--ink);font-weight:600}
+.stepper{display:grid;grid-template-columns:repeat(10,minmax(0,1fr))}
+.stepper .s{display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;font-size:12.5px;color:var(--ink3);text-align:center;line-height:1.25}
+.stepper .s::before{content:"";position:absolute;top:10px;right:50%;width:100%;height:2px;background:var(--line)}
+.stepper .s:first-child::before{display:none}
+.stepper .done::before,.stepper .now::before{background:var(--accent)}
+.stepper .dot{position:relative;width:22px;height:22px;border-radius:50%;border:2px solid #C9D1DA;background:var(--white);display:grid;place-items:center;color:var(--white)}
+.stepper .dot svg{width:13px;height:13px}
+.stepper .done .dot{background:var(--accent);border-color:var(--accent)}
+.stepper .now .dot{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.stepper .now .dot::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.stepper .now{color:var(--ink);font-weight:700}.stepper .done{color:var(--ink2)}
+/* next action, ladder, checks, timeline, tracks */
+.next h2{font-size:21px;line-height:1.3;letter-spacing:-.01em;margin:6px 0 4px}
+.next .why{color:var(--ink2);margin-bottom:18px}
+.next .top{display:flex;align-items:center;gap:10px}
+.ladder{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:18px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ladder>div{padding:12px 14px;border-left:1px solid var(--line);font-size:13.5px;color:var(--ink2)}
+.ladder>div:first-child{border-left:0}
+.ladder .k{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.ladder .num{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--soft);color:var(--ink2);flex:none}
+.ladder .done .num,.ladder .now .num{background:var(--accent);color:var(--white)}
+.ladder .now{background:var(--accent-soft)}
+.check{list-style:none}
+.check li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;padding:11px 0;border-top:1px solid var(--line2);align-items:start}
+.check li:first-child{border-top:0;padding-top:0}
+.mk{width:22px;height:22px;border-radius:50%;display:grid;place-items:center}
+.mk svg{width:13px;height:13px}
+.mk.ok{background:var(--green-soft);color:var(--green)}.mk.no{background:var(--red-soft);color:var(--red)}.mk.todo{border:2px solid #C9D1DA}
+.check b{font-weight:600;display:block}
+.check span{color:var(--ink2);font-size:13.5px}
+.check .r{font-size:13px;color:var(--ink3);white-space:nowrap}
+.tl{list-style:none}
+.tl li{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:14px;padding:10px 0;border-top:1px solid var(--line2);font-size:14px}
+.tl li:first-child{border-top:0;padding-top:0}
+.tl time{color:var(--ink3);font-size:13px}
+.tl b{font-weight:600}.tl .by{display:block;color:var(--ink2);font-size:13px}
+.src{font-size:12px;font-weight:600;color:var(--ink2);background:var(--soft);border-radius:6px;padding:2px 8px;height:fit-content;white-space:nowrap}
+.tracks{list-style:none}
+.tracks li{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:11px 0;border-top:1px solid var(--line2)}
+.tracks li:first-child{border-top:0;padding-top:0}
+.tracks b{display:block;font-weight:600;font-size:14px}.tracks span{color:var(--ink2);font-size:13.5px}
+.reach{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.reach li{display:flex;gap:10px;align-items:flex-start}.reach svg{color:var(--ink3);margin-top:1px}
+.linkrow{color:var(--accent);font-weight:600;font-size:14px;margin-top:12px}
+/* options, summaries, action bar */
+.opts{display:flex;flex-direction:column;gap:12px}
+.opt{display:grid;grid-template-columns:22px minmax(0,1fr);gap:14px;border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--white)}
+.opt.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.radio{width:20px;height:20px;border-radius:50%;border:2px solid #AEB7C2;margin-top:2px;display:grid;place-items:center;background:var(--white)}
+.sel .radio,.radio.on{border-color:var(--accent)}
+.sel .radio::after,.radio.on::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.opt.dim{background:#FAFBFC;color:var(--ink3)}
+.opt h4{font-size:15.5px;font-weight:700;display:flex;align-items:center;gap:10px}
+.opt p{font-size:14px;color:var(--ink2);margin-top:3px}
+.ticks{list-style:none;display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px;font-size:13.5px;color:var(--ink2)}
+.ticks li{display:flex;align-items:center;gap:6px}.ticks svg{width:14px;height:14px;color:var(--green)}
+.ticks .x svg{color:var(--ink3)}
+.sbar{display:flex;flex-direction:column;gap:12px;font-size:14.5px}
+.sbar small{display:block;font-size:12.5px;font-weight:700;color:var(--ink3)}
+.approved{display:flex;align-items:center;gap:8px;color:var(--green);font-weight:600;font-size:14px;background:var(--green-soft);border-radius:8px;padding:10px 12px}
+.approved svg{width:16px;height:16px}
+.actionbar{display:flex;align-items:center;justify-content:space-between;gap:16px;background:var(--white);border-top:1px solid var(--line);padding:16px 32px}
+.events{font-size:13px;color:var(--ink3)}
+.events code{font-family:Consolas,monospace;font-size:12.5px;color:var(--ink2);background:var(--soft);padding:1px 6px;border-radius:4px;margin-left:4px}
+.selectbox{display:flex;align-items:center;justify-content:space-between;height:40px;border:1px solid var(--line);border-radius:8px;padding:0 12px;font-size:14px;color:var(--ink3);background:var(--white);margin-top:10px;max-width:320px}
+.formrow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:12px}
+.formrow small{display:block;font-size:12.5px;color:var(--ink3);margin-bottom:3px}
+.formrow b{display:block;font-weight:600;font-size:14px}
+.inbox{list-style:none;display:flex;flex-direction:column}
+.inbox li{padding:14px 16px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:3px;font-size:13.5px;color:var(--ink2)}
+.inbox li:first-child{border-top:0}
+.inbox li b{font-size:15px;color:var(--ink)}
+.inbox li.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);padding:0 12px}
+.tabs span{padding:12px 10px;font-weight:600;font-size:14px;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs .on{color:var(--accent);border-bottom-color:var(--accent)}
+.docs{display:flex;gap:10px;margin-top:14px}
+.doc{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13.5px;font-weight:600;color:var(--accent-ink)}
+.doc svg{color:var(--ink3);width:16px;height:16px}
+.box{display:flex;align-items:center;gap:10px;font-size:14px}
+.cbox{width:20px;height:20px;border-radius:5px;background:var(--accent);color:var(--white);display:grid;place-items:center;flex:none}
+.cbox svg{width:13px;height:13px}
+
+/* impact */
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.kpi .big{font-size:42px;font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:8px 0 2px}
+.kpi .of{color:var(--ink2);font-size:14px}
+.kpi .vs{margin-top:14px;padding-top:12px;border-top:1px solid var(--line2);font-size:13.5px;color:var(--ink2)}
+.kpi .vs b{color:var(--ink);font-weight:600}
+.bars{list-style:none;display:flex;flex-direction:column;gap:10px}
+.bars li{display:grid;grid-template-columns:150px minmax(0,1fr) 40px;gap:12px;align-items:center;font-size:13.5px}
+.bar{height:14px;border-radius:4px;background:var(--soft);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.bar.amberbar i{background:#B7752A}
+.bars .v{text-align:right;font-weight:600}
+.grid3{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:start}
+.mini{width:100%;border-collapse:collapse}
+.mini th{background:none;padding:0 0 8px;border-bottom:1px solid var(--line);font-size:12.5px}
+.mini td{padding:9px 0;border-bottom:1px solid var(--line2);font-size:14px}
+.mini tr:last-child td{border-bottom:0}
+.mini .num{text-align:right;font-weight:600}
+.mini th.num{text-align:right}
+.aitext{font-size:14.5px;line-height:1.55}
+.aitext p+p{margin-top:8px}
+/* phones */
+.phones{display:flex;gap:44px;align-items:flex-start}
+.pcol{display:flex;flex-direction:column;align-items:center;gap:14px}
+.pcol .pcap{font-size:14px;color:var(--ink2);text-align:center;max-width:360px}
+.pcol .pcap b{display:block;color:var(--ink);font-size:15px}
+.phone{width:390px;height:844px;border-radius:54px;background:#10151B;padding:12px;box-shadow:var(--shadow);flex:none;position:relative}
+.scr{width:100%;height:100%;border-radius:43px;background:var(--bg);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.notch{position:absolute;top:22px;left:50%;transform:translateX(-50%);width:112px;height:32px;border-radius:20px;background:#10151B;z-index:2}
+.sb{height:54px;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0;font-weight:600;font-size:15px;flex:none}
+.sb .bat{width:26px;height:12px;border:2px solid var(--ink);border-radius:4px;position:relative}
+.sb .bat::after{content:"";position:absolute;inset:1px 5px 1px 1px;background:var(--ink);border-radius:1px}
+.papp{padding:6px 18px 18px;display:flex;flex-direction:column;gap:14px;font-size:16px;flex:1}
+.apptop{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;color:var(--ink3)}
+.lang{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;font-size:13px;background:var(--white)}
+.lang span{padding:3px 11px}.lang .on{background:var(--ink);color:var(--white)}
+.hello{font-size:27px;font-weight:700;letter-spacing:-.015em;line-height:1.2}
+.pcard{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:18px}
+.pcard.key{border:2px solid var(--accent)}
+.pcard .lbl{font-size:13.5px}
+.pcard h4{font-size:21px;line-height:1.25;margin:4px 0 8px;letter-spacing:-.01em}
+.pcard p{font-size:16px;color:var(--ink2);line-height:1.45}
+.pcard p+p{margin-top:4px}
+.pcard .when{color:var(--ink);font-weight:600}
+.pbtn{display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:14px;font-weight:600;font-size:17px;border:1px solid var(--line);background:var(--white);color:var(--ink);margin-top:10px}
+.pbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--white)}
+.pbtn svg{width:18px;height:18px}
+.prow{display:flex;gap:12px;align-items:center}
+.prow .av{width:44px;height:44px;font-size:15px}
+.prow b{display:block;font-size:17px}.prow small{display:block;color:var(--ink3);font-size:14px}
+.psteps{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:15.5px;margin-top:8px}
+.psteps li{display:flex;gap:12px;align-items:center;color:var(--ink2)}
+.psteps .mk{width:24px;height:24px}
+.psteps .now{color:var(--ink);font-weight:700}
+.psteps .nowdot{width:24px;height:24px;border-radius:50%;border:2px solid var(--accent);display:grid;place-items:center;flex:none}
+.psteps .nowdot::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.pback{display:flex;align-items:center;gap:6px;color:var(--accent);font-weight:600;font-size:16px}
+.ptitle{font-size:24px;font-weight:700;letter-spacing:-.01em}
+.pfine{font-size:13.5px;color:var(--ink3);line-height:1.4}
+.choice{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:13px 14px;font-size:16px;margin-top:10px;line-height:1.35}
+.choice.sel{border-color:var(--accent);background:var(--accent-soft)}
+.choice .radio{flex:none;margin-top:1px}
+.scale{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+.scale span{height:46px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;font-weight:700;font-size:17px}
+.scale .on{background:var(--accent);border-color:var(--accent);color:var(--white)}
+.scalelbl{display:flex;justify-content:space-between;font-size:13px;color:var(--ink3);margin-top:6px}
+.done-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:10px 6px 4px}
+.done-hero .big{width:56px;height:56px;border-radius:50%;background:var(--green-soft);color:var(--green);display:grid;place-items:center}
+.done-hero .big svg{width:28px;height:28px}
+.done-hero h4{font-size:22px}
+.done-hero p{color:var(--ink2);font-size:16px}
+.helping{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:16px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+.helping svg{color:var(--accent);margin-top:2px}
+.helping b{display:block;font-size:16px}.helping span{font-size:14.5px;color:var(--ink2)}
+.pcard.locked{background:var(--soft)}
+.pcard.locked .prow svg{color:var(--ink3)}
+/* basic phone */
+.fphone{width:280px;background:#262B31;border-radius:42px 42px 58px 58px;padding:30px 24px 34px;box-shadow:var(--shadow);flex:none}
+.fspk{width:64px;height:6px;border-radius:3px;background:#3B4148;margin:0 auto 18px}
+.fscr{background:#DCE4D2;border-radius:8px;height:318px;padding:12px 13px;font-family:Consolas,"Courier New",monospace;font-size:15px;line-height:1.4;color:#141A12;border:5px solid #151A1F}
+.fhead{display:flex;justify-content:space-between;border-bottom:1px solid #8A9481;padding-bottom:6px;margin-bottom:8px;font-weight:700}
+.fsoft{display:flex;justify-content:space-between;margin-top:16px;padding:0 6px;color:#C9CFD6;font-size:13px;font-weight:600}
+.fkeys{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
+.fkeys span{height:36px;border-radius:14px;background:#3A4047;color:#E9EDF1;display:grid;place-items:center;font-weight:600;font-size:16px}
+.cols3{display:grid;grid-template-columns:300px minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start;width:1440px}
+.recs{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:16px;width:280px}
+.recs li{display:flex;align-items:center;gap:8px;font-size:14px;background:var(--white);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.recs .mk{width:20px;height:20px}
+.script{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.script li{background:var(--soft);border-radius:10px;padding:11px 14px;font-size:15px;line-height:1.45}
+.script li small{display:block;font-size:12.5px;font-weight:700;color:var(--ink3);margin-bottom:2px}
+.keys{display:flex;gap:8px;margin-top:12px}
+.keys span{border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13.5px;font-weight:600;background:var(--white)}
+.result{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--green-soft);border-radius:10px;padding:11px 14px;font-size:14.5px}
+.result .mk{background:var(--white);flex:none}
+.rules{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px;margin-top:28px;width:1440px}
+.rule{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.rule svg{color:var(--accent);margin-top:1px}
+/* email */
+.mail{background:var(--white);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;width:600px}
+.mail .mh{padding:16px 22px;border-bottom:1px solid var(--line);font-size:14px;display:flex;flex-direction:column;gap:5px;background:#FAFBFC}
+.mail .mh div{display:flex;gap:10px}.mail .mh b{font-weight:600;color:var(--ink3);width:62px;flex:none}
+.mail .subj{font-size:18px;font-weight:700;padding:18px 22px 0}
+.mail .mb{padding:14px 22px 24px;font-size:15.5px;display:flex;flex-direction:column;gap:12px;line-height:1.5}
+/* flow */
+.flow{width:2380px;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:30px 30px 26px;box-shadow:var(--shadow)}
+.fgrid{display:grid;grid-template-columns:150px repeat(10,minmax(0,1fr));column-gap:24px;row-gap:12px}
+.lane{font-size:13.5px;font-weight:700;color:var(--ink2);padding-top:12px;line-height:1.3}
+.lane small{display:block;font-weight:400;color:var(--ink3);font-size:12.5px}
+.stage{position:relative;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:12px 14px;min-height:78px}
+.stage .no{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--white);font-weight:700;font-size:13px;margin-bottom:8px}
+.stage b{display:block;font-size:16px;line-height:1.25}
+.stage code{display:block;font-family:Consolas,monospace;font-size:11px;color:var(--accent-ink);margin-top:5px;word-break:break-all}
+.stage::after{content:"";position:absolute;right:-18px;top:50%;width:11px;height:11px;border-top:2px solid var(--accent);border-right:2px solid var(--accent);transform:translateY(-50%) rotate(45deg)}
+.stage.last::after{display:none}
+.cell{background:var(--soft);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.38}
+.cell small{display:block;color:var(--ink3);font-size:12.5px;margin-top:3px}
+.cell.e{background:transparent;border:1px dashed var(--line2)}
+.cell.pt{background:var(--white);border:1px solid var(--line)}
+.refs{display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;padding-top:4px}
+.refs span{font-size:12.5px;font-weight:600;color:var(--accent-ink);background:var(--white);border:1px solid var(--accent-line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+.band{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:24px;margin-top:20px;align-items:start}
+.band .body{border-radius:12px;padding:16px 20px;font-size:15px}
+.band.exc .body{background:var(--amber-soft);border:1px solid var(--amber-line)}
+.band.aib .body{background:var(--soft);border:1px solid var(--line)}
+.esc{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.esc span{background:var(--white);border:1px solid var(--amber-line);border-radius:10px;padding:8px 12px;font-weight:600;font-size:14px}
+.esc svg{color:var(--amber)}
+.flowfoot{margin-top:18px;color:var(--ink3);font-size:14px}
+/* refinements */
+.btn.off{opacity:.42}
+.plink{display:flex;align-items:center;justify-content:center;height:44px;margin-top:6px;color:var(--accent);font-weight:600;font-size:16.5px}
+.bars.wide li{grid-template-columns:205px minmax(0,1fr) 40px}
+.selectbox{max-width:560px}
+.stepper .now .dot::after{width:10px;height:10px}
+.papp{gap:12px}
+.pcard.locked .prow{align-items:flex-start}
+.pcard.locked .prow svg{margin-top:4px}
+
+.events{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.events .ev{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="logo" viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1D5FA8" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="50 13" transform="rotate(-60 14 14)"/><circle cx="19" cy="5.4" r="2.7" fill="#1D5FA8"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.3 4.3L19 7.2"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.8l9 15.7H3z"/><path d="M12 10v4.2M12 16.9v.2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6l-6 6 6 6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 6l6 6-6 6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13.5 6.5L19 12l-5.5 5.5"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M6.6 3.5h3l1.6 4.2-2.2 1.5a11 11 0 0 0 5.8 5.8l1.5-2.2 4.2 1.6v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3l2 5.6 5.6 2-5.6 2L12 18.2l-2-5.6-5.6-2 5.6-2z"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4.5 5.5h15v10h-9l-4.5 3.5v-3.5h-1.5z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3A4 4 0 0 0 13 5.3l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/><path d="M4 4l16 16"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5z"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.4"/></symbol>
+</defs>
+</svg>
+
+<section class="board" id="b00" data-file="00-flow">
+<div class="cap"><span class="n">Flow</span><div><h2>One case, from screening result to closed</h2><p>Every case in every screening programme follows the same ten stages. Shown here with Hessa Al Dhaheri, 66, from Madinat Zayed in Al Dhafra, whose breast screening needs more tests.</p></div></div>
+<div class="flow">
+<div class="fgrid">
+<div class="lane"></div>
+<div class="stage"><span class="no">1</span><b>Result received</b></div>
+<div class="stage"><span class="no">2</span><b>Case opened</b></div>
+<div class="stage"><span class="no">3</span><b>Owner assigned</b></div>
+<div class="stage"><span class="no">4</span><b>Patient notified</b></div>
+<div class="stage"><span class="no">5</span><b>Patient confirmed</b></div>
+<div class="stage"><span class="no">6</span><b>Consultation</b></div>
+<div class="stage"><span class="no">7</span><b>Follow-up</b></div>
+<div class="stage"><span class="no">8</span><b>Outcome recorded</b></div>
+<div class="stage"><span class="no">9</span><b>Closure review</b></div>
+<div class="stage last"><span class="no">10</span><b>Closed</b></div>
+
+<div class="lane">Responsible</div>
+<div class="cell">Screening physician<small>Dr. Rekha Varghese</small></div>
+<div class="cell">CareLoop<small>Automatic</small></div>
+<div class="cell">Nurse navigator<small>Huda Saleh, or the facility lead if no one is free</small></div>
+<div class="cell">Nurse navigator<small>Huda Saleh</small></div>
+<div class="cell">Hessa, or Saeed for her<small>Saeed: appointments only</small></div>
+<div class="cell">Referring clinician<small>Dr. Rekha Varghese</small></div>
+<div class="cell">Receiving clinician<small>Dr. Layla Haddad, then each treating team</small></div>
+<div class="cell">Treating clinician<small>Dr. Layla Haddad</small></div>
+<div class="cell">Authorised clinician<small>Dr. Layla Haddad</small></div>
+<div class="cell">Authorised clinician<small>Care continues with a named team</small></div>
+
+<div class="lane">Hessa and Saeed<small>What they get</small></div>
+<div class="cell pt">Her mammogram at the Family Health Centre. A printed card says who will call her.</div>
+<div class="cell e"></div>
+<div class="cell e"></div>
+<div class="cell pt">A short text: "Please expect our call." Then a call from Huda in Arabic, at the time she chose.</div>
+<div class="cell pt">She says the next step back in her own words. She can ask for a call at any time.</div>
+<div class="cell e"></div>
+<div class="cell pt">Reminder text and automated call. She presses 1, or Saeed confirms for her.</div>
+<div class="cell pt">Told in person. A printed care plan in large type and a new named contact.</div>
+<div class="cell e"></div>
+<div class="cell pt">Chemotherapy, radiotherapy and tablets, each with a named owner. Then yearly checks.</div>
+
+<div class="lane">Hospital system<small>Clinical actions</small></div>
+<div class="cell">Result interpreted: needs more tests.</div>
+<div class="cell e"></div>
+<div class="cell e"></div>
+<div class="cell e"></div>
+<div class="cell e"></div>
+<div class="cell">Agrees the next step: breast assessment.</div>
+<div class="cell">Chooses a unit and sends the referral. The unit accepts or declines with a reason. Appointment booked, then attended.</div>
+<div class="cell">Diagnosis, treatment plan and first treatment recorded.</div>
+<div class="cell">Checks every required step has evidence.</div>
+<div class="cell">Signs a closing reason.</div>
+
+<div class="lane">CareLoop<small>Automatic</small></div>
+<div class="cell">Reads the result. Ignores duplicates.</div>
+<div class="cell">Opens one case per result, with the clinician's urgency.</div>
+<div class="cell">Names one owner. Never leaves a case with no one.</div>
+<div class="cell">Records sent, delivered and failed. No answer creates a task.</div>
+<div class="cell">Records "confirmed" and "understood" separately.</div>
+<div class="cell">Starts the clock for the next step.</div>
+<div class="cell">Keeps the sender responsible until a unit accepts. AI drafts the handoff summary.</div>
+<div class="cell">Asks for evidence of each care step.</div>
+<div class="cell">Blocks closing until the list is complete.</div>
+<div class="cell">Counts the case on the Impact page. Keeps continuing care visible.</div>
+
+<div class="lane">Screens</div>
+<div class="refs"></div>
+<div class="refs"><span>1 Worklist</span></div>
+<div class="refs"><span>1 Worklist</span><span>2 Case</span></div>
+<div class="refs"><span>7 Basic phone</span><span>8 Patient view</span></div>
+<div class="refs"><span>7 Basic phone</span><span>8 Patient view</span><span>9 Caregiver</span></div>
+<div class="refs"><span>2 Case</span></div>
+<div class="refs"><span>3 Refer</span><span>4 Accept</span><span>2 Case</span><span>9 Caregiver</span></div>
+<div class="refs"><span>2 Case</span></div>
+<div class="refs"><span>5 Close</span></div>
+<div class="refs"><span>5 Close</span><span>6 Impact</span></div>
+</div>
+
+<div class="band exc"><div class="lane">When something goes wrong</div><div class="body">
+<b>Late, declined, not reached, not confirmed or no owner:</b> CareLoop creates a task with a named person and a deadline, then escalates until a person acts.
+<div class="esc"><span>1 Reminder to the owner</span><svg class="i"><use href="#i-arrow"/></svg><span>2 Facility lead, at the deadline</span><svg class="i"><use href="#i-arrow"/></svg><span>3 Programme coordinator</span><span style="border-style:dashed">Urgent cases skip step 1</span><span style="border-style:dashed">Every escalation must be acknowledged by a person</span><span style="border-style:dashed">A case never closes by itself</span></div>
+</div></div>
+
+<div class="band aib"><div class="lane">Where AI helps</div><div class="body">
+<b>AI drafts, people decide.</b> Plain-language explanations and Arabic translations for patients, checked by a clinician. Handoff summaries, approved by the referring clinician. Impact summaries, approved by the programme coordinator. AI never sets urgency, sends a message or closes a case.
+</div></div>
+<p class="flowfoot">The same ten stages work for breast, bowel, cervical and lung screening and for heart, kidney and diabetes checks. Each programme only changes its settings: steps, deadlines and required evidence.</p>
+</div>
+</section>
+
+<section class="board" id="b01" data-file="01-worklist">
+<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case across all screening programmes, sorted by risk, with one next action and one person responsible. In the solution design, this is the exception dashboard.</p>
+<div class="meta"><span>For: care coordinators, nurse navigators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US05, US13, US16</span><span>Requirements: FR-07, FR-09, FR-10</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar">
+<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
+<nav class="nav"><span class="on">Worklist</span><span>Impact</span></nav>
+<div class="grow"></div>
+<span class="pill">Synthetic data</span>
+<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
+</div>
+<div class="page">
+<div class="head">
+<div><h1>Worklist</h1><p class="sub">Thursday 12 November 2026, 09:00 · 24 open cases. Each case has one next action and one person responsible.</p></div>
+<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">My team<svg class="i"><use href="#i-down"/></svg></span><span class="field search"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span></div>
+</div>
+<div class="chips">
+<span class="chip on">All open <b>24</b></span>
+<span class="chip"><i class="d red"></i>Urgent <b>1</b></span>
+<span class="chip"><i class="d red"></i>Overdue <b>1</b></span>
+<span class="chip"><i class="d red"></i>Referral declined <b>1</b></span>
+<span class="chip"><i class="d amber"></i>Not reached <b>1</b></span>
+<span class="chip"><i class="d amber"></i>Not confirmed <b>1</b></span>
+<span class="chip"><i class="d amber"></i>No owner <b>1</b></span>
+</div>
+<div class="tablecard"><table>
+<colgroup><col style="width:200px"><col style="width:150px"><col style="width:165px"><col><col style="width:185px"><col style="width:150px"><col style="width:200px"></colgroup>
+<thead><tr><th>Patient</th><th>Programme</th><th>Stage</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="name">Hessa Al Dhaheri</span><span class="l2">66 · MRN 100 245 891</span></td><td>Breast screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Send a new referral<span class="l2">Regional Hospital declined: no capacity</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td><span class="red" style="font-weight:600">18 hours late</span><span class="l2">Was due Wed, 15:00</span></td><td><span class="st red">Overdue</span><span class="l2">Escalated to Joy Bautista</span></td></tr>
+<tr><td><span class="name">Noura Al Shamsi</span><span class="l2">44 · MRN 100 318 402</span></td><td>Breast screening</td><td>Consultation<span class="l2">Stage 6 of 10</span></td><td>Agree the next step with her today<span class="l2">Result marked urgent by Dr. Rekha Varghese</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st red">Urgent</span><span class="l2">Shorter deadlines</span></td></tr>
+<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient confirmed<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">From his health app</span></td></tr>
+<tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">57 · MRN 100 402 233</span></td><td>Bowel screening</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Choose a new owner<span class="l2">Aisha Al Nuaimi is on leave</span></td><td>Joy Bautista<span class="l2">Facility lead</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st amber">No owner</span><span class="l2">In the facility lead queue</span></td></tr>
+<tr><td><span class="name">Maricel Reyes</span><span class="l2">46 · MRN 100 455 790</span></td><td>Cervical screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her between 13:00 and 14:00<span class="l2">Two calls not answered; this is her lunch break</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not reached</span><span class="l2">Tried twice</span></td></tr>
+<tr><td><span class="name">Nasreen Akhtar</span><span class="l2">52 · MRN 100 468 104</span></td><td>Breast screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her with an Urdu interpreter<span class="l2">No reply to the text for two working days</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not confirmed</span><span class="l2">Text delivered Tue 10 Nov</span></td></tr>
+<tr><td><span class="name">Rashid Al Hosani</span><span class="l2">61 · MRN 100 512 337</span></td><td>Bowel screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Endoscopy Unit to accept the referral<span class="l2">Sent Wed 11 Nov, 10:00</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 12:00<span class="l2">1 day left</span></td><td><span class="st blue">Waiting for acceptance</span><span class="l2">Sender stays responsible</span></td></tr>
+<tr><td><span class="name">Mohammed Rafiq</span><span class="l2">49 · MRN 100 538 920</span></td><td>Heart, kidney and diabetes check</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Tell him his blood test result<span class="l2">By phone, in Urdu or English</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 17:00<span class="l2">1 day left</span></td><td><span class="st green">On track</span></td></tr>
+</tbody></table>
+<div class="more">Show 16 more cases that are on track</div>
+</div>
+<p class="note">Read-only. Clinical actions are recorded in each hospital's own system; CareLoop shows where every case is and who must act next.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b02" data-file="02-case">
+<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only; clinical actions happen in the hospital system.</p>
+<div class="meta"><span>For: care team and clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US01, US03, US08, US10, US13, US14, US16</span><span>Requirements: FR-02, FR-03, FR-06, FR-07</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar">
+<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
+<nav class="nav"><span class="on">Worklist</span><span>Impact</span></nav>
+<div class="grow"></div>
+<span class="pill">Synthetic data</span>
+<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
+</div>
+<div class="page">
+<div class="crumb"><svg class="i"><use href="#i-left"/></svg>Worklist</div>
+<div class="pbanner">
+<span class="av">HA</span>
+<div class="who"><div class="nm">Hessa Al Dhaheri</div>
+<div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Emirates ID 784-1960-•••••••-•</span></div>
+<div class="tags"><span class="tag">Speaks Arabic</span><span class="tag">Calls 10:00 to 12:00</span><span class="tag">Basic phone, no internet</span><span class="tag">Helper: Saeed (son), appointments only</span></div></div>
+<span class="pill">Synthetic record</span>
+</div>
+<div class="card">
+<div class="casebar"><span>Programme: <b>Breast screening</b></span><span>Urgency: <b>Routine</b>, set by Dr. Rekha Varghese</span><span>Care coordinator: <b>Huda Saleh</b></span><span>Opened: <b>Tue 10 Nov 2026, 09:00</b></span></div>
+<div class="stepper">
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Result received</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Case opened</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Owner assigned</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Patient notified</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Patient confirmed</div>
+<div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Consultation</div>
+<div class="s now"><span class="dot"></span>Follow-up</div>
+<div class="s"><span class="dot"></span>Outcome recorded</div>
+<div class="s"><span class="dot"></span>Closure review</div>
+<div class="s"><span class="dot"></span>Closed</div>
+</div>
+</div>
+<div class="grid2">
+<div class="stack">
+<div class="card next">
+<div class="top"><span class="lbl">Next action</span><span class="badge red">Overdue</span><span class="badge grey">Escalated to Joy Bautista, facility lead</span></div>
+<h2>Send a new referral for breast assessment</h2>
+<p class="why">Regional Hospital declined the referral on Tue 10 Nov at 15:00 with the reason "no capacity". Dr. Rekha stays responsible until another unit accepts.</p>
+<div class="kv">
+<div><small>Responsible</small><b>Dr. Rekha Varghese</b><span>Screening physician, Family Health Centre</span></div>
+<div><small>Was due</small><b class="red">Wed 11 Nov, 15:00</b><span>18 hours late</span></div>
+<div><small>Target</small><b>Assessment by Mon 16 Nov</b><span>DoH: within 5 working days of screening</span></div>
+</div>
+<div class="ladder">
+<div class="done"><div class="k"><span class="num">1</span>Reminder to Dr. Rekha</div>Sent Wed 11 Nov, 11:00</div>
+<div class="now"><div class="k"><span class="num">2</span>Joy Bautista, facility lead</div>Escalated Wed, 15:00. Acknowledged today, 08:30.</div>
+<div><div class="k"><span class="num">3</span>Dr. Obaid Al Suwaidi</div>Programme coordinator, at 12:00 today if still open</div>
+</div>
+</div>
+<div class="card">
+<h3>Needed before the outcome can be recorded</h3>
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood the next step</b><span>Said it back on a call with Huda Saleh, Tue 10 Nov</span></div><span class="r">Done</span></li>
+<li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>A receiving clinician accepted the referral</b><span>Declined by Regional Hospital: no capacity</span></div><span class="r red">Missing</span></li>
+<li><span class="mk todo"></span><div><b>Appointment booked and confirmed</b><span>By Hessa, or by Saeed for her</span></div><span class="r">Waiting</span></li>
+<li><span class="mk todo"></span><div><b>The clinic confirmed she attended</b><span>A booking or a reminder does not count</span></div><span class="r">Waiting</span></li>
+<li><span class="mk todo"></span><div><b>Outcome recorded by the responsible clinician</b><span>With a link to the clinical record</span></div><span class="r">Waiting</span></li>
+</ul>
+</div>
+<div class="card">
+<h3>Timeline<span class="r small muted">Newest first, from all systems</span></h3>
+<ul class="tl">
+<li><time>Thu 12 Nov, 08:30</time><div><b>Escalation acknowledged</b><span class="by">Joy Bautista asked Dr. Rekha to refer again by 10:00</span></div><span class="src">CareLoop</span></li>
+<li><time>Wed 11 Nov, 15:00</time><div><b>Escalated to the facility lead</b><span class="by">New referral not sent by the deadline</span></div><span class="src">CareLoop</span></li>
+<li><time>Wed 11 Nov, 11:00</time><div><b>Reminder sent to Dr. Rekha Varghese</b><span class="by">New referral due at 15:00</span></div><span class="src">CareLoop</span></li>
+<li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
+<li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
+<li><time>Tue 10 Nov, 11:20</time><div><b>Next step understood</b><span class="by">Hessa said it back on a call with Huda Saleh</span></div><span class="src">Patient channel</span></li>
+<li><time>Tue 10 Nov, 11:15</time><div><b>Result explained by phone, in Arabic</b><span class="by">Huda Saleh</span></div><span class="src">Patient channel</span></li>
+</ul>
+<div class="linkrow">Show 5 earlier events</div>
+</div>
+</div>
+<div class="stack">
+<div class="card">
+<h3>Where each part stands</h3>
+<ul class="tracks">
+<li><div><b>Patient contact</b><span>Notified and confirmed, Tue 10 Nov</span></div><span class="badge green">Done</span></li>
+<li><div><b>Consultation</b><span>Refer for breast assessment</span></div><span class="badge green">Done</span></li>
+<li><div><b>Referral</b><span>Regional Hospital: no capacity</span></div><span class="badge red">Declined</span></li>
+<li><div><b>Appointment</b><span>Not booked yet</span></div><span class="badge grey">Not started</span></li>
+</ul>
+</div>
+<div class="card">
+<h3>How to reach Hessa</h3>
+<ul class="reach">
+<li><svg class="i"><use href="#i-phone"/></svg><span>Phone call in Arabic, 10:00 to 12:00</span></li>
+<li><svg class="i"><use href="#i-msg"/></svg><span>Automated calls and short texts in Arabic</span></li>
+<li><svg class="i"><use href="#i-user"/></svg><span>Saeed Al Dhaheri, her son: appointments only. Hessa agreed on Tue 10 Nov.</span></li>
+<li><svg class="i"><use href="#i-lock"/></svg><span>Results are given by a person, never by text</span></li>
+</ul>
+</div>
+<div class="card">
+<h3>Her contact person</h3>
+<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · 02 000 0000</small></div></div>
+<p class="note" style="margin-top:12px">Hessa always has one named person to call. If Huda changes, Hessa is told who replaces her.</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b03" data-file="03-refer">
+<div class="cap"><span class="n">3</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions. AI drafts the handoff summary; she checks and approves it before the referral is sent.</p>
+<div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05, FR-11</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar his">
+<div class="sys"><b>Hospital system</b><small>Family Health Centre, Madinat Zayed</small></div>
+<div class="grow"></div>
+<span class="pill">Simulated for testing</span>
+<div class="me"><span class="av">RV</span><div><b>Dr. Rekha Varghese</b><small>Screening physician</small></div></div>
+</div>
+<div class="page">
+<div class="crumb">Hessa Al Dhaheri <span class="sep">/</span> New referral</div>
+<div class="head"><div><h1>New referral: breast assessment</h1><p class="sub">Thursday 12 November 2026, 09:20 · Target: assessment by Mon 16 Nov (DoH: within 5 working days of screening)</p></div></div>
+<div class="pbanner compact">
+<span class="av">HA</span>
+<div class="who"><div class="nm">Hessa Al Dhaheri</div><div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Speaks Arabic</span><span>Helper: Saeed (son)</span></div></div>
+</div>
+<div class="grid2" style="grid-template-columns:minmax(0,1fr) 470px">
+<div class="card">
+<h3>Suggested units<span class="r small muted">Matched on service, earliest date, language and travel</span></h3>
+<div class="opts">
+<div class="opt sel"><span class="radio"></span><div>
+<h4>Breast Assessment Unit, General Hospital, Abu Dhabi<span class="badge green">Best match</span></h4>
+<p>Earliest appointment: <b style="color:var(--ink)">Mon 16 Nov, 10:30</b>, within the target</p>
+<p>Receiving clinician: Dr. Layla Haddad, breast surgeon</p>
+<ul class="ticks"><li><svg class="i"><use href="#i-check"/></svg>Breast assessment and biopsy</li><li><svg class="i"><use href="#i-check"/></svg>Arabic-speaking staff</li><li><svg class="i"><use href="#i-check"/></svg>Hospital transport from Madinat Zayed</li></ul>
+</div></div>
+<div class="opt"><span class="radio"></span><div>
+<h4>Breast Clinic, Eastern Hospital, Al Ain</h4>
+<p>Earliest appointment: <b style="color:var(--ink)">Wed 18 Nov, 09:00</b>, <span class="amber">after the target</span></p>
+<ul class="ticks"><li><svg class="i"><use href="#i-check"/></svg>Breast assessment and biopsy</li><li><svg class="i"><use href="#i-check"/></svg>Arabic-speaking staff</li><li class="x"><svg class="i"><use href="#i-clock"/></svg>About three hours by car</li></ul>
+</div></div>
+<div class="opt dim"><span class="radio"></span><div>
+<h4>Breast Clinic, Regional Hospital, Al Dhafra</h4>
+<p>No capacity until Mon 30 Nov. Declined this referral on Tue 10 Nov.</p>
+</div></div>
+</div>
+<p class="note" style="margin-top:14px">Suggestions come from a synthetic directory. You choose the unit; the unit confirms its own availability.</p>
+</div>
+<div class="card">
+<h3>Handoff summary for Dr. Layla Haddad<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft</span></span></h3>
+<div class="sbar">
+<div><small>Situation</small>Hessa Al Dhaheri, 66. Her screening mammogram on Mon 9 Nov 2026 needs further assessment.</div>
+<div><small>Background</small>A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic. Her son Saeed helps with appointments, with her consent.</div>
+<div><small>Assessment</small>See the screening report in the clinical record. AI never writes this part.</div>
+<div><small>Request</small>Please accept her and offer an assessment by Mon 16 Nov.</div>
+</div>
+<div class="btns" style="margin-top:18px"><span class="btn">Edit</span><span class="btn primary">Approve summary</span></div>
+<p class="note" style="margin-top:14px">AI uses only the facts in the case. It cannot send, change urgency or edit the record. Your approval is recorded.</p>
+</div>
+</div>
+</div>
+<div class="actionbar">
+<span class="events">Sends to CareLoop:<span class="ev">Summary approved</span><span class="ev">Referral sent</span></span>
+<div class="btns" style="align-items:center"><span class="note">Approve the summary to send</span><span class="btn">Cancel</span><span class="btn primary off">Send referral to General Hospital</span></div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b04" data-file="04-accept-referral">
+<div class="cap"><span class="n">4</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and the approved summary. She accepts responsibility, or declines with a fixed reason. Labs use the same screen for test requests.</p>
+<div class="meta"><span>For: receiving clinicians, labs and appointment teams</span><span>Built in: HIS simulator</span><span>Stories: US08, US09, US10</span><span>Requirements: FR-05, FR-06</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar his">
+<div class="sys"><b>Hospital system</b><small>General Hospital, Abu Dhabi</small></div>
+<div class="grow"></div>
+<span class="pill">Simulated for testing</span>
+<div class="me"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon</small></div></div>
+</div>
+<div class="page">
+<div class="grid2" style="grid-template-columns:360px minmax(0,1fr)">
+<div class="card" style="padding:0;overflow:hidden">
+<div class="tabs"><span class="on">Referrals 2</span><span>Test requests 1</span></div>
+<ul class="inbox">
+<li><b>Shamma Al Mheiri</b><span>Breast assessment · <span class="red" style="font-weight:600">Urgent</span></span><span>From Family Health Centre, Khalifa City, 09:50</span><span>Reply by 11:50</span></li>
+<li class="sel"><b>Hessa Al Dhaheri</b><span>Breast assessment · Routine</span><span>From Family Health Centre, Madinat Zayed, 09:25</span><span>Reply by 13:25</span></li>
+</ul>
+</div>
+<div class="stack">
+<div class="pbanner compact">
+<span class="av">HA</span>
+<div class="who"><div class="nm">Hessa Al Dhaheri</div><div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Speaks Arabic</span><span>Helper: Saeed (son)</span></div></div>
+<span class="pill">Received 09:25</span>
+</div>
+<div class="card">
+<h3>Request</h3>
+<div class="kv">
+<div><small>From</small><b>Dr. Rekha Varghese</b><span>Screening physician, Family Health Centre, Madinat Zayed</span></div>
+<div><small>Asked for</small><b>Breast assessment</b><span>After her screening mammogram on Mon 9 Nov</span></div>
+<div><small>Target</small><b>Assessment by Mon 16 Nov</b><span>DoH: within 5 working days of screening</span></div>
+</div>
+<div class="docs"><span class="doc"><svg class="i"><use href="#i-doc"/></svg>Screening report</span><span class="doc"><svg class="i"><use href="#i-doc"/></svg>Mammogram images</span></div>
+</div>
+<div class="card">
+<h3>Handoff summary<span class="r"><span class="badge green">Approved by Dr. Rekha Varghese, 09:22</span></span></h3>
+<div class="sbar">
+<div><small>Situation</small>Hessa Al Dhaheri, 66. Her screening mammogram on Mon 9 Nov 2026 needs further assessment.</div>
+<div><small>Background</small>A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic; her son Saeed helps with appointments.</div>
+<div><small>Assessment</small>See the screening report in the clinical record.</div>
+<div><small>Request</small>Please accept her and offer an assessment by Mon 16 Nov.</div>
+</div>
+</div>
+<div class="card">
+<h3>Your decision</h3>
+<div class="opts">
+<div class="opt sel"><span class="radio"></span><div>
+<h4>Accept: I take responsibility for the next step</h4>
+<div class="formrow">
+<div><small>Responsible clinician</small><b>Dr. Layla Haddad</b></div>
+<div><small>Appointment offered</small><b>Mon 16 Nov 2026, 10:30</b></div>
+<div><small>Place</small><b>Clinic B, Building 2</b></div>
+</div>
+</div></div>
+<div class="opt"><span class="radio"></span><div>
+<h4>Decline</h4>
+<div class="selectbox">Choose a reason: no capacity, wrong service or missing information<svg class="i"><use href="#i-down"/></svg></div>
+<p style="margin-top:8px">If you decline, Dr. Rekha stays responsible and CareLoop asks her team to refer again.</p>
+</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="actionbar">
+<span class="events">Sends to CareLoop:<span class="ev">Referral accepted</span><span class="ev">Appointment booked</span></span>
+<div class="btns"><span class="btn primary">Accept referral</span></div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b05" data-file="05-close-case">
+<div class="cap"><span class="n">5</span><div><h2>Close the case</h2><p>Only an authorised clinician can close a case, and only when every required step has evidence. Continuing care keeps a named owner after closing.</p>
+<div class="meta"><span>For: authorised clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12, US14, US15</span><span>Requirements: FR-08</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar his">
+<div class="sys"><b>Hospital system</b><small>General Hospital, Abu Dhabi</small></div>
+<div class="grow"></div>
+<span class="pill">Simulated for testing</span>
+<div class="me"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon</small></div></div>
+</div>
+<div class="page">
+<div class="crumb">Hessa Al Dhaheri <span class="sep">/</span> Close the case</div>
+<div class="head"><div><h1>Close the case</h1><p class="sub">Wednesday 9 December 2026, 10:00 · Breast screening · Stage 9 of 10: closure review</p></div></div>
+<div class="pbanner compact">
+<span class="av">HA</span>
+<div class="who"><div class="nm">Hessa Al Dhaheri</div><div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Case opened Tue 10 Nov 2026</span></div></div>
+</div>
+<div class="grid2" style="grid-template-columns:minmax(0,1fr) 470px">
+<div class="card">
+<h3>Required before closing<span class="r small muted">Breast screening pathway, version 1</span></h3>
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Assessment attended</b><span>Clinic attendance record</span></div><span class="r">Mon 16 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Diagnosis recorded</b><span>Pathology report</span></div><span class="r">Thu 19 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Result explained in person</b><span>Dr. Layla Haddad, with Saeed present</span></div><span class="r">Fri 20 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Treatment plan agreed by the cancer team</b><span>Cancer team meeting record</span></div><span class="r">Wed 25 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood her plan</b><span>Said it back to Mariam Al Kaabi, cancer nurse navigator</span></div><span class="r">Thu 26 Nov</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Treatment started</b><span>Operation note: surgery</span></div><span class="r">Mon 7 Dec</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Continuing care accepted</b><span>Dr. Karim Nassar, medical oncologist, Cancer Centre</span></div><span class="r">Tue 8 Dec</span></li>
+</ul>
+<div class="approved" style="margin-top:14px"><svg class="i"><use href="#i-check"/></svg>All seven required steps have evidence</div>
+</div>
+<div class="stack">
+<div class="card">
+<h3>Reason for closing</h3>
+<div class="opts" style="gap:8px">
+<div class="box"><span class="radio on"></span><b>Treated, and care continues with a named team</b></div>
+<div class="box"><span class="radio"></span>On surveillance, with a next date</div>
+<div class="box"><span class="radio"></span>No cancer found on further tests</div>
+<div class="box"><span class="radio"></span>Declined by the patient, after a recorded discussion</div>
+<div class="box"><span class="radio"></span>Moved, and accepted by another provider</div>
+<div class="box"><span class="radio"></span>Not reachable, after recorded attempts</div>
+</div>
+</div>
+<div class="card">
+<h3>Continuing care</h3>
+<ul class="reach">
+<li><svg class="i"><use href="#i-user"/></svg><span><b>Dr. Karim Nassar</b>, medical oncologist, Cancer Centre</span></li>
+<li><svg class="i"><use href="#i-clock"/></svg><span>Next: chemotherapy from Mon 4 Jan 2027, then radiotherapy and hormone tablets</span></li>
+<li><svg class="i"><use href="#i-phone"/></svg><span>Hessa's contact: Mariam Al Kaabi, cancer nurse navigator</span></li>
+</ul>
+</div>
+<div class="card">
+<div class="box"><span class="cbox"><svg class="i"><use href="#i-check"/></svg></span>I have checked the evidence above</div>
+<p class="note" style="margin-top:10px">Signed as Dr. Layla Haddad, authorised to close breast screening cases. AI, timers and messages can never close a case.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="actionbar">
+<span class="events">Sends to CareLoop:<span class="ev">Closure authorised</span><span class="ev">Reason: treated</span></span>
+<div class="btns"><span class="btn">Cancel</span><span class="btn primary">Sign and close the case</span></div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b06" data-file="06-impact">
+<div class="cap"><span class="n">6</span><div><h2>Impact</h2><p>Programme leads see whether people got care on time, what is still unresolved and whether patients understood. Every number comes from the case events.</p>
+<div class="meta"><span>For: programme coordinators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US16</span><span>Requirements: FR-09</span></div></div></div>
+<div class="frame">
+<div class="win"><i></i><i></i><i></i></div>
+<div class="appbar">
+<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
+<nav class="nav"><span>Worklist</span><span class="on">Impact</span></nav>
+<div class="grow"></div>
+<span class="pill">Synthetic data</span>
+<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
+</div>
+<div class="page">
+<div class="head">
+<div><h1>Impact</h1><p class="sub">All screening programmes · 1 September to 12 November 2026 · 240 cases</p></div>
+<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">All facilities<svg class="i"><use href="#i-down"/></svg></span></div>
+</div>
+<div class="kpis">
+<div class="card kpi"><span class="lbl">Care completed by the agreed deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">Without CareLoop: <b>61%</b> (122 of 200)</div></div>
+<div class="card kpi"><span class="lbl">Unresolved and past the deadline</span><div class="big">9</div><span class="of">Out of 56 open cases, all with a named owner</span><div class="vs">Without CareLoop: <b>38</b></div></div>
+<div class="card kpi"><span class="lbl">Understood their next step</span><div class="big">91%</div><span class="of">208 of 228 said it back correctly the first time</span><div class="vs">The other 20 had a call from their nurse</div></div>
+</div>
+<div class="grid3">
+<div class="card">
+<h3>Cases that reached each stage<span class="r small muted">Out of 240</span></h3>
+<ul class="bars">
+<li><span>1 Result received</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>2 Case opened</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>3 Owner assigned</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>4 Patient notified</span><span class="bar"><i style="width:98.3%"></i></span><span class="v">236</span></li>
+<li><span>5 Patient confirmed</span><span class="bar"><i style="width:95%"></i></span><span class="v">228</span></li>
+<li><span>6 Consultation</span><span class="bar"><i style="width:92.1%"></i></span><span class="v">221</span></li>
+<li><span>7 Follow-up</span><span class="bar"><i style="width:89.2%"></i></span><span class="v">214</span></li>
+<li><span>8 Outcome recorded</span><span class="bar"><i style="width:82.5%"></i></span><span class="v">198</span></li>
+<li><span>9 Closure review</span><span class="bar"><i style="width:79.2%"></i></span><span class="v">190</span></li>
+<li><span>10 Closed</span><span class="bar"><i style="width:76.7%"></i></span><span class="v">184</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Still open and moving: 56 cases, each with a named owner.</p>
+</div>
+<div class="stack">
+<div class="card">
+<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft, approved by Dr. Obaid Al Suwaidi</span></span></h3>
+<div class="aitext"><p>Most delays came from referrals that Regional Hospital declined for lack of capacity (11 cases). Re-referring them to General Hospital took a median of one working day.</p><p>Patients who were not reached at first were usually reached at a second time they chose. No patient is named in this summary.</p></div>
+</div>
+<div class="card">
+<h3>Why cases got stuck<span class="r small muted">Exceptions raised</span></h3>
+<ul class="bars wide">
+<li><span>Declined: no capacity</span><span class="bar amberbar"><i style="width:100%"></i></span><span class="v">11</span></li>
+<li><span>Not reached</span><span class="bar amberbar"><i style="width:63.6%"></i></span><span class="v">7</span></li>
+<li><span>Appointment missed</span><span class="bar amberbar"><i style="width:54.5%"></i></span><span class="v">6</span></li>
+<li><span>Declined: missing information</span><span class="bar amberbar"><i style="width:36.4%"></i></span><span class="v">4</span></li>
+<li><span>Patient declined care</span><span class="bar amberbar"><i style="width:18.2%"></i></span><span class="v">2</span></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="grid3">
+<div class="card">
+<h3>How long each step takes<span class="r small muted">Working days</span></h3>
+<table class="mini"><thead><tr><th>Step</th><th class="num">Median</th><th class="num">9 in 10 cases within</th></tr></thead><tbody>
+<tr><td>Result to patient notified</td><td class="num">0.5</td><td class="num">1.5</td></tr>
+<tr><td>Notified to patient confirmed</td><td class="num">0.5</td><td class="num">2</td></tr>
+<tr><td>Referral sent to accepted</td><td class="num">1</td><td class="num">3</td></tr>
+<tr><td>Accepted to appointment attended</td><td class="num">3</td><td class="num">5</td></tr>
+<tr><td>Result to case closed</td><td class="num">19</td><td class="num">34</td></tr>
+</tbody></table>
+</div>
+<div class="card">
+<h3>Late cases by place</h3>
+<table class="mini"><thead><tr><th>Facility</th><th class="num">Late cases</th></tr></thead><tbody>
+<tr><td>Regional Hospital, Al Dhafra</td><td class="num">4</td></tr>
+<tr><td>General Hospital, Abu Dhabi</td><td class="num">2</td></tr>
+<tr><td>Family Health Centre, Madinat Zayed</td><td class="num">2</td></tr>
+<tr><td>Endoscopy Unit, General Hospital</td><td class="num">1</td></tr>
+</tbody></table>
+</div>
+</div>
+<p class="note">Synthetic data. "Without CareLoop" replays the same 240 cases with reminders and escalation switched off.</p>
+</div>
+</div>
+</section>
+
+<section class="board" id="b07" data-file="07-basic-phone">
+<div class="cap"><span class="n">7</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts and automated calls only carry dates and places, and she confirms by replying or pressing 1.</p>
+<div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
+<div class="cols3" style="grid-template-columns:minmax(0,1fr) 300px minmax(0,1fr)">
+<div class="card">
+<h3><svg class="i"><use href="#i-phone"/></svg>Call from her nurse<span class="r small muted">Tue 10 Nov, 11:15</span></h3>
+<p class="note">Huda Saleh calls in Arabic. Shown here in English.</p>
+<ul class="script">
+<li><small>Check it is her</small>Hello, this is Huda, a nurse at the Family Health Centre. Can you tell me your date of birth, please?</li>
+<li><small>Privacy</small>Is this a good time to talk privately?</li>
+<li><small>The news</small>Your mammogram needs a closer look, so Dr. Rekha would like you to have more tests. Most women who are asked back do not have cancer.</li>
+<li><small>Next step</small>We will call you with the day and the place. Saeed can come with you.</li>
+<li><small>Teach-back</small>So I know I explained it well, can you tell me what happens next?</li>
+</ul>
+<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Understood.</b> Hessa said it back in her own words.</span></div>
+<p class="note" style="margin-top:10px">Plain words drafted by AI and approved by Dr. Rekha Varghese.</p>
+</div>
+<div class="pcol">
+<div class="fphone">
+<div class="fspk"></div>
+<div class="fscr"><div class="fhead"><span>02 000 0001</span><span>10:30</span></div>Hessa, you have an appointment on Mon 16 Nov at 10:30 am, General Hospital, Building 2. Reply 1 to confirm or 2 for a call. Help: 02 000 0000</div>
+<div class="fsoft"><span>Reply</span><span>Back</span></div>
+<div class="fkeys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>*</span><span>0</span><span>#</span></div>
+</div>
+<ul class="recs">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Sent and delivered, Thu 10:30</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Hessa replied 1 at 10:41: confirmed</li>
+</ul>
+<p class="pcap">Text message in Arabic, shown in English. It comes from a number she can reply to, and works on any phone with no internet.</p>
+</div>
+<div class="card">
+<h3><svg class="i"><use href="#i-phone"/></svg>Automated reminder call<span class="r small muted">Fri 13 Nov, 10:00</span></h3>
+<p class="note">In Arabic, shown here in English. No reading needed.</p>
+<ul class="script">
+<li>Hello. This is an automated call from General Hospital for Hessa Al Dhaheri.</li>
+<li>You have an appointment on Monday the 16th of November, at half past ten in the morning, in Building 2.</li>
+<li>Press 1 to confirm. Press 2 to talk to a person. Press 9 to hear this again.</li>
+</ul>
+<div class="keys"><span>1 Confirm</span><span>2 Talk to a person</span><span>9 Repeat</span></div>
+<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Confirmed.</b> Hessa pressed 1 at 10:01.</span></div>
+<p class="note" style="margin-top:10px">No answer after two tries creates a task for Huda to call her.</p>
+</div>
+</div>
+<div class="rules">
+<div class="rule"><svg class="i"><use href="#i-lock"/></svg><span>No results, diagnoses or body parts in texts or automated calls</span></div>
+<div class="rule"><svg class="i"><use href="#i-link"/></svg><span>No links: nothing to click and nothing to install</span></div>
+<div class="rule"><svg class="i"><use href="#i-tag"/></svg><span>Neutral place names, such as "Building 2", never the clinic's name</span></div>
+<div class="rule"><svg class="i"><use href="#i-lang"/></svg><span>In her language, at the time of day she chose</span></div>
+<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Press or reply 1 to confirm and 2 to reach a person</span></div>
+</div>
+</section>
+
+<section class="board" id="b08" data-file="08-patient-view">
+<div class="cap"><span class="n">8</span><div><h2>Patient view</h2><p>For people with a smartphone, CareLoop appears inside the health app they already use. There is no new app to install. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
+<div class="meta"><span>For: patients with a smartphone</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
+<div class="phones">
+<div class="pcol">
+<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
+<div class="papp">
+<div class="apptop"><span>Your health app</span><span class="lang"><span class="on">English</span><span>العربية</span></span></div>
+<div class="hello">Hello, Amna</div>
+<div class="pcard key"><span class="lbl">Your next step</span><h4>More tests at the breast clinic</h4><p class="when">Friday 13 November, 9:00 am</p><p>General Hospital, Building 2, Clinic B</p><span class="pbtn primary">I will come</span><span class="plink">I need another time</span></div>
+<div class="pcard"><span class="lbl">Your nurse</span><div class="prow" style="margin-top:10px"><span class="av">LM</span><div style="flex:1"><b>Latifa Al Mazrouei</b><small>Family Health Centre</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
+<div class="pcard"><span class="lbl">Your steps</span><ul class="psteps">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Screening, Tue 3 Nov</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Result explained, Thu 5 Nov</li>
+<li class="now"><span class="nowdot"></span>More tests, Fri 13 Nov</li>
+<li><span class="mk todo"></span>Results, then next care</li>
+</ul></div>
+</div></div></div>
+<div class="pcap"><b>Home</b>One next step and one named person, always.</div>
+</div>
+<div class="pcol">
+<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
+<div class="papp">
+<div class="pback"><svg class="i"><use href="#i-left"/></svg>Home</div>
+<div class="ptitle">Your result</div>
+<div class="pcard"><span class="lbl">Breast screening, Tue 3 Nov 2026</span><h4>Your mammogram needs a closer look</h4><p>The doctors saw an area they want to check more closely. Most women who are asked back for more tests do not have cancer.</p><p class="pfine" style="margin-top:10px">Checked by Dr. Hind Al Mansoori, screening physician</p></div>
+<div class="pcard"><span class="lbl">What happens on Friday</span><p style="margin-top:6px">Another mammogram and an ultrasound scan, and sometimes a small needle test. A doctor gives you the results in person.</p></div>
+<div class="pcard"><span class="lbl">Questions?</span><p style="margin-top:6px">Latifa, your nurse, can explain anything again.</p><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
+</div></div></div>
+<div class="pcap"><b>Her result, in plain words</b>Drafted by AI from the report and checked by her doctor. Also in Arabic.</div>
+</div>
+<div class="pcol">
+<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:42</span><span class="bat"></span></div>
+<div class="papp">
+<div class="done-hero"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><h4>Thank you, Amna</h4><p>We have told the clinic you will come on Friday at 9:00 am.</p></div>
+<div class="pcard"><span class="lbl">One question, so we know we explained it well</span><h4 style="font-size:19px">What will you do next?</h4>
+<div class="choice sel"><span class="radio"></span>Go to General Hospital on Friday at 9:00 am for more tests</div>
+<div class="choice"><span class="radio"></span>Wait for the hospital to call me</div>
+<div class="choice"><span class="radio"></span>I am not sure</div>
+</div>
+<div class="pcard"><h4 style="font-size:17px;margin-top:0">How sure do you feel about what happens next?</h4><div class="scale"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span></div><div class="scalelbl"><span>Not sure</span><span>Very sure</span></div></div>
+<span class="pbtn primary" style="margin-top:0">Send</span>
+</div></div></div>
+<div class="pcap"><b>Confirm, then say it back</b>"Confirmed" and "understood" are recorded separately. "I am not sure" sends her nurse a call-back task.</div>
+</div>
+</div>
+</section>
+
+<section class="board" id="b09" data-file="09-caregiver-and-email">
+<div class="cap"><span class="n">9</span><div><h2>Caregiver and email</h2><p>Saeed helps his mother with appointments only, as she agreed. He never sees her results, and anything he does is recorded as his own action.</p>
+<div class="meta"><span>For: authorised caregivers and anyone who prefers email</span><span>Built in: patient-channel simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
+<div class="phones">
+<div class="pcol">
+<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>12:08</span><span class="bat"></span></div>
+<div class="papp">
+<div class="apptop"><span>Your health app</span><span class="lang"><span class="on">English</span><span>العربية</span></span></div>
+<div class="helping"><svg class="i"><use href="#i-user"/></svg><div><b>You are helping Hessa Al Dhaheri</b><span>With appointments only. Hessa agreed on Tue 10 Nov 2026.</span></div></div>
+<div class="pcard key"><span class="lbl">Her next appointment</span><h4>Monday 16 November<br>10:30 am</h4><p>General Hospital, Building 2, Clinic B</p><p>Please bring her Emirates ID.</p><span class="pbtn primary">Confirm for Hessa</span><span class="pbtn">Ask for another time</span></div>
+<div class="pcard"><span class="lbl">Help</span><p style="margin-top:6px">Her nurse, Huda Saleh: 02 000 0000</p><p>Transport help: 02 000 0001</p></div>
+<div class="pcard locked"><div class="prow"><svg class="i"><use href="#i-lock"/></svg><div><b>Not shared with you</b><small>Results and medical notes. Hessa hears these from her care team.</small></div></div></div>
+</div></div></div>
+<div class="pcap"><b>Saeed's view</b>Only what Hessa agreed to share.</div>
+</div>
+<div class="stack" style="width:640px">
+<div class="mail">
+<div class="mh"><div><b>From</b>Appointments team, General Hospital</div><div><b>To</b>Saeed Al Dhaheri</div><div><b>Sent</b>Thu 12 Nov 2026, 10:32</div></div>
+<div class="subj">Appointment for Hessa Al Dhaheri on Monday 16 November</div>
+<div class="mb">
+<p>Dear Saeed,</p>
+<p>Hessa has an appointment on Monday 16 November at 10:30 am at General Hospital, Building 2, Clinic B.</p>
+<p>Please arrive 15 minutes early and bring her Emirates ID.</p>
+<p>To confirm, reply "Yes" to this email. To change the time, call 02 000 0001, Monday to Friday, 8:00 am to 4:00 pm.</p>
+<p>Appointments team, General Hospital<br>Reference: 4821</p>
+</div>
+</div>
+<p class="note">No medical details and no links. Sent to Saeed only because Hessa agreed.</p>
+<div class="card">
+<h3>What CareLoop records</h3>
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Email delivered</b><span>To Saeed, Thu 12 Nov, 10:32</span></div><span class="r"></span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Confirmed by Hessa</b><span>She replied 1 to her own text message</span></div><span class="r">10:41</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Confirmed by Saeed, for Hessa</b><span>Recorded as Saeed's action, separate from Hessa's own</span></div><span class="r">12:10</span></li>
+</ul>
+<p class="note" style="margin-top:12px">If Hessa withdraws her agreement, Saeed's access ends at once.</p>
+</div>
+</div>
+</div>
+</section>
+
+</body></html>

@@ -2,7 +2,7 @@
 
 CareLoop is a synthetic prototype for coordinating one breast-screening follow-up pathway across existing health systems. It makes ownership, handoffs, deadlines, exceptions, and evidence visible; provider HIS/EMRs and approved patient channels remain the systems of record.
 
-This repository contains a runnable API and web scaffold, local container setup, CI and release workflows, and shared workstream documentation. The [architecture](docs/architecture.md), [component register](docs/workstreams.md), and [development guide](docs/development.md) define how members can work independently while integrating against common contracts.
+This repository contains a runnable API and web scaffold, local container setup, CI and release workflows, and shared workstream documentation. The [architecture](docs/architecture.md), [component register](docs/workstreams.md), [development guide](docs/development.md), and [UI design](docs/ui-design/README.md) define how members can work independently while integrating against common contracts.
 
 ## Prototype boundaries
 
@@ -19,7 +19,7 @@ This repository contains a runnable API and web scaffold, local container setup,
 ```text
 CareLoop.sln                .NET solution
 contracts/                  Shared event and API contract guidance
-docs/                       Architecture, workstreams, and development practices
+docs/                       Architecture, workstreams, development practices, and UI design
 infra/local/                Local environment notes
 src/
   api/CareLoop.Api/         ASP.NET Core API starter and Dockerfile
