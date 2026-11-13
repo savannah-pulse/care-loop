@@ -1,7 +1,7 @@
 # AI specification: summaries and stage insights
 
-**Status:** Design proposal for team and clinical review  
-**Primary requirement:** FR-11, human-reviewed AI coordination summary at handoff  
+**Status:** Design proposal for team and clinical review
+**Primary requirement:** FR-11, human-reviewed AI coordination summary at handoff
 **Related work:** FR-04 (patient-channel simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
 
 ## 1. Purpose and design boundary
@@ -23,7 +23,7 @@ The handoff summary is the core FR-11 deliverable. Patient-facing drafts, transl
 
 ### 2.1 Clinician handoff summary
 
-**User:** Receiving or responsible clinician reviewing a handoff.  
+**User:** Receiving or responsible clinician reviewing a handoff.
 **Trigger:** An authorized user requests a summary, or the backend identifies an eligible handoff and presents a draft for review.
 
 The draft may organize:
@@ -39,7 +39,7 @@ Every included assertion will be traceable to one or more supplied source refere
 
 ### 2.2 Patient-friendly stage explanation (extension)
 
-**User:** Patient, through an approved provider channel or a staff-assisted conversation.  
+**User:** Patient, through an approved provider channel or a staff-assisted conversation.
 **Trigger:** A provider-authorized request for a patient-facing draft after a relevant stage outcome has been finalized.
 
 The draft may explain, in clear and supportive language:
@@ -60,7 +60,7 @@ Support English (`en`) and UAE Arabic (`ar-AE`) as explicit output-language pref
 2. The service translates that approved text to UAE Arabic using a reviewed health-language glossary and approved template terminology.
 3. The system retains language, source text version, translation version, reviewer, and approval status.
 
-Translation must preserve negation, uncertainty, numbers, dates, instructions, and the difference between screening and diagnostic outcomes. 
+Translation must preserve negation, uncertainty, numbers, dates, instructions, and the difference between screening and diagnostic outcomes.
 
 ### 2.4 Periodic stage insights (extension)
 
@@ -81,7 +81,7 @@ No causal attribution is permitted from descriptive aggregates. Do not infer pat
 
 ## 3. Microsoft Foundry endpoint and Python integration
 
-Deploy an approved model in the project's Microsoft Foundry environment and call that deployment from the existing Python AI service. The endpoint and model deployment are configuration, not constants in source code. 
+Deploy an approved model in the project's Microsoft Foundry environment and call that deployment from the existing Python AI service. The endpoint and model deployment are configuration, not constants in source code.
 
 For a current Foundry project, the Foundry project endpoint has the form:
 
