@@ -12,9 +12,14 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// Applies recorded outcome evidence.
 /// </summary>
 /// <remarks>
-/// Checks <see cref="TransitionRules"/>, stores the evidence reference on the case and moves it to
-/// closure review with a next action for the authorized closer. Completing follow-up resolves any
-/// open escalation. Recording an outcome never closes the case by itself.
+/// Refuses an outcome whose <see cref="OutcomePayload.EvidenceKind"/> the pathway does not declare
+/// (C21), so an unrecognised outcome never counts as evidence. Otherwise checks
+/// <see cref="TransitionRules"/>, stores the evidence reference and kind on the case and, from
+/// follow-up, moves it to closure review with a next action for the authorized closer. A further
+/// outcome during closure review adds evidence without leaving the stage. When the evidence kind
+/// names a next action of its own (a treatment plan leads to <c>start-treatment</c>), that action
+/// and its deadline replace the stage's. Completing follow-up resolves any open escalation.
+/// Recording an outcome never closes the case by itself.
 /// </remarks>
 public sealed class OutcomeHandler : IEventHandler
 {
@@ -43,18 +48,27 @@ public sealed class OutcomeHandler : IEventHandler
         var @case = HandlerSupport.RequireCase(existing, EventType);
         var pathway = _pathways.Get(@case.PathwayId);
 
+        var kind = pathway.EvidenceKinds.FirstOrDefault(k => string.Equals(k.Kind, payload.EvidenceKind, StringComparison.OrdinalIgnoreCase));
+        if (kind is null)
+        {
+            var known = string.Join(", ", pathway.EvidenceKinds.Select(k => k.Kind));
+            return HandlerSupport.Refused(@case,
+                $"Evidence kind '{payload.EvidenceKind}' is not one the pathway '{pathway.Id}' declares ({known}); the outcome was not recorded.");
+        }
+
         var transition = TransitionRules.Evaluate(@case, EventType, envelope.Actor, pathway);
         if (!transition.Verdict.Allowed)
         {
             return HandlerSupport.Refused(@case, transition.Verdict.Reason!);
         }
 
-        if (transition.NextAction is { } nextAction && !HandlerSupport.HasDeadline(@case, nextAction, pathway, out var missing))
+        var nextAction = kind.NextAction ?? transition.NextAction;
+        if (nextAction is not null && !HandlerSupport.HasDeadline(@case, nextAction, pathway, out var missing))
         {
             return HandlerSupport.Refused(@case, missing!);
         }
 
-        @case.RecordOutcomeEvidence(payload.EvidenceReference, envelope.OccurredAt);
+        @case.RecordOutcomeEvidence(payload.EvidenceReference, envelope.OccurredAt, kind.Kind);
 
         if (transition.NextStage is { } next)
         {
@@ -63,9 +77,9 @@ public sealed class OutcomeHandler : IEventHandler
 
         @case.ResolveEscalations(envelope.OccurredAt);
 
-        if (transition.NextAction is { } action)
+        if (nextAction is not null)
         {
-            HandlerSupport.SetNextAction(@case, action, pathway, _clock);
+            HandlerSupport.SetNextAction(@case, nextAction, pathway, _clock);
         }
 
         return HandlerSupport.Applied(@case, payload.EvidenceReference);

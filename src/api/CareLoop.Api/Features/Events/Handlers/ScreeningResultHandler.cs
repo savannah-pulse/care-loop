@@ -19,7 +19,9 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// nobody owns; a case with a named owner gets the review-pending stage's. A result for which a case
 /// already exists, or that names an unknown pathway, is refused rather than opening a second case.
 /// The patient's language and contact points in the payload are not stored: a case holds no contact
-/// data, and the notification feature resolves recipients when it sends.
+/// data, and the notification feature resolves recipients when it sends. The patient's display name
+/// and second identifier are stored on the case for staff screens (C20); they are demographic, not
+/// clinical, and the projection written to the audit trail leaves them out.
 /// </remarks>
 public sealed class ScreeningResultHandler : IEventHandler
 {
@@ -71,7 +73,9 @@ public sealed class ScreeningResultHandler : IEventHandler
             payload.PathwayId,
             payload.FacilityId,
             owner,
-            _clock.UtcNow);
+            _clock.UtcNow,
+            payload.PatientDisplayName,
+            payload.PatientSecondaryIdentifier);
 
         var transition = TransitionRules.Evaluate(@case, EventType, HandlerSupport.ActorOrSource(envelope), pathway);
         if (!transition.Verdict.Allowed)

@@ -53,9 +53,12 @@ public static class TransitionRules
     /// Refuses: any event on a closed case; an event whose type does not leave or belong to the
     /// current stage; an actor whose role is not allowed for the transition, or no actor at all when
     /// the stage names allowed roles. Track events (notification, consultation, referral,
-    /// appointment) are allowed during follow-up and closure review without changing the stage.
+    /// appointment) are allowed during follow-up and closure review without changing the stage. A
+    /// further <see cref="CaseEventType.OutcomeRecorded"/> during closure review is allowed without
+    /// changing the stage, by the roles the pathway lets record an outcome, because the design
+    /// records diagnosis, treatment plan and treatment started as separate outcomes.
     /// CareLoop's own internal events (<see cref="CaseEventType.DeadlineElapsed"/>,
-    /// <see cref="CaseEventType.HandoffSummaryApproved"/>) and a consent record
+    /// <see cref="CaseEventType.HandoffSummaryApproved"/>, <see cref="CaseEventType.EscalationAcknowledged"/>) and a consent record
     /// (<see cref="CaseEventType.ConsentRecorded"/>) are allowed on any open case without
     /// changing the stage, because they are coordination, not pathway progress.
     /// </para>
@@ -113,7 +116,29 @@ public static class TransitionRules
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }
 
-        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved or CaseEventType.ConsentRecorded)
+        if (eventType == CaseEventType.OutcomeRecorded && @case.Stage == CaseStage.ClosureReview)
+        {
+            // A further outcome (a treatment plan after a diagnosis, treatment after the plan) adds
+            // evidence without leaving closure review. Who may record it is the rule of the stage
+            // that an outcome leaves, so the same roles apply wherever the outcome arrives.
+            var outcomeStage = pathway.Stages.FirstOrDefault(s => s.LeavesOn.Contains(CaseEventType.OutcomeRecorded));
+            if (outcomeStage is { AllowedRoles.Count: > 0 })
+            {
+                if (actor is null)
+                {
+                    return Refuse($"{eventType} must name who performed it; allowed roles are {Join(outcomeStage.AllowedRoles)}.");
+                }
+
+                if (!outcomeStage.AllowedRoles.Contains(actor.Role, StringComparer.OrdinalIgnoreCase))
+                {
+                    return Refuse($"Role '{actor.Role}' may not record an outcome; allowed roles are {Join(outcomeStage.AllowedRoles)}.");
+                }
+            }
+
+            return new TransitionResult { Verdict = RuleResult.Allow() };
+        }
+
+        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved or CaseEventType.EscalationAcknowledged or CaseEventType.ConsentRecorded)
         {
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }

@@ -204,6 +204,7 @@ public sealed class EfCaseRepositoryTests : IDisposable
         @case.BeginAppointment("SYN-APPT-0001", _clock.UtcNow.AddDays(2), _clock.UtcNow).Advance(AppointmentStatus.Attended, _clock.UtcNow, null);
         @case.Escalate(new Escalation { Level = 1, EscalatedTo = TestData.FacilityLeadQueue(), RaisedAt = _clock.UtcNow, Reason = "overdue" });
         @case.Escalate(new Escalation { Level = 2, EscalatedTo = new CaseOwner { Reference = "SYN-COORD", Role = "coordinator", FacilityId = "SYN-FAC-A", IsQueue = true }, RaisedAt = _clock.UtcNow, Reason = "still overdue" });
+        @case.AcknowledgeEscalation(new Actor { Reference = "SYN-COORD-0001", Role = "coordinator", FacilityId = "SYN-FAC-A" }, _clock.UtcNow);
         @case.RecordOutcomeEvidence("SYN-PROC-0001", _clock.UtcNow);
         @case.MoveTo(CaseStage.ClosureReview, _clock.UtcNow);
         var decision = new ClosureDecision
@@ -246,6 +247,9 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(2, loaded.Escalations.Count);
         Assert.All(loaded.Escalations, e => Assert.NotNull(e.ResolvedAt));
         Assert.Equal("SYN-COORD", loaded.Escalations[1].EscalatedTo.Reference);
+        Assert.Null(loaded.Escalations[0].AcknowledgedBy);
+        Assert.Equal("SYN-COORD-0001", loaded.Escalations[1].AcknowledgedBy!.Reference);
+        Assert.Equal(_clock.UtcNow, loaded.Escalations[1].AcknowledgedAt);
         Assert.False(loaded.IsEscalated);
         Assert.NotNull(loaded.Closure);
         Assert.Equal(decision, loaded.Closure with { DocumentedAttemptReferences = decision.DocumentedAttemptReferences });
@@ -253,6 +257,26 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(new DateOnly(2027, 3, 1), loaded.Closure.NextSurveillanceDate);
         Assert.Null(loaded.NextAction);
         Assert.Null(loaded.PendingAssignment);
+    }
+
+    [Fact]
+    public async Task Patient_name_and_record_number_round_trip_and_stay_out_of_the_audit_trail()
+    {
+        var @case = TestData.NewCase(_clock.UtcNow, "SYN-RESULT-0020", patientDisplayName: "SYN Patient One", patientSecondaryIdentifier: "SYN-MRN-0001");
+
+        await using (var db = NewContext())
+        {
+            await NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(@case, "SYN-EVT-20", _clock.UtcNow), CancellationToken.None);
+        }
+
+        await using var verify = NewContext();
+        var loaded = (await NewRepository(verify).GetAsync(@case.Id, CancellationToken.None))!;
+        var audit = await verify.AuditEvents.SingleAsync(a => a.CaseId == @case.Id);
+
+        Assert.Equal("SYN Patient One", loaded.PatientDisplayName);
+        Assert.Equal("SYN-MRN-0001", loaded.PatientSecondaryIdentifier);
+        Assert.DoesNotContain("SYN Patient One", audit.NewProjectionJson);
+        Assert.DoesNotContain("SYN-MRN-0001", audit.NewProjectionJson);
     }
 
     [Fact]

@@ -36,7 +36,7 @@ The prototype is not yet fit for real patient data. These are prerequisites for 
 - **Authentication and authorization.** `DemoRoles` (identity stated in request headers) is replaced by real sign-in for dashboard users and authenticated system-to-system access on `/fhir`.
 - **Clinical approval.** The pathway definition and every message template are approved by a clinical adviser; no placeholder remains.
 - **Live integrations.** HIS, patient channel, SMS and email are implemented behind the existing seams and switched on through configuration.
-- **Security and data protection.** Encryption in transit and at rest, managed secrets, access logging, retention rules and a review against the health-data regulation that applies to the deployment.
+- **Security and data protection.** Encryption in transit and at rest, managed secrets, access logging, retention rules and a review against the health-data regulation that applies to the deployment. The case store holds patient names and identifiers, so it is personal health data from the first real record.
 
 ## Repository layout
 
@@ -158,7 +158,7 @@ File names inside folders are a starting point. Folder boundaries and dependency
 
 ## Domain model
 
-**Case.** One actionable result equals one case. It holds source identifiers and references (not clinical data), pathway, clinician-reviewed urgency, stage, current owner and due time.
+**Case.** One actionable result equals one case. It holds source identifiers and references (not clinical data), the patient's display name and a second identifier such as the MRN (demographic, for staff screens; never shown to the coordinator role), pathway, clinician-reviewed urgency, stage, current owner and due time.
 
 **Stages.**
 
@@ -455,3 +455,4 @@ Work in this order. Finish and test each step before starting the next.
 - Do not invent clinical content: result categories, urgency levels, timeframes or closure criteria must come from the pathway definition file, with values marked as placeholders.
 - Keep secrets out of the repository. Use environment variables and provide a `.env.example`.
 - Report honestly what was built, what was tested and what was not.
+- Keep [`docs/workstreams.md`](docs/workstreams.md) current. When a change removes a workstream's last `TODO(WS-n)` tag and un-skips its last test, set that workstream's **Status** to `Done` in the summary table in the same change. When you finish a design-gap item, mark it `Done` in its workstream's section. Never mark something `Done` that still has a stub, a skipped test or a failing test; if later work reopens a workstream, set it back to `Open`.

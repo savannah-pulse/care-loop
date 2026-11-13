@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CareLoop.Api.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(CareLoopDbContext))]
-    [Migration("20261113070726_CaregiverConsentAndConfidence")]
-    partial class CaregiverConsentAndConfidence
+    [Migration("20261113134241_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -122,6 +122,52 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("MissingOrConflictingFactsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ModelDeployment")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PolicyVersion")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("PromptVersion")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTimeOffset?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RejectedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SectionsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SourceFactReferencesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -131,9 +177,16 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CaseId");
+
+                    b.HasIndex("CaseId", "Status");
 
                     b.ToTable("HandoffSummaries", (string)null);
                 });
@@ -164,6 +217,10 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("OutcomeEvidenceKind")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<string>("OutcomeEvidenceReference")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
@@ -173,8 +230,16 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("PatientDisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("PatientReference")
                         .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PatientSecondaryIdentifier")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -599,6 +664,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
 
                             NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b1.Property<int>("Id"));
 
+                            b1.Property<DateTimeOffset?>("AcknowledgedAt")
+                                .HasColumnType("timestamp with time zone");
+
                             b1.Property<Guid>("CaseId")
                                 .HasColumnType("uuid");
 
@@ -624,6 +692,33 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
 
                             b1.WithOwner()
                                 .HasForeignKey("CaseId");
+
+                            b1.OwnsOne("CareLoop.Domain.Events.Actor", "AcknowledgedBy", b2 =>
+                                {
+                                    b2.Property<int>("EscalationId")
+                                        .HasColumnType("integer");
+
+                                    b2.Property<string>("FacilityId")
+                                        .HasMaxLength(100)
+                                        .HasColumnType("character varying(100)");
+
+                                    b2.Property<string>("Reference")
+                                        .IsRequired()
+                                        .HasMaxLength(200)
+                                        .HasColumnType("character varying(200)");
+
+                                    b2.Property<string>("Role")
+                                        .IsRequired()
+                                        .HasMaxLength(100)
+                                        .HasColumnType("character varying(100)");
+
+                                    b2.HasKey("EscalationId");
+
+                                    b2.ToTable("CaseEscalations");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("EscalationId");
+                                });
 
                             b1.OwnsOne("CareLoop.Domain.Cases.CaseOwner", "EscalatedTo", b2 =>
                                 {
@@ -655,6 +750,8 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                                     b2.WithOwner()
                                         .HasForeignKey("EscalationId");
                                 });
+
+                            b1.Navigation("AcknowledgedBy");
 
                             b1.Navigation("EscalatedTo")
                                 .IsRequired();

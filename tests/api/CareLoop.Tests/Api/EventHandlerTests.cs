@@ -31,6 +31,28 @@ public sealed class EventHandlerTests
     }
 
     [Fact]
+    public async Task Screening_result_keeps_the_patient_name_and_record_number_for_staff_but_not_in_the_audit_snapshot()
+    {
+        var @case = await _harness.ApplyAsync(Envelopes.ScreeningResult(_harness.Clock.UtcNow, namedOwner: Envelopes.Clinician(),
+            patientDisplayName: "SYN Patient One", patientSecondaryIdentifier: "SYN-MRN-0001"));
+
+        Assert.Equal("SYN Patient One", @case.PatientDisplayName);
+        Assert.Equal("SYN-MRN-0001", @case.PatientSecondaryIdentifier);
+        var audit = Assert.Single(_harness.Repository.AuditEvents);
+        Assert.DoesNotContain("SYN Patient One", audit.NewProjectionJson);
+        Assert.DoesNotContain("SYN-MRN-0001", audit.NewProjectionJson);
+    }
+
+    [Fact]
+    public async Task Screening_result_without_demographics_leaves_them_empty()
+    {
+        var @case = await _harness.ApplyAsync(Envelopes.ScreeningResult(_harness.Clock.UtcNow, namedOwner: Envelopes.Clinician()));
+
+        Assert.Null(@case.PatientDisplayName);
+        Assert.Null(@case.PatientSecondaryIdentifier);
+    }
+
+    [Fact]
     public async Task Second_screening_result_for_the_same_result_is_refused()
     {
         await _harness.OpenCaseAsync();
@@ -289,6 +311,71 @@ public sealed class EventHandlerTests
     }
 
     [Fact]
+    public async Task Outcome_with_a_kind_the_pathway_does_not_declare_is_refused_and_audited()
+    {
+        await _harness.ReviewedCaseAsync();
+        var events = _harness.Repository.Events.Count;
+
+        var result = await _harness.IngestAsync(Envelopes.Outcome(_harness.Clock.UtcNow, "Procedure/SYN-PROC-0009", evidenceKind: "PLACEHOLDER-UNKNOWN-KIND"));
+
+        Assert.Equal(IngestOutcome.Rejected, result.Outcome);
+        Assert.Contains("PLACEHOLDER-UNKNOWN-KIND", result.Reason);
+        var @case = _harness.TheCase();
+        Assert.Equal(CaseStage.FollowUpActive, @case.Stage);
+        Assert.Null(@case.OutcomeEvidenceReference);
+        Assert.Equal(events + 1, _harness.Repository.Events.Count);
+        Assert.Equal(SourceEventDisposition.Rejected, _harness.Repository.Events.Last().Disposition);
+    }
+
+    [Fact]
+    public async Task Treatment_plan_outcome_sets_start_treatment_as_the_next_action()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var @case = await _harness.ApplyAsync(Envelopes.Outcome(_harness.Clock.UtcNow, "CarePlan/SYN-PLAN-0001", evidenceKind: "treatment-plan"));
+
+        Assert.Equal(CaseStage.ClosureReview, @case.Stage);
+        Assert.Equal("treatment-plan", @case.OutcomeEvidenceKind);
+        Assert.Equal("start-treatment", @case.NextAction);
+        var startWithin = _harness.Pathway.Deadlines.Single(d => d.NextAction == "start-treatment" && d.UrgencyCode is null).Duration;
+        Assert.Equal(_harness.Clock.UtcNow.Add(startWithin), @case.DueAt);
+    }
+
+    [Fact]
+    public async Task Diagnosis_then_plan_then_treatment_are_recorded_as_separate_outcomes_in_closure_review()
+    {
+        await _harness.CaseInClosureReviewAsync();
+        Assert.Equal("diagnosis", _harness.TheCase().OutcomeEvidenceKind);
+        Assert.Equal("decide-closure", _harness.TheCase().NextAction);
+
+        var planned = await _harness.ApplyAsync(Envelopes.Outcome(_harness.Clock.UtcNow, "CarePlan/SYN-PLAN-0001", evidenceKind: "treatment-plan"));
+        Assert.Equal(CaseStage.ClosureReview, planned.Stage);
+        Assert.Equal("start-treatment", planned.NextAction);
+        Assert.Equal("CarePlan/SYN-PLAN-0001", planned.OutcomeEvidenceReference);
+
+        _harness.Clock.Advance(TimeSpan.FromHours(2));
+        var started = await _harness.ApplyAsync(Envelopes.Outcome(_harness.Clock.UtcNow, "Procedure/SYN-PROC-0002", evidenceKind: "treatment-started"));
+        Assert.Equal(CaseStage.ClosureReview, started.Stage);
+        Assert.Equal("treatment-started", started.OutcomeEvidenceKind);
+        Assert.Equal("decide-closure", started.NextAction);
+        Assert.Null(started.Closure);
+
+        Assert.Equal(3, _harness.Repository.Events.Count(e => e.Type == CaseEventType.OutcomeRecorded && e.Disposition == SourceEventDisposition.Applied));
+    }
+
+    [Fact]
+    public async Task Further_outcome_in_closure_review_by_a_role_that_may_not_record_outcomes_is_refused()
+    {
+        await _harness.CaseInClosureReviewAsync();
+
+        var result = await _harness.IngestAsync(Envelopes.Outcome(_harness.Clock.UtcNow, "CarePlan/SYN-PLAN-0001", evidenceKind: "treatment-plan",
+            actor: new Actor { Reference = "SYN-STAFF-0099", Role = "receptionist", FacilityId = "SYN-FAC-A" }));
+
+        Assert.Equal(IngestOutcome.Rejected, result.Outcome);
+        Assert.Equal("decide-closure", _harness.TheCase().NextAction);
+    }
+
+    [Fact]
     public async Task Closure_with_evidence_closes_the_case()
     {
         await _harness.CaseInClosureReviewAsync();
@@ -408,9 +495,10 @@ public sealed class EventHandlerTests
 
         Assert.Equal(ReferralTrack.RespondAction, @case.NextAction);
         Assert.Equal("respond-to-referral", @case.NextAction);
-        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+        var respondWithin = _harness.Pathway.Deadlines.Single(d => d.NextAction == ReferralTrack.RespondAction && d.UrgencyCode is null).Duration;
+        Assert.Equal(_harness.Clock.UtcNow.Add(respondWithin), @case.DueAt);
 
-        _harness.Clock.Advance(TimeSpan.FromHours(4));
+        _harness.Clock.Advance(TimeSpan.FromHours(1));
         await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Accepted));
 
         Assert.True(@case.Referral!.IsComplete());

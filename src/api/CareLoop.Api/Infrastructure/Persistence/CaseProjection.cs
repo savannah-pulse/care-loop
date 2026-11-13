@@ -13,7 +13,7 @@ namespace CareLoop.Api.Infrastructure.Persistence;
 /// An audit entry must show what changed, so each one carries the case as it was and as it is.
 /// The snapshot is a flat, stable shape rather than the serialized aggregate: it names stage,
 /// owner, next action, deadline, flags, tracks, escalations and closure, and nothing else. It holds
-/// references only, never clinical content or contact details.
+/// references only, never clinical content, contact details or the patient's name and record number.
 /// </para>
 /// <para>
 /// The shape is shared by <see cref="EfCaseRepository"/> and the in-memory repository used in tests,
@@ -64,8 +64,11 @@ public sealed record CaseProjection
     /// <summary>The appointment track, when started.</summary>
     public TrackSnapshot? Appointment { get; init; }
 
-    /// <summary>Reference to the recorded outcome evidence.</summary>
+    /// <summary>Reference to the most recently recorded outcome evidence.</summary>
     public string? OutcomeEvidenceReference { get; init; }
+
+    /// <summary>The kind of the most recently recorded outcome evidence, as a code from the pathway's evidence kinds.</summary>
+    public string? OutcomeEvidenceKind { get; init; }
 
     /// <summary>The closure decision, once closed.</summary>
     public ClosureDecision? Closure { get; init; }
@@ -116,6 +119,7 @@ public sealed record CaseProjection
                 ? new TrackSnapshot(a.Status.ToString(), a.SourceReference, a.UpdatedAt, a.IsComplete(), null, null, null)
                 : null,
             OutcomeEvidenceReference = @case.OutcomeEvidenceReference,
+            OutcomeEvidenceKind = @case.OutcomeEvidenceKind,
             Closure = @case.Closure,
             CaregiverConsent = @case.CaregiverConsent is { } consent
                 ? new ConsentSnapshot(consent.CaregiverContactPoint.Channel.ToString(), consent.GrantedAt, consent.WithdrawnAt, consent.IsActive, consent.EvidenceReference, consent.WithdrawalEvidenceReference)

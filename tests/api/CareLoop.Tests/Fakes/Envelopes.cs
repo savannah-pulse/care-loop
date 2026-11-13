@@ -25,7 +25,7 @@ public static class Envelopes
     public static string NextEventId() => $"SYN-EVT-{Interlocked.Increment(ref _counter):0000}";
 
     /// <summary>A screening result that opens a case.</summary>
-    public static EventEnvelope ScreeningResult(DateTimeOffset at, string resultId = ResultId, Actor? namedOwner = null, string pathwayId = "breast-screening", string? eventId = null) =>
+    public static EventEnvelope ScreeningResult(DateTimeOffset at, string resultId = ResultId, Actor? namedOwner = null, string pathwayId = "breast-screening", string? eventId = null, string? patientDisplayName = null, string? patientSecondaryIdentifier = null) =>
         new()
         {
             SourceSystem = TestData.SourceSystem,
@@ -37,6 +37,8 @@ public static class Envelopes
             Payload = new ScreeningResultPayload
             {
                 PatientReference = "SYN-PT-0001",
+                PatientDisplayName = patientDisplayName,
+                PatientSecondaryIdentifier = patientSecondaryIdentifier,
                 PathwayId = pathwayId,
                 FacilityId = "SYN-FAC-A",
                 ResultReference = $"DiagnosticReport/{resultId}",
@@ -168,7 +170,7 @@ public static class Envelopes
         };
 
     /// <summary>Recorded outcome evidence.</summary>
-    public static EventEnvelope Outcome(DateTimeOffset at, string evidenceReference = "Procedure/SYN-PROC-0001", string resultId = ResultId) =>
+    public static EventEnvelope Outcome(DateTimeOffset at, string evidenceReference = "Procedure/SYN-PROC-0001", string resultId = ResultId, string evidenceKind = "diagnosis", Actor? actor = null) =>
         new()
         {
             SourceSystem = TestData.SourceSystem,
@@ -176,8 +178,8 @@ public static class Envelopes
             Type = CaseEventType.OutcomeRecorded,
             SourceResultId = resultId,
             OccurredAt = at,
-            Actor = Clinician(),
-            Payload = new OutcomePayload { EvidenceReference = evidenceReference, EvidenceKind = "PLACEHOLDER-EVIDENCE-KIND" },
+            Actor = actor ?? Clinician(),
+            Payload = new OutcomePayload { EvidenceReference = evidenceReference, EvidenceKind = evidenceKind },
         };
 
     /// <summary>A closure decision.</summary>
