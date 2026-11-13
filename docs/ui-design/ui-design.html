@@ -362,6 +362,7 @@ td .l2{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
 .rules-ar li{display:flex;gap:12px;align-items:flex-start}
 .rules-ar svg{color:var(--accent);margin-top:2px}
 .refs.meas span{color:var(--ink2);border-color:var(--line);background:var(--soft)}
+.refs span.sim{color:var(--ink3);background:transparent;border:1px dashed var(--field)}
 .psteps{gap:8px}
 .sb{height:48px}
 .plink{margin-top:4px}
@@ -489,17 +490,17 @@ code.role{margin-top:6px}
 <div class="refs"><code>ClosureReview</code></div>
 <div class="refs"><code>Closed</code></div>
 
-<div class="lane">Screens</div>
-<div class="refs"><span>15 First visit</span><span>16 Screening result</span><span>2 Case</span></div>
+<div class="lane">Screens<small>Dashed: not shown in the hackathon</small></div>
+<div class="refs"><span class="sim">15 First visit</span><span class="sim">16 Screening result</span><span>2 Case</span></div>
 <div class="refs"><span>1 Worklist</span></div>
 <div class="refs"><span>1 Worklist</span><span>2 Case</span></div>
-<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span><span>11 Arabic</span></div>
+<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span><span class="sim">11 Arabic</span></div>
 <div class="refs"><span>9 Basic phone</span><span>10 Patient view</span></div>
-<div class="refs"><span>5 Consultation</span></div>
-<div class="refs"><span>17 Escalation</span><span>18 Handoff summary</span><span>6 Refer</span><span>7 Accept</span><span>12 Caregiver</span><span>19 Assessment</span></div>
-<div class="refs"><span>20 Lab result</span><span>21 Diagnosis and plan</span><span>2 Case</span></div>
-<div class="refs"><span>8 Close</span></div>
-<div class="refs"><span>8 Close</span><span>3 Impact</span><span>22 Treatment</span><span>23 All clear</span></div>
+<div class="refs"><span class="sim">5 Consultation</span></div>
+<div class="refs"><span>17 Escalation</span><span>18 Handoff summary</span><span class="sim">6 Refer</span><span class="sim">7 Accept</span><span>12 Caregiver</span><span class="sim">19 Assessment</span></div>
+<div class="refs"><span class="sim">20 Lab result</span><span class="sim">21 Diagnosis and plan</span><span>2 Case</span></div>
+<div class="refs"><span class="sim">8 Close</span></div>
+<div class="refs"><span class="sim">8 Close</span><span>3 Impact</span><span class="sim">22 Treatment</span><span class="sim">23 All clear</span></div>
 
 <div class="lane">Measured<small>On screen 3</small></div>
 <div class="refs meas"></div>
@@ -836,7 +837,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b05" data-file="05-consultation">
 <div class="cap"><span class="n">5</span><div><h2>Consultation</h2><p>Clinicians answer questions from colleagues and from patients in one list, each with a reply deadline. Here Dr. Rekha asks a breast surgeon about an urgent result. A patient's request for a call goes to his nurse first, and she passes it on when it needs a doctor.</p>
-<div class="meta"><span>For: clinicians</span><span>Built in: HIS simulator</span><span>Stories: US05, US07</span><span>Requirements: FR-05</span></div></div></div>
+<div class="meta"><span>For: clinicians</span><span>Built in: HIS simulator</span><span>Stories: US05, US07</span><span>Requirements: FR-05</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his">
@@ -889,7 +890,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b06" data-file="06-refer">
 <div class="cap"><span class="n">6</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions, and sends the referral with the handoff summary she approved in CareLoop (screen 18). Here the summary can be read, not changed.</p>
-<div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05, FR-11</span></div></div></div>
+<div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05, FR-11</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his">
@@ -948,7 +949,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b07" data-file="07-accept-referral">
 <div class="cap"><span class="n">7</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and the approved summary. She accepts responsibility, or declines with a fixed reason. Labs use the same screen, because a test request is a referral to the lab.</p>
-<div class="meta"><span>For: receiving clinicians, labs and appointment teams</span><span>Built in: HIS simulator</span><span>Stories: US08, US09, US10</span><span>Requirements: FR-05, FR-06</span></div></div></div>
+<div class="meta"><span>For: receiving clinicians, labs and appointment teams</span><span>Built in: HIS simulator</span><span>Stories: US08, US09, US10</span><span>Requirements: FR-05, FR-06</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his">
@@ -1020,7 +1021,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b08" data-file="08-close-case">
 <div class="cap"><span class="n">8</span><div><h2>Close the case</h2><p>Only an authorised clinician can close a case, and only when every required step has evidence. Continuing care keeps a named owner after closing.</p>
-<div class="meta"><span>For: authorised clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12, US14, US15</span><span>Requirements: FR-08</span></div></div></div>
+<div class="meta"><span>For: authorised clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12, US14, US15</span><span>Requirements: FR-08</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his">
@@ -1187,7 +1188,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b11" data-file="11-arabic">
 <div class="cap"><span class="n">11</span><div><h2>Arabic, right to left</h2><p>The target design for Arabic, deferred: the prototype runs in English until a qualified reviewer approves the Arabic wording. The layout mirrors, so reading order, steps and buttons run right to left, while numbers stay as 0 to 9.</p>
-<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
+<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span><span>Hackathon: deferred</span></div></div></div>
 <div class="phones">
 <div class="pcol">
 <div class="phone"><div class="scr" dir="rtl" lang="ar"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
@@ -1381,7 +1382,7 @@ code.role{margin-top:6px}
 
 <section class="board" id="b15" data-file="15-first-visit">
 <div class="cap"><span class="n">15</span><div><h2>First visit</h2><p>Hessa sees her family doctor for a routine check. Dr. Sara orders a screening mammogram, and Hessa chooses, in writing, who may get her appointment details. CareLoop starts only if a result needs follow-up, and her consent goes with that case.</p>
-<div class="meta"><span>For: family doctors</span><span>Built in: HIS simulator</span><span>Stories: US01, US04</span></div></div></div>
+<div class="meta"><span>For: family doctors</span><span>Built in: HIS simulator</span><span>Stories: US01, US04</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>Family Health Centre, Madinat Zayed</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">SH</span><div><b>Dr. Sara Al Hammadi</b><small>Family doctor</small></div></div></div>
@@ -1420,7 +1421,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b16" data-file="16-screening-result">
 <div class="cap"><span class="n">16</span><div><h2>Screening result</h2><p>Dr. Rekha reads Hessa's mammogram. Signing a result that needs more tests opens a case in CareLoop and names a person to tell Hessa.</p>
-<div class="meta"><span>For: screening doctors</span><span>Built in: HIS simulator</span><span>Stories: US01, US02</span></div></div></div>
+<div class="meta"><span>For: screening doctors</span><span>Built in: HIS simulator</span><span>Stories: US01, US02</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>Family Health Centre, Madinat Zayed</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">RV</span><div><b>Dr. Rekha Varghese</b><small>Screening physician</small></div></div></div>
@@ -1547,6 +1548,13 @@ code.role{margin-top:6px}
 </ul>
 </div>
 <div class="card">
+<h3>Her other screening</h3>
+<ul class="reach">
+<li><svg class="i"><use href="#i-doc"/></svg><span>Bowel screening, Mon 3 Mar 2025: she needed a colonoscopy, which found no cancer. Closed on Thu 24 Apr 2025.</span></li>
+</ul>
+<p class="note" style="margin-top:12px">From her other cases in CareLoop. Only doctors see this. Her full history is in her hospital record.</p>
+</div>
+<div class="card">
 <h3>Kept with your decision</h3>
 <ul class="reach">
 <li><svg class="i"><use href="#i-user"/></svg><span>Your name, the time, and whether you approved, edited or rejected it</span></li>
@@ -1563,7 +1571,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b19" data-file="19-assessment">
 <div class="cap"><span class="n">19</span><div><h2>Assessment and biopsy</h2><p>Hessa comes to her assessment. The clinic records that she came, and her biopsy goes to the lab. CareLoop tracks the sample until the result is back.</p>
-<div class="meta"><span>For: assessment clinics</span><span>Built in: HIS simulator</span><span>Stories: US10</span></div></div></div>
+<div class="meta"><span>For: assessment clinics</span><span>Built in: HIS simulator</span><span>Stories: US10</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>General Hospital, Abu Dhabi</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon</small></div></div></div>
@@ -1605,7 +1613,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b20" data-file="20-lab-result">
 <div class="cap"><span class="n">20</span><div><h2>Lab result</h2><p>The lab sends Hessa's biopsy result to Dr. Layla. CareLoop checks that she reviews it in time, and that Hessa hears it in person.</p>
-<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US10, US11</span></div></div></div>
+<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US10, US11</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>General Hospital, Abu Dhabi</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon</small></div></div></div>
@@ -1646,7 +1654,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b21" data-file="21-diagnosis-and-plan">
 <div class="cap"><span class="n">21</span><div><h2>Diagnosis and plan</h2><p>Dr. Layla gives Hessa her result in person, and the cancer team agrees a plan. A cancer nurse navigator becomes Hessa's named contact.</p>
-<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12</span></div></div></div>
+<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US11, US12</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>General Hospital, Abu Dhabi</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">LH</span><div><b>Dr. Layla Haddad</b><small>Breast surgeon</small></div></div></div>
@@ -1687,7 +1695,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b22" data-file="22-treatment">
 <div class="cap"><span class="n">22</span><div><h2>Treatment</h2><p>After the screening case closes, CareLoop keeps every treatment, owner and appointment in one place, so nothing is missed until Hessa finishes. Target design: care after the screening case closes is not in the hackathon build.</p>
-<div class="meta"><span>For: cancer nurse navigators</span><span>Built in: CareLoop web app</span><span>Stories: US12, US16</span></div></div></div>
+<div class="meta"><span>For: cancer nurse navigators</span><span>Built in: CareLoop web app</span><span>Stories: US12, US16</span><span>Hackathon: target design only</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
@@ -1760,7 +1768,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b23" data-file="23-all-clear">
 <div class="cap"><span class="n">23</span><div><h2>All clear</h2><p>Hessa finishes her treatment. Dr. Karim tells her in person that there is no sign of cancer, and her follow-up is planned with one named contact. Target design: after the screening case closes, not in the hackathon build.</p>
-<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US12, US15</span></div></div></div>
+<div class="meta"><span>For: treating clinicians</span><span>Built in: HIS simulator</span><span>Stories: US12, US15</span><span>Hackathon: target design only</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his"><div class="sys"><b>Hospital system</b><small>Cancer Centre, Abu Dhabi</small></div><div class="grow"></div><span class="pill">Simulated for testing</span><div class="me"><span class="av">KN</span><div><b>Dr. Karim Nassar</b><small>Medical oncologist</small></div></div></div>
