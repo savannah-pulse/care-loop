@@ -462,6 +462,16 @@
               }
             }
           },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
           "501": {
             "description": "Not Implemented",
             "content": {
@@ -524,6 +534,100 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ApproveSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/handoff-summary/{summaryId}/rejection": {
+      "post": {
+        "tags": [
+          "Summaries"
+        ],
+        "summary": "Rejects a drafted handoff summary.",
+        "operationId": "RejectHandoffSummary",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case the summary belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "summaryId",
+            "in": "path",
+            "description": "The draft being rejected.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-User",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectSummaryRequest"
               }
             }
           },
@@ -1167,8 +1271,15 @@
           "summaryId",
           "caseId",
           "status",
+          "sections",
           "text",
+          "missingOrConflictingFacts",
+          "humanReviewRequired",
           "draftedBy",
+          "modelDeployment",
+          "promptVersion",
+          "trigger",
+          "language",
           "draftedAt"
         ],
         "type": "object",
@@ -1184,16 +1295,50 @@
             "format": "uuid"
           },
           "status": {
-            "description": "Whether the summary is a draft or approved.",
+            "description": "Where the summary stands with its reviewer.",
             "$ref": "#/components/schemas/HandoffSummaryStatus"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SummarySectionResponse"
+            },
+            "description": "The sections of the summary, in reading order."
           },
           "text": {
             "type": "string",
-            "description": "The summary text."
+            "description": "The sections run together as plain text; what a reviewer signs and what the HIS receives as a `DocumentReference`."
+          },
+          "missingOrConflictingFacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the draft reported as missing, stale or contradictory, for a person to resolve."
+          },
+          "humanReviewRequired": {
+            "type": "boolean",
+            "description": "Whether a person must review this before it can be used. Always `true` while the status is `Draft`."
           },
           "draftedBy": {
             "type": "string",
             "description": "Name of the AI provider that produced the draft."
+          },
+          "modelDeployment": {
+            "type": "string",
+            "description": "The model deployment that produced the draft."
+          },
+          "promptVersion": {
+            "type": "string",
+            "description": "Version of the prompt and template used, so a reviewer can tell two drafts apart."
+          },
+          "trigger": {
+            "type": "string",
+            "description": "Why the draft was produced: because a person asked, or because a handoff was proposed."
+          },
+          "language": {
+            "type": "string",
+            "description": "BCP 47 language tag the summary is written in."
           },
           "draftedAt": {
             "type": "string",
@@ -1205,25 +1350,48 @@
               "null",
               "string"
             ],
-            "description": "Reference of the person who approved it; `null` while it is a draft."
+            "description": "Reference of the person who approved it; `null` unless the status is `Approved`."
           },
           "approvedAt": {
             "type": [
               "null",
               "string"
             ],
-            "description": "When it was approved; `null` while it is a draft.",
+            "description": "When it was approved; `null` unless the status is `Approved`.",
             "format": "date-time"
+          },
+          "rejectedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference of the person who rejected it; `null` unless the status is `Rejected`."
+          },
+          "rejectedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was rejected; `null` unless the status is `Rejected`.",
+            "format": "date-time"
+          },
+          "rejectionReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the reviewer rejected it; `null` unless the status is `Rejected`."
           }
         },
-        "description": "A handoff summary for a case, returned when one is drafted or approved."
+        "description": "A handoff summary for a case, returned when one is drafted, approved or rejected."
       },
       "HandoffSummaryStatus": {
         "enum": [
           "Draft",
-          "Approved"
+          "Approved",
+          "Rejected"
         ],
-        "description": "Whether a handoff summary is still an AI draft or has been approved by a person."
+        "description": "Where a handoff summary stands with its reviewer."
       },
       "HealthResponse": {
         "required": [
@@ -1461,6 +1629,19 @@
           }
         }
       },
+      "RejectSummaryRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why the reviewer turned the draft down. Stored with the rejection and read when the drafts are evaluated."
+          }
+        },
+        "description": "Body of the request rejecting a drafted handoff summary."
+      },
       "SimulationArmResponse": {
         "required": [
           "escalationEnabled",
@@ -1584,6 +1765,32 @@
           "Rejected"
         ],
         "description": "What CareLoop did with a source event."
+      },
+      "SummarySectionResponse": {
+        "required": [
+          "heading",
+          "text",
+          "sourceFactIds"
+        ],
+        "type": "object",
+        "properties": {
+          "heading": {
+            "type": "string",
+            "description": "Heading of the section."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text of the section."
+          },
+          "sourceFactIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Identifiers of the facts the section was drafted from, so a reviewer can check each statement against its source."
+          }
+        },
+        "description": "One section of a handoff summary and the facts it rests on."
       },
       "TimelineEntryResponse": {
         "required": [

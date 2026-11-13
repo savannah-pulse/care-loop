@@ -2,7 +2,6 @@ using CareLoop.Api.Features.Summaries;
 using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Time;
-using CareLoop.Domain.Cases;
 using CareLoop.Domain.Recipients;
 
 namespace CareLoop.Tests.Api;
@@ -27,13 +26,16 @@ public sealed class WorkingInfrastructureTests
         var provider = new NoOpAiProvider();
         var request = new HandoffSummaryRequest
         {
+            RequestId = Guid.NewGuid(),
             CaseId = Guid.NewGuid(),
             PathwayId = "breast-screening",
-            Stage = CaseStage.FollowUpActive,
-            CurrentOwnerRole = "clinician",
-            Exceptions = [],
-            TimelineLines = [],
+            Purpose = SummaryPurpose.ClinicianHandoff,
+            Trigger = DraftTrigger.Requested,
+            Facts = [],
+            KnownGaps = [],
             Language = "en",
+            PolicyVersion = "breast-screening-v1",
+            PromptVersion = "fr11-v1",
         };
 
         Assert.False(provider.IsEnabled);

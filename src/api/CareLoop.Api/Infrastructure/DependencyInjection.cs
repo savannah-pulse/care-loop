@@ -158,23 +158,43 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the AI provider chosen by <c>Ai:Provider</c>; the no-op provider is the default.
+    /// Registers the AI provider chosen by <c>Ai:Provider</c>, the drafting pipeline and, when it is
+    /// switched on, the subscriber that drafts a summary as soon as a handoff is proposed.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration; supplies the <c>Ai</c> section.</param>
     /// <returns>The same service collection, for chaining.</returns>
+    /// <remarks>
+    /// The no-op provider is the default, so the API runs with no AI service and no credential.
+    /// <c>AiWorkflow</c> calls the Python service, which owns the prompt and the Foundry
+    /// credentials; <c>FoundryDirect</c> calls a deployment from here instead. Both sit behind
+    /// <see cref="IAiProvider"/>, so nothing outside this method knows which is in use.
+    /// </remarks>
     public static IServiceCollection AddSummaries(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
 
         var provider = configuration.GetValue<string>($"{AiOptions.SectionName}:{nameof(AiOptions.Provider)}");
-        if (string.Equals(provider, "AzureOpenAi", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(provider, "AiWorkflow", StringComparison.OrdinalIgnoreCase))
         {
-            services.AddHttpClient<IAiProvider, AzureOpenAiProvider>();
+            services.AddHttpClient<IAiProvider, AiWorkflowProvider>();
+        }
+        else if (string.Equals(provider, "FoundryDirect", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddHttpClient<IAiProvider, FoundryDirectProvider>();
         }
         else
         {
             services.AddSingleton<IAiProvider, NoOpAiProvider>();
+        }
+
+        services.AddScoped<HandoffFactCollector>();
+        services.AddScoped<HandoffSummaryDrafter>();
+
+        if (configuration.GetValue<bool>($"{AiOptions.SectionName}:{nameof(AiOptions.AutoDraftOnHandoff)}"))
+        {
+            // Off by default: an automatic draft spends a model call and sends facts out of CareLoop with nobody having asked.
+            services.AddScoped<IDomainEventSubscriber, AutoDraftOnHandoff>();
         }
 
         return services;

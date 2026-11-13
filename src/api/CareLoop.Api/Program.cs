@@ -54,6 +54,7 @@ app.MapGetMetrics();
 app.MapRunSimulation();
 app.MapDraftHandoffSummary();
 app.MapApproveSummary();
+app.MapRejectSummary();
 
 await app.RunAsync();
 

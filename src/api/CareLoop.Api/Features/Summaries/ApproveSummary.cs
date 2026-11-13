@@ -1,11 +1,7 @@
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Infrastructure.Auth;
-using CareLoop.Contracts.Cases;
 using CareLoop.Contracts.Common;
-using CareLoop.Contracts.Exceptions;
-using CareLoop.Contracts.Metrics;
 using CareLoop.Contracts.Summaries;
-using CareLoop.Domain.Cases;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CareLoop.Api.Features.Summaries;
@@ -14,7 +10,14 @@ namespace CareLoop.Api.Features.Summaries;
 /// Slice for <c>POST /cases/{caseId}/handoff-summary/{summaryId}/approval</c>: a person approves a drafted summary.
 /// </summary>
 /// <remarks>
-/// The approval is an event: will record a <c>HandoffSummaryApproved</c> source event through the single write path, naming the approver from the demo identity headers, so the audit trail shows who took responsibility for the text. Approval changes nothing else: it cannot set urgency, alter source data, close the case or send a message.
+/// The approval is an event: will record a <c>HandoffSummaryApproved</c> source event through the
+/// single write path, naming the approver from the demo identity headers, so the audit trail shows
+/// who took responsibility for the text. What is approved is exactly the text in the request,
+/// which may differ from the draft, because the approver owns the words they sign.
+/// <para>
+/// Approval changes nothing else: it cannot set urgency, alter source data, close the case or send
+/// a message. It is what lets the FHIR publisher send the <c>DocumentReference</c>.
+/// </para>
 /// </remarks>
 public static class ApproveSummary
 {
@@ -45,10 +48,11 @@ public static class ApproveSummary
     /// <param name="userReference">Reference of the approving person, from the demo identity header.</param>
     /// <param name="role">Role of the approving person, from the demo identity header.</param>
     /// <param name="ct">Cancels the request.</param>
-    /// <returns>200 with the approved summary; 403 when the caller has no role allowed to approve; 404 when the case or draft does not exist; 409 when it is already approved.</returns>
+    /// <returns>200 with the approved summary; 403 when the caller has no role allowed to approve; 404 when the case or draft does not exist; 409 when it is already approved or was rejected.</returns>
     public static IResult Handle(Guid caseId, Guid summaryId, ApproveSummaryRequest request, [FromHeader(Name = DemoRoles.UserHeader)] string? userReference, [FromHeader(Name = DemoRoles.RoleHeader)] string? role, CancellationToken ct)
     {
-        // TODO(WS-9): check the role, mark the record Approved and save a HandoffSummaryApproved event via ICaseRepository.SaveAsync.
+        // TODO(WS-9): check the role against the pathway's summary approver roles, mark the record
+        // Approved with the approved text, and save a HandoffSummaryApproved event via ICaseRepository.SaveAsync.
         return NotImplementedResults.For("WS9", "ApproveSummary");
     }
 }
