@@ -80,6 +80,7 @@ public sealed class Case
         PathwayId = pathwayId;
         FacilityId = facilityId;
         Owner = initialOwner;
+        Exceptions = initialOwner.IsQueue ? CaseExceptions.Unassigned : CaseExceptions.None;
         Stage = CaseStage.Received;
         CreatedAt = receivedAt;
         UpdatedAt = receivedAt;
@@ -173,6 +174,9 @@ public sealed class Case
     /// <summary>Domain events raised since the case was loaded; the repository writes them to the outbox and clears them.</summary>
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents;
 
+    /// <summary><see langword="true"/> once the case has been closed. A closed case is final and refuses every further change.</summary>
+    public bool IsClosed => Stage == CaseStage.Closed;
+
     /// <summary>
     /// Queues a domain event to be written to the outbox with the next save.
     /// </summary>
@@ -194,12 +198,18 @@ public sealed class Case
     /// <param name="urgencyCode">The urgency code from the review; must be one the pathway definition knows.</param>
     /// <param name="reviewer">The clinician who reviewed the result.</param>
     /// <param name="at">When the review was completed.</param>
-    /// <remarks>Urgency always arrives clinician-reviewed from the HIS. This method stores it; it must never derive or adjust it.</remarks>
+    /// <remarks>Urgency always arrives clinician-reviewed from the HIS. This method stores it exactly as received; it must never derive or adjust it. Checking the code against the pathway's known codes is the caller's job, because the Domain has no pathway here.</remarks>
+    /// <exception cref="ArgumentException"><paramref name="urgencyCode"/> is empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="reviewer"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void RecordReview(string urgencyCode, Actor reviewer, DateTimeOffset at)
     {
-        // TODO(WS-1): store the reviewed urgency and update UpdatedAt; reject when the case is closed.
-        throw new NotImplementedException("WS1: Case.RecordReview");
+        ArgumentException.ThrowIfNullOrWhiteSpace(urgencyCode);
+        ArgumentNullException.ThrowIfNull(reviewer);
+        ThrowIfClosed();
+
+        Urgency = urgencyCode;
+        Touch(at);
     }
 
     /// <summary>
@@ -207,11 +217,19 @@ public sealed class Case
     /// </summary>
     /// <param name="stage">The stage to enter.</param>
     /// <param name="at">When the move happened.</param>
-    /// <exception cref="InvalidOperationException">The case is closed, which is final.</exception>
+    /// <remarks>Entering <see cref="CaseStage.Closed"/> is possible only through <see cref="Close"/>, which needs the authorized decision, so no caller can close a case by moving it.</remarks>
+    /// <exception cref="InvalidOperationException">The case is closed, which is final, or <paramref name="stage"/> is <see cref="CaseStage.Closed"/>.</exception>
     public void MoveTo(CaseStage stage, DateTimeOffset at)
     {
-        // TODO(WS-1): set Stage and UpdatedAt; a Closed case can never move.
-        throw new NotImplementedException("WS1: Case.MoveTo");
+        ThrowIfClosed();
+        if (stage == CaseStage.Closed)
+        {
+            throw new InvalidOperationException(
+                "A case cannot be moved to Closed; closure requires an authorized decision through Close.");
+        }
+
+        Stage = stage;
+        Touch(at);
     }
 
     /// <summary>
@@ -220,22 +238,48 @@ public sealed class Case
     /// <param name="nextAction">Key of the next action, as named in the pathway definition.</param>
     /// <param name="dueAt">The deadline computed by <see cref="Rules.DeadlinePolicy"/>.</param>
     /// <param name="at">When the next action was set.</param>
-    /// <remarks>Every exception must end here: a case is never parked without a next action, an owner and a deadline.</remarks>
+    /// <remarks>Every exception must end here: a case is never parked without a next action, an owner and a deadline. Setting a new next action starts a new clock, so the overdue flag of the previous one is cleared.</remarks>
+    /// <exception cref="ArgumentException"><paramref name="nextAction"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void SetNextAction(string nextAction, DateTimeOffset dueAt, DateTimeOffset at)
     {
-        // TODO(WS-1): set NextAction, DueAt and UpdatedAt; clear the Overdue flag.
-        throw new NotImplementedException("WS1: Case.SetNextAction");
+        ArgumentException.ThrowIfNullOrWhiteSpace(nextAction);
+        ThrowIfClosed();
+
+        NextAction = nextAction;
+        DueAt = dueAt;
+        Exceptions &= ~CaseExceptions.Overdue;
+        Touch(at);
     }
 
     /// <summary>
     /// Records a proposed ownership transfer without changing the accountable owner.
     /// </summary>
     /// <param name="proposal">The proposal produced by <see cref="Rules.OwnershipRules"/>.</param>
-    /// <exception cref="InvalidOperationException">Another proposal is already pending.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="proposal"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">Another proposal is already pending, or the case is closed.</exception>
     public void ProposeOwner(Assignment proposal)
     {
-        // TODO(WS-1): set PendingAssignment and raise HandoffProposed; Owner must not change.
-        throw new NotImplementedException("WS1: Case.ProposeOwner");
+        ArgumentNullException.ThrowIfNull(proposal);
+        ThrowIfClosed();
+        if (PendingAssignment is not null)
+        {
+            throw new InvalidOperationException(
+                $"A handoff to '{PendingAssignment.ProposedOwner.Reference}' is already pending; it must be accepted or rejected first.");
+        }
+
+        PendingAssignment = proposal with { Status = AssignmentStatus.Proposed, RespondedAt = null, RejectionReason = null };
+        Touch(proposal.ProposedAt);
+
+        Raise(new HandoffProposed
+        {
+            EventId = Guid.NewGuid(),
+            CaseId = Id,
+            OccurredAt = proposal.ProposedAt,
+            CurrentOwner = Owner,
+            ProposedOwner = proposal.ProposedOwner,
+            RespondBy = proposal.RespondBy,
+        });
     }
 
     /// <summary>
@@ -243,11 +287,18 @@ public sealed class Case
     /// </summary>
     /// <param name="acceptedBy">The person accepting; must be the proposed owner.</param>
     /// <param name="at">When the transfer was accepted.</param>
-    /// <exception cref="InvalidOperationException">No proposal is pending, or it was proposed to someone else.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="acceptedBy"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">No proposal is pending, it was proposed to someone else, or the case is closed.</exception>
     public void AcceptOwnership(Actor acceptedBy, DateTimeOffset at)
     {
-        // TODO(WS-1): set Owner to the proposed owner, clear PendingAssignment and the Unassigned flag.
-        throw new NotImplementedException("WS1: Case.AcceptOwnership");
+        ArgumentNullException.ThrowIfNull(acceptedBy);
+        ThrowIfClosed();
+        var proposal = RequirePendingProposalFor(acceptedBy);
+
+        Owner = proposal.ProposedOwner;
+        PendingAssignment = null;
+        Exceptions &= ~CaseExceptions.Unassigned;
+        Touch(at);
     }
 
     /// <summary>
@@ -256,11 +307,30 @@ public sealed class Case
     /// <param name="rejectedBy">The person refusing; must be the proposed owner.</param>
     /// <param name="reason">The reason given.</param>
     /// <param name="at">When the transfer was refused.</param>
-    /// <exception cref="InvalidOperationException">No proposal is pending, or it was proposed to someone else.</exception>
+    /// <remarks>The case is flagged <see cref="CaseExceptions.Rejected"/> so it appears in the exception queue until the owner has arranged the alternative and set a new next action.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="rejectedBy"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="reason"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">No proposal is pending, it was proposed to someone else, or the case is closed.</exception>
     public void RejectOwnership(Actor rejectedBy, string reason, DateTimeOffset at)
     {
-        // TODO(WS-1): clear PendingAssignment, flag Rejected and raise HandoffRejected; Owner must not change.
-        throw new NotImplementedException("WS1: Case.RejectOwnership");
+        ArgumentNullException.ThrowIfNull(rejectedBy);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        ThrowIfClosed();
+        var proposal = RequirePendingProposalFor(rejectedBy);
+
+        PendingAssignment = null;
+        Exceptions |= CaseExceptions.Rejected;
+        Touch(at);
+
+        Raise(new HandoffRejected
+        {
+            EventId = Guid.NewGuid(),
+            CaseId = Id,
+            OccurredAt = at,
+            CurrentOwner = Owner,
+            RejectedBy = proposal.ProposedOwner,
+            Reason = reason,
+        });
     }
 
     /// <summary>
@@ -268,11 +338,25 @@ public sealed class Case
     /// </summary>
     /// <param name="owner">The new accountable owner.</param>
     /// <param name="at">When the assignment was made.</param>
-    /// <remarks>Transfers between people must use propose and accept instead, so responsibility is never dropped.</remarks>
+    /// <remarks>Transfers between people must use propose and accept instead, so responsibility is never dropped. Assigning a queue flags the case <see cref="CaseExceptions.Unassigned"/>; assigning a person clears that flag.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="owner"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void AssignOwner(CaseOwner owner, DateTimeOffset at)
     {
-        // TODO(WS-1): set Owner; set or clear the Unassigned flag depending on owner.IsQueue.
-        throw new NotImplementedException("WS1: Case.AssignOwner");
+        ArgumentNullException.ThrowIfNull(owner);
+        ThrowIfClosed();
+
+        Owner = owner;
+        if (owner.IsQueue)
+        {
+            Exceptions |= CaseExceptions.Unassigned;
+        }
+        else
+        {
+            Exceptions &= ~CaseExceptions.Unassigned;
+        }
+
+        Touch(at);
     }
 
     /// <summary>
@@ -281,10 +365,28 @@ public sealed class Case
     /// <param name="templateKey">Key of the approved template to send.</param>
     /// <param name="at">When the notification was requested.</param>
     /// <returns>The started track.</returns>
+    /// <remarks>Requesting a notification does not complete anything, transfer ownership or stop a clock: only the patient's acknowledgement completes the track.</remarks>
+    /// <exception cref="ArgumentException"><paramref name="templateKey"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">The notification track has already started, or the case is closed.</exception>
     public NotificationTrack BeginNotification(string templateKey, DateTimeOffset at)
     {
-        // TODO(WS-1): create the Notification track and raise NotificationRequested.
-        throw new NotImplementedException("WS1: Case.BeginNotification");
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateKey);
+        ThrowIfClosed();
+        ThrowIfTrackStarted(Notification, TrackKind.Notification);
+
+        Notification = new NotificationTrack(at);
+        Touch(at);
+
+        Raise(new NotificationRequested
+        {
+            EventId = Guid.NewGuid(),
+            CaseId = Id,
+            OccurredAt = at,
+            PatientReference = PatientReference,
+            TemplateKey = templateKey,
+        });
+
+        return Notification;
     }
 
     /// <summary>
@@ -292,11 +394,16 @@ public sealed class Case
     /// </summary>
     /// <param name="sourceReference">Reference to the consultation <c>ServiceRequest</c>.</param>
     /// <param name="at">When the consultation was requested.</param>
-    /// <returns>The started track.</returns>
+    /// <returns>The started track, in status <see cref="ConsultationStatus.Requested"/>.</returns>
+    /// <exception cref="InvalidOperationException">The consultation track has already started, or the case is closed.</exception>
     public ConsultationTrack BeginConsultation(string sourceReference, DateTimeOffset at)
     {
-        // TODO(WS-1): create the Consultation track in status Requested.
-        throw new NotImplementedException("WS1: Case.BeginConsultation");
+        ThrowIfClosed();
+        ThrowIfTrackStarted(Consultation, TrackKind.Consultation);
+
+        Consultation = new ConsultationTrack(sourceReference, at);
+        Touch(at);
+        return Consultation;
     }
 
     /// <summary>
@@ -304,11 +411,16 @@ public sealed class Case
     /// </summary>
     /// <param name="sourceReference">Reference to the referral <c>ServiceRequest</c>.</param>
     /// <param name="at">When the referral was sent.</param>
-    /// <returns>The started track.</returns>
+    /// <returns>The started track, in status <see cref="ReferralStatus.Sent"/>.</returns>
+    /// <exception cref="InvalidOperationException">The referral track has already started, or the case is closed.</exception>
     public ReferralTrack BeginReferral(string sourceReference, DateTimeOffset at)
     {
-        // TODO(WS-1): create the Referral track in status Sent.
-        throw new NotImplementedException("WS1: Case.BeginReferral");
+        ThrowIfClosed();
+        ThrowIfTrackStarted(Referral, TrackKind.Referral);
+
+        Referral = new ReferralTrack(sourceReference, at);
+        Touch(at);
+        return Referral;
     }
 
     /// <summary>
@@ -317,11 +429,22 @@ public sealed class Case
     /// <param name="sourceReference">Reference to the <c>Appointment</c>.</param>
     /// <param name="scheduledFor">When the appointment is scheduled for.</param>
     /// <param name="at">When the appointment was booked.</param>
-    /// <returns>The started track.</returns>
+    /// <returns>The started track, in status <see cref="AppointmentStatus.Scheduled"/>.</returns>
+    /// <remarks>If outcome evidence was already recorded on the case, it is linked to the new track so the order in which the hospital system reports attendance and outcome does not matter.</remarks>
+    /// <exception cref="InvalidOperationException">The appointment track has already started, or the case is closed.</exception>
     public AppointmentTrack BeginAppointment(string sourceReference, DateTimeOffset scheduledFor, DateTimeOffset at)
     {
-        // TODO(WS-1): create the Appointment track in status Scheduled.
-        throw new NotImplementedException("WS1: Case.BeginAppointment");
+        ThrowIfClosed();
+        ThrowIfTrackStarted(Appointment, TrackKind.Appointment);
+
+        Appointment = new AppointmentTrack(sourceReference, scheduledFor, at);
+        if (OutcomeEvidenceReference is not null)
+        {
+            Appointment.RecordOutcome(OutcomeEvidenceReference, at);
+        }
+
+        Touch(at);
+        return Appointment;
     }
 
     /// <summary>
@@ -329,10 +452,14 @@ public sealed class Case
     /// </summary>
     /// <param name="exception">The exception flag or flags to set.</param>
     /// <param name="at">When the exception was detected.</param>
+    /// <remarks>Flagging never parks the case: the caller must also give it a next action with an owner and a deadline through <see cref="SetNextAction"/>.</remarks>
+    /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void FlagException(CaseExceptions exception, DateTimeOffset at)
     {
-        // TODO(WS-1): set the flag(s) on Exceptions and update UpdatedAt.
-        throw new NotImplementedException("WS1: Case.FlagException");
+        ThrowIfClosed();
+
+        Exceptions |= exception;
+        Touch(at);
     }
 
     /// <summary>
@@ -342,19 +469,36 @@ public sealed class Case
     /// <param name="at">When the exception was resolved.</param>
     public void ClearException(CaseExceptions exception, DateTimeOffset at)
     {
-        // TODO(WS-1): clear the flag(s) on Exceptions and update UpdatedAt.
-        throw new NotImplementedException("WS1: Case.ClearException");
+        Exceptions &= ~exception;
+        Touch(at);
     }
 
     /// <summary>
     /// Raises an escalation on the case.
     /// </summary>
     /// <param name="escalation">The escalation step reached, from the pathway's escalation ladder.</param>
-    /// <remarks>Escalation adds oversight only: it changes neither the stage nor the owner.</remarks>
+    /// <remarks>Escalation adds oversight only: it changes neither the stage nor the owner, who remains accountable for the overdue action.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="escalation"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void Escalate(Escalation escalation)
     {
-        // TODO(WS-1): append the escalation, set IsEscalated and raise EscalationRaised.
-        throw new NotImplementedException("WS1: Case.Escalate");
+        ArgumentNullException.ThrowIfNull(escalation);
+        ThrowIfClosed();
+
+        _escalations.Add(escalation with { ResolvedAt = null });
+        IsEscalated = true;
+        Touch(escalation.RaisedAt);
+
+        Raise(new EscalationRaised
+        {
+            EventId = Guid.NewGuid(),
+            CaseId = Id,
+            OccurredAt = escalation.RaisedAt,
+            Level = escalation.Level,
+            EscalatedTo = escalation.EscalatedTo,
+            CurrentOwner = Owner,
+            Reason = escalation.Reason,
+        });
     }
 
     /// <summary>
@@ -363,8 +507,16 @@ public sealed class Case
     /// <param name="at">When the overdue action was completed.</param>
     public void ResolveEscalations(DateTimeOffset at)
     {
-        // TODO(WS-1): set ResolvedAt on open escalations and clear IsEscalated.
-        throw new NotImplementedException("WS1: Case.ResolveEscalations");
+        for (var i = 0; i < _escalations.Count; i++)
+        {
+            if (_escalations[i].ResolvedAt is null)
+            {
+                _escalations[i] = _escalations[i] with { ResolvedAt = at };
+            }
+        }
+
+        IsEscalated = false;
+        Touch(at);
     }
 
     /// <summary>
@@ -372,11 +524,17 @@ public sealed class Case
     /// </summary>
     /// <param name="evidenceReference">Reference to the <c>Procedure</c> or follow-up <c>DiagnosticReport</c>.</param>
     /// <param name="at">When the outcome was recorded.</param>
-    /// <remarks>Recording an outcome does not close the case; it only makes an authorized closure decision possible.</remarks>
+    /// <remarks>Recording an outcome does not close the case; it only makes an authorized closure decision possible. The evidence is also linked to the appointment track, which completes only when the patient attended and an outcome is documented.</remarks>
+    /// <exception cref="ArgumentException"><paramref name="evidenceReference"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void RecordOutcomeEvidence(string evidenceReference, DateTimeOffset at)
     {
-        // TODO(WS-1): set OutcomeEvidenceReference and UpdatedAt.
-        throw new NotImplementedException("WS1: Case.RecordOutcomeEvidence");
+        ArgumentException.ThrowIfNullOrWhiteSpace(evidenceReference);
+        ThrowIfClosed();
+
+        OutcomeEvidenceReference = evidenceReference;
+        Appointment?.RecordOutcome(evidenceReference, at);
+        Touch(at);
     }
 
     /// <summary>
@@ -384,10 +542,64 @@ public sealed class Case
     /// </summary>
     /// <param name="decision">The authorized closure decision with its evidence or documented exception.</param>
     /// <param name="at">When the closure was applied.</param>
+    /// <remarks>Closure is final. The next action, deadline, exception flags, pending handoff and open escalations are all cleared, because nothing remains to be done and nobody is accountable for a closed case.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="decision"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">The case is already closed.</exception>
     public void Close(ClosureDecision decision, DateTimeOffset at)
     {
-        // TODO(WS-1): set Closure and Stage = Closed, clear NextAction/DueAt/exceptions, raise CaseClosed.
-        throw new NotImplementedException("WS1: Case.Close");
+        ArgumentNullException.ThrowIfNull(decision);
+        ThrowIfClosed();
+
+        Closure = decision;
+        Stage = CaseStage.Closed;
+        NextAction = null;
+        DueAt = null;
+        Exceptions = CaseExceptions.None;
+        PendingAssignment = null;
+        ResolveEscalations(at);
+        Touch(at);
+
+        Raise(new CaseClosed
+        {
+            EventId = Guid.NewGuid(),
+            CaseId = Id,
+            OccurredAt = at,
+            Reason = decision.Reason,
+            AuthorizedBy = decision.AuthorizedBy,
+        });
+    }
+
+    private void Touch(DateTimeOffset at) => UpdatedAt = at > UpdatedAt ? at : UpdatedAt;
+
+    private void ThrowIfClosed()
+    {
+        if (IsClosed)
+        {
+            throw new InvalidOperationException($"Case {Id} is closed; a closed case is final and cannot change.");
+        }
+    }
+
+    private static void ThrowIfTrackStarted(object? track, TrackKind kind)
+    {
+        if (track is not null)
+        {
+            throw new InvalidOperationException($"The {kind} track has already started; a case has at most one of each track.");
+        }
+    }
+
+    private Assignment RequirePendingProposalFor(Actor responder)
+    {
+        if (PendingAssignment is null)
+        {
+            throw new InvalidOperationException($"Case {Id} has no pending handoff to respond to.");
+        }
+
+        if (!string.Equals(PendingAssignment.ProposedOwner.Reference, responder.Reference, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"The handoff was proposed to '{PendingAssignment.ProposedOwner.Reference}', not to '{responder.Reference}'; nobody can respond on another person's behalf.");
+        }
+
+        return PendingAssignment;
     }
 }

@@ -12,7 +12,7 @@ namespace CareLoop.Domain.Tracks;
 /// </para>
 /// <para>
 /// <b>Rules.</b> The track completes only when the consultation outcome is recorded. A rejection
-/// returns the next action to the current owner.
+/// returns the next action to the current owner, who may request the consultation again.
 /// </para>
 /// <para>
 /// <b>Why.</b> A consultation is how a case is handed to another clinician, which is where
@@ -21,6 +21,39 @@ namespace CareLoop.Domain.Tracks;
 /// </remarks>
 public sealed class ConsultationTrack
 {
+    /// <summary>
+    /// Which statuses may follow which. A status not listed as a key is final.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<ConsultationStatus, ConsultationStatus[]> AllowedMoves =
+        new Dictionary<ConsultationStatus, ConsultationStatus[]>
+        {
+            [ConsultationStatus.Requested] = [ConsultationStatus.OwnerProposed, ConsultationStatus.Accepted, ConsultationStatus.Rejected],
+            [ConsultationStatus.OwnerProposed] = [ConsultationStatus.Accepted, ConsultationStatus.Rejected],
+            [ConsultationStatus.Accepted] = [ConsultationStatus.OutcomeRecorded],
+            [ConsultationStatus.Rejected] = [ConsultationStatus.Requested, ConsultationStatus.OwnerProposed],
+            [ConsultationStatus.OutcomeRecorded] = [],
+        };
+
+    /// <summary>
+    /// Starts the track when a consultation is requested. Used by <see cref="Cases.Case.BeginConsultation"/>.
+    /// </summary>
+    /// <param name="sourceReference">Reference to the consultation <c>ServiceRequest</c>.</param>
+    /// <param name="startedAt">When the consultation was requested.</param>
+    public ConsultationTrack(string? sourceReference, DateTimeOffset startedAt)
+    {
+        Status = ConsultationStatus.Requested;
+        SourceReference = sourceReference;
+        StartedAt = startedAt;
+        UpdatedAt = startedAt;
+    }
+
+    /// <summary>
+    /// Used only by the persistence layer when materializing a stored track.
+    /// </summary>
+    private ConsultationTrack()
+    {
+    }
+
     /// <summary>The current status of the track.</summary>
     public ConsultationStatus Status { get; private set; }
 
@@ -39,20 +72,24 @@ public sealed class ConsultationTrack
     /// <param name="status">The status reported by the source system.</param>
     /// <param name="at">When the change happened according to the source.</param>
     /// <param name="sourceReference">Reference to the source resource carrying the status.</param>
+    /// <remarks>Reporting the current status again is accepted and only refreshes the reference and time, so a resend is harmless.</remarks>
     /// <exception cref="InvalidOperationException">The change is not a valid move from the current status.</exception>
     public void Advance(ConsultationStatus status, DateTimeOffset at, string? sourceReference)
     {
-        // TODO(WS-1): validate the status move, then update Status, SourceReference and UpdatedAt.
-        throw new NotImplementedException("WS1: ConsultationTrack.Advance");
+        if (status != Status && !AllowedMoves[Status].Contains(status))
+        {
+            throw new InvalidOperationException(
+                $"The consultation track cannot move from {Status} to {status}.");
+        }
+
+        Status = status;
+        SourceReference = sourceReference ?? SourceReference;
+        UpdatedAt = at;
     }
 
     /// <summary>
     /// Tells whether the track has reached its completing status.
     /// </summary>
     /// <returns><see langword="true"/> only when the consultation outcome has been recorded.</returns>
-    public bool IsComplete()
-    {
-        // TODO(WS-1): return whether Status is the completing status for this track.
-        throw new NotImplementedException("WS1: ConsultationTrack.IsComplete");
-    }
+    public bool IsComplete() => Status == ConsultationStatus.OutcomeRecorded;
 }
