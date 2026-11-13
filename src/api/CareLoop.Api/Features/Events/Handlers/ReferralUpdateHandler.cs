@@ -21,7 +21,8 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// rejection clears the exception. A sent referral gives the case the
 /// <see cref="ReferralTrack.RespondAction"/> next action with the pathway's response deadline;
 /// the receiving service's acceptance completes that action, resolves any escalation raised while
-/// it was overdue and hands the owner the follow-up action.
+/// it was overdue and hands the owner the follow-up action. A referral reported as sent while it is
+/// already sent changes nothing, so a resend never restarts the response deadline.
 /// </remarks>
 public sealed class ReferralUpdateHandler : IEventHandler
 {
@@ -62,6 +63,13 @@ public sealed class ReferralUpdateHandler : IEventHandler
                 if (!HandlerSupport.HasDeadline(@case, ReferralTrack.RespondAction, pathway, out var noResponseDeadline))
                 {
                     return HandlerSupport.Refused(@case, noResponseDeadline!);
+                }
+
+                // A repeat of the referral already sent (the ServiceRequest, then its Task, and every resend) is
+                // recorded but must not restart the response deadline, or a resend would hide an overdue reply.
+                if (@case.Referral is { Status: ReferralStatus.Sent })
+                {
+                    break;
                 }
 
                 if (@case.Referral is { } sent)

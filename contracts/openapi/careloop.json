@@ -679,25 +679,15 @@
           "FHIR"
         ],
         "summary": "Describes what the CareLoop FHIR boundary supports.",
-        "description": "Will list one entry per registered IFhirInboundMapper (create and update) plus read on\n`Task`.",
+        "description": "Lists one entry per registered IFhirInboundMapper (create and update) plus read on\n`Task`, so the statement can never drift from what the endpoints accept.",
         "operationId": "GetFhirCapabilityStatement",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "200 with a FHIR R4 `CapabilityStatement` listing the supported resource types and interactions.",
             "content": {
               "application/fhir+json": {
                 "schema": {
                   "$ref": "#/components/schemas/JsonElement"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not Implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
                 }
               }
             }
@@ -736,14 +726,11 @@
             }
           },
           "404": {
-            "description": "Not Found"
-          },
-          "501": {
-            "description": "Not Implemented",
+            "description": "Not Found",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }
@@ -816,6 +803,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -826,12 +823,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "503": {
+            "description": "Service Unavailable",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }
@@ -904,6 +901,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -914,12 +921,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "503": {
+            "description": "Service Unavailable",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }

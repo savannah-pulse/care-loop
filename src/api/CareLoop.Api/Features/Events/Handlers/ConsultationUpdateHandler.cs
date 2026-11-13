@@ -22,6 +22,8 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// A request gives the case the <see cref="ConsultationTrack.AnswerAction"/> next action with the
 /// pathway's answer deadline; the answer (acceptance or recorded outcome) completes that action,
 /// resolves any escalation raised while it was overdue and hands the owner the follow-up action.
+/// A request repeated while the consultation is already requested changes nothing, so a resend never
+/// restarts the answer deadline; a request after a rejection is a new request and does.
 /// </remarks>
 public sealed class ConsultationUpdateHandler : IEventHandler
 {
@@ -75,6 +77,15 @@ public sealed class ConsultationUpdateHandler : IEventHandler
         }
 
         var track = @case.Consultation;
+
+        // The source sends the request twice (the ServiceRequest, then its Task in state requested) and resends
+        // each new version. A repeat of the request it already made is recorded but must not restart the
+        // answer deadline, or every resend would push an overdue answer out of sight.
+        if (track is { Status: ConsultationStatus.Requested })
+        {
+            return HandlerSupport.Applied(@case, payload.TaskReference);
+        }
+
         if (track is null)
         {
             @case.BeginConsultation(payload.ServiceRequestReference, envelope.OccurredAt);

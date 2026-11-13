@@ -1,12 +1,13 @@
 {
   "resourceType": "Task",
   "id": "SYN-TASK-0001",
-  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/reviewed-urgency", "valueCode": "PLACEHOLDER-URGENCY-A" } ],
   "status": "completed",
   "intent": "order",
-  "code": { "text": "PLACEHOLDER - synthetic, not a clinical code" },
+  "code": { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/task-code", "code": "clinical-review" } ] },
   "focus": { "reference": "DiagnosticReport/SYN-RESULT-0001" },
   "for": { "reference": "Patient/SYN-PT-0001" },
-  "owner": { "reference": "Practitioner/SYN-STAFF-0001" },
-  "lastModified": "2026-01-01T09:00:00Z"
+  "lastModified": "2026-01-01T09:00:00Z",
+  "owner": { "reference": "Practitioner/SYN-STAFF-0001", "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-role", "valueCode": "clinician" }, { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-facility", "valueString": "SYN-FAC-A" } ] }
 }

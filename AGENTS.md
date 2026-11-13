@@ -69,7 +69,8 @@ care-loop/
 │   │   │   ├── Recipients/             Recipient, ContactPoint, NotificationChannel
 │   │   │   ├── Events/                 SourceEvent, CaseEventType, AuditEvent
 │   │   │   │   └── DomainEvents/       IDomainEvent, NotificationRequested, HandoffProposed, HandoffRejected,
-│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed
+│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed,
+│   │   │   │                           HandoffSummaryApproved
 │   │   │   ├── Rules/                  TransitionRules, OwnershipRules, ClosureGate, DeadlinePolicy
 │   │   │   ├── Pathways/               PathwayDefinition, IPathwayProvider
 │   │   │   └── Time/                   IClock
@@ -202,20 +203,21 @@ Inbound:
 
 | Event | FHIR resource | Interpretation |
 |---|---|---|
-| Screening result | `DiagnosticReport` with `Observation`s | A new report opens a case |
+| Screening result | `DiagnosticReport` with `Observation`s | A new report opens a case; the patient's display name, MRN, language and contact points come from its `Patient` (contained, or read from the source) |
 | Clinical review | `Task` (review) | Completed, with priority as the reviewed urgency |
 | Consultation | `ServiceRequest` plus `Task` | Task status: requested, accepted, rejected, completed |
 | Referral | `ServiceRequest` plus `Task` | Same pattern |
 | Appointment | `Appointment` | booked, fulfilled, noshow |
 | Outcome | `Procedure` or follow-up `DiagnosticReport` | Becomes the evidence reference |
-| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer |
+| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer; it counts only when it targets that case `Task` |
+| Caregiver consent | `Consent` | `active` grants, `inactive`, `rejected` or a `deny` provision withdraws; the caregiver is a contained `RelatedPerson` |
 
 Outbound:
 
 | From CareLoop | FHIR resource |
 |---|---|
 | Escalation notice | `Task` |
-| Handoff summary | `DocumentReference` |
+| Handoff summary | `DocumentReference`, sent when a person approves it |
 | Case status (also feeds the patient view) | `Task` via `GET /fhir/Task/{id}` |
 
 Case to `Task` field mapping: handoff status to `Task.status`; pathway stage to `Task.businessStatus`; owner to `Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`; patient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to `Task.statusReason`. Keep all code mappings in `StatusMap`.
@@ -224,14 +226,19 @@ FHIR carries state; the engine wants events. Each inbound mapper must work out w
 
 Delivery reports and patient replies are not part of the FHIR boundary. They come back through the notification provider that sent the message (see "Events and notifications").
 
-Endpoints: `POST` and `PUT /fhir/{resourceType}`, `GET /fhir/Task/{id}`, `GET /fhir/metadata`.
+Endpoints: `POST /fhir/{resourceType}`, `PUT /fhir/{resourceType}/{id}` (the URL id must equal the body id), `GET /fhir/Task/{id}`, `GET /fhir/metadata`.
+
+The sending system names itself in `meta.source`, using its key under `ExternalSystems:Systems`. A resource without it is refused with 400, and one from a system that is not configured there with 403. Replies go back to the system a case came from.
+
+A contact point with `ContactPoint.system` `other` is reached through the simulator channel, for the patient and for a consented caregiver alike; `sms` and `email` are reserved for the real providers.
 
 ## Events and notifications
 
 | Domain event | FHIR message out | Direct notification to |
 |---|---|---|
 | `NotificationRequested` | None | Patient |
-| `HandoffProposed` | `Task` plus `DocumentReference` | Proposed owner |
+| `HandoffProposed` | `Task` | Proposed owner |
+| `HandoffSummaryApproved` | `DocumentReference` (exactly the approved text) | None |
 | `HandoffRejected`, `ReferralRejected` | `Task` update | Current owner |
 | `CallRequested` | `Task` | Current owner |
 | `DeadlineApproaching` | None | Current owner |
