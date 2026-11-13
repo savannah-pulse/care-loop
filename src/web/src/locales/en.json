@@ -1,0 +1,431 @@
+{
+  "app": {
+    "name": "CareLoop",
+    "documentTitle": "{page} · CareLoop",
+    "skipToContent": "Skip to main content"
+  },
+  "nav": {
+    "label": "Main",
+    "worklist": "Worklist",
+    "impact": "Impact",
+    "programmes": "Programmes"
+  },
+  "identity": {
+    "signedInAs": "Signed in as",
+    "current": "Signed in",
+    "titleAtFacility": "{title} · {facility}"
+  },
+  "staffTitles": {
+    "nurseNavigator": "Nurse navigator",
+    "screeningPhysician": "Screening physician",
+    "facilityLead": "Facility lead",
+    "programmeCoordinator": "Programme coordinator"
+  },
+  "facilities": {
+    "familyHealthCentre": "Family Health Centre"
+  },
+  "roles": {
+    "clinician": "Clinician",
+    "receiving-clinician": "Receiving clinician",
+    "nurse-navigator": "Nurse navigator",
+    "coordinator": "Programme coordinator",
+    "facility-lead": "Facility lead",
+    "lab": "Lab team",
+    "system": "CareLoop"
+  },
+  "owner": {
+    "queue": "{role} queue",
+    "queueDetail": "No named owner yet",
+    "unknownRole": "Role: {role}"
+  },
+  "programmes": {
+    "breast-screening": "Breast screening",
+    "lung-screening": "Lung screening",
+    "bowel-screening": "Bowel screening",
+    "cervical-screening": "Cervical screening",
+    "heart-kidney-diabetes": "Heart, kidney and diabetes check"
+  },
+  "stages": {
+    "steps": {
+      "resultReceived": "Result received",
+      "caseOpened": "Case opened",
+      "ownerAssigned": "Owner assigned",
+      "patientNotified": "Patient notified",
+      "patientAcknowledged": "Patient acknowledged",
+      "consultation": "Consultation",
+      "followUp": "Follow-up",
+      "outcomeRecorded": "Outcome recorded",
+      "closureReview": "Closure review",
+      "closed": "Closed"
+    },
+    "list": {
+      "Received": "Case opened",
+      "ReviewPending": "Owner assigned",
+      "FollowUpActive": "In follow-up",
+      "ClosureReview": "Closure review",
+      "Closed": "Closed"
+    },
+    "position": "Stage {number} of 10",
+    "followUpPosition": "Stages 4 to 7 of 10",
+    "stepperLabel": "Where the case is",
+    "stepDone": "done",
+    "stepCurrent": "current stage",
+    "stepToDo": "not reached yet"
+  },
+  "nextActions": {
+    "assign-owner": "Choose an owner",
+    "review-result": "Review the result",
+    "acknowledge-notification": "Make sure the patient has the message",
+    "answer-consultation": "Answer the consultation",
+    "respond-to-referral": "Accept or decline the referral",
+    "arrange-follow-up": "Arrange the follow-up",
+    "call-patient": "Call the patient back",
+    "contact-patient-another-way": "Contact the patient another way",
+    "reassign-consultation": "Find another clinician for the consultation",
+    "arrange-alternative-referral": "Send a new referral",
+    "rebook-appointment": "Rebook the appointment",
+    "decide-closure": "Decide whether to close the case",
+    "none": "No next action",
+    "unknown": "Next action: {key}"
+  },
+  "status": {
+    "overdue": "Overdue",
+    "urgent": "Urgent",
+    "declined": "Referral declined",
+    "notReached": "Not reached",
+    "notAcknowledged": "Not acknowledged",
+    "needsOwner": "Needs a new owner",
+    "callBack": "Call-back requested",
+    "waitingAcceptance": "Waiting for acceptance",
+    "onTrack": "On track",
+    "closed": "Closed",
+    "escalated": "Escalated",
+    "detail": {
+      "needsOwner": "Facility lead covers it until someone accepts",
+      "callBack": "The patient asked for a call",
+      "waitingAcceptance": "Sender stays responsible"
+    }
+  },
+  "exceptions": {
+    "Overdue": "Overdue",
+    "Rejected": "Referral declined",
+    "Unreachable": "Not reached",
+    "Unacknowledged": "Not acknowledged",
+    "Unassigned": "Needs a new owner",
+    "why": {
+      "Overdue": "It is past its deadline.",
+      "Rejected": "A referral or handoff was declined, so another must be arranged.",
+      "Unreachable": "Every way of contacting the patient failed.",
+      "Unacknowledged": "The message was delivered, but the patient has not acknowledged it in time.",
+      "Unassigned": "No named person owns this case yet, so the facility lead covers it."
+    }
+  },
+  "urgency": {
+    "urgent": "Urgent",
+    "routine": "Routine",
+    "notReviewed": "Not reviewed yet"
+  },
+  "time": {
+    "dateTime": "{weekday} {day} {month}, {time}",
+    "dateTimeWithYear": "{weekday} {day} {month} {year}, {time}",
+    "today": "Today, {time}",
+    "late": "{duration} late",
+    "left": "{duration} left",
+    "dueNow": "Due now",
+    "wasDue": "Was due {date}",
+    "noDueTime": "No due time",
+    "minutes": "{count} min",
+    "hours": "{count} h",
+    "hoursMinutes": "{hours} h {minutes} min",
+    "days": {
+      "one": "{count} day",
+      "other": "{count} days"
+    },
+    "daysHours": {
+      "one": "{count} day {hours} h",
+      "other": "{count} days {hours} h"
+    }
+  },
+  "states": {
+    "notAvailableTitle": "Not available yet",
+    "errorBody": "Check your connection, then try again.",
+    "lastTried": "Last tried at {time}.",
+    "tryAgain": "Try again",
+    "checkAgain": "Check again"
+  },
+  "worklist": {
+    "title": "Worklist",
+    "subtitle": "{date} · {count}. Each case has one next action and one person responsible.",
+    "openCases": {
+      "one": "{count} open case",
+      "other": "{count} open cases"
+    },
+    "programmeLabel": "Programme",
+    "allProgrammes": "All programmes",
+    "searchLabel": "Search by patient reference",
+    "searchPlaceholder": "Search patient reference",
+    "filtersLabel": "Show cases",
+    "chips": {
+      "all": "All open",
+      "urgent": "Urgent",
+      "overdue": "Overdue",
+      "declined": "Referral declined",
+      "notReached": "Not reached",
+      "notAcknowledged": "Not acknowledged",
+      "needsOwner": "Needs a new owner"
+    },
+    "caption": "Open cases, most at risk first. Select a case to open it.",
+    "columns": {
+      "patient": "Patient",
+      "programme": "Programme",
+      "stage": "Stage",
+      "nextAction": "Next action",
+      "responsible": "Responsible",
+      "due": "Due",
+      "status": "Status"
+    },
+    "patientDetail": "Patient reference",
+    "showing": "Showing {shown} of {total}.",
+    "loading": "Loading cases…",
+    "notAvailable": "The case list is not switched on yet. Cases will show here once it is.",
+    "errorTitle": "Cases could not be loaded",
+    "emptyTitle": "Nothing needs you right now",
+    "emptyAllOnTrack": {
+      "one": "Your {count} case is on track. The next deadline is {date}.",
+      "other": "All {count} of your cases are on track. The next deadline is {date}."
+    },
+    "emptyAllOnTrackNoDeadline": {
+      "one": "Your {count} case is on track.",
+      "other": "All {count} of your cases are on track."
+    },
+    "emptyNoCases": "There are no open cases.",
+    "showAll": "Show all cases",
+    "filterEmptyTitle": "No cases match these filters",
+    "filterEmptyBody": "Try another filter, or clear them to see every open case.",
+    "clearFilters": "Clear filters",
+    "note": "Read-only. Clinical actions are recorded in each hospital's own system; CareLoop shows where every case is and who must act next."
+  },
+  "case": {
+    "titleFallback": "Case",
+    "back": "Worklist",
+    "resultFrom": "Result {result} from {system}",
+    "facility": "Facility {facility}",
+    "programme": "Programme:",
+    "urgency": "Urgency:",
+    "opened": "Opened:",
+    "lastChange": "Last change:",
+    "closedReason": "Closed:",
+    "outcomeEvidence": "Outcome evidence:",
+    "nextActionLabel": "Next action",
+    "responsible": "Responsible",
+    "due": "Due",
+    "wasDue": "Was due",
+    "escalation": "Escalation",
+    "escalationOpen": "Escalated",
+    "escalationOpenDetail": "Oversight has been brought in. The owner stays accountable.",
+    "escalationNone": "Not escalated",
+    "proposedOwner": "Waiting for {name} to accept. {owner} stays responsible until then.",
+    "noProblem": "Nothing is blocking this case.",
+    "tracksTitle": "Where each part stands",
+    "timelineTitle": "Timeline",
+    "timelineOrder": "Newest first",
+    "timelineEmpty": "Nothing has happened on this case yet.",
+    "timelineLoading": "Loading the timeline…",
+    "timelineNotAvailable": "The timeline is not switched on yet.",
+    "timelineError": "The timeline could not be loaded.",
+    "showEarlier": {
+      "one": "Show {count} earlier event",
+      "other": "Show {count} earlier events"
+    },
+    "summaryTitle": "Handoff summary",
+    "summaryBody": "Before a referral is sent, check the summary AI drafts from this case's facts, then approve or reject it.",
+    "summaryLink": "Open the handoff summary",
+    "loading": "Loading the case…",
+    "notAvailable": "Case details are not switched on yet.",
+    "errorTitle": "The case could not be loaded",
+    "notFoundTitle": "Case not found",
+    "notFoundBody": "There is no case at this link. Check the link, or find the case on the worklist.",
+    "note": "Read-only. Reports, images and notes stay in the hospital system."
+  },
+  "closureReasons": {
+    "Treated": "Treated",
+    "OnSurveillance": "On surveillance",
+    "NegativeOnConfirmation": "Negative on confirmation",
+    "Declined": "Declined by the patient",
+    "TransferredAndAccepted": "Transferred and accepted elsewhere",
+    "Untraceable": "Untraceable after documented attempts"
+  },
+  "tracks": {
+    "kinds": {
+      "Notification": "Patient contact",
+      "Consultation": "Consultation",
+      "Referral": "Referral",
+      "Appointment": "Appointment"
+    },
+    "notStarted": "Not started",
+    "updated": "Updated {date}",
+    "statuses": {
+      "Notification": {
+        "Sent": "Sent",
+        "Delivered": "Delivered",
+        "Failed": "Not reached",
+        "Acknowledged": "Acknowledged",
+        "Understood": "Understood"
+      },
+      "Consultation": {
+        "Requested": "Requested",
+        "OwnerProposed": "Waiting for acceptance",
+        "Accepted": "Accepted",
+        "Rejected": "Declined",
+        "OutcomeRecorded": "Done"
+      },
+      "Referral": {
+        "Sent": "Sent",
+        "Accepted": "Accepted",
+        "Rejected": "Declined"
+      },
+      "Appointment": {
+        "Scheduled": "Booked",
+        "Attended": "Attended",
+        "Missed": "Missed"
+      }
+    },
+    "notes": {
+      "delivered": "Delivered, but not acknowledged yet.",
+      "referralAccepted": "Accepted is not completed care."
+    }
+  },
+  "timeline": {
+    "events": {
+      "ScreeningResultReceived": "Result received",
+      "ClinicalReviewCompleted": "Result reviewed",
+      "NotificationUpdated": "Patient contact updated",
+      "ConsultationUpdated": "Consultation updated",
+      "ReferralUpdated": "Referral updated",
+      "AppointmentUpdated": "Appointment updated",
+      "OutcomeRecorded": "Outcome recorded",
+      "ClosureDecided": "Case closed",
+      "ConsentRecorded": "Consent recorded",
+      "DeadlineElapsed": "Deadline reached",
+      "HandoffSummaryApproved": "Handoff summary approved"
+    },
+    "refused": "Refused"
+  },
+  "summary": {
+    "title": "Handoff summary",
+    "subtitle": "Check every line before the summary goes with a referral.",
+    "draftedAt": "AI draft from {date}",
+    "startTitle": "No draft yet",
+    "startBody": "AI can draft a summary from the facts in this case. You check every line, then approve or reject it. Nothing is used until you approve it.",
+    "draft": "Draft the summary",
+    "drafting": "Drafting…",
+    "cardTitle": "Summary",
+    "aiDraft": "AI draft",
+    "editedByYou": "Edited by you",
+    "sources": "Sources",
+    "assessmentNote": "AI never writes this part.",
+    "aiNote": "AI used only the facts in this case. It cannot send anything, change urgency or edit the record.",
+    "checkTitle": "Check before you approve",
+    "checkNone": "The draft reported nothing missing or conflicting.",
+    "keptTitle": "Kept with your decision",
+    "keptWho": "Your name, the time, and whether you approved or rejected it",
+    "keptText": "The text you approve, with every change you make",
+    "keptFacts": "The facts each part cites",
+    "keptModel": "The AI version that drafted it: {model}, prompt {prompt}",
+    "keptNote": "Approving does not send a referral. You send it from your hospital system, with the approved summary attached.",
+    "actionsLabel": "Decide on this summary",
+    "edit": "Edit",
+    "stopEditing": "Stop editing",
+    "reject": "Reject",
+    "approve": "Approve summary",
+    "approving": "Approving…",
+    "rejectTitle": "Why are you rejecting this draft?",
+    "rejectHelp": "Your reason is kept with the draft and helps the team improve what AI writes.",
+    "rejectReasonRequired": "Give a reason before rejecting.",
+    "rejectConfirm": "Reject draft",
+    "rejecting": "Rejecting…",
+    "cancel": "Cancel",
+    "approvedByYou": "Approved by you, {date}",
+    "approvedBy": "Approved by {name}, {date}",
+    "approvedNext": "Send the referral from your hospital system, with this summary attached.",
+    "rejectedByYou": "Rejected by you, {date}",
+    "rejectedBy": "Rejected by {name}, {date}",
+    "rejectedReason": "Reason: {reason}",
+    "rejectedNext": "Write the summary yourself in your hospital system and attach it to the referral.",
+    "noDraftTitle": "No AI draft",
+    "noDraft": {
+      "notAvailable": "No AI draft: drafting is not available yet.",
+      "conflict": "No AI draft: AI drafting is switched off, or this case already has an approved summary.",
+      "unavailable": "No AI draft: the AI service did not produce a draft it could check.",
+      "error": "No AI draft: the service is off or did not answer."
+    },
+    "noDraftBody": "CareLoop cannot take a summary you write yourself yet. Write it in your hospital system and attach it to the referral. Every other step still works.",
+    "decisionFailed": {
+      "forbidden": "Only a clinician can approve or reject this summary.",
+      "conflict": "This draft was already decided or replaced. Draft the summary again.",
+      "notAvailable": "Saving a decision is not available yet.",
+      "notFound": "This draft no longer exists. Draft the summary again.",
+      "invalid": "The decision could not be saved. Check the text and try again.",
+      "error": "Your decision could not be saved. Try again."
+    },
+    "clinicianOnlyTitle": "For clinicians",
+    "clinicianOnly": "Handoff summaries are checked and approved by clinicians. You are signed in as {name}, {title}."
+  },
+  "impact": {
+    "title": "Impact",
+    "subtitle": "All screening programmes · Updated {date} · {count}",
+    "cases": {
+      "one": "{count} case",
+      "other": "{count} cases"
+    },
+    "closedLabel": "Cases closed",
+    "closedOf": "{closed} of {total} cases, with evidence or a documented exception",
+    "medianClosure": "Median time to closure: {duration}",
+    "noClosureYet": "No case closed yet",
+    "overdueLabel": "Open cases past their deadline",
+    "overdueOf": "Out of {open} open cases",
+    "overdueDetail": "Escalated: {escalated} · Need a new owner: {unassigned}",
+    "ackLabel": "Patients who acknowledged the message",
+    "ackOf": "Share of notifications the patient acknowledged",
+    "ackDetail": "Delivery alone does not count.",
+    "noRate": "None yet",
+    "byStageTitle": "Open cases by stage",
+    "byStageOf": "Out of {open}",
+    "byExceptionTitle": "Why cases are waiting",
+    "byExceptionOf": "Open cases with each exception",
+    "byExceptionNone": "No open case has an exception.",
+    "loading": "Loading the numbers…",
+    "notAvailable": "The numbers are not switched on yet.",
+    "errorTitle": "The numbers could not be loaded",
+    "comparisonTitle": "With and without escalation",
+    "comparisonOf": "Scenario: {cohort}",
+    "measure": "Measure",
+    "withEscalation": "With escalation",
+    "escalationOff": "Escalation off",
+    "rows": {
+      "closed": "Cases closed",
+      "closedDetail": "Out of the cases replayed",
+      "closedValue": "{closed} of {total}",
+      "stalled": "Cases stalled",
+      "stalledDetail": "Past their deadline and never picked up",
+      "escalations": "Escalations raised",
+      "median": "Median time to closure",
+      "noneClosed": "None closed"
+    },
+    "comparisonNote": "The same cohort is replayed twice, with seed {seed}: once with reminders and escalation on, once with them off. It shows how escalation changes what happens; it is not evidence of real-world results.",
+    "comparisonLoading": "Running the comparison…",
+    "comparisonNotAvailable": "The comparison is not switched on yet.",
+    "comparisonError": "The comparison could not be run."
+  },
+  "programmesPage": {
+    "title": "Programmes",
+    "subtitle": "Each screening programme sets its own steps, deadlines, evidence and owners.",
+    "notAvailableTitle": "Programme settings are not available yet",
+    "notAvailableBody": "CareLoop cannot share its programme settings yet. When it can, each programme's steps, deadlines, evidence and owners will show here, with the version in use."
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "There is nothing at this link.",
+    "link": "Go to the worklist"
+  }
+}
