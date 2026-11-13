@@ -3,7 +3,9 @@ using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Rules;
 using CareLoop.Domain.Time;
+using CareLoop.Domain.Tracks;
 
 namespace CareLoop.Api.Features.Events.Handlers;
 
@@ -11,7 +13,10 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// Applies an appointment status change.
 /// </summary>
 /// <remarks>
-/// Will start or advance the appointment track. A missed appointment never parks the case: it creates a next action with the current owner and a deadline. Attendance alone does not complete the track; a documented outcome is also needed.
+/// Starts or advances the appointment track. Attendance alone does not complete the track; the
+/// outcome must also be recorded. A missed appointment gives the current owner a new next action
+/// (rebooking) and deadline, and a rebooked appointment gives them the follow-up action
+/// (<see cref="HandlerSupport.ArrangeFollowUpAction"/>) so the case is never without a deadline.
 /// </remarks>
 public sealed class AppointmentUpdateHandler : IEventHandler
 {
@@ -33,10 +38,66 @@ public sealed class AppointmentUpdateHandler : IEventHandler
     public CaseEventType EventType => CaseEventType.AppointmentUpdated;
 
     /// <inheritdoc/>
-    /// <remarks>Expects the envelope's payload to be a <see cref="AppointmentUpdatePayload"/>.</remarks>
+    /// <remarks>Expects the envelope's payload to be an <see cref="AppointmentUpdatePayload"/>.</remarks>
     public Task<EventHandlingResult> HandleAsync(Case? existing, EventEnvelope envelope, CancellationToken ct)
     {
-        // TODO(WS-2): advance the Appointment track; on a missed appointment set a new next action and deadline.
-        throw new NotImplementedException("WS2: AppointmentUpdateHandler.HandleAsync");
+        var payload = HandlerSupport.Payload<AppointmentUpdatePayload>(envelope);
+        var @case = HandlerSupport.RequireCase(existing, EventType);
+        var pathway = _pathways.Get(@case.PathwayId);
+
+        var transition = TransitionRules.Evaluate(@case, EventType, envelope.Actor, pathway);
+        if (!transition.Verdict.Allowed)
+        {
+            return HandlerSupport.Refused(@case, transition.Verdict.Reason!);
+        }
+
+        var scheduledFor = payload.ScheduledFor ?? envelope.OccurredAt;
+
+        switch (payload.Status)
+        {
+            case AppointmentStatus.Scheduled:
+                if (@case.Appointment is { } booked)
+                {
+                    var wasMissed = booked.Status == AppointmentStatus.Missed;
+                    if (wasMissed && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var missing))
+                    {
+                        return HandlerSupport.Refused(@case, missing!);
+                    }
+
+                    booked.Rebook(scheduledFor, envelope.OccurredAt, payload.AppointmentReference);
+                    if (wasMissed)
+                    {
+                        HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
+                    }
+                }
+                else
+                {
+                    @case.BeginAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt);
+                }
+
+                break;
+
+            case AppointmentStatus.Attended:
+                var attended = @case.Appointment ?? @case.BeginAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt);
+                attended.Advance(AppointmentStatus.Attended, envelope.OccurredAt, payload.AppointmentReference);
+                break;
+
+            case AppointmentStatus.Missed:
+                var rebookAction = HandlerSupport.ExceptionAction(pathway, TrackKind.Appointment);
+                if (!HandlerSupport.HasDeadline(@case, rebookAction, pathway, out var noDeadline))
+                {
+                    return HandlerSupport.Refused(@case, noDeadline!);
+                }
+
+                var missed = @case.Appointment ?? @case.BeginAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt);
+                missed.Advance(AppointmentStatus.Missed, envelope.OccurredAt, payload.AppointmentReference);
+                HandlerSupport.SetNextAction(@case, rebookAction, pathway, _clock);
+                break;
+
+            default:
+                return HandlerSupport.Refused(@case, $"Appointment status {payload.Status} is not understood.");
+        }
+
+        return HandlerSupport.Applied(@case, payload.AppointmentReference);
     }
 }

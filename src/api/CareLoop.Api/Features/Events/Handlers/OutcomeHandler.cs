@@ -3,15 +3,18 @@ using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Rules;
 using CareLoop.Domain.Time;
 
 namespace CareLoop.Api.Features.Events.Handlers;
 
 /// <summary>
-/// Records outcome evidence and moves the case to closure review.
+/// Applies recorded outcome evidence.
 /// </summary>
 /// <remarks>
-/// Will check <see cref="CareLoop.Domain.Rules.TransitionRules"/>, store the evidence reference on the case and move it to closure review with a next action for the authorized closer. Recording an outcome never closes the case by itself.
+/// Checks <see cref="TransitionRules"/>, stores the evidence reference on the case and moves it to
+/// closure review with a next action for the authorized closer. Completing follow-up resolves any
+/// open escalation. Recording an outcome never closes the case by itself.
 /// </remarks>
 public sealed class OutcomeHandler : IEventHandler
 {
@@ -33,10 +36,38 @@ public sealed class OutcomeHandler : IEventHandler
     public CaseEventType EventType => CaseEventType.OutcomeRecorded;
 
     /// <inheritdoc/>
-    /// <remarks>Expects the envelope's payload to be a <see cref="OutcomePayload"/>.</remarks>
+    /// <remarks>Expects the envelope's payload to be an <see cref="OutcomePayload"/>.</remarks>
     public Task<EventHandlingResult> HandleAsync(Case? existing, EventEnvelope envelope, CancellationToken ct)
     {
-        // TODO(WS-2): record the evidence reference, move to ClosureReview and set the closure-decision deadline.
-        throw new NotImplementedException("WS2: OutcomeHandler.HandleAsync");
+        var payload = HandlerSupport.Payload<OutcomePayload>(envelope);
+        var @case = HandlerSupport.RequireCase(existing, EventType);
+        var pathway = _pathways.Get(@case.PathwayId);
+
+        var transition = TransitionRules.Evaluate(@case, EventType, envelope.Actor, pathway);
+        if (!transition.Verdict.Allowed)
+        {
+            return HandlerSupport.Refused(@case, transition.Verdict.Reason!);
+        }
+
+        if (transition.NextAction is { } nextAction && !HandlerSupport.HasDeadline(@case, nextAction, pathway, out var missing))
+        {
+            return HandlerSupport.Refused(@case, missing!);
+        }
+
+        @case.RecordOutcomeEvidence(payload.EvidenceReference, envelope.OccurredAt);
+
+        if (transition.NextStage is { } next)
+        {
+            @case.MoveTo(next, envelope.OccurredAt);
+        }
+
+        @case.ResolveEscalations(envelope.OccurredAt);
+
+        if (transition.NextAction is { } action)
+        {
+            HandlerSupport.SetNextAction(@case, action, pathway, _clock);
+        }
+
+        return HandlerSupport.Applied(@case, payload.EvidenceReference);
     }
 }

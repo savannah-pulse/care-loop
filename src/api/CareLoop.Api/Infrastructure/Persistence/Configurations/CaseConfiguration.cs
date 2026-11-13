@@ -42,6 +42,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.HasIndex(c => c.DueAt);
 
         builder.Ignore(c => c.DomainEvents);
+        builder.Ignore(c => c.IsClosed);
 
         builder.OwnsOne(c => c.Owner, owner =>
         {
@@ -120,6 +121,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         {
             track.Property(t => t.Status).HasConversion<string>().HasMaxLength(40);
             track.Property(t => t.SourceReference).HasMaxLength(200);
+            track.Property(t => t.OutcomeReference).HasMaxLength(200);
         });
 
         builder.OwnsOne(c => c.Closure, closure =>

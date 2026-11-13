@@ -25,6 +25,7 @@
     { "nextAction": "acknowledge-notification", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
     { "nextAction": "acknowledge-notification", "urgencyCode": "PLACEHOLDER-URGENCY-A", "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
     { "nextAction": "respond-to-handoff", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "arrange-follow-up", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
     { "nextAction": "call-patient", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
     { "nextAction": "contact-patient-another-way", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
     { "nextAction": "reassign-consultation", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
