@@ -1,4 +1,5 @@
 using CareLoop.Domain.Cases;
+using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Domain.Tracks;
 using Hl7.Fhir.Model;
 using FhirTask = Hl7.Fhir.Model.Task;
@@ -22,17 +23,23 @@ public sealed class CaseTaskMapper
     /// Builds the FHIR resource.
     /// </summary>
     /// <param name="case">The case to represent.</param>
+    /// <param name="rejection">
+    /// The handoff rejection being published, if any. Rejecting a handoff clears the proposal from the case, so the
+    /// status <c>rejected</c> and the reason come from the event. When a newer handoff is already pending (a late
+    /// delivery), the newer state wins and the rejection is not shown.
+    /// </param>
     /// <returns>The case <c>Task</c>, with the case identifier as its logical identifier and the case version as its version.</returns>
-    public FhirTask Map(Case @case)
+    public FhirTask Map(Case @case, HandoffRejected? rejection = null)
     {
         ArgumentNullException.ThrowIfNull(@case);
 
+        var handoffRejected = rejection is not null && @case.PendingAssignment is null && !@case.IsClosed;
         var result = new ResourceReference($"DiagnosticReport/{@case.SourceResultId}");
         var task = new FhirTask
         {
             Id = OutboundSupport.CaseTaskId(@case.Id),
             Meta = new Meta { VersionId = @case.Version.ToString(System.Globalization.CultureInfo.InvariantCulture) },
-            Status = StatusMap.ToTaskStatus(@case),
+            Status = StatusMap.ToTaskStatus(@case, handoffRejected),
             Intent = FhirTask.TaskIntent.Order,
             Code = StatusMap.TaskCode(StatusMap.CaseTaskCode),
             BusinessStatus = StatusMap.ToBusinessStatus(@case.Stage),
@@ -43,7 +50,7 @@ public sealed class CaseTaskMapper
             Requester = @case.PendingAssignment is { } assignment ? OutboundSupport.Reference(assignment.ProposedBy) : null,
             AuthoredOnElement = new FhirDateTime(@case.CreatedAt),
             LastModifiedElement = new FhirDateTime(@case.UpdatedAt),
-            StatusReason = StatusReason(@case),
+            StatusReason = handoffRejected ? StatusMap.ToRejectionReason(rejection!.Reason) : StatusReason(@case),
             Description = @case.NextAction,
         };
 
@@ -69,11 +76,6 @@ public sealed class CaseTaskMapper
         if (@case.Closure is { } closure)
         {
             return StatusMap.ToStatusReason(closure.Reason);
-        }
-
-        if (@case.PendingAssignment is { Status: AssignmentStatus.Rejected } rejected)
-        {
-            return StatusMap.ToRejectionReason(rejected.RejectionReason ?? "No reason given.");
         }
 
         return @case.Referral is { Status: ReferralStatus.Rejected } referral

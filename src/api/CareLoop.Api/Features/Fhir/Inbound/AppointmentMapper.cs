@@ -14,10 +14,10 @@ namespace CareLoop.Api.Features.Fhir.Inbound;
 /// <see cref="StatusMap"/>; other statuses produce no event. The appointment names the screening result in
 /// <c>supportingInformation</c>, the one field of an <c>Appointment</c> that may point at a <c>DiagnosticReport</c>.
 /// <para>
-/// When the event happened depends on the status. A booking happened when it was made (<c>created</c>, else
-/// <c>meta.lastUpdated</c>), never at the appointment's future <c>start</c>. Attendance and a missed appointment
-/// happened at the appointment itself (<c>end</c>, else <c>start</c>, else <c>meta.lastUpdated</c>), never at the
-/// booking time, so the timeline stays in order and the time-to-attendance measures are right.
+/// The event happened when the source recorded this state: <c>meta.lastUpdated</c>, which moves with every change,
+/// so a rebooking or an attendance is never dated at the original booking. Without it, a booking falls back to
+/// <c>created</c>, never the appointment's future <c>start</c>; attendance and a missed appointment fall back to the
+/// appointment itself (<c>end</c>, else <c>start</c>), never the booking time.
 /// </para>
 /// </remarks>
 public sealed class AppointmentMapper : IFhirInboundMapper
@@ -45,8 +45,8 @@ public sealed class AppointmentMapper : IFhirInboundMapper
                 Type = CaseEventType.AppointmentUpdated,
                 SourceResultId = InboundSupport.RequireResultId(appointment, appointment.SupportingInformation),
                 OccurredAt = status == AppointmentStatus.Scheduled
-                    ? InboundSupport.OccurredAt(appointment, InboundSupport.Instant(appointment.CreatedElement))
-                    : InboundSupport.OccurredAt(appointment, appointment.End, appointment.Start),
+                    ? InboundSupport.OccurredAt(appointment, appointment.Meta?.LastUpdated, InboundSupport.Instant(appointment.CreatedElement))
+                    : InboundSupport.OccurredAt(appointment, appointment.Meta?.LastUpdated, appointment.End, appointment.Start),
                 Actor = appointment.Participant.Select(p => InboundSupport.ReadActor(p.Actor)).FirstOrDefault(a => a is not null),
                 Payload = new AppointmentUpdatePayload
                 {

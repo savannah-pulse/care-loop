@@ -55,6 +55,21 @@ public sealed class AppointmentMapperTests
         Assert.Equal(new DateTimeOffset(2026, 1, 3, 8, 30, 0, TimeSpan.Zero), envelope.OccurredAt);
     }
 
+    [Theory]
+    [InlineData(FhirAppointmentStatus.Booked)]
+    [InlineData(FhirAppointmentStatus.Fulfilled)]
+    [InlineData(FhirAppointmentStatus.Noshow)]
+    public void The_source_update_time_comes_first_so_a_rebooking_is_not_dated_at_the_first_booking(FhirAppointmentStatus status)
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Status = status;
+        appointment.Meta!.LastUpdated = new DateTimeOffset(2026, 1, 5, 14, 0, 0, TimeSpan.Zero);
+
+        var envelope = Assert.Single(Map(Mapper, appointment));
+
+        Assert.Equal(new DateTimeOffset(2026, 1, 5, 14, 0, 0, TimeSpan.Zero), envelope.OccurredAt);
+    }
+
     [Fact]
     public void Attendance_without_an_end_happened_at_the_start()
     {

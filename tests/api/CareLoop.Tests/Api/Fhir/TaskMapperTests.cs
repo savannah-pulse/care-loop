@@ -148,6 +148,28 @@ public sealed class TaskMapperTests
         Assert.Equal("PLACEHOLDER note", payload.ExceptionNote);
     }
 
+    [Theory]
+    [InlineData("#")]
+    [InlineData("Task/SYN-CASE-TASK-0001")]
+    [InlineData("Task/SYN-CASE-TASK-0001/_history/3")]
+    public void Provenance_that_targets_this_task_names_the_authorizer(string target)
+    {
+        var envelope = Assert.Single(Map(Mapper, CaseTaskWithProvenanceTargeting(target)));
+
+        Assert.Equal("SYN-STAFF-0002", envelope.Actor?.Reference);
+    }
+
+    [Theory]
+    [InlineData("Task/SYN-OTHER-TASK")]
+    [InlineData("Task/SYN-CASE-TASK-0001/_history/2")]
+    [InlineData("DiagnosticReport/SYN-RESULT-0001")]
+    public void Provenance_that_targets_another_record_names_no_authorizer(string target)
+    {
+        var envelope = Assert.Single(Map(Mapper, CaseTaskWithProvenanceTargeting(target)));
+
+        Assert.Null(envelope.Actor);
+    }
+
     [Fact]
     public void Case_task_without_provenance_has_no_authorizer()
     {
@@ -198,4 +220,16 @@ public sealed class TaskMapperTests
         Type = new CodeableConcept(StatusMap.ClosureOutputSystem, type),
         Value = value,
     };
+
+    private static FhirTask CaseTaskWithProvenanceTargeting(string target)
+    {
+        var provenance = Sample<Provenance>("Provenance");
+        var caseTask = (FhirTask)provenance.Contained[0];
+        provenance.Contained.Clear();
+        provenance.Target = [new ResourceReference(target)];
+        caseTask.Contained.Add(provenance);
+        caseTask.RelevantHistory.Add(new ResourceReference("#SYN-PROV-0001"));
+        caseTask.Meta = new Meta { VersionId = "3" };
+        return caseTask;
+    }
 }

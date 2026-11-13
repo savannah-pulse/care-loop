@@ -209,7 +209,7 @@ Inbound:
 | Referral | `ServiceRequest` plus `Task` | Same pattern |
 | Appointment | `Appointment` | booked, fulfilled, noshow |
 | Outcome | `Procedure` or follow-up `DiagnosticReport` | Becomes the evidence reference |
-| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer |
+| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer; it counts only when it targets that case `Task` |
 | Caregiver consent | `Consent` | `active` grants, `inactive`, `rejected` or a `deny` provision withdraws; the caregiver is a contained `RelatedPerson` |
 
 Outbound:

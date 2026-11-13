@@ -143,8 +143,12 @@ public static class StatusMap
     /// Maps a case's handoff state to <c>Task.status</c>.
     /// </summary>
     /// <param name="case">The case being represented as a FHIR <c>Task</c>.</param>
-    /// <returns>The task status: requested while a handoff is pending, accepted or in-progress while owned, rejected after a refusal, completed when closed.</returns>
-    public static FhirTaskStatus ToTaskStatus(Case @case)
+    /// <param name="handoffRejected">
+    /// <see langword="true"/> when the task is published for a handoff rejection and no newer handoff is pending. The
+    /// case itself keeps no trace of a rejected proposal (rejection clears it), so the caller says so.
+    /// </param>
+    /// <returns>The task status: requested while a handoff is pending, rejected for a rejection, accepted or in-progress while owned, completed when closed.</returns>
+    public static FhirTaskStatus ToTaskStatus(Case @case, bool handoffRejected = false)
     {
         ArgumentNullException.ThrowIfNull(@case);
 
@@ -153,13 +157,17 @@ public static class StatusMap
             return FhirTaskStatus.Completed;
         }
 
-        return @case.PendingAssignment?.Status switch
+        if (@case.PendingAssignment is { Status: AssignmentStatus.Proposed })
         {
-            AssignmentStatus.Proposed => FhirTaskStatus.Requested,
-            AssignmentStatus.Rejected => FhirTaskStatus.Rejected,
-            _ when @case.Stage == CaseStage.Received => FhirTaskStatus.Accepted,
-            _ => FhirTaskStatus.InProgress,
-        };
+            return FhirTaskStatus.Requested;
+        }
+
+        if (handoffRejected)
+        {
+            return FhirTaskStatus.Rejected;
+        }
+
+        return @case.Stage == CaseStage.Received ? FhirTaskStatus.Accepted : FhirTaskStatus.InProgress;
     }
 
     /// <summary>

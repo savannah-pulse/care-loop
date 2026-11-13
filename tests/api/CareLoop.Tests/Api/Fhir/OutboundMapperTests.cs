@@ -73,6 +73,37 @@ public sealed class OutboundMapperTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Handoff_rejection_publishes_status_rejected_with_the_reason()
+    {
+        var harness = new IngestionHarness();
+        var @case = await harness.ReviewedCaseAsync();
+
+        var task = new CaseTaskMapper().Map(@case, Rejection(@case.Id, "No capacity this week"));
+
+        Assert.Equal(FhirTaskStatus.Rejected, task.Status);
+        Assert.Equal(StatusMap.RejectedReasonCode, StatusMap.CodeIn(task.StatusReason, StatusMap.StatusReasonSystem));
+        Assert.Equal("No capacity this week", task.StatusReason!.Text);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Late_handoff_rejection_does_not_hide_a_newer_pending_handoff()
+    {
+        var harness = new IngestionHarness();
+        await harness.ReviewedCaseAsync();
+        await harness.ApplyAsync(Envelopes.Consultation(harness.Clock.UtcNow, CareLoop.Domain.Tracks.ConsultationStatus.Requested));
+        var @case = await harness.ApplyAsync(Envelopes.Consultation(
+            harness.Clock.UtcNow,
+            CareLoop.Domain.Tracks.ConsultationStatus.OwnerProposed,
+            proposedOwner: TestData.Clinician("SYN-STAFF-0002") with { Role = "receiving-clinician" },
+            actor: Envelopes.Clinician()));
+
+        var task = new CaseTaskMapper().Map(@case, Rejection(@case.Id, "An earlier proposal was declined"));
+
+        Assert.Equal(FhirTaskStatus.Requested, task.Status);
+        Assert.Null(task.StatusReason);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Case_maps_to_a_Task_with_every_documented_field()
     {
         var harness = new IngestionHarness();
@@ -128,6 +159,16 @@ public sealed class OutboundMapperTests
         Assert.DoesNotContain("SYNTHETIC Patient One", json);
         Assert.DoesNotContain("SYN-MRN-0001", json);
     }
+
+    private static HandoffRejected Rejection(Guid caseId, string reason) => new()
+    {
+        EventId = Guid.NewGuid(),
+        CaseId = caseId,
+        OccurredAt = At,
+        CurrentOwner = TestData.Clinician(),
+        RejectedBy = TestData.Clinician("SYN-STAFF-0002"),
+        Reason = reason,
+    };
 
     private static HandoffSummaryApproved Approval(HandoffSummaryRecord summary) => new()
     {

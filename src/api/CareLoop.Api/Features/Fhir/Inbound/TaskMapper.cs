@@ -17,6 +17,9 @@ namespace CareLoop.Api.Features.Fhir.Inbound;
 /// becomes a clinical review with the reviewed urgency; a consultation or referral task becomes a status update
 /// using <see cref="StatusMap"/> (requested, accepted, rejected, completed); the case task set to completed becomes a
 /// closure decision, whose authorizer is the agent of the <c>Provenance</c> in <c>Task.relevantHistory</c> (contained).
+/// That <c>Provenance</c> counts only when it targets this task (<c>#</c>, or <c>Task/{id}</c> with a matching version
+/// when one is given): otherwise a closure could borrow an authorizer recorded for another resource. Without a
+/// matching <c>Provenance</c> the closure names no actor, so the closure gate refuses it and the refusal is audited.
 /// A closure that arrives as a <c>Provenance</c> with the case task contained is mapped by <see cref="ProvenanceMapper"/>
 /// through <see cref="MapClosure"/>, so both carriers produce the same event.
 /// </remarks>
@@ -177,7 +180,26 @@ public sealed class TaskMapper : IFhirInboundMapper
     }
 
     private static Provenance? Authorizer(FhirTask task) =>
-        task.RelevantHistory.Select(r => InboundSupport.Contained<Provenance>(task, r)).FirstOrDefault(p => p is not null);
+        task.RelevantHistory
+            .Select(r => InboundSupport.Contained<Provenance>(task, r))
+            .FirstOrDefault(p => p is not null && p.Target.Any(t => TargetsTask(t.Reference, task)));
+
+    private static bool TargetsTask(string? reference, FhirTask task)
+    {
+        // A contained resource names its container as "#".
+        if (reference == "#")
+        {
+            return true;
+        }
+
+        if (InboundSupport.Parse(reference) is not { Type: "Task" } target || !string.Equals(target.Id, task.Id, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var history = reference!.IndexOf("/_history/", StringComparison.Ordinal);
+        return history < 0 || string.Equals(reference[(history + "/_history/".Length)..], task.Meta?.VersionId, StringComparison.Ordinal);
+    }
 
     private static string ResultOf(FhirTask task) =>
         InboundSupport.RequireResultId(task, task.BasedOn.Prepend(task.Focus));
