@@ -142,8 +142,11 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C10: parse the confidence value in `SimulatorInboundNotificationHandler`.
-- C13: `RecipientResolver` sends a caregiver with active consent the appointment date, time and place only; a caregiver template under `Templates/en/`; each send is a `NotificationAttempt`; withdrawal stops sends. `EmailNotificationProvider` stays a stub.
+- C10 (decision 3): in `SimulatorInboundNotificationHandler`, map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` and parse the 1 to 5 value into `NotificationUpdatePayload.Confidence`, using the category code WS3 adds to `StatusMap`. A rating is a measure, never an acknowledgement. The WS1 and WS2 parts are done.
+- C13 (decision 7): `RecipientResolver` sends a caregiver with active consent the appointment date, time and place only, never the result. Add a caregiver template under `Templates/en/`, with a standard and an SMS-safe variant. Record each send as a `NotificationAttempt`. Check `Consent.IsActive` when the message is sent, not only when the event was raised, because the outbox may deliver after a withdrawal; a withdrawal stops every later send. `SimulatorNotificationProvider` marks the `CommunicationRequest` as a caregiver message on the `Email` channel, so the patient-channel simulator files it in its Email inbox (WS8). `EmailNotificationProvider` stays a stub. `Consent`, `RecipientKind.Caregiver` and `ConsentHandler` are done; the FHIR `Consent` mapping is WS3's. **Blocked:** scheduling an appointment raises no domain event and the appointment payload carries no place (see "Caregiver appointment message" in the contract points below).
+- C15 (decision 13): each `EscalationRaised` staff notice says who acknowledged the previous level, if anyone (WS5 sends the event). This needs a field on `EscalationRaised` (WS1) and a placeholder in the staff template. Staff notices still carry no patient detail. See "Acknowledgement in escalation notices" in the contract points below.
+- Decision 2: a patient reply never changes appointment status. "I will come" arrives as `acknowledgement` and is translated to `Acknowledged` only.
+- Open contract points to settle before building: "Staff notification transport" (the HIS simulator already reads staff notices from FHIR `Task` codes) and "Simulator provider wire format" (how the notification attempt identifier and the recipient kind are carried).
 
 ## WS5 Deadlines and escalation
 
@@ -161,8 +164,9 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue` and includes who acknowledged the previous level in each `EscalationRaised` notice; acknowledgement never stops the clock.
+- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue` and includes who acknowledged the previous level in each `EscalationRaised` notice; acknowledgement never stops the clock. `EscalationRaised` has no field for the acknowledgement yet; see "Acknowledgement in escalation notices" in the contract points below.
 - C21: `ComputeDueAt` handles the `start-treatment` deadline like any other next action; no special case.
+- C12 and decision 18: `answer-consultation` (1 day), `respond-to-referral` (4 hours) and `call-patient` (2 hours) are ordinary next-action deadlines. Durations are clock time: add no working-hours calendar, which stays future work.
 
 ## WS6 Read endpoints and dashboard
 
@@ -189,11 +193,10 @@ Because the contracts already exist, every workstream can start now against the 
 - C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the handoff summary screen drafts, edits on approval and rejects (decisions 4 and 10); the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
 - C10: `confidenceRate` on `MetricsResponse`.
 - C11: add `nurse-navigator`, `receiving-clinician` and `lab` to `DemoRoles.HumanRoles` (shared file; agree first).
-- C15: `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`.
+- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. Only the role the escalation went to may acknowledge (the Domain enforces it); acknowledging never clears an exception, changes the owner or stops the clock.
 - C19: `patientReference` filter on `GET /cases`, allowed for `clinician` and `receiving-clinician` only, refused for other roles, audited as a read under C4.
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `CaseSummaryResponse`, `CaseDetailResponse` and `ExceptionItemResponse` for staff roles only; null for `coordinator`, whose screens show no names.
 - Decision 19: `DisplayLabel` on `CaseSummaryResponse` and `CaseDetailResponse`, from `CaseDisplayLabels.From`.
-- C15: the acknowledgement endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`.
 
 ## WS7 HIS simulator
 
@@ -216,6 +219,8 @@ Because the contracts already exist, every workstream can start now against the 
 - C21: outcome resources carry an evidence kind from the pathway's vocabulary (agree the code with WS3).
 - C11: let `ActingStaff` take the roles `nurse-navigator`, `receiving-clinician` and `lab`, and offer them on the clinician actions page.
 - Decision 4: AI summaries are approved in the CareLoop web app. The HIS simulator only receives the approved `DocumentReference`; no CareLoop endpoint other than `/fhir` is called.
+- C13 (decision 7): a FHIR `Consent` builder (grant and withdrawal, with a synthetic caregiver contact point) and a matching `HisEventKind`, so a scenario can send `ConsentRecorded` (agree the resource shape with WS3, and the step action with WS10). If the "Caregiver appointment message" proposal is adopted, `AppointmentBuilder` also sends the place.
+- Contract points waiting on WS7 (see the table below): `PUT` route shape, external system identifier (`his-simulator`), urgency on the review `Task`, the simulated marker, and staff notification transport.
 
 ## WS8 Patient-channel simulator
 
@@ -234,8 +239,10 @@ Because the contracts already exist, every workstream can start now against the 
 **Design gaps**
 
 - C7: on the `Sms` channel accept an inbound reply of `1` as acknowledge and `2` as call-me (screen 9).
-- C10: a confidence rating action (1 to 5) on the inbox and a `Communication` builder with category `confidence-rating`.
-- C13: an `Email` value in `InboxChannel` so caregiver messages are shown, not sent.
+- C10 (decision 3): a confidence rating action (1 to 5) on the inbox and a sixth `Communication` builder with category `confidence-rating`. A rating is not an acknowledgement.
+- C13 (decision 7): an `Email` value in `InboxChannel` so caregiver messages are shown, not sent. How the simulator recognises a caregiver message is part of "Simulator provider wire format" (WS4).
+- Decision 2: "I will come" sends an `acknowledgement` `Communication` only. There is no appointment-confirmation reply.
+- Contract points waiting on WS8 (see the table below): `PUT` route shape, `Communication.category` codes, simulator provider wire format, and the simulated marker.
 
 ## WS9 AI handoff summary
 
@@ -263,6 +270,10 @@ Implementing either provider needs a dependency that is not yet agreed: `Azure.I
 
 The `HandoffSummaries` table needs a migration for the provenance columns (suggested name `HandoffSummaryProvenance`). Migrations are WS2's folder; agree who writes it.
 
+Since decision 15 (C20), the case holds `PatientDisplayName` and `PatientSecondaryIdentifier`. `HandoffFactCollector` must never turn them into facts: decision 9 keeps names and identifiers out of every prompt.
+
+Two contract points are still open for WS9 (see the table below): summary approver roles, and the removed `Ai:AzureOpenAi` section and API key setting that `appsettings.json` and `docker-compose.yml` still carry.
+
 **Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-spec.md`](ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
 
 ## WS10 Scenarios and end-to-end tests
@@ -281,8 +292,6 @@ The `HandoffSummaries` table needs a migration for the provenance columns (sugge
 - The four journey test classes and the two Playwright specs
 - Changes to `scenario.schema.json` must be agreed with WS7 and WS8, whose scenario records mirror it
 
----
-
 **Design gaps**
 
 - C8: scenarios for call-me then call-back, understand after a reminder, consultation rejected, missed appointment then rebook, closure `Declined`, and closure `Untraceable` with documented attempts. Grown (decision 16): the demo scenario also sends the hospital-system events of design screens 15, 16 and 19 to 21, in order: `ConsentRecorded/Granted` when the case opens, the assessment `AppointmentUpdated/Attended`, the lab `ReferralUpdated/Sent` and `/Accepted`, and `OutcomeRecorded` with kinds `diagnosis`, `treatment-plan` and `treatment-started` (C21), with an escalation on the late referral for screen 17 (C15).
@@ -290,7 +299,8 @@ The `HandoffSummaries` table needs a migration for the provenance columns (sugge
 - C21: `happy-path.json` still sends `PLACEHOLDER-EVIDENCE-KIND`, which the API now refuses; change every scenario outcome to a kind the pathway declares.
 - C5: give `SimulationArmResponse` the same measures as `MetricsResponse` so the escalation-off comparison is like for like.
 - C10: a `rate-confidence` patient behaviour in `scenario.schema.json` (agree with WS7 and WS8).
-- C13: a scenario with a consented caregiver and one where consent is withdrawn.
+- C13: a scenario with a consented caregiver and one where consent is withdrawn. The schema's step `action` list has no consent action yet: add one (for example `consent`, with grant or withdraw) for the HIS simulator to send, agreed with WS7. The caregiver's appointment message also waits on the "Caregiver appointment message" contract point.
+- Decision 2: patient behaviours stay `acknowledge`, `understand` and `call-me` (plus `rate-confidence`). There is no appointment-confirmation behaviour.
 
 ## Shared (change by agreement)
 
@@ -312,12 +322,12 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Topic | Between | State |
 |---|---|---|
 | `PUT` route shape | WS3, WS7, WS8 | The API maps `PUT /fhir/{resourceType}/{id}` (standard FHIR update). `AGENTS.md` writes `PUT /fhir/{resourceType}`. Confirm. |
-| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. WS8 proposes codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`; `StatusMap` must match. |
+| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. WS8 proposes codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`, plus `confidence-rating` (decision 3, C10); `StatusMap` must match all five. |
 | External system identifiers | WS2, WS3, WS7 | `ExternalSystems:Systems` is keyed by system identifier, and the key must equal the source system identifier that system sends. The development settings use `his-simulator`; the HIS simulator does not yet send an agreed identifier. |
 | Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`), applied by the patient-channel simulator when a notification arrives. Cohort runs need a way to give each generated patient their scenario's behaviour. |
 | Time in a live run | WS1, WS5, WS7, WS8, WS10 | CareLoop runs on real time. A live run uses the demo pathway folder (`Pathways:Directory`), whose deadlines are divided by 1800, and both simulators pace scenarios with `Scenarios:RealSecondsPerScenarioHour` = 2. The three figures must stay equal. End-to-end tests should assert outcomes, not exact times, and leave headroom for slow machines. |
 | Simulator provider wire format | WS4, WS8 | Private to the simulator provider: a FHIR `CommunicationRequest` to the patient-channel simulator, and a FHIR `Communication` back to `POST /notifications/inbound/simulator`. Agree the `Communication.category` codes and how the notification attempt identifier is carried. |
-| Patient replies beyond acknowledgement | WS1, WS4, WS8 | A reply such as a patient accepting an appointment has no event or track status yet. Decide which replies exist and what each one means for the case before a handler translates them. |
+| Patient replies beyond acknowledgement | WS1, WS4, WS8 | Settled (decisions 2 and 3): the replies are acknowledgement, teach-back, call-me and confidence rating. Accepting an appointment is an acknowledgement; a patient reply never changes appointment status. |
 | Simulated marker on FHIR resources | WS7, WS8 | The simulators mark the resources they send (the API test samples use `meta.tag` in system `.../data-origin` with code `simulated`; WS8 planned `meta.security` `HTEST`; pick one). CareLoop neither requires nor emits a marker. |
 | Staff notification transport | WS4, WS7 | The HIS simulator offers both `POST /fhir/Task` and a plain `POST /staff-inbox/notifications`. Decide which `SimulatorNotificationProvider` uses and drop the other. |
 | Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. |
@@ -337,6 +347,8 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Roles | WS1, WS6, WS7 | Settled (decision 5): add `nurse-navigator`, `receiving-clinician` and `lab` (C11). `DemoRoles` is shared; WS6 edits it after announcing. |
 | Consultation reply deadline | WS1, WS2 | Settled (decision 6): `answer-consultation` and `respond-to-referral` replace `respond-to-handoff`; both placeholders (C12). |
 | Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the patient-channel simulator's `Email` channel; real email stays out of scope. |
+| Caregiver appointment message | WS1, WS2, WS3, WS4 | Open; blocks the WS4 part of C13. `Case.BeginAppointment` raises no domain event, so `NotificationRouter` is never told an appointment was booked. `AppointmentUpdatePayload` carries `ScheduledFor` but no place. Proposal: WS1 raises a domain event (for example `AppointmentScheduled`, carrying date, time and place) when the appointment track starts or is rebooked; WS2 adds the place to the payload; WS3 maps it from `Appointment` (for example the `Location` participant's display name). WS4 then routes it to the caregiver while consent is active. |
+| Acknowledgement in escalation notices | WS1, WS4, WS5 | Open. WS5 is to include who acknowledged the previous level in each `EscalationRaised` notice (C15), but `EscalationRaised` has no field for it and the staff template has only `{{hisLink}}`. Proposal: WS1 adds an optional acknowledged-by role and time to `EscalationRaised`, WS5 fills them, and WS4 adds a placeholder to the staff template. |
 | Escalation acknowledgement | WS1, WS2, WS5, WS6 | Settled (decision 13): C15. Only the role the escalation went to may acknowledge; it is audited and never clears an exception, changes the owner or stops the clock. |
 | Patient identifiers | WS1, WS2, WS3, WS6, WS7 | Settled (decision 15): C20. The screening result carries the patient's display name and MRN; the case stores them; staff roles read them, `coordinator` does not. `AGENTS.md` changes (shared; agree first). |
 | Display labels | WS1, WS6, WS10 | Settled (decision 19): the ten labels are computed by a Domain function and returned on reads and in metrics; the web app never recomputes them. |
