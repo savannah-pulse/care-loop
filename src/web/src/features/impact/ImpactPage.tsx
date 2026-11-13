@@ -1,5 +1,5 @@
 import { useId, type ReactNode } from 'react'
-import { ReadView } from '../../components'
+import { Icon, ReadView } from '../../components'
 import { useMetrics, useSimulation, type Metrics, type SimulationArm, type SimulationResult } from '../../data'
 import { CASE_STAGES, EXCEPTION_NAMES, exceptionLabel, stageLabel } from '../../domain'
 import {
@@ -220,12 +220,19 @@ function Comparison({ result, labelledBy }: { readonly result: SimulationResult;
           />
           <ComparisonRow
             label={t('impact.rows.median')}
+            detail={t('impact.rows.medianDetail')}
             withEscalation={medianText(on)}
             escalationOff={medianText(off)}
           />
         </tbody>
       </table>
-      <p className="note linkrow">{t('impact.comparisonNote', { seed: String(result.seed) })}</p>
+      <details className="disclosure method">
+        <summary>
+          {t('impact.methodTitle')}
+          <Icon name="down" />
+        </summary>
+        <p>{t('impact.methodBody')}</p>
+      </details>
     </>
   )
 }
@@ -237,7 +244,8 @@ function Comparison({ result, labelledBy }: { readonly result: SimulationResult;
  * Read-only. The headline cards and bars come from `GET /metrics`. The comparison comes from
  * `POST /metrics/simulation`, which replays a cohort scenario twice, with reminders and escalation
  * on and off; it illustrates the coordination effect and is not evidence of real-world results.
- * Only measures the API returns are shown; the fuller set in the design waits for C5.
+ * The scenario's name and seed stay out of view; the method is explained under "How this is worked
+ * out". Only measures the API returns are shown; the fuller set in the design waits for C5.
  */
 export function ImpactPage() {
   useDocumentTitle(t('impact.title'))
@@ -247,22 +255,21 @@ export function ImpactPage() {
   const generatedAt = metrics.state.status === 'ready' ? parseInstant(metrics.state.data.generatedAt) : undefined
   return (
     <div className="page">
-      <div className="head">
-        <div>
-          <h1>{t('impact.title')}</h1>
-          {metrics.state.status === 'ready' && generatedAt ? (
-            <p className="sub">
-              {t('impact.subtitle', {
-                date: formatDateTime(generatedAt),
-                count: tp('impact.cases', toCount(metrics.state.data.totalCases)),
-              })}
-            </p>
-          ) : null}
-        </div>
+      <div className="page-head">
+        <h1>{t('impact.title')}</h1>
+        {metrics.state.status === 'ready' && generatedAt ? (
+          <p className="lede">
+            {t('impact.subtitle', {
+              date: formatDateTime(generatedAt),
+              count: tp('impact.cases', toCount(metrics.state.data.totalCases)),
+            })}
+          </p>
+        ) : null}
       </div>
       <ReadView
         read={metrics}
-        loading={t('impact.loading')}
+        loadingLabel={t('impact.loading')}
+        skeleton="cards"
         notAvailable={t('impact.notAvailable')}
         errorTitle={t('impact.errorTitle')}
       >
@@ -271,15 +278,10 @@ export function ImpactPage() {
       <section className="card" aria-labelledby={comparisonId}>
         <h2 className="card-title" id={comparisonId}>
           {t('impact.comparisonTitle')}
-          {simulation.state.status === 'ready' ? (
-            <span className="r small muted">
-              {t('impact.comparisonOf', { cohort: simulation.state.data.cohortScenario })}
-            </span>
-          ) : null}
         </h2>
         <ReadView
           read={simulation}
-          loading={t('impact.comparisonLoading')}
+          loadingLabel={t('impact.comparisonLoading')}
           notAvailable={t('impact.comparisonNotAvailable')}
           errorTitle={t('impact.comparisonError')}
         >

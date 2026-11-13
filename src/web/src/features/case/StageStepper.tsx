@@ -1,6 +1,8 @@
+import { useId } from 'react'
 import { Icon } from '../../components'
 import type { CaseStage, TrackStatus } from '../../data'
 import { DISPLAY_STEPS, currentStepIndex } from '../../domain'
+import { WIDE_LAYOUT_QUERY, useMediaQuery } from '../../hooks'
 import { t } from '../../i18n'
 
 /** Props for {@link StageStepper}. */
@@ -11,33 +13,92 @@ export interface StageStepperProps {
   readonly tracks: readonly TrackStatus[]
 }
 
-/**
- * The bar of ten display stages on the case screen, from "Result received" to "Closed".
- *
- * @remarks
- * Steps before the current one are done, the current one is marked, and later ones are still to
- * come; a closed case has every step done. The current step follows rule C9 (see
- * `currentStepIndex`). Each step's state is also written out for screen readers.
- */
-export function StageStepper({ stage, tracks }: StageStepperProps) {
-  const current = currentStepIndex(stage, tracks)
-  const closed = stage === 'Closed'
+interface StepsProps {
+  readonly current: number
+  readonly closed: boolean
+}
+
+function stepState(index: number, { current, closed }: StepsProps): 'done' | 'now' | 'toDo' {
+  if (closed || index < current) {
+    return 'done'
+  }
+  return index === current ? 'now' : 'toDo'
+}
+
+const STATE_WORDS = {
+  done: 'stages.stepDone',
+  now: 'stages.stepCurrent',
+  toDo: 'stages.stepToDo',
+} as const
+
+function Steps({ steps, className }: { readonly steps: StepsProps; readonly className: string }) {
   return (
-    <ol className="stepper" aria-label={t('stages.stepperLabel')}>
+    <ol className={className}>
       {DISPLAY_STEPS.map((key, index) => {
-        const done = index < current || closed
-        const now = index === current && !closed
-        const state = done ? t('stages.stepDone') : now ? t('stages.stepCurrent') : t('stages.stepToDo')
+        const state = stepState(index, steps)
         return (
-          <li key={key} className={done ? 's done' : now ? 's now' : 's'} aria-current={now ? 'step' : undefined}>
+          <li
+            key={key}
+            className={state === 'toDo' ? 's' : `s ${state}`}
+            aria-current={state === 'now' ? 'step' : undefined}
+          >
             <span className="dot" aria-hidden="true">
-              {done ? <Icon name="check" /> : null}
+              {state === 'done' ? <Icon name="check" /> : null}
             </span>
-            {t(key)}
-            <span className="visually-hidden">, {state}</span>
+            <span className="step-label">{t(key)}</span>
+            <span className="visually-hidden">{t('stages.stepAnnounce', { state: t(STATE_WORDS[state]) })}</span>
           </li>
         )
       })}
     </ol>
+  )
+}
+
+function CompactSteps({ steps }: { readonly steps: StepsProps }) {
+  const index = steps.closed ? DISPLAY_STEPS.length - 1 : steps.current
+  const next = steps.closed ? undefined : DISPLAY_STEPS[steps.current + 1]
+  return (
+    <div className="stage-compact">
+      <p className="stage-now">
+        {t('stages.stepOf', { number: index + 1, total: DISPLAY_STEPS.length, label: t(DISPLAY_STEPS[index]) })}
+      </p>
+      <span className="segments" aria-hidden="true">
+        {DISPLAY_STEPS.map((key, position) => (
+          <span key={key} className={position <= index ? 'seg reached' : 'seg'} />
+        ))}
+      </span>
+      <p className="stage-next">{next ? t('stages.next', { label: t(next) }) : t('stages.allDone')}</p>
+      <details className="disclosure">
+        <summary>
+          {t('stages.seeAll')}
+          <Icon name="down" />
+        </summary>
+        <Steps steps={steps} className="steps-list" />
+      </details>
+    </div>
+  )
+}
+
+/**
+ * Where the case is among the ten display stages, from "Result received" to "Closed".
+ *
+ * @remarks
+ * On wide screens all ten steps sit side by side, with labels that wrap onto two lines and never
+ * overlap. Below 900 px it is compact: "Step 7 of 10: Follow-up", a slim bar, the next step and a
+ * "See all steps" list. Steps before the current one are done and later ones are still to come; a
+ * closed case has every step done. The current step follows rule C9 (see `currentStepIndex`), and
+ * each step's state is also written out for screen readers.
+ */
+export function StageStepper({ stage, tracks }: StageStepperProps) {
+  const wide = useMediaQuery(WIDE_LAYOUT_QUERY)
+  const headingId = useId()
+  const steps: StepsProps = { current: currentStepIndex(stage, tracks), closed: stage === 'Closed' }
+  return (
+    <section className="card stage-card" aria-labelledby={headingId}>
+      <h2 className="visually-hidden" id={headingId}>
+        {t('stages.stepperLabel')}
+      </h2>
+      {wide ? <Steps steps={steps} className="stepper" /> : <CompactSteps steps={steps} />}
+    </section>
   )
 }

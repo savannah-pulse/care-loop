@@ -3,13 +3,19 @@ import type { ReactNode } from 'react'
 /** Names of the icons the app draws. */
 export type IconName =
   | 'alert'
+  | 'calendar'
+  | 'chat'
   | 'check'
   | 'clock'
   | 'doc'
   | 'down'
   | 'left'
+  | 'list'
   | 'lock'
+  | 'phone'
+  | 'right'
   | 'search'
+  | 'send'
   | 'spark'
   | 'user'
   | 'x'
@@ -27,6 +33,24 @@ const ICONS: Readonly<Record<IconName, IconShape>> = {
       <>
         <path d="M12 3.8l9 15.7H3z" />
         <path d="M12 10v4.2M12 16.9v.2" />
+      </>
+    ),
+  },
+  calendar: {
+    strokeWidth: 1.9,
+    body: (
+      <>
+        <rect x="4" y="5.5" width="16" height="14.5" rx="2" />
+        <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
+      </>
+    ),
+  },
+  chat: {
+    strokeWidth: 1.9,
+    body: (
+      <>
+        <path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5h-8.5l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6.5A1.5 1.5 0 0 1 5 5z" />
+        <path d="M8 9.5h8M8 12.5h5" />
       </>
     ),
   },
@@ -51,6 +75,15 @@ const ICONS: Readonly<Record<IconName, IconShape>> = {
   },
   down: { strokeWidth: 2, body: <path d="M7 10l5 5 5-5" /> },
   left: { strokeWidth: 2.2, body: <path d="M14.5 6l-6 6 6 6" /> },
+  list: {
+    strokeWidth: 1.9,
+    body: (
+      <>
+        <path d="M9.5 7h10M9.5 12h10M9.5 17h10" />
+        <path d="M4.8 7h.4M4.8 12h.4M4.8 17h.4" strokeWidth="2.6" />
+      </>
+    ),
+  },
   lock: {
     strokeWidth: 1.9,
     body: (
@@ -60,12 +93,28 @@ const ICONS: Readonly<Record<IconName, IconShape>> = {
       </>
     ),
   },
+  phone: {
+    strokeWidth: 1.9,
+    body: (
+      <path d="M8.4 4.2l1.3 3.2a1.2 1.2 0 0 1-.3 1.3L8 10a11.6 11.6 0 0 0 6 6l1.3-1.4a1.2 1.2 0 0 1 1.3-.3l3.2 1.3a1.2 1.2 0 0 1 .7 1.3l-.4 2a1.8 1.8 0 0 1-1.9 1.4A15.6 15.6 0 0 1 3.7 5.7 1.8 1.8 0 0 1 5.1 3.8l2-.4a1.2 1.2 0 0 1 1.3.8z" />
+    ),
+  },
+  right: { strokeWidth: 2.2, body: <path d="M9.5 6l6 6-6 6" /> },
   search: {
     strokeWidth: 2,
     body: (
       <>
         <circle cx="11" cy="11" r="6.5" />
         <path d="M16 16l4 4" />
+      </>
+    ),
+  },
+  send: {
+    strokeWidth: 1.9,
+    body: (
+      <>
+        <path d="M20.5 3.5L3.5 10.4l6.8 3.3 3.3 6.8z" />
+        <path d="M20.5 3.5l-10.2 10.2" />
       </>
     ),
   },

@@ -1,8 +1,8 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { Badge, ReadView } from '../../components'
 import type { Read, TimelineEntry } from '../../data'
-import { describeActor, newestFirst, timelineTitle } from '../../domain'
-import { formatDateTime, parseInstant } from '../../format'
+import { describeActor, groupByDay, newestFirst, timelineKind, timelineSource, timelineTitle } from '../../domain'
+import { formatDayHeading, formatTime, parseInstant } from '../../format'
 import { t, tp } from '../../i18n'
 
 /** How many timeline entries show before "Show earlier events". */
@@ -14,19 +14,46 @@ export interface TimelineCardProps {
   readonly read: Read<TimelineEntry[]>
 }
 
-function TimelineItem({ entry }: { readonly entry: TimelineEntry }) {
+function actorLine(entry: TimelineEntry): string {
+  const actor = describeActor(entry.actorReference, entry.actorRole)
+  switch (timelineSource(entry)) {
+    case 'hospital':
+      return t('timeline.fromHospital', { actor })
+    case 'careLoop':
+      return t('timeline.inCareLoop', { actor })
+    case undefined:
+      return actor
+  }
+}
+
+interface ItemProps {
+  readonly entry: TimelineEntry
+  readonly focusTarget?: boolean
+}
+
+function TimelineItem({ entry, focusTarget = false }: ItemProps) {
+  const ref = useRef<HTMLLIElement>(null)
   const at = parseInstant(entry.sourceTimestamp)
+  useEffect(() => {
+    if (focusTarget) {
+      ref.current?.focus()
+    }
+  }, [focusTarget])
   return (
-    <li>
-      <time dateTime={entry.sourceTimestamp}>{at ? formatDateTime(at) : entry.sourceTimestamp}</time>
-      <div>
-        <b>
-          {timelineTitle(entry.eventType)}
+    <li className="tl-item" ref={ref} tabIndex={focusTarget ? -1 : undefined}>
+      <time className="tl-time" dateTime={entry.sourceTimestamp}>
+        {at ? formatTime(at) : entry.sourceTimestamp}
+      </time>
+      <div className="tl-body">
+        <span className="tl-kind">
+          {timelineKind(entry.eventType)}
           {entry.disposition === 'Rejected' ? <Badge tone="red">{t('timeline.refused')}</Badge> : null}
-        </b>
-        {entry.reason ? <span className="by">{entry.reason}</span> : null}
+        </span>
+        <p>{entry.reason.trim() === '' ? timelineTitle(entry.eventType) : entry.reason}</p>
+        <p className="tl-by" title={entry.actorReference}>
+          {actorLine(entry)}
+        </p>
       </div>
-      <span className="src">{describeActor(entry.actorReference, entry.actorRole)}</span>
     </li>
   )
 }
@@ -39,13 +66,27 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
   }
   const shown = expanded ? ordered : ordered.slice(0, TIMELINE_PAGE)
   const hidden = ordered.length - shown.length
+  const firstRevealed = expanded ? ordered[TIMELINE_PAGE]?.auditEventId : undefined
   return (
     <>
-      <ul className="tl">
-        {shown.map((entry) => (
-          <TimelineItem key={entry.auditEventId} entry={entry} />
+      <ol className="tl-days">
+        {groupByDay(shown).map((day) => (
+          <li key={day.key}>
+            <h3 className="tl-day-title">
+              {day.date ? formatDayHeading(day.date) : day.entries[0]?.sourceTimestamp}
+            </h3>
+            <ol className="tl">
+              {day.entries.map((entry) => (
+                <TimelineItem
+                  key={entry.auditEventId}
+                  entry={entry}
+                  focusTarget={entry.auditEventId === firstRevealed}
+                />
+              ))}
+            </ol>
+          </li>
         ))}
-      </ul>
+      </ol>
       {hidden > 0 ? (
         <button type="button" className="linkbtn linkrow" onClick={() => setExpanded(true)}>
           {tp('case.showEarlier', hidden)}
@@ -56,24 +97,26 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
 }
 
 /**
- * The case's timeline, newest first: what happened, why, and who or what did it.
+ * The case's timeline, newest first and grouped by day: what happened, what kind of step it was,
+ * and who did it where.
  *
  * @remarks
- * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Events CareLoop refused, such as a
- * closure without evidence, are marked "Refused". The first {@link TIMELINE_PAGE} entries show,
- * with a button for the earlier ones.
+ * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Each entry's reason is its main
+ * line. Events CareLoop refused, such as a closure without evidence, are marked "Refused". The
+ * first {@link TIMELINE_PAGE} entries show, with a button for the earlier ones; once they show,
+ * focus moves to the first of them.
  */
 export function TimelineCard({ read }: TimelineCardProps) {
   const headingId = useId()
   return (
-    <section className="card" aria-labelledby={headingId}>
+    <section className="card timeline" aria-labelledby={headingId}>
       <h2 className="card-title" id={headingId}>
         {t('case.timelineTitle')}
         <span className="r small muted">{t('case.timelineOrder')}</span>
       </h2>
       <ReadView
         read={read}
-        loading={t('case.timelineLoading')}
+        loadingLabel={t('case.timelineLoading')}
         notAvailable={t('case.timelineNotAvailable')}
         errorTitle={t('case.timelineError')}
       >

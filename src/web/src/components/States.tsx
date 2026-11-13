@@ -4,30 +4,103 @@ import { formatTime } from '../format'
 import { t } from '../i18n'
 import { Icon, type IconName } from './Icon'
 
+/**
+ * The shapes a loading placeholder can take, each roughly the shape of what will appear.
+ *
+ * @remarks
+ * - `lines`: a few lines of text, as in a timeline.
+ * - `list`: a short list of cases, as on the worklist.
+ * - `cards`: a row of number cards, as on the impact screen.
+ * - `page`: a heading block over a card, as on a case.
+ */
+export type SkeletonShape = 'lines' | 'list' | 'cards' | 'page'
+
 /** Props for {@link LoadingState}. */
 export interface LoadingStateProps {
-  /** What is loading, for example `Loading cases…`. */
-  readonly text: string
+  /** What is loading, read out by screen readers only, for example `Loading your worklist`. */
+  readonly label: string
+  /** The shape of the placeholder; `lines` by default. */
+  readonly shape?: SkeletonShape
+}
+
+function Bar({ size }: { readonly size: string }) {
+  return <span className="sk" style={{ inlineSize: size }} />
+}
+
+function Lines() {
+  return (
+    <>
+      <Bar size="72%" />
+      <Bar size="94%" />
+      <Bar size="58%" />
+    </>
+  )
+}
+
+function Shape({ shape }: { readonly shape: SkeletonShape }) {
+  switch (shape) {
+    case 'lines':
+      return <Lines />
+    case 'list':
+      return (
+        <>
+          {['a', 'b', 'c'].map((key) => (
+            <span key={key} className="sk-card">
+              <Bar size="38%" />
+              <Bar size="80%" />
+              <Bar size="55%" />
+            </span>
+          ))}
+        </>
+      )
+    case 'cards':
+      return (
+        <span className="sk-row">
+          {['a', 'b', 'c'].map((key) => (
+            <span key={key} className="sk-card">
+              <Bar size="60%" />
+              <span className="sk sk-big" />
+              <Bar size="85%" />
+            </span>
+          ))}
+        </span>
+      )
+    case 'page':
+      return (
+        <>
+          <span className="sk-card">
+            <Bar size="45%" />
+            <Bar size="70%" />
+          </span>
+          <span className="sk-card">
+            <Lines />
+          </span>
+        </>
+      )
+  }
 }
 
 /**
- * A calm line shown while data loads.
+ * Grey placeholder shapes shown while data loads, instead of a "loading" message.
  *
  * @remarks
- * Announced politely to screen readers. The spinner stops for people who prefer reduced motion.
+ * The placeholder is hidden from assistive technology; screen readers hear the label once, politely.
+ * Its gentle shimmer stops for people who prefer reduced motion.
  */
-export function LoadingState({ text }: LoadingStateProps) {
+export function LoadingState({ label, shape = 'lines' }: LoadingStateProps) {
   return (
-    <div className="state-line" role="status">
-      <span className="spinner" aria-hidden="true" />
-      {text}
+    <div className={`skeleton skeleton-${shape}`} role="status">
+      <span className="visually-hidden">{label}</span>
+      <span className="skeleton-shape" aria-hidden="true">
+        <Shape shape={shape} />
+      </span>
     </div>
   )
 }
 
 /** Props for {@link NotAvailableState}. */
 export interface NotAvailableStateProps {
-  /** The heading; `Not available yet` by default. */
+  /** The heading; `This part isn't ready yet` by default. */
   readonly title?: string
   /** What is not available and what to expect. */
   readonly body: string
@@ -38,7 +111,7 @@ export interface NotAvailableStateProps {
 }
 
 /**
- * A calm notice that a part of CareLoop is not available yet, or not for the signed-in role.
+ * A calm notice that a part of CareLoop is not ready yet, or not for the signed-in role.
  *
  * @remarks
  * Shown when the API answers HTTP 501: the endpoint is in the contract but not built. It is not an
@@ -54,7 +127,7 @@ export function NotAvailableState({ title, body, icon = 'clock', onCheckAgain }:
         <b>{title ?? t('states.notAvailableTitle')}</b>
         <span>{body}</span>
         {onCheckAgain ? (
-          <button type="button" className="btn small-btn" onClick={onCheckAgain}>
+          <button type="button" className="btn" onClick={onCheckAgain}>
             {t('states.checkAgain')}
           </button>
         ) : null}
@@ -65,7 +138,7 @@ export function NotAvailableState({ title, body, icon = 'clock', onCheckAgain }:
 
 /** Props for {@link ErrorState}. */
 export interface ErrorStateProps {
-  /** What could not be done, for example `Cases could not be loaded`. */
+  /** What could not be done, for example `We couldn't load your worklist`. */
   readonly title: string
   /** When the failed attempt was made; shown so people know how fresh the message is. */
   readonly failedAt?: Date
@@ -74,7 +147,7 @@ export interface ErrorStateProps {
 }
 
 /**
- * An error message with a way to try again.
+ * A friendly error message with a way to try again.
  *
  * @remarks
  * Shown when the API fails in any way other than "not built yet": a network failure, a server error
@@ -93,7 +166,7 @@ export function ErrorState({ title, failedAt, onRetry }: ErrorStateProps) {
           {failedAt ? ` ${t('states.lastTried', { time: formatTime(failedAt) })}` : null}
         </span>
         {onRetry ? (
-          <button type="button" className="btn small-btn" onClick={onRetry}>
+          <button type="button" className="btn" onClick={onRetry}>
             {t('states.tryAgain')}
           </button>
         ) : null}
@@ -108,27 +181,32 @@ export interface EmptyStateProps {
   readonly title: string
   /** The explanation under the heading. */
   readonly body: string
-  /** Whether nothing being there is good news; shows a green check instead of a neutral mark. */
-  readonly positive?: boolean
+  /** The icon: a green check when nothing being there is good news, a neutral search mark otherwise. */
+  readonly icon?: 'positive' | 'neutral' | IconName
+  /** The heading level; 2 by default, 1 when the message is the whole page. */
+  readonly level?: 1 | 2
   /** An optional action, such as a button to show everything. */
   readonly action?: ReactNode
 }
 
 /**
- * A centred message used instead of an empty list or table.
+ * A centred message with an icon, used instead of an empty list or a missing screen.
  *
  * @remarks
  * CareLoop never shows an empty table: it says what is on track, what to try next, or what is
  * missing.
  */
-export function EmptyState({ title, body, positive = false, action }: EmptyStateProps) {
+export function EmptyState({ title, body, icon = 'neutral', level = 2, action }: EmptyStateProps) {
+  const Heading = level === 1 ? 'h1' : 'h2'
+  const name: IconName = icon === 'positive' ? 'check' : icon === 'neutral' ? 'search' : icon
+  const tone = icon === 'positive' ? 'big' : icon === 'neutral' ? 'big neutral' : 'big accent'
   return (
     <div className="empty">
-      <span className={positive ? 'big' : 'big neutral'} aria-hidden="true">
-        <Icon name={positive ? 'check' : 'search'} />
+      <span className={tone} aria-hidden="true">
+        <Icon name={name} />
       </span>
-      <b>{title}</b>
-      <span>{body}</span>
+      <Heading className="empty-title">{title}</Heading>
+      <p>{body}</p>
       {action}
     </div>
   )
@@ -138,11 +216,13 @@ export function EmptyState({ title, body, positive = false, action }: EmptyState
 export interface ReadViewProps<T> {
   /** The read to follow, from one of the data hooks. */
   readonly read: Read<T>
-  /** Shown while loading, for example `Loading the case…`. */
-  readonly loading: string
+  /** What is loading, for screen readers, for example `Loading the case`. */
+  readonly loadingLabel: string
+  /** The shape of the loading placeholder; `lines` by default. */
+  readonly skeleton?: SkeletonShape
   /** Shown when the endpoint answers 501. */
   readonly notAvailable: string
-  /** Heading shown when the read fails. */
+  /** Heading shown when the read fails, for example `We couldn't load this case`. */
   readonly errorTitle: string
   /** Heading and text shown when the API answers 404; a 404 is treated as an error when absent. */
   readonly notFound?: { readonly title: string; readonly body: string; readonly action?: ReactNode }
@@ -151,16 +231,24 @@ export interface ReadViewProps<T> {
 }
 
 /**
- * Shows a read from the API in whichever state it is in: loading, data, not available yet, not
- * found or failed with a way to try again.
+ * Shows a read from the API in whichever state it is in: loading, data, not ready yet, not found or
+ * failed with a way to try again.
  *
  * @remarks
  * Every screen uses it so the states look and behave the same everywhere.
  */
-export function ReadView<T>({ read, loading, notAvailable, errorTitle, notFound, children }: ReadViewProps<T>) {
+export function ReadView<T>({
+  read,
+  loadingLabel,
+  skeleton = 'lines',
+  notAvailable,
+  errorTitle,
+  notFound,
+  children,
+}: ReadViewProps<T>) {
   const { state, retry } = read
   if (state.status === 'loading') {
-    return <LoadingState text={loading} />
+    return <LoadingState label={loadingLabel} shape={skeleton} />
   }
   if (state.status === 'ready') {
     return <>{children(state.data)}</>

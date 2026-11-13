@@ -88,24 +88,3 @@ export function currentStepIndex(stage: CaseStage, tracks: readonly TrackStatus[
 export function stageLabel(stage: CaseStage): string {
   return t(`stages.list.${stage}`)
 }
-
-/**
- * Says where a stage sits among the ten display stages, for the worklist.
- *
- * @param stage - The case's stage in the API.
- * @returns For example `Stage 3 of 10`, or `Stages 4 to 7 of 10` during follow-up.
- */
-export function stagePosition(stage: CaseStage): string {
-  switch (stage) {
-    case 'Received':
-      return t('stages.position', { number: 2 })
-    case 'ReviewPending':
-      return t('stages.position', { number: 3 })
-    case 'FollowUpActive':
-      return t('stages.followUpPosition')
-    case 'ClosureReview':
-      return t('stages.position', { number: 9 })
-    case 'Closed':
-      return t('stages.position', { number: 10 })
-  }
-}

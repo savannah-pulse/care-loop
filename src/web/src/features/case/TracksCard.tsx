@@ -1,6 +1,6 @@
 import { useId } from 'react'
-import { Badge } from '../../components'
-import type { TrackStatus } from '../../data'
+import { Badge, Icon, type IconName } from '../../components'
+import type { TrackKind, TrackStatus } from '../../data'
 import { TRACK_KINDS, describeTrack } from '../../domain'
 import { t } from '../../i18n'
 
@@ -10,8 +10,16 @@ export interface TracksCardProps {
   readonly tracks: readonly TrackStatus[]
 }
 
+const TRACK_ICONS: Readonly<Record<TrackKind, IconName>> = {
+  Notification: 'phone',
+  Consultation: 'chat',
+  Referral: 'send',
+  Appointment: 'calendar',
+}
+
 /**
- * "Where each part stands": the four parallel tracks of a case, each with its own status.
+ * "How each part is going": the four parallel tracks of a case, each with an icon and its status in
+ * words.
  *
  * @remarks
  * Patient contact, consultation, referral and appointment run side by side, so the stage bar shows
@@ -20,7 +28,7 @@ export interface TracksCardProps {
 export function TracksCard({ tracks }: TracksCardProps) {
   const headingId = useId()
   return (
-    <section className="card" aria-labelledby={headingId}>
+    <section className="card tracks-card" aria-labelledby={headingId}>
       <h2 className="card-title" id={headingId}>
         {t('case.tracksTitle')}
       </h2>
@@ -32,12 +40,17 @@ export function TracksCard({ tracks }: TracksCardProps) {
           )
           return (
             <li key={kind}>
-              <div>
-                <b>{view.name}</b>
+              <span className="track-icon" aria-hidden="true">
+                <Icon name={TRACK_ICONS[kind]} />
+              </span>
+              <div className="track-text">
+                <span className="track-head">
+                  <b>{view.name}</b>
+                  <Badge tone={view.tone}>{view.status}</Badge>
+                </span>
                 {view.updated ? <span className="sub-line">{view.updated}</span> : null}
                 {view.note ? <span className="sub-line">{view.note}</span> : null}
               </div>
-              <Badge tone={view.tone}>{view.status}</Badge>
             </li>
           )
         })}

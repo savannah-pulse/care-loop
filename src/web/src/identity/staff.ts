@@ -1,3 +1,4 @@
+import { facilityName } from '../format'
 import { t, type MessageKey } from '../i18n'
 import type { RoleKey } from './roles'
 
@@ -16,14 +17,16 @@ export interface StaffMember {
   readonly reference: string
   /** The person's name as shown on screen. */
   readonly name: string
+  /** How a greeting addresses the person: the first name, with the title for doctors. */
+  readonly shortName: string
   /** Initials shown in the avatar. */
   readonly initials: string
   /** The role the person acts in, sent as `X-Demo-Role`. */
   readonly role: RoleKey
   /** Catalogue key of the person's job title. */
   readonly titleKey: MessageKey
-  /** Catalogue key of the facility the person works at, when they work at one. */
-  readonly facilityKey?: MessageKey
+  /** Identifier of the facility the person works at, when they work at one. */
+  readonly facilityId?: string
 }
 
 /**
@@ -39,33 +42,37 @@ export const STAFF: readonly StaffMember[] = [
     id: 'huda-saleh',
     reference: 'Practitioner/huda-saleh',
     name: 'Huda Saleh',
+    shortName: 'Huda',
     initials: 'HS',
     role: 'nurse-navigator',
     titleKey: 'staffTitles.nurseNavigator',
-    facilityKey: 'facilities.familyHealthCentre',
+    facilityId: 'family-health-centre',
   },
   {
     id: 'rekha-varghese',
     reference: 'Practitioner/rekha-varghese',
     name: 'Dr. Rekha Varghese',
+    shortName: 'Dr. Rekha',
     initials: 'RV',
     role: 'clinician',
     titleKey: 'staffTitles.screeningPhysician',
-    facilityKey: 'facilities.familyHealthCentre',
+    facilityId: 'family-health-centre',
   },
   {
     id: 'joy-bautista',
     reference: 'Practitioner/joy-bautista',
     name: 'Joy Bautista',
+    shortName: 'Joy',
     initials: 'JB',
     role: 'facility-lead',
     titleKey: 'staffTitles.facilityLead',
-    facilityKey: 'facilities.familyHealthCentre',
+    facilityId: 'family-health-centre',
   },
   {
     id: 'obaid-al-suwaidi',
     reference: 'Practitioner/obaid-al-suwaidi',
     name: 'Dr. Obaid Al Suwaidi',
+    shortName: 'Dr. Obaid',
     initials: 'OS',
     role: 'coordinator',
     titleKey: 'staffTitles.programmeCoordinator',
@@ -103,5 +110,5 @@ export function findStaffById(id: string): StaffMember | undefined {
  */
 export function staffDescription(member: StaffMember): string {
   const title = t(member.titleKey)
-  return member.facilityKey ? t('identity.titleAtFacility', { title, facility: t(member.facilityKey) }) : title
+  return member.facilityId ? t('identity.titleAtFacility', { title, facility: facilityName(member.facilityId) }) : title
 }

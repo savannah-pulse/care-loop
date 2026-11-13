@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState } from 'react'
-import { Badge, Icon, NotAvailableState, ReadView } from '../../components'
+import { useCallback, useEffect, useId, useRef, useState, type Ref } from 'react'
+import { Badge, Dialog, Icon, LoadingState, NotAvailableState, ReadView, Toast } from '../../components'
 import {
   approveHandoffSummary,
   draftHandoffSummary,
@@ -11,8 +11,8 @@ import {
   type HandoffSummary,
   type SummarySection,
 } from '../../data'
-import { programmeName } from '../../domain'
-import { formatDateTime, parseInstant } from '../../format'
+import { describeOwner, programmeName } from '../../domain'
+import { factLabel, formatDateTime, parseInstant, patientLabel } from '../../format'
 import { useDocumentTitle } from '../../hooks'
 import { findStaffByReference, isClinicianRole, useSignedInStaff, type StaffMember } from '../../identity'
 import { t, type MessageKey } from '../../i18n'
@@ -45,11 +45,15 @@ const DECISION_MESSAGES: Readonly<Partial<Record<FailureKind, MessageKey>>> = {
   invalid: 'summary.decisionFailed.invalid',
 }
 
+function decisionMessage(kind: FailureKind): string {
+  return t(DECISION_MESSAGES[kind] ?? 'summary.decisionFailed.error')
+}
+
 function personName(reference: string | null | undefined, me: StaffMember): string | undefined {
   if (!reference || reference === me.reference) {
     return undefined
   }
-  return findStaffByReference(reference)?.name ?? reference
+  return findStaffByReference(reference)?.name ?? t('summary.anotherClinician')
 }
 
 function when(value: string | null | undefined): string {
@@ -57,39 +61,46 @@ function when(value: string | null | undefined): string {
   return date ? formatDateTime(date) : ''
 }
 
+function Sources({ ids }: { readonly ids: readonly string[] }) {
+  if (ids.length === 0) {
+    return null
+  }
+  return (
+    <ul className="srcs" aria-label={t('summary.sources')}>
+      {ids.map((id) => (
+        <li key={id} title={id}>
+          <Icon name="doc" />
+          {factLabel(id)}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 interface SectionBlockProps {
   readonly section: SummarySection
   readonly index: number
   readonly editing: boolean
   readonly onEdit: (index: number, text: string) => void
+  readonly fieldRef?: Ref<HTMLTextAreaElement>
 }
 
-function SectionBlock({ section, index, editing, onEdit }: SectionBlockProps) {
+function SectionBlock({ section, index, editing, onEdit, fieldRef }: SectionBlockProps) {
   const fieldId = useId()
   const assessment = isAssessmentSection(section)
-  const sources =
-    section.sourceFactIds.length > 0 ? (
-      <ul className="srcs" aria-label={t('summary.sources')}>
-        {section.sourceFactIds.map((id) => (
-          <li key={id}>
-            <Icon name="doc" />
-            {id}
-          </li>
-        ))}
-      </ul>
-    ) : null
   if (editing && !assessment) {
     return (
       <div>
         <label htmlFor={fieldId}>{section.heading}</label>
         <textarea
+          ref={fieldRef}
           id={fieldId}
           className="textarea"
           value={section.text}
-          rows={Math.max(3, Math.ceil(section.text.length / 90))}
+          rows={Math.max(3, Math.ceil(section.text.length / 70))}
           onChange={(event) => onEdit(index, event.target.value)}
         />
-        {sources}
+        <Sources ids={section.sourceFactIds} />
       </div>
     )
   }
@@ -97,7 +108,7 @@ function SectionBlock({ section, index, editing, onEdit }: SectionBlockProps) {
     <div>
       <h3>{section.heading}</h3>
       <p className="section-text">{section.text}</p>
-      {assessment ? <p className="note">{t('summary.assessmentNote')}</p> : sources}
+      {assessment ? <p className="note">{t('summary.assessmentNote')}</p> : <Sources ids={section.sourceFactIds} />}
     </div>
   )
 }
@@ -154,41 +165,86 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
   const [summary, setSummary] = useState(initial)
   const [edits, setEdits] = useState<SectionEdits>({})
   const [editing, setEditing] = useState(false)
-  const [rejecting, setRejecting] = useState(false)
+  const [dialog, setDialog] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
   const [reasonMissing, setReasonMissing] = useState(false)
-  const [busy, setBusy] = useState<'approve' | 'reject'>()
+  const [busy, setBusy] = useState(false)
   const [decisionError, setDecisionError] = useState<FailureKind>()
+  const [toast, setToast] = useState<string>()
   const ids = useId()
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const firstFieldRef = useRef<HTMLTextAreaElement>(null)
   const reasonRef = useRef<HTMLTextAreaElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  const open = summary.status === 'Draft'
 
   useEffect(() => {
     headingRef.current?.focus()
   }, [])
 
   useEffect(() => {
-    if (rejecting) {
-      reasonRef.current?.focus()
+    if (editing) {
+      firstFieldRef.current?.focus()
     }
-  }, [rejecting])
+  }, [editing])
+
+  useEffect(() => {
+    if (!open) {
+      return undefined
+    }
+    // Browsers apply the page's scroll padding when they scroll a field into view, but not always
+    // when a focused field is already on screen; this keeps it clear of the action bar either way.
+    const keepClear = (event: FocusEvent): void => {
+      const target = event.target
+      if (!(target instanceof HTMLElement) || target.closest('dialog, .actionbar, .toast-region')) {
+        return
+      }
+      window.requestAnimationFrame(() => {
+        const bar = barRef.current
+        if (bar && target.getBoundingClientRect().bottom > bar.getBoundingClientRect().top) {
+          target.scrollIntoView({ block: 'nearest' })
+        }
+      })
+    }
+    document.addEventListener('focusin', keepClear)
+    return () => document.removeEventListener('focusin', keepClear)
+  }, [open])
+
+  const dismissToast = useCallback(() => setToast(undefined), [])
 
   const sections = applyEdits(summary.sections, edits)
   const edited = hasEdits(summary.sections, edits)
-  const open = summary.status === 'Draft'
   const facts = summary.missingOrConflictingFacts
+  const firstEditable = sections.findIndex((section) => !isAssessmentSection(section))
 
   const onEdit = (index: number, text: string): void => setEdits((current) => ({ ...current, [index]: text }))
 
+  const openDialog = (which: 'approve' | 'reject'): void => {
+    setDecisionError(undefined)
+    setReasonMissing(false)
+    setDialog(which)
+  }
+
+  const closeDialog = (): void => {
+    setDialog(undefined)
+    setDecisionError(undefined)
+    setReasonMissing(false)
+  }
+
+  const decided = (next: HandoffSummary, message: string): void => {
+    setSummary(next)
+    setEditing(false)
+    setDialog(undefined)
+    setToast(message)
+  }
+
   const approve = async (): Promise<void> => {
-    setBusy('approve')
+    setBusy(true)
     setDecisionError(undefined)
     const outcome = await approveHandoffSummary(caseId, summary.summaryId, approvedTextFor(summary, edits))
-    setBusy(undefined)
+    setBusy(false)
     if (outcome.ok) {
-      setSummary(outcome.data)
-      setEditing(false)
-      setRejecting(false)
+      decided(outcome.data, t('summary.approvedToast'))
     } else {
       setDecisionError(outcome.failure.kind)
     }
@@ -200,14 +256,12 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
       reasonRef.current?.focus()
       return
     }
-    setBusy('reject')
+    setBusy(true)
     setDecisionError(undefined)
     const outcome = await rejectHandoffSummary(caseId, summary.summaryId, reason.trim())
-    setBusy(undefined)
+    setBusy(false)
     if (outcome.ok) {
-      setSummary(outcome.data)
-      setEditing(false)
-      setRejecting(false)
+      decided(outcome.data, t('summary.rejectedToast'))
     } else {
       setDecisionError(outcome.failure.kind)
     }
@@ -215,11 +269,11 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
 
   return (
     <>
-      <div className="grid2">
+      <div className="summary-grid">
         <section className="card" aria-labelledby={`${ids}-heading`}>
           <h2 className="card-title" id={`${ids}-heading`} tabIndex={-1} ref={headingRef}>
             {t('summary.cardTitle')}
-            <span className="r btns">
+            <span className="r pills">
               {edited ? <Badge tone="blue">{t('summary.editedByYou')}</Badge> : null}
               <span className="ai">
                 <Icon name="spark" />
@@ -228,7 +282,7 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
             </span>
           </h2>
           <Decision summary={summary} me={me} />
-          <div className="sbar linkrow">
+          <div className="sbar">
             {sections.map((section, index) => (
               <SectionBlock
                 key={`${index}-${section.heading}`}
@@ -236,6 +290,7 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
                 index={index}
                 editing={editing && open}
                 onEdit={onEdit}
+                fieldRef={index === firstEditable ? firstFieldRef : undefined}
               />
             ))}
           </div>
@@ -250,7 +305,7 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
               <ul className="check">
                 {facts.map((fact) => (
                   <li key={fact}>
-                    <span className="mk todo" aria-hidden="true" />
+                    <span className="mk" aria-hidden="true" />
                     <span>{fact}</span>
                   </li>
                 ))}
@@ -288,79 +343,77 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
         </div>
       </div>
 
-      {open && rejecting ? (
-        <section className="card" id={`${ids}-reject`}>
-          <label className="card-title" htmlFor={`${ids}-reason`}>
-            {t('summary.rejectTitle')}
-          </label>
-          <p className="note" id={`${ids}-reason-help`}>
-            {t('summary.rejectHelp')}
-          </p>
-          <textarea
-            ref={reasonRef}
-            id={`${ids}-reason`}
-            className="textarea linkrow"
-            value={reason}
-            aria-invalid={reasonMissing}
-            aria-describedby={reasonMissing ? `${ids}-reason-help ${ids}-reason-error` : `${ids}-reason-help`}
-            onChange={(event) => {
-              setReason(event.target.value)
-              setReasonMissing(false)
-            }}
-          />
-          {reasonMissing ? (
-            <p className="field-error" id={`${ids}-reason-error`}>
-              {t('summary.rejectReasonRequired')}
-            </p>
-          ) : null}
-          <div className="btns linkrow">
-            <button type="button" className="btn" disabled={busy !== undefined} onClick={() => void reject()}>
-              {busy === 'reject' ? t('summary.rejecting') : t('summary.rejectConfirm')}
-            </button>
-            <button type="button" className="btn" disabled={busy !== undefined} onClick={() => setRejecting(false)}>
-              {t('summary.cancel')}
-            </button>
-          </div>
-        </section>
-      ) : null}
-
       {open ? (
-        <div className="actionbar" role="group" aria-label={t('summary.actionsLabel')}>
-          {decisionError ? (
-            <p className="field-error grow" role="alert">
-              {t(DECISION_MESSAGES[decisionError] ?? 'summary.decisionFailed.error')}
-            </p>
-          ) : null}
+        <div className="actionbar" role="group" aria-label={t('summary.actionsLabel')} ref={barRef}>
           <div className="btns">
-            <button
-              type="button"
-              className="btn"
-              aria-expanded={rejecting}
-              aria-controls={`${ids}-reject`}
-              disabled={busy !== undefined}
-              onClick={() => setRejecting((value) => !value)}
-            >
+            <button type="button" className="btn" onClick={() => openDialog('reject')}>
               {t('summary.reject')}
             </button>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy !== undefined}
-              onClick={() => setEditing((value) => !value)}
-            >
+            <button type="button" className="btn" onClick={() => setEditing((value) => !value)}>
               {editing ? t('summary.stopEditing') : t('summary.edit')}
             </button>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy !== undefined}
-              onClick={() => void approve()}
-            >
-              {busy === 'approve' ? t('summary.approving') : t('summary.approve')}
+            <button type="button" className="btn primary" onClick={() => openDialog('approve')}>
+              {t('summary.approve')}
             </button>
           </div>
         </div>
       ) : null}
+
+      <Dialog open={dialog === 'approve'} title={t('summary.approveDialogTitle')} onClose={closeDialog}>
+        <p>{t('summary.approveDialogBody')}</p>
+        {decisionError ? (
+          <p className="field-error" role="alert">
+            {decisionMessage(decisionError)}
+          </p>
+        ) : null}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={closeDialog}>
+            {t('summary.cancel')}
+          </button>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void approve()}>
+            {busy ? t('summary.approving') : t('summary.approve')}
+          </button>
+        </div>
+      </Dialog>
+
+      <Dialog open={dialog === 'reject'} title={t('summary.rejectDialogTitle')} onClose={closeDialog}>
+        <label htmlFor={`${ids}-reason`}>{t('summary.rejectReasonLabel')}</label>
+        <p className="help" id={`${ids}-reason-help`}>
+          {t('summary.rejectHelp')}
+        </p>
+        <textarea
+          ref={reasonRef}
+          id={`${ids}-reason`}
+          className="textarea"
+          value={reason}
+          aria-invalid={reasonMissing}
+          aria-describedby={reasonMissing ? `${ids}-reason-help ${ids}-reason-error` : `${ids}-reason-help`}
+          onChange={(event) => {
+            setReason(event.target.value)
+            setReasonMissing(false)
+          }}
+        />
+        {reasonMissing ? (
+          <p className="field-error" id={`${ids}-reason-error`}>
+            {t('summary.rejectReasonRequired')}
+          </p>
+        ) : null}
+        {decisionError ? (
+          <p className="field-error" role="alert">
+            {decisionMessage(decisionError)}
+          </p>
+        ) : null}
+        <div className="dialog-actions">
+          <button type="button" className="btn" onClick={closeDialog}>
+            {t('summary.cancel')}
+          </button>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void reject()}>
+            {busy ? t('summary.rejecting') : t('summary.rejectConfirm')}
+          </button>
+        </div>
+      </Dialog>
+
+      <Toast message={toast} onDismiss={dismissToast} />
     </>
   )
 }
@@ -381,26 +434,28 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
   }
 
   const drafted = draft.step === 'ready' ? parseInstant(draft.summary.draftedAt) : undefined
+  const owner = describeOwner(detail.owner)
+  const ownerIsMe = !detail.owner.isQueue && detail.owner.reference === me.reference
 
   return (
     <>
-      <div className="head">
-        <div>
-          <h1>{t('summary.title')}</h1>
-          <p className="sub">
-            {drafted ? t('summary.draftedAt', { date: formatDateTime(drafted) }) : t('summary.subtitle')}
-          </p>
-        </div>
+      <div className="page-head">
+        <h1>{t('summary.title')}</h1>
+        <p className="lede">
+          {drafted ? t('summary.draftedAt', { date: formatDateTime(drafted) }) : t('summary.subtitle')}
+        </p>
       </div>
-      <div className="pbanner compact">
-        <span className="av" aria-hidden="true">
+      <div className="patient-head compact">
+        <span className="pi" aria-hidden="true">
           <Icon name="user" />
         </span>
         <div className="who">
-          <p className="nm">{detail.patientReference}</p>
-          <p className="id">
-            <span>{programmeName(detail.pathwayId)}</span>
-            <span>{t('case.resultFrom', { result: detail.sourceResultId, system: detail.sourceSystem })}</span>
+          <p className="nm" title={detail.patientReference}>
+            {patientLabel(detail.patientReference)}
+          </p>
+          <p className="meta">
+            <span title={detail.pathwayId}>{programmeName(detail.pathwayId)}</span>
+            <span title={detail.sourceSystem}>{t('case.resultFrom', { result: detail.sourceResultId })}</span>
           </p>
         </div>
       </div>
@@ -409,7 +464,7 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
         <NotAvailableState
           icon="lock"
           title={t('summary.clinicianOnlyTitle')}
-          body={t('summary.clinicianOnly', { name: me.name, title: t(me.titleKey) })}
+          body={ownerIsMe ? t('summary.clinicianOnlyYou') : t('summary.clinicianOnly', { name: owner.subject })}
         />
       ) : draft.step === 'ready' ? (
         <DraftView key={draft.summary.summaryId} caseId={detail.caseId} initial={draft.summary} me={me} />
@@ -424,7 +479,7 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
           </div>
           <p className="note linkrow">{t('summary.noDraftBody')}</p>
           {draft.failure.kind === 'conflict' ? null : (
-            <button type="button" className="btn small-btn linkrow" onClick={() => void requestDraft()}>
+            <button type="button" className="btn linkrow" onClick={() => void requestDraft()}>
               {draft.failure.kind === 'notAvailable' ? t('states.checkAgain') : t('states.tryAgain')}
             </button>
           )}
@@ -434,19 +489,20 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
           <h2 className="card-title" id={`${ids}-start`}>
             {t('summary.startTitle')}
           </h2>
-          <p className="note">{t('summary.startBody')}</p>
+          <p className="why">{t('summary.startBody')}</p>
           <button
             type="button"
             className="btn primary linkrow"
             disabled={draft.step === 'drafting'}
             onClick={() => void requestDraft()}
           >
+            <Icon name="spark" />
             {draft.step === 'drafting' ? t('summary.drafting') : t('summary.draft')}
           </button>
           {draft.step === 'drafting' ? (
-            <p className="visually-hidden" role="status">
-              {t('summary.drafting')}
-            </p>
+            <div className="linkrow">
+              <LoadingState label={t('summary.draftingLabel')} />
+            </div>
           ) : null}
         </section>
       )}
@@ -461,9 +517,12 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
  * @remarks
  * AI output is a draft. `POST /cases/{caseId}/handoff-summary` drafts it; nothing is used until a
  * clinician approves it, and the approval is recorded with their name, the time and the exact text
- * they approved. AI never writes the assessment, so that section cannot be edited here. When there
- * is no draft (AI off, not built yet, or failed), the screen says so plainly and never shows
- * half-made text. Only clinician roles get the actions; the API decides who may approve.
+ * they approved. AI never writes the assessment, so that section cannot be edited here. Approving
+ * asks for a confirmation and rejecting asks for a reason, each in a small dialog, and a short
+ * message confirms the decision. The actions stay in reach in a bar at the bottom of the screen;
+ * the page keeps room above it so a focused field is never hidden. When there is no draft (AI off,
+ * not built yet, or failed), the screen says so plainly and never shows half-made text. Only
+ * clinician roles get the actions; the API decides who may approve.
  */
 export function SummaryPage({ caseId }: SummaryPageProps) {
   useDocumentTitle(t('summary.title'))
@@ -472,11 +531,13 @@ export function SummaryPage({ caseId }: SummaryPageProps) {
     <div className="page">
       <a className="crumb" href={routeHref({ name: 'case', caseId })}>
         <Icon name="left" />
-        {read.state.status === 'ready' ? read.state.data.patientReference : t('case.titleFallback')}
+        {read.state.status === 'ready' ? patientLabel(read.state.data.patientReference) : t('case.titleFallback')}
       </a>
+      {read.state.status === 'ready' ? null : <h1 className="visually-hidden">{t('summary.title')}</h1>}
       <ReadView
         read={read}
-        loading={t('case.loading')}
+        loadingLabel={t('case.loading')}
+        skeleton="page"
         notAvailable={t('case.notAvailable')}
         errorTitle={t('case.errorTitle')}
         notFound={{ title: t('case.notFoundTitle'), body: t('case.notFoundBody') }}

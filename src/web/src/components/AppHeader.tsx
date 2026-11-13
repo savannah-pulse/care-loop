@@ -39,24 +39,26 @@ export function AppHeader({ route }: AppHeaderProps) {
   const current = sectionOf(route)
   return (
     <header className="appbar">
-      <a className="brand" href={routeHref({ name: 'worklist' })}>
-        <Logo />
-        {t('app.name')}
-      </a>
-      <nav className="nav" aria-label={t('nav.label')}>
-        {SECTIONS.map((section) => (
-          <a
-            key={section}
-            href={routeHref({ name: section })}
-            className={section === current ? 'on' : undefined}
-            aria-current={section === current ? 'page' : undefined}
-          >
-            {t(`nav.${section}`)}
-          </a>
-        ))}
-      </nav>
-      <div className="grow" />
-      <SignedInMenu />
+      <div className="appbar-inner">
+        <a className="brand" href={routeHref({ name: 'worklist' })}>
+          <Logo />
+          <span className="brand-text">{t('app.name')}</span>
+        </a>
+        <nav className="nav" aria-label={t('nav.label')}>
+          {SECTIONS.map((section) => (
+            <a
+              key={section}
+              href={routeHref({ name: section })}
+              className={section === current ? 'on' : undefined}
+              aria-current={section === current ? 'page' : undefined}
+            >
+              {t(`nav.${section}`)}
+            </a>
+          ))}
+        </nav>
+        <div className="grow" />
+        <SignedInMenu />
+      </div>
     </header>
   )
 }

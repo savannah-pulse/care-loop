@@ -120,6 +120,36 @@ export function formatLongDateTime(date: Date): string {
 }
 
 /**
+ * Formats a day without the time or year, in Abu Dhabi time.
+ *
+ * @param date - The instant to show.
+ * @returns For example `Wed 11 Nov`.
+ */
+export function formatDate(date: Date): string {
+  return t('time.date', { ...toParts(shortParts, date) })
+}
+
+/**
+ * Formats a day in full without the year, as a heading over that day's events, in Abu Dhabi time.
+ *
+ * @param date - Any instant on the day.
+ * @returns For example `Thursday 12 November`.
+ */
+export function formatDayHeading(date: Date): string {
+  return t('time.date', { ...toParts(longParts, date) })
+}
+
+/**
+ * Names the calendar day an instant falls on in Abu Dhabi, for grouping.
+ *
+ * @param date - The instant.
+ * @returns The local day as `YYYY-MM-DD`, for example `2026-11-12`.
+ */
+export function dayKey(date: Date): string {
+  return calendarDay.format(date)
+}
+
+/**
  * Tells whether two instants fall on the same calendar day in Abu Dhabi.
  *
  * @param a - The first instant.
@@ -127,7 +157,26 @@ export function formatLongDateTime(date: Date): string {
  * @returns `true` when both are on the same local day.
  */
 export function isSameDay(a: Date, b: Date): boolean {
-  return calendarDay.format(a) === calendarDay.format(b)
+  return dayKey(a) === dayKey(b)
+}
+
+/** The part of the day a greeting refers to. */
+export type PartOfDay = 'morning' | 'afternoon' | 'evening'
+
+const hourOfDay = new Intl.DateTimeFormat(LOCALE, { timeZone: TIME_ZONE, hour: '2-digit', hourCycle: 'h23' })
+
+/**
+ * Tells which part of the day it is in Abu Dhabi, for a greeting.
+ *
+ * @param date - The instant, usually now.
+ * @returns `morning` from 05:00 to 11:59, `afternoon` from 12:00 to 17:59 and `evening` otherwise.
+ */
+export function partOfDay(date: Date): PartOfDay {
+  const hour = Number(hourOfDay.format(date))
+  if (hour >= 5 && hour < 12) {
+    return 'morning'
+  }
+  return hour >= 12 && hour < 18 ? 'afternoon' : 'evening'
 }
 
 /**

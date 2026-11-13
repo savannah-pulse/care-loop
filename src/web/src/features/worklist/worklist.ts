@@ -1,14 +1,14 @@
 import type { CaseSummary } from '../../data'
 import {
   caseStatus,
-  exceptionLabel,
   isUrgent,
+  nextActionReason,
   programmeName,
+  stageLabel,
   type CaseStatus,
-  type CaseStatusKind,
   type Tone,
 } from '../../domain'
-import { parseInstant } from '../../format'
+import { isSameDay, parseInstant, patientLabel } from '../../format'
 
 /**
  * The worklist's filter chips: all open cases, then one per exception queue.
@@ -50,28 +50,37 @@ const FILTER_EXCEPTIONS: Readonly<Partial<Record<WorklistFilter, string>>> = {
   needsOwner: 'Unassigned',
 }
 
-const STATUS_EXCEPTIONS: Readonly<Partial<Record<CaseStatusKind, string>>> = {
-  overdue: 'Overdue',
-  declined: 'Rejected',
-  notReached: 'Unreachable',
-  notAcknowledged: 'Unacknowledged',
-  needsOwner: 'Unassigned',
-}
+/**
+ * The groups the worklist puts open cases in, most pressing first.
+ *
+ * @remarks
+ * - `now`, "Needs action now": overdue, reviewed as urgent, or escalated.
+ * - `today`, "Due today": due later today in Abu Dhabi.
+ * - `later`, "Coming up": everything else, including cases without a due time.
+ */
+export const WORKLIST_GROUPS = ['now', 'today', 'later'] as const
 
-/** One open case, prepared for the worklist table. */
+/** One of the worklist's groups. */
+export type WorklistGroup = (typeof WORKLIST_GROUPS)[number]
+
+/** One open case, prepared for the worklist. */
 export interface WorklistRow {
   /** The case as `GET /cases` returned it. */
   readonly summary: CaseSummary
-  /** The status word the row shows. */
+  /** The status word the case shows. */
   readonly status: CaseStatus
   /** `true` when the clinician reviewed the result as urgent. */
   readonly urgent: boolean
   /** When the next action is due, when it has a due time. */
   readonly due?: Date
+  /** The patient's friendly identifier, for example `Patient 100 245 891`. */
+  readonly patient: string
   /** The programme's name. */
   readonly programme: string
-  /** Exceptions other than the one the status already names, in plain words. */
-  readonly otherFlags: readonly string[]
+  /** The stage in plain words, for example `In follow-up`. */
+  readonly stage: string
+  /** Why the next action is needed, in a few words, when there is something to explain. */
+  readonly reason?: string
 }
 
 /**
@@ -83,18 +92,16 @@ export interface WorklistRow {
 export function toWorklistRows(cases: readonly CaseSummary[]): WorklistRow[] {
   return cases
     .filter((summary) => summary.stage !== 'Closed')
-    .map((summary) => {
-      const status = caseStatus(summary)
-      const named = STATUS_EXCEPTIONS[status.kind]
-      return {
-        summary,
-        status,
-        urgent: isUrgent(summary.urgency),
-        due: parseInstant(summary.dueAt),
-        programme: programmeName(summary.pathwayId),
-        otherFlags: summary.exceptions.filter((name) => name !== named).map(exceptionLabel),
-      }
-    })
+    .map((summary) => ({
+      summary,
+      status: caseStatus(summary),
+      urgent: isUrgent(summary.urgency),
+      due: parseInstant(summary.dueAt),
+      patient: patientLabel(summary.patientReference),
+      programme: programmeName(summary.pathwayId),
+      stage: stageLabel(summary.stage),
+      reason: nextActionReason(summary),
+    }))
 }
 
 /**
@@ -144,19 +151,50 @@ export function matchesProgramme(row: WorklistRow, pathwayId: string): boolean {
   return pathwayId === '' || row.summary.pathwayId === pathwayId
 }
 
+function compact(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, '')
+}
+
 /**
  * Tells whether a row matches what was typed in the search box.
  *
  * @param row - A worklist row.
  * @param query - The search text; blank matches everything.
- * @returns `true` when the patient reference contains the text, ignoring case.
+ * @returns `true` when the patient's number or reference contains the text, ignoring case and
+ * spaces, so `100 245`, `100245` and `p-100245891` all find `Patient 100 245 891`.
  *
  * @remarks
- * Case reads carry only the patient reference, not a name or MRN, so search is by reference.
+ * Case reads carry only the patient reference, not a name, so search is by number.
  */
 export function matchesSearch(row: WorklistRow, query: string): boolean {
-  const text = query.trim().toLowerCase()
-  return text === '' || row.summary.patientReference.toLowerCase().includes(text)
+  const text = compact(query)
+  return text === '' || compact(row.patient).includes(text) || compact(row.summary.patientReference).includes(text)
+}
+
+/**
+ * Tells whether a case's next action is late.
+ *
+ * @param row - A worklist row.
+ * @param now - The current time.
+ * @returns `true` when its due time has passed or the API reports it as overdue.
+ */
+export function isOverdue(row: WorklistRow, now: Date): boolean {
+  return row.status.kind === 'overdue' || (row.due !== undefined && row.due.getTime() < now.getTime())
+}
+
+/**
+ * Works out which group a case goes in.
+ *
+ * @param row - A worklist row.
+ * @param now - The current time.
+ * @returns `now` for overdue, urgent or escalated cases; `today` for cases due later today in Abu
+ * Dhabi; `later` for everything else.
+ */
+export function groupOf(row: WorklistRow, now: Date): WorklistGroup {
+  if (isOverdue(row, now) || row.urgent || row.summary.isEscalated) {
+    return 'now'
+  }
+  return row.due && isSameDay(row.due, now) ? 'today' : 'later'
 }
 
 function isPressing(row: WorklistRow): boolean {
@@ -186,6 +224,52 @@ export function sortByRisk(rows: readonly WorklistRow[]): WorklistRow[] {
     }
     return a.summary.patientReference.localeCompare(b.summary.patientReference)
   })
+}
+
+/** One group of the worklist and its cases. */
+export interface WorklistSection {
+  /** Which group this is. */
+  readonly group: WorklistGroup
+  /** Its cases, most at risk first. */
+  readonly rows: readonly WorklistRow[]
+}
+
+/**
+ * Puts rows into the worklist's groups.
+ *
+ * @param rows - The rows to group, after filtering.
+ * @param now - The current time.
+ * @returns The groups that have cases, in the order of {@link WORKLIST_GROUPS}, each ordered by
+ * {@link sortByRisk}. Empty groups are left out.
+ */
+export function groupRows(rows: readonly WorklistRow[], now: Date): WorklistSection[] {
+  return WORKLIST_GROUPS.map((group) => ({
+    group,
+    rows: sortByRisk(rows.filter((row) => groupOf(row, now) === group)),
+  })).filter((section) => section.rows.length > 0)
+}
+
+/** The numbers in the worklist's summary line. */
+export interface WorklistCounts {
+  /** Open cases. */
+  readonly open: number
+  /** Open cases whose next action is late. */
+  readonly overdue: number
+  /** Open cases due later today in Abu Dhabi. */
+  readonly dueToday: number
+}
+
+/**
+ * Counts the open cases for the worklist's summary line.
+ *
+ * @param rows - Every open case, before any filter.
+ * @param now - The current time.
+ * @returns How many cases are open, overdue and due later today.
+ */
+export function countOpen(rows: readonly WorklistRow[], now: Date): WorklistCounts {
+  const overdue = rows.filter((row) => isOverdue(row, now)).length
+  const dueToday = rows.filter((row) => !isOverdue(row, now) && row.due && isSameDay(row.due, now)).length
+  return { open: rows.length, overdue, dueToday }
 }
 
 /** A programme the worklist can be narrowed to. */

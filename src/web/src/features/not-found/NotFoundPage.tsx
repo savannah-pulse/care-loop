@@ -10,12 +10,12 @@ export function NotFoundPage() {
   useDocumentTitle(t('notFound.title'))
   return (
     <div className="page">
-      <h1 className="visually-hidden">{t('notFound.title')}</h1>
       <EmptyState
+        level={1}
         title={t('notFound.title')}
         body={t('notFound.body')}
         action={
-          <a className="btn small-btn" href={routeHref({ name: 'worklist' })}>
+          <a className="btn" href={routeHref({ name: 'worklist' })}>
             {t('notFound.link')}
           </a>
         }

@@ -109,8 +109,8 @@ export function t(key: MessageKey, params?: MessageParams): string {
  *
  * @example
  * ```ts
- * tp('worklist.openCases', 1) // "1 open case"
- * tp('worklist.openCases', 8) // "8 open cases"
+ * tp('worklist.summary.open', 1) // "1 open case"
+ * tp('worklist.summary.open', 8) // "8 open cases"
  * ```
  */
 export function tp(key: PluralKey, count: number, params?: MessageParams): string {

@@ -27,7 +27,7 @@ export const CASE_STATUS_KINDS = [
 /** One of the statuses a case can show. */
 export type CaseStatusKind = (typeof CASE_STATUS_KINDS)[number]
 
-/** A case's status as shown on screen: a word with a coloured dot, and an optional line under it. */
+/** A case's status as shown on screen: a word with a coloured dot. */
 export interface CaseStatus {
   /** Which status applies. */
   readonly kind: CaseStatusKind
@@ -35,8 +35,6 @@ export interface CaseStatus {
   readonly tone: Tone
   /** The status word, for example `Overdue`. */
   readonly label: string
-  /** A short line under the status, for example `Escalated`. */
-  readonly detail?: string
   /** How pressing the status is: 0 is the most pressing. */
   readonly rank: number
 }
@@ -100,32 +98,16 @@ function statusKind(input: CaseStatusInput): CaseStatusKind {
   return 'onTrack'
 }
 
-function statusDetail(kind: CaseStatusKind, isEscalated: boolean): string | undefined {
-  if (isEscalated) {
-    return t('status.escalated')
-  }
-  switch (kind) {
-    case 'needsOwner':
-      return t('status.detail.needsOwner')
-    case 'callBack':
-      return t('status.detail.callBack')
-    case 'waitingAcceptance':
-      return t('status.detail.waitingAcceptance')
-    default:
-      return undefined
-  }
-}
-
 /**
  * Works out the status a case shows.
  *
  * @param input - The case's stage, urgency, exceptions, next action and escalation flag.
- * @returns The status word, its tone, an optional detail line and its rank for sorting.
+ * @returns The status word, its tone and its rank for sorting.
  *
  * @remarks
  * A call-back request is a next action (`call-patient`), not an exception, and a referral waiting
  * for the receiving unit is `respond-to-referral`: the sender stays responsible until it is
- * accepted. An open escalation is always mentioned under the status.
+ * accepted. An open escalation is not a status: screens show it next to the status.
  */
 export function caseStatus(input: CaseStatusInput): CaseStatus {
   const kind = statusKind(input)
@@ -133,7 +115,6 @@ export function caseStatus(input: CaseStatusInput): CaseStatus {
     kind,
     tone: TONES[kind],
     label: t(`status.${kind}`),
-    detail: statusDetail(kind, input.isEscalated),
     rank: CASE_STATUS_KINDS.indexOf(kind),
   }
 }
