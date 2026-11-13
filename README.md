@@ -12,9 +12,9 @@ tracks ownership and deadlines, raises escalations and blocks unsafe closure.
 > messages as simulated. Real patient data, credentials and live endpoint addresses must never be committed to this
 > repository. See "Before real patient data" in [`AGENTS.md`](AGENTS.md) for what a production deployment needs first.
 
-The [architecture](docs/architecture.md), [workstreams](docs/workstreams.md), [development guide](docs/development.md)
-and [UI design](docs/ui-design/README.md) define how members work independently against common contracts. The rules
-every contributor follows are in [`AGENTS.md`](AGENTS.md).
+The [architecture](docs/architecture.md), [workstreams](docs/workstreams.md), [AI specification](docs/ai-spec.md),
+[development guide](docs/development.md), and [UI design](docs/ui-design/README.md) define how members work
+independently against common contracts. The rules every contributor follows are in [`AGENTS.md`](AGENTS.md).
 
 ## Prototype boundaries
 

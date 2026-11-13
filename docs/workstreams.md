@@ -176,6 +176,8 @@ Because the contracts already exist, every workstream can start now against the 
 - `Infrastructure/Ai/AzureOpenAiProvider.cs` (ask before adding an SDK package; the stub uses plain `HttpClient`)
 - `NoOpAiProvider` already works and stays the default
 
+**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. See [`ai-spec.md`](ai-spec.md) for the full AI contract and governed extensions.
+
 ## WS10 Scenarios and end-to-end tests
 
 **Owns**
