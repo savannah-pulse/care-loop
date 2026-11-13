@@ -1,10 +1,24 @@
 {
   "resourceType": "DiagnosticReport",
   "id": "SYN-RESULT-0001",
-  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "contained": [
+    {
+      "resourceType": "Patient",
+      "id": "SYN-PT-0001",
+      "identifier": [ { "system": "https://careloop.invalid/fhir/sid/mrn", "value": "SYN-MRN-0001" } ],
+      "name": [ { "use": "official", "text": "SYNTHETIC Patient One" } ],
+      "telecom": [ { "system": "other", "value": "SYN-INBOX-0001" } ],
+      "communication": [ { "language": { "coding": [ { "system": "urn:ietf:bcp:47", "code": "en" } ] }, "preferred": true } ]
+    }
+  ],
   "status": "final",
+  "category": [ { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/pathway", "code": "breast-screening" } ] } ],
   "code": { "text": "PLACEHOLDER - synthetic, not a clinical code" },
-  "subject": { "reference": "Patient/SYN-PT-0001" },
+  "subject": { "reference": "#SYN-PT-0001" },
   "issued": "2026-01-01T08:00:00Z",
-  "result": [ { "reference": "Observation/SYN-OBS-0001" } ]
+  "performer": [ { "reference": "Organization/SYN-FAC-A" } ],
+  "resultsInterpreter": [ { "reference": "Practitioner/SYN-STAFF-0001", "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-role", "valueCode": "clinician" }, { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-facility", "valueString": "SYN-FAC-A" } ] } ],
+  "result": [ { "reference": "Observation/SYN-OBS-0001" } ],
+  "conclusion": "PLACEHOLDER-RESULT-VALUE - synthetic, never copied into CareLoop"
 }

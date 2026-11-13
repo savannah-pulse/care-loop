@@ -1,0 +1,21 @@
+{
+  "resourceType": "Consent",
+  "id": "SYN-CONSENT-0001",
+  "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/screening-result", "valueReference": { "reference": "DiagnosticReport/SYN-RESULT-0001" } } ],
+  "contained": [
+    {
+      "resourceType": "RelatedPerson",
+      "id": "SYN-CG-0001",
+      "patient": { "reference": "Patient/SYN-PT-0001" },
+      "telecom": [ { "system": "email", "value": "SYN-CG-INBOX-0001" } ]
+    }
+  ],
+  "status": "active",
+  "scope": { "coding": [ { "system": "http://terminology.hl7.org/CodeSystem/consentscope", "code": "patient-privacy" } ] },
+  "category": [ { "text": "PLACEHOLDER - caregiver may receive appointment date, time and place" } ],
+  "patient": { "reference": "Patient/SYN-PT-0001" },
+  "dateTime": "2026-01-02T09:00:00Z",
+  "policyRule": { "text": "PLACEHOLDER - synthetic policy" },
+  "provision": { "actor": [ { "role": { "text": "caregiver" }, "reference": { "reference": "#SYN-CG-0001" } } ] }
+}

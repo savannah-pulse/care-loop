@@ -23,7 +23,7 @@ Rules of the road:
 |---|---|---|---|
 | 1 | Domain rules | nothing | Done |
 | 2 | Persistence and intake | WS1 | Done |
-| 3 | FHIR boundary | WS2 (ingestor and envelope contracts) | Open |
+| 3 | FHIR boundary | WS2 (ingestor and envelope contracts) | Done |
 | 4 | Outbox and notifications | WS1 (domain events), WS2 (outbox tables) | Open |
 | 5 | Deadlines and escalation | WS1, WS2 | Open |
 | 6 | Read endpoints and dashboard | WS2 (schema) | Open |
@@ -116,10 +116,10 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C10: map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` in `StatusMap.ToNotificationUpdateKind`, and carry the 1 to 5 value into `NotificationUpdatePayload.Confidence` (the handler refuses a missing or out-of-range value).
-- C13: add a seventh inbound mapper, `ConsentMapper`, that turns a FHIR `Consent` resource into a `ConsentRecorded` envelope with a `ConsentPayload`: `status` `active` is `Granted` (with the caregiver's contact point read from the resource), `inactive` or `rejected` is `Withdrawn`; the resource identifier plus version is the source event ID. Register it with the other mappers.
-- C20: `DiagnosticReportMapper` reads the patient's display name and MRN from the referenced FHIR `Patient` (contained or resolved through `FhirHttpClient`) into `ScreeningResultPayload`; a sample with a `Patient` in `Fhir/Samples/`.
-- C21: `Procedure` and follow-up `DiagnosticReport` mappers set `OutcomePayload.EvidenceKind` to one of the pathway's declared kinds; agree the FHIR code to kind mapping in `StatusMap`.
+- C10: map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` in `StatusMap.ToNotificationUpdateKind`, and carry the 1 to 5 value into `NotificationUpdatePayload.Confidence` (the handler refuses a missing or out-of-range value). Done on the FHIR side: `StatusMap.ToConfidence` reads the value from the first `payload.contentString`; WS4's `SimulatorInboundNotificationHandler` has to call it, since patient replies do not cross the FHIR boundary.
+- C13: add a seventh inbound mapper, `ConsentMapper`, that turns a FHIR `Consent` resource into a `ConsentRecorded` envelope with a `ConsentPayload`: `status` `active` is `Granted` (with the caregiver's contact point read from the resource), `inactive` or `rejected` is `Withdrawn`; the resource identifier plus version is the source event ID. Register it with the other mappers. Done: the caregiver is a contained `RelatedPerson` named in `provision.actor`, and the consent names its screening result through the `screening-result` extension.
+- C20: `DiagnosticReportMapper` reads the patient's display name and MRN from the referenced FHIR `Patient` (contained or resolved through `FhirHttpClient`) into `ScreeningResultPayload`; a sample with a `Patient` in `Fhir/Samples/`. Done: a contained `Patient` (`subject` = `#id`) is read directly; a literal `Patient/{id}` is read from the source system when it is configured, and otherwise the case opens without demographics. `Patient.json` and the contained patient in `DiagnosticReport.json` are the samples.
+- C21: `Procedure` and follow-up `DiagnosticReport` mappers set `OutcomePayload.EvidenceKind` to one of the pathway's declared kinds; agree the FHIR code to kind mapping in `StatusMap`. Done: the kind is the code in `https://careloop.invalid/fhir/CodeSystem/evidence-kind` on `Procedure.code` or the follow-up report's `code`, passed through unchanged; WS7 sends the pathway's kind names there.
 
 ## WS4 Outbox and notifications
 
@@ -321,16 +321,16 @@ The scaffold made these choices or left them open. Settle each one before both s
 
 | Topic | Between | State |
 |---|---|---|
-| `PUT` route shape | WS3, WS7, WS8 | The API maps `PUT /fhir/{resourceType}/{id}` (standard FHIR update). `AGENTS.md` writes `PUT /fhir/{resourceType}`. Confirm. |
-| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. WS8 proposes codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`, plus `confidence-rating` (decision 3, C10); `StatusMap` must match all five. |
-| External system identifiers | WS2, WS3, WS7 | `ExternalSystems:Systems` is keyed by system identifier, and the key must equal the source system identifier that system sends. The development settings use `his-simulator`; the HIS simulator does not yet send an agreed identifier. |
+| `PUT` route shape | WS3, WS7, WS8 | The API maps `PUT /fhir/{resourceType}/{id}` (standard FHIR update). `AGENTS.md` writes `PUT /fhir/{resourceType}`. WS3 implemented `PUT /fhir/{resourceType}/{id}`; the URL id must equal the body id or the request is refused with 400. CareLoop's own outbound sends use the same shape (`PUT {baseUrl}/fhir/{type}/{id}`). WS7 and WS8 to confirm; `AGENTS.md` (shared) still to be aligned. |
+| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. WS8 proposes codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`, plus `confidence-rating` (decision 3, C10); `StatusMap` has all five. WS8 to confirm. |
+| External system identifiers | WS2, WS3, WS7 | `ExternalSystems:Systems` is keyed by system identifier, and the key must equal the source system identifier that system sends. The development settings use `his-simulator`; the HIS simulator does not yet send an agreed identifier. WS3 proposal (implemented): the sender puts its identifier in `meta.source` on every resource, and a resource without it is refused with 400. The case keeps that value as its source system, and replies are routed to it. WS7 to confirm and send `his-simulator`. |
 | Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`), applied by the patient-channel simulator when a notification arrives. Cohort runs need a way to give each generated patient their scenario's behaviour. |
 | Time in a live run | WS1, WS5, WS7, WS8, WS10 | CareLoop runs on real time. A live run uses the demo pathway folder (`Pathways:Directory`), whose deadlines are divided by 1800, and both simulators pace scenarios with `Scenarios:RealSecondsPerScenarioHour` = 2. The three figures must stay equal. End-to-end tests should assert outcomes, not exact times, and leave headroom for slow machines. |
 | Simulator provider wire format | WS4, WS8 | Private to the simulator provider: a FHIR `CommunicationRequest` to the patient-channel simulator, and a FHIR `Communication` back to `POST /notifications/inbound/simulator`. Agree the `Communication.category` codes and how the notification attempt identifier is carried. |
 | Patient replies beyond acknowledgement | WS1, WS4, WS8 | Settled (decisions 2 and 3): the replies are acknowledgement, teach-back, call-me and confidence rating. Accepting an appointment is an acknowledgement; a patient reply never changes appointment status. |
 | Simulated marker on FHIR resources | WS7, WS8 | The simulators mark the resources they send (the API test samples use `meta.tag` in system `.../data-origin` with code `simulated`; WS8 planned `meta.security` `HTEST`; pick one). CareLoop neither requires nor emits a marker. |
 | Staff notification transport | WS4, WS7 | The HIS simulator offers both `POST /fhir/Task` and a plain `POST /staff-inbox/notifications`. Decide which `SimulatorNotificationProvider` uses and drop the other. |
-| Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. |
+| Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. WS3 implemented both, extension first: `TaskMapper` reads the `valueCode` of `https://careloop.invalid/fhir/StructureDefinition/reviewed-urgency` and, when it is absent, falls back to `Task.priority`. The value is stored unchanged. WS7 to confirm and send the extension. |
 | Nine event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`. Caregiver consent is its own event, `ConsentRecorded` (C13), so there are exactly nine source events and handlers. |
 | Internal events | WS2, WS5, WS6, WS9 | `DeadlineElapsed`, `HandoffSummaryApproved` and `EscalationAcknowledged` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
 | Rejected events | WS1, WS2 | A refused event is saved with `Disposition = Rejected`, so the attempt is audited through the same write path. |

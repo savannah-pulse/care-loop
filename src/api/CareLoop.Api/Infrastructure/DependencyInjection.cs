@@ -78,12 +78,15 @@ public static class DependencyInjection
     {
         services.Configure<ExternalSystemsOptions>(configuration.GetSection(ExternalSystemsOptions.SectionName));
 
-        services.AddSingleton<IFhirInboundMapper, DiagnosticReportMapper>();
-        services.AddSingleton<IFhirInboundMapper, TaskMapper>();
-        services.AddSingleton<IFhirInboundMapper, ServiceRequestMapper>();
-        services.AddSingleton<IFhirInboundMapper, AppointmentMapper>();
-        services.AddSingleton<IFhirInboundMapper, ProcedureMapper>();
-        services.AddSingleton<IFhirInboundMapper, ProvenanceMapper>();
+        // Scoped: DiagnosticReportMapper reads the referenced Patient through the typed FhirHttpClient,
+        // which must not be captured by a singleton.
+        services.AddScoped<IFhirInboundMapper, DiagnosticReportMapper>();
+        services.AddScoped<IFhirInboundMapper, TaskMapper>();
+        services.AddScoped<IFhirInboundMapper, ServiceRequestMapper>();
+        services.AddScoped<IFhirInboundMapper, AppointmentMapper>();
+        services.AddScoped<IFhirInboundMapper, ProcedureMapper>();
+        services.AddScoped<IFhirInboundMapper, ProvenanceMapper>();
+        services.AddScoped<IFhirInboundMapper, ConsentMapper>();
 
         services.AddSingleton<EscalationTaskMapper>();
         services.AddSingleton<HandoffDocumentReferenceMapper>();

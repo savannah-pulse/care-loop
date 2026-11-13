@@ -29,8 +29,8 @@ public sealed class FhirSampleFilesTests
     {
         string[] expected =
         [
-            "Appointment", "Communication", "CommunicationRequest", "DiagnosticReport", "DocumentReference",
-            "Observation", "Procedure", "Provenance", "ServiceRequest", "Task",
+            "Appointment", "Communication", "CommunicationRequest", "Consent", "DiagnosticReport", "DocumentReference",
+            "Observation", "Patient", "Procedure", "Provenance", "ServiceRequest", "Task",
         ];
 
         var actual = Directory.GetFiles(SamplesDirectory, "*.json").Select(Path.GetFileNameWithoutExtension).Order();
