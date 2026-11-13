@@ -1,13 +1,53 @@
+# CareLoop local stack: database, API, web, AI workflow service and both simulators.
+# It runs on the simulators and synthetic data only. Build context is the repository root so the
+# shared Directory.Build.props, global.json and src/simulators/scenarios are available to each image.
+# Copy .env.example to .env to change ports or turn the AI provider on.
+name: careloop
+
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-careloop}
+      POSTGRES_USER: ${POSTGRES_USER:-careloop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - careloop-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-careloop} -d ${POSTGRES_DB:-careloop}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   api:
     build:
       context: .
       dockerfile: src/api/CareLoop.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__CareLoop: Host=db;Port=5432;Database=${POSTGRES_DB:-careloop};Username=${POSTGRES_USER:-careloop};Password=${POSTGRES_PASSWORD:-change-me-local-only}
+      Database__MigrateOnStartup: "true"
+      Pathways__Directory: Infrastructure/Pathways/demo
+      ExternalSystems__Systems__his-simulator__BaseUrl: http://his-simulator:8080
+      Notifications__Simulator__PatientChannelBaseUrl: http://patient-channel-simulator:8080
+      Notifications__Simulator__StaffInboxBaseUrl: http://his-simulator:8080
+      Ai__Provider: ${AI_PROVIDER:-NoOp}
+      Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
+      Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}
+      Ai__AzureOpenAi__ApiKey: ${AZURE_OPENAI_API_KEY:-}
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   web:
     build:
@@ -16,11 +56,49 @@ services:
     depends_on:
       - api
     ports:
-      - "4173:80"
+      - "${WEB_PORT:-4173}:80"
 
   ai-workflow:
     build:
       context: src/ai_workflow
       dockerfile: Dockerfile
     ports:
-      - "8081:8080"
+      - "${AI_WORKFLOW_PORT:-8081}:8080"
+
+  his-simulator:
+    build:
+      context: .
+      dockerfile: src/simulators/his/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      CareLoop__FhirBaseUrl: http://api:8080/fhir
+      Scenarios__Directory: /app/scenarios
+      Scenarios__RealSecondsPerScenarioHour: "2"
+    ports:
+      - "${HIS_SIMULATOR_PORT:-5081}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  patient-channel-simulator:
+    build:
+      context: .
+      dockerfile: src/simulators/patient-channel/Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      CareLoop__FhirBaseUrl: http://api:8080/fhir
+      CareLoop__NotificationCallbackUrl: http://api:8080/notifications/inbound/simulator
+      Scenarios__Directory: /app/scenarios
+      Scenarios__RealSecondsPerScenarioHour: "2"
+    ports:
+      - "${PATIENT_CHANNEL_SIMULATOR_PORT:-5082}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  careloop-db:

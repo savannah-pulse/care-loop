@@ -7,9 +7,9 @@
 - Python 3.13 for the AI workflow service.
 - Docker Compose v2 for the local container setup.
 
-Run `dotnet test CareLoop.sln` for the API smoke test. Run `dotnet run --project src/api/CareLoop.Api` to start the API at the URL printed by ASP.NET Core; `/health` is the scaffold's only endpoint. In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
+Run `dotnet build CareLoop.sln` and `dotnet test CareLoop.sln` for the API, the Domain and both simulators; the build fails on any warning, including a missing XML documentation comment. Run `dotnet run --project src/api/CareLoop.Api` to start the API on `http://localhost:5080`; its routes and configuration are in `src/api/README.md`, and each simulator's README covers its own host and ClientApp. In `src/web`, run `npm ci`, then `npm run dev`. The web UI is a placeholder, not a patient-facing product.
 
-`docker compose up --build` runs the API on port 8080, the static web starter on port 4173, and the Python workflow service on port 8081. The web starter does not yet call the API. No database or production deployment environment is configured.
+`docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the static web starter on port 4173, the Python workflow service on port 8081, the HIS simulator on 5081 and the patient-channel simulator on 5082 (ports come from `.env`, template in `.env.example`). The web starter does not yet call the API. No production deployment environment is configured.
 
 The Python workflow package is under `src/ai_workflow`. Create and activate a virtual environment there, install `python -m pip install --editable ".[dev]"`, then run `uvicorn careloop_ai_workflow.main:app --reload --port 8081`. Run `ruff check .` and `pytest` from that directory.
 
@@ -17,7 +17,7 @@ The Python service defines stage and agent interfaces but has no model provider 
 
 ## Working agreements
 
-- Work in the component folders shown in the root README and keep cross-component interfaces in `contracts/`.
+- Work in the component folders shown in the root README and keep cross-component interfaces in `contracts/`. File ownership per workstream is in `docs/workstreams.md`; the rules every contributor follows are in `AGENTS.md`.
 - Agree shared event schemas and state-transition rules before changing their shape. Version intentional breaking changes and update all affected producers, consumers, and fixtures together.
 - Keep the UI and simulators independently runnable where practical. The UI can use mock data while backend work proceeds, but label it and replace it through the API contract rather than coupling it to simulator internals.
 - Keep configuration explicit. Clinical clocks, urgency, closure evidence, message content, and provider qualifications must come from an approved source; do not fill gaps with invented defaults.

@@ -1,0 +1,9 @@
+{
+  "resourceType": "Procedure",
+  "id": "SYN-PROC-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "completed",
+  "code": { "text": "PLACEHOLDER - synthetic, not a clinical code" },
+  "subject": { "reference": "Patient/SYN-PT-0001" },
+  "performedDateTime": "2026-01-03T09:00:00Z"
+}

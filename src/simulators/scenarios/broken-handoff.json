@@ -1,0 +1,25 @@
+{
+  "$schema": "./scenario.schema.json",
+  "name": "broken-handoff",
+  "synthetic": true,
+  "description": "SIMULATED. Ownership is proposed to a consultation owner who never accepts; the previous owner stays accountable, the deadline passes and the case escalates. A closure attempt without evidence is then rejected.",
+  "pathwayId": "breast-screening",
+  "patients": [
+    { "ref": "patient-1", "syntheticId": "SYN-PT-0001", "displayName": "Synthetic Patient 0001", "language": "en",
+      "behaviour": { "delivery": "deliver", "response": "acknowledge", "respondAfter": "PT1H" } }
+  ],
+  "steps": [
+    { "id": "s1", "at": "PT0S", "actor": "his", "action": "screening-result", "caseRef": "case-1", "patientRef": "patient-1",
+      "params": { "resultCategory": "PLACEHOLDER-RESULT-ACTIONABLE", "facility": "SYN-FAC-A" } },
+    { "id": "s2", "at": "PT1H", "actor": "his", "action": "clinical-review", "caseRef": "case-1", "status": "completed",
+      "performer": { "syntheticId": "SYN-STAFF-0001", "role": "clinician", "facility": "SYN-FAC-A" },
+      "params": { "urgency": "PLACEHOLDER-URGENCY-A" } },
+    { "id": "s3", "at": "PT4H", "actor": "his", "action": "consultation-update", "caseRef": "case-1", "status": "requested",
+      "performer": { "syntheticId": "SYN-STAFF-0001", "role": "clinician", "facility": "SYN-FAC-A" },
+      "params": { "proposedOwner": { "syntheticId": "SYN-STAFF-0003", "role": "clinician", "facility": "SYN-FAC-B" } } },
+    { "id": "s4", "at": "P5D", "actor": "his", "action": "closure", "caseRef": "case-1", "status": "completed",
+      "performer": { "syntheticId": "SYN-STAFF-0001", "role": "clinician", "facility": "SYN-FAC-A" },
+      "params": { "closureReason": "Treated" } }
+  ],
+  "expect": { "finalStage": "FollowUpActive", "escalated": true, "exceptions": ["Overdue"], "closureAccepted": false }
+}

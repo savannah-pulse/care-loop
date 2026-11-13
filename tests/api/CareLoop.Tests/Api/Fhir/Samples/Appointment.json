@@ -1,0 +1,9 @@
+{
+  "resourceType": "Appointment",
+  "id": "SYN-APPT-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "booked",
+  "start": "2026-01-03T08:00:00Z",
+  "end": "2026-01-03T08:30:00Z",
+  "participant": [ { "actor": { "reference": "Patient/SYN-PT-0001" }, "status": "accepted" } ]
+}

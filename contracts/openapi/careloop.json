@@ -1,0 +1,1728 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "CareLoop.Api | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Reports that the service is running.",
+        "description": "A liveness check only: it does not touch the database, so it stays green while a dependency is starting.",
+        "operationId": "GetHealth",
+        "responses": {
+          "200": {
+            "description": "200 with the service name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/inbound/{provider}": {
+      "post": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Receives one message from a notification provider.",
+        "operationId": "ReceiveInboundNotification",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "Name of the provider calling back, as used in List&lt;string&gt; NotificationOptions.EnabledProviders (case-insensitive).",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": { }
+            },
+            "application/fhir+json": {
+              "schema": { }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": { }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Lists cases, optionally filtered.",
+        "operationId": "ListCases",
+        "parameters": [
+          {
+            "name": "stage",
+            "in": "query",
+            "description": "Only cases in this stage; all stages when omitted.",
+            "schema": {
+              "$ref": "#/components/schemas/CaseStage"
+            }
+          },
+          {
+            "name": "ownerReference",
+            "in": "query",
+            "description": "Only cases owned by this person or queue; all owners when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "escalated",
+            "in": "query",
+            "description": "Only cases with (or without) an open escalation; both when omitted.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Number of cases to skip, for paging; zero when omitted.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "description": "Maximum number of cases to return; a server default when omitted.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CaseSummaryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Returns one case.",
+        "operationId": "GetCase",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "CareLoop's identifier of the case.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/timeline": {
+      "get": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Returns the audit timeline of one case.",
+        "operationId": "GetCaseTimeline",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "CareLoop's identifier of the case.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TimelineEntryResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exceptions": {
+      "get": {
+        "tags": [
+          "Exceptions"
+        ],
+        "summary": "Lists the cases that currently need attention.",
+        "operationId": "GetExceptions",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "query",
+            "description": "Only cases of this facility; all facilities when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerReference",
+            "in": "query",
+            "description": "Only cases owned by this person or queue; all owners when omitted.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExceptionItemResponse"
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Returns the current loop-closure metrics.",
+        "operationId": "GetMetrics",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricsResponse"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics/simulation": {
+      "post": {
+        "tags": [
+          "Metrics"
+        ],
+        "summary": "Runs the escalation comparison on a simulated cohort.",
+        "operationId": "RunSimulation",
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/handoff-summary": {
+      "post": {
+        "tags": [
+          "Summaries"
+        ],
+        "summary": "Drafts a handoff summary for a case.",
+        "operationId": "DraftHandoffSummary",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case to summarise.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/handoff-summary/{summaryId}/approval": {
+      "post": {
+        "tags": [
+          "Summaries"
+        ],
+        "summary": "Approves a drafted handoff summary.",
+        "operationId": "ApproveHandoffSummary",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case the summary belongs to.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "summaryId",
+            "in": "path",
+            "description": "The draft being approved.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Demo-User",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Demo-Role",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HandoffSummaryResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fhir/metadata": {
+      "get": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Describes what the CareLoop FHIR boundary supports.",
+        "description": "Will list one entry per registered IFhirInboundMapper (create and update) plus read on\n`Task`.",
+        "operationId": "GetFhirCapabilityStatement",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fhir/Task/{id}": {
+      "get": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Returns the current status of a case as a FHIR `Task`; also feeds the patient view.",
+        "description": "Field mapping: handoff status to `Task.status`; stage to `Task.businessStatus`; owner to\n`Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`;\npatient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to\n`Task.statusReason`.",
+        "operationId": "GetFhirTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "CareLoop's case identifier, used as the logical identifier of the case `Task`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fhir/{resourceType}": {
+      "post": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Accepts a new FHIR resource from an external system.",
+        "operationId": "CreateFhirResource",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "in": "path",
+            "description": "The FHIR resource type in the URL, for example `DiagnosticReport`; must match the body.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/fhir+json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fhir/{resourceType}/{id}": {
+      "put": {
+        "tags": [
+          "FHIR"
+        ],
+        "summary": "Accepts a new version of an existing FHIR resource from an external system.",
+        "description": "An update is state, not an event: the mapper derives the transition and the resource version makes a resend idempotent.",
+        "operationId": "UpdateFhirResource",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "in": "path",
+            "description": "The FHIR resource type in the URL; must match the body.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The logical identifier of the resource; must match the body.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/fhir+json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            },
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApproveSummaryRequest": {
+        "required": [
+          "approvedText"
+        ],
+        "type": "object",
+        "properties": {
+          "approvedText": {
+            "type": "string",
+            "description": "The text being approved. The approver may have edited the draft; what is approved is exactly this text."
+          }
+        },
+        "description": "Body of the request approving a drafted handoff summary."
+      },
+      "CaseDetailResponse": {
+        "required": [
+          "caseId",
+          "sourceSystem",
+          "sourceResultId",
+          "patientReference",
+          "pathwayId",
+          "facilityId",
+          "stage",
+          "owner",
+          "isEscalated",
+          "exceptions",
+          "tracks",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "description": "CareLoop's identifier of the case.",
+            "format": "uuid"
+          },
+          "sourceSystem": {
+            "type": "string",
+            "description": "Identifier of the system that produced the result."
+          },
+          "sourceResultId": {
+            "type": "string",
+            "description": "The source system's identifier of the actionable result."
+          },
+          "patientReference": {
+            "type": "string",
+            "description": "Source-system reference of the patient. Never a name."
+          },
+          "pathwayId": {
+            "type": "string",
+            "description": "Identifier of the pathway the case follows."
+          },
+          "facilityId": {
+            "type": "string",
+            "description": "The facility that produced the result."
+          },
+          "stage": {
+            "description": "The pathway stage the case is in.",
+            "$ref": "#/components/schemas/CaseStage"
+          },
+          "urgency": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The clinician-reviewed urgency code; `null` until the review arrives."
+          },
+          "owner": {
+            "description": "The one owner accountable for the next action.",
+            "$ref": "#/components/schemas/OwnerResponse"
+          },
+          "proposedOwner": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The owner a transfer is proposed to, while a proposal is pending. The current owner stays accountable until it is accepted.",
+                "$ref": "#/components/schemas/OwnerResponse"
+              }
+            ]
+          },
+          "nextAction": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the single next action."
+          },
+          "dueAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the next action is due.",
+            "format": "date-time"
+          },
+          "isEscalated": {
+            "type": "boolean",
+            "description": "`true` while the case has an open escalation."
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the unresolved exceptions on the case."
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackStatusResponse"
+            },
+            "description": "The state of each parallel track."
+          },
+          "outcomeEvidenceReference": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference to the recorded outcome evidence, when there is any."
+          },
+          "closureReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The reason the case was closed; `null` while it is open.",
+                "$ref": "#/components/schemas/ClosureReason"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the case was opened.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When the case last changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "The full coordination state of one case, returned by `GET /cases/{caseId}`."
+      },
+      "CaseEventType": {
+        "enum": [
+          "ScreeningResultReceived",
+          "ClinicalReviewCompleted",
+          "NotificationUpdated",
+          "ConsultationUpdated",
+          "ReferralUpdated",
+          "AppointmentUpdated",
+          "OutcomeRecorded",
+          "ClosureDecided",
+          "DeadlineElapsed",
+          "HandoffSummaryApproved"
+        ],
+        "description": "The kinds of event that can change a case."
+      },
+      "CaseStage": {
+        "enum": [
+          "Received",
+          "ReviewPending",
+          "FollowUpActive",
+          "ClosureReview",
+          "Closed"
+        ],
+        "description": "The pathway stage a case is in."
+      },
+      "CaseSummaryResponse": {
+        "required": [
+          "caseId",
+          "patientReference",
+          "pathwayId",
+          "stage",
+          "owner",
+          "isEscalated",
+          "exceptions",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "description": "CareLoop's identifier of the case.",
+            "format": "uuid"
+          },
+          "patientReference": {
+            "type": "string",
+            "description": "Source-system reference of the patient. Never a name."
+          },
+          "pathwayId": {
+            "type": "string",
+            "description": "Identifier of the pathway the case follows."
+          },
+          "stage": {
+            "description": "The pathway stage the case is in.",
+            "$ref": "#/components/schemas/CaseStage"
+          },
+          "urgency": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The clinician-reviewed urgency code; `null` until the review arrives."
+          },
+          "owner": {
+            "description": "The one owner accountable for the next action.",
+            "$ref": "#/components/schemas/OwnerResponse"
+          },
+          "nextAction": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the single next action."
+          },
+          "dueAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the next action is due.",
+            "format": "date-time"
+          },
+          "isEscalated": {
+            "type": "boolean",
+            "description": "`true` while the case has an open escalation."
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the unresolved exceptions on the case; empty when there are none."
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When the case last changed.",
+            "format": "date-time"
+          }
+        },
+        "description": "One row in the case list returned by `GET /cases`."
+      },
+      "ClosureReason": {
+        "enum": [
+          "Treated",
+          "OnSurveillance",
+          "NegativeOnConfirmation",
+          "Declined",
+          "TransferredAndAccepted",
+          "Untraceable",
+          null
+        ]
+      },
+      "ExceptionItemResponse": {
+        "required": [
+          "caseId",
+          "patientReference",
+          "exceptions",
+          "stage",
+          "nextAction",
+          "owner",
+          "dueAt",
+          "isEscalated",
+          "escalationLevel"
+        ],
+        "type": "object",
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "description": "CareLoop's identifier of the case.",
+            "format": "uuid"
+          },
+          "patientReference": {
+            "type": "string",
+            "description": "Source-system reference of the patient. Never a name."
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names of the unresolved exceptions on the case."
+          },
+          "stage": {
+            "description": "The pathway stage the case is in.",
+            "$ref": "#/components/schemas/CaseStage"
+          },
+          "urgency": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The clinician-reviewed urgency code; `null` until the review arrives."
+          },
+          "nextAction": {
+            "type": "string",
+            "description": "Key of the single next action."
+          },
+          "owner": {
+            "description": "The owner accountable for the next action.",
+            "$ref": "#/components/schemas/OwnerResponse"
+          },
+          "dueAt": {
+            "type": "string",
+            "description": "When the next action is due.",
+            "format": "date-time"
+          },
+          "overdueBy": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "How long the next action is overdue; `null` when it is not overdue."
+          },
+          "isEscalated": {
+            "type": "boolean",
+            "description": "`true` while the case has an open escalation."
+          },
+          "escalationLevel": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The highest escalation level reached; zero when never escalated.",
+            "format": "int32"
+          }
+        },
+        "description": "One row in the exception queue returned by `GET /exceptions`."
+      },
+      "HandoffSummaryResponse": {
+        "required": [
+          "summaryId",
+          "caseId",
+          "status",
+          "text",
+          "draftedBy",
+          "draftedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "summaryId": {
+            "type": "string",
+            "description": "Identifier of the summary.",
+            "format": "uuid"
+          },
+          "caseId": {
+            "type": "string",
+            "description": "The case the summary describes.",
+            "format": "uuid"
+          },
+          "status": {
+            "description": "Whether the summary is a draft or approved.",
+            "$ref": "#/components/schemas/HandoffSummaryStatus"
+          },
+          "text": {
+            "type": "string",
+            "description": "The summary text."
+          },
+          "draftedBy": {
+            "type": "string",
+            "description": "Name of the AI provider that produced the draft."
+          },
+          "draftedAt": {
+            "type": "string",
+            "description": "When the draft was produced.",
+            "format": "date-time"
+          },
+          "approvedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference of the person who approved it; `null` while it is a draft."
+          },
+          "approvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was approved; `null` while it is a draft.",
+            "format": "date-time"
+          }
+        },
+        "description": "A handoff summary for a case, returned when one is drafted or approved."
+      },
+      "HandoffSummaryStatus": {
+        "enum": [
+          "Draft",
+          "Approved"
+        ],
+        "description": "Whether a handoff summary is still an AI draft or has been approved by a person."
+      },
+      "HealthResponse": {
+        "required": [
+          "status",
+          "service"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Always `ok` when the service is able to answer."
+          },
+          "service": {
+            "type": "string",
+            "description": "Name of the service that answered."
+          }
+        },
+        "description": "Body of `GET /health`."
+      },
+      "JsonElement": { },
+      "MetricsResponse": {
+        "required": [
+          "generatedAt",
+          "totalCases",
+          "openCases",
+          "closedCases",
+          "casesByStage",
+          "casesByException",
+          "overdueCases",
+          "escalatedCases",
+          "unassignedCases"
+        ],
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "description": "When the metrics were computed.",
+            "format": "date-time"
+          },
+          "totalCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Total number of cases.",
+            "format": "int32"
+          },
+          "openCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of cases not yet closed.",
+            "format": "int32"
+          },
+          "closedCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of cases closed with evidence or a documented exception.",
+            "format": "int32"
+          },
+          "casesByStage": {
+            "type": "object",
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Number of open cases per stage name."
+          },
+          "casesByException": {
+            "type": "object",
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Number of open cases per unresolved exception name."
+          },
+          "overdueCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of open cases past their deadline.",
+            "format": "int32"
+          },
+          "escalatedCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of open cases with an open escalation.",
+            "format": "int32"
+          },
+          "unassignedCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of open cases in the facility lead queue with no named owner.",
+            "format": "int32"
+          },
+          "acknowledgementRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Share of notifications the patient acknowledged, from 0 to 1; `null` when none were sent.",
+            "format": "double"
+          },
+          "closureRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Share of cases closed, from 0 to 1; `null` when there are no cases.",
+            "format": "double"
+          },
+          "medianTimeToClosure": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Median time from result received to closure; `null` when no case is closed."
+          }
+        },
+        "description": "Loop-closure metrics returned by `GET /metrics`."
+      },
+      "NotImplementedResponse": {
+        "required": [
+          "workstream",
+          "feature",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "workstream": {
+            "type": "string",
+            "description": "The workstream that will implement the endpoint, for example `WS6`."
+          },
+          "feature": {
+            "type": "string",
+            "description": "The slice that is not implemented yet."
+          },
+          "message": {
+            "type": "string",
+            "description": "A short explanation for whoever called the endpoint."
+          }
+        },
+        "description": "Body returned with HTTP 501 by endpoints that are scaffolded but not yet implemented."
+      },
+      "OwnerResponse": {
+        "required": [
+          "reference",
+          "role",
+          "facilityId",
+          "isQueue"
+        ],
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "Source-system reference of the person, or the queue identifier."
+          },
+          "role": {
+            "type": "string",
+            "description": "The role the owner holds."
+          },
+          "facilityId": {
+            "type": "string",
+            "description": "The facility the owner belongs to."
+          },
+          "isQueue": {
+            "type": "boolean",
+            "description": "`true` when the owner is the facility lead queue rather than a named person."
+          }
+        },
+        "description": "The person or queue accountable for a case, as shown in the dashboard."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SimulationArmResponse": {
+        "required": [
+          "escalationEnabled",
+          "totalCases",
+          "closedCases",
+          "stalledCases",
+          "escalationsRaised"
+        ],
+        "type": "object",
+        "properties": {
+          "escalationEnabled": {
+            "type": "boolean",
+            "description": "`true` when deadlines and escalation were active in this arm."
+          },
+          "totalCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of simulated cases replayed.",
+            "format": "int32"
+          },
+          "closedCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of cases closed with evidence or a documented exception by the end of the replay.",
+            "format": "int32"
+          },
+          "stalledCases": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of cases left without action past their deadline and never picked up.",
+            "format": "int32"
+          },
+          "escalationsRaised": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of escalations raised.",
+            "format": "int32"
+          },
+          "medianTimeToClosure": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Median time from result received to closure; `null` when no case closed."
+          }
+        },
+        "description": "The result of replaying the cohort under one condition (with or without escalation)."
+      },
+      "SimulationRequest": {
+        "required": [
+          "cohortScenario"
+        ],
+        "type": "object",
+        "properties": {
+          "cohortScenario": {
+            "type": "string",
+            "description": "Name of the cohort scenario to replay, for example `cohort`."
+          },
+          "seed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "Random seed overriding the scenario's own, so a run can be repeated exactly; `null` uses the scenario's seed.",
+            "format": "int32"
+          }
+        },
+        "description": "Parameters for the with-and-without-escalation comparison started by `POST /metrics/simulation`."
+      },
+      "SimulationResponse": {
+        "required": [
+          "cohortScenario",
+          "seed",
+          "withEscalation",
+          "withoutEscalation"
+        ],
+        "type": "object",
+        "properties": {
+          "cohortScenario": {
+            "type": "string",
+            "description": "Name of the cohort scenario that was replayed."
+          },
+          "seed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The seed used, so the run can be repeated.",
+            "format": "int32"
+          },
+          "withEscalation": {
+            "description": "The arm with deadlines and escalation active.",
+            "$ref": "#/components/schemas/SimulationArmResponse"
+          },
+          "withoutEscalation": {
+            "description": "The arm with deadlines and escalation switched off.",
+            "$ref": "#/components/schemas/SimulationArmResponse"
+          }
+        },
+        "description": "The with-and-without-escalation comparison returned by `POST /metrics/simulation`."
+      },
+      "SourceEventDisposition": {
+        "enum": [
+          "Applied",
+          "Rejected"
+        ],
+        "description": "What CareLoop did with a source event."
+      },
+      "TimelineEntryResponse": {
+        "required": [
+          "auditEventId",
+          "eventType",
+          "disposition",
+          "actorReference",
+          "actorRole",
+          "sourceTimestamp",
+          "receivedTimestamp",
+          "newStage",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "auditEventId": {
+            "type": "string",
+            "description": "Identifier of the audit entry.",
+            "format": "uuid"
+          },
+          "eventType": {
+            "description": "The kind of event.",
+            "$ref": "#/components/schemas/CaseEventType"
+          },
+          "disposition": {
+            "description": "Whether the event was applied or refused (for example a closure attempt without evidence).",
+            "$ref": "#/components/schemas/SourceEventDisposition"
+          },
+          "actorReference": {
+            "type": "string",
+            "description": "The source system or actor responsible."
+          },
+          "actorRole": {
+            "type": "string",
+            "description": "The role the actor acted in."
+          },
+          "sourceTimestamp": {
+            "type": "string",
+            "description": "When the action happened according to the source.",
+            "format": "date-time"
+          },
+          "receivedTimestamp": {
+            "type": "string",
+            "description": "When CareLoop received it.",
+            "format": "date-time"
+          },
+          "priorStage": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The stage before the event; `null` when the event opened the case.",
+                "$ref": "#/components/schemas/CaseStage"
+              }
+            ]
+          },
+          "newStage": {
+            "description": "The stage after the event.",
+            "$ref": "#/components/schemas/CaseStage"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why the change was made or refused."
+          },
+          "evidenceReference": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference to the supporting evidence, when there is any."
+          }
+        },
+        "description": "One audit entry in a case timeline, returned by `GET /cases/{caseId}/timeline`."
+      },
+      "TrackKind": {
+        "enum": [
+          "Notification",
+          "Consultation",
+          "Referral",
+          "Appointment"
+        ],
+        "description": "Identifies one of the parallel follow-up tracks of a case."
+      },
+      "TrackStatusResponse": {
+        "required": [
+          "kind",
+          "isComplete"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "Which track this is.",
+            "$ref": "#/components/schemas/TrackKind"
+          },
+          "status": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The track's status name, for example `Delivered` or `Accepted`; `null` when the track has not started."
+          },
+          "isComplete": {
+            "type": "boolean",
+            "description": "`true` when the track has reached its completing status. Delivery alone does not complete notification; an accepted referral is still not completed care."
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the track last changed; `null` when it has not started.",
+            "format": "date-time"
+          }
+        },
+        "description": "The current state of one parallel track of a case."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health"
+    },
+    {
+      "name": "Notifications"
+    },
+    {
+      "name": "Cases"
+    },
+    {
+      "name": "Exceptions"
+    },
+    {
+      "name": "Metrics"
+    },
+    {
+      "name": "Summaries"
+    },
+    {
+      "name": "FHIR"
+    }
+  ]
+}

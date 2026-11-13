@@ -1,0 +1,67 @@
+{
+  "app": {
+    "title": "Patient-channel simulator",
+    "documentTitle": "CareLoop patient-channel simulator (simulated)"
+  },
+  "banner": {
+    "simulated": "Simulated data. Every patient, message and case shown here is synthetic."
+  },
+  "nav": {
+    "label": "Simulator screens",
+    "inbox": "Patient inbox",
+    "caseStatus": "Case status",
+    "patientBehaviours": "Patient behaviours",
+    "scenarioRunner": "Scenario runner",
+    "messageLog": "FHIR message log"
+  },
+  "placeholder": {
+    "notice": "Placeholder screen. Workstream WS8 will build it.",
+    "plannedHeading": "Planned for this screen"
+  },
+  "inbox": {
+    "title": "Patient inbox",
+    "description": "Simulated messages sent to the patient by CareLoop, with the actions a patient can take.",
+    "planned": {
+      "list": "List of simulated messages with channel, delivery state and response state",
+      "acknowledge": "Acknowledge action",
+      "understand": "\"I understand\" teach-back action",
+      "callMe": "\"Call me\" action"
+    }
+  },
+  "caseStatus": {
+    "title": "Case status",
+    "description": "What the patient can see about their follow-up, read from the CareLoop case Task.",
+    "planned": {
+      "lookup": "Look up a case by its Task identifier",
+      "status": "Stage, deadline and last update, with no clinical detail"
+    }
+  },
+  "patientBehaviours": {
+    "title": "Patient behaviours",
+    "description": "Choose how each simulated patient reacts when CareLoop notifies them. A patient only reacts to a notification that arrives, and delivery is never an acknowledgement.",
+    "planned": {
+      "list": "Patients that have a behaviour of their own, and the scenario that set it",
+      "delivery": "Delivery outcome: delivered, failed with a reason, or nothing reported",
+      "response": "Patient response: none, acknowledge, confirm understanding or ask for a call",
+      "timing": "Delay before responding, and responding only to a reminder",
+      "default": "The default behaviour for every other patient"
+    }
+  },
+  "scenarioRunner": {
+    "title": "Scenario runner",
+    "description": "Put the patient behaviours of a shared scenario in force, then watch how those patients react to CareLoop's notifications.",
+    "planned": {
+      "list": "List of available scenarios",
+      "run": "Start a run",
+      "progress": "Each patient's reactions as notifications arrive"
+    }
+  },
+  "messageLog": {
+    "title": "FHIR message log",
+    "description": "Every FHIR exchange between this simulator and CareLoop.",
+    "planned": {
+      "list": "Inbound and outbound exchanges, newest first",
+      "detail": "The FHIR JSON of a selected exchange"
+    }
+  }
+}

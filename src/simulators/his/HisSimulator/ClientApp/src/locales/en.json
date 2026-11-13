@@ -1,0 +1,60 @@
+{
+  "app": {
+    "title": "HIS Simulator",
+    "subtitle": "A simulated hospital information system for CareLoop"
+  },
+  "banner": {
+    "simulated": "Simulated data only. Every patient, staff member and message shown here is synthetic."
+  },
+  "nav": {
+    "label": "Simulator sections",
+    "scenarios": "Scenario runner",
+    "inbox": "Staff inbox",
+    "fhirLog": "FHIR message log",
+    "actions": "Act as clinician"
+  },
+  "placeholder": {
+    "notice": "This screen is a placeholder. It has not been built yet.",
+    "planned": "Planned for this screen"
+  },
+  "scenarioRunner": {
+    "title": "Scenario runner",
+    "description": "Replays the HIS steps of a scripted, simulated scenario against CareLoop.",
+    "planned": {
+      "list": "List the scenarios found in the scenarios directory",
+      "run": "Start a run of a chosen scenario",
+      "progress": "Show the progress and result of each step in a run",
+      "expect": "Show what the scenario is expected to demonstrate"
+    }
+  },
+  "staffInbox": {
+    "title": "Staff inbox",
+    "description": "Simulated messages CareLoop has sent to hospital staff. Receiving a message is not an acknowledgement.",
+    "planned": {
+      "list": "List escalations, handoff proposals, call requests, handoff summaries and staff notifications",
+      "filter": "Filter the inbox by the member of staff it is addressed to",
+      "detail": "Open an item to see its FHIR message"
+    }
+  },
+  "fhirLog": {
+    "title": "FHIR message log",
+    "description": "Every simulated FHIR message this simulator has sent to CareLoop or received from it.",
+    "planned": {
+      "sent": "List the messages sent to CareLoop with their HTTP status",
+      "received": "List the messages received from CareLoop",
+      "filter": "Filter by direction and by case",
+      "body": "Show the FHIR JSON of a message"
+    }
+  },
+  "clinicianActions": {
+    "title": "Act as clinician",
+    "description": "Manually perform the actions a person would take in the hospital system. The simulator never decides urgency or closure itself.",
+    "planned": {
+      "cases": "Choose one of the simulated cases",
+      "review": "Record a clinical review with the reviewed urgency",
+      "referral": "Accept or reject a referral",
+      "outcome": "Record an outcome",
+      "closure": "Authorize closure with evidence or a documented exception"
+    }
+  }
+}

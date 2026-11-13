@@ -1,38 +1,228 @@
-# Component workstreams
+# Workstreams
 
-Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API, web UI, and Python workflow service are scaffolds; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned.
+Ten workstreams build CareLoop in parallel. This file says, for each one, which files it owns, what it depends on and
+which stubs it implements. The earlier component register, which maps each component to its user stories and functional
+requirements, is kept in [`component-register.md`](component-register.md). Find your stubs with:
 
-| Workstream | Scope and first deliverable | Stories / requirements | Depends on |
-|---|---|---|---|
-| Orchestration API and case engine | Typed event intake; validation, correlation, idempotency, guarded transitions, ownership, audit, and case/timeline/exception read endpoints. First: agreed event envelope and replay-safe `RESULT_RECEIVED` → `OWNER_ASSIGNED` path. | US01, US08–US15; FR01–FR08, FR10 | Shared event contract; pathway and role assumptions |
-| Coordination store | Event log, coordination projection, source/reference keys, assignments, exceptions, evidence references, and audit. Store no clinical record. First: persistence model supporting replay and timeline reconstruction. | US01, US08–US16; FR02, FR03, FR08–FR10 | API event and projection model; database choice |
-| HIS simulator and mock adapter | Synthetic result, review, consultation, referral, appointment, and outcome events; preserve source identifiers and allow deterministic replay. First: one actionable result event and one duplicate replay. | US01, US06–US12; FR01, FR02, FR05, FR06 | Shared envelope; synthetic scenario |
-| Patient-channel simulator | Simulated send, delivery, failure, acknowledgement, clarification/call request, and patient view. Keep receipt, understanding, consent, and caregiver actions separate. First: one success path and one failed/unacknowledged path. | US02–US05; FR04 | API communication events; reviewed English copy |
-| Deadline and escalation worker | Deterministic checks for overdue, rejected, missing, unassigned, and unacknowledged work; append owned escalation events without advancing the case stage. First: a configurable overdue case test. | US03, US05, US08, US10, US13, US14; FR07 | API/store query; approved clocks and escalation recipients |
-| Demo UI | React/TypeScript coordination dashboard, read-only timeline, patient view, exception queues, and synthetic impact view. First: mock-data prototype; replace stubs with API reads as they become available. | US02–US05, US10, US16; FR09, FR10 | Wireframe/data shape; API read contract |
-| Python AI workflow | Python service and stage-specific agent interfaces coordinating the ten-stage journey. Agents propose non-clinical follow-up actions and human-reviewable drafts; the .NET API validates every state change. First: stage map, synthetic-only context/proposal types, service health endpoint, and workflow contract tests. | US01–US16; FR02–FR11 | .NET API event/action contract; approved pathway rules; AI provider decision |
-| Contract and journey tests | Validate envelope compatibility, replay behavior, guarded ownership/closure, and end-to-end synthetic scenarios. First: reusable fixtures for one successful journey and one stalled handoff. | US01, US08–US16; FR01–FR10 | Shared contracts; stable simulator fixtures |
+```bash
+grep -rn "TODO(WS-4)" --include="*.cs" --include="*.ts" --include="*.tsx" .
+```
 
-## Integration milestones
+Rules of the road:
 
-1. **Agree the contract:** envelope, event types, source keys, idempotency, payload ownership, and error behavior. Do this before independent producers emit incompatible events.
-2. **Prove intake:** replay one synthetic result, open one case, and show its owner, source provenance, and timeline.
-3. **Build in parallel:** UI may use clearly labeled mock data; simulators and worker integrate only through the API contract.
-4. **Prove exceptions:** rejected referral, failed/unacknowledged contact, missing event, or overdue action stays open with an accountable next action and escalation.
-5. **Prove closure:** reach `CLOSED` only through authorized human action with required evidence or a documented, authorized exception.
-6. **Rehearse:** run one full ten-stage synthetic journey and one broken handoff; report synthetic metrics with denominators and assumptions.
+- Edit only the files your workstream owns. To change someone else's file, or anything under **Shared**, agree it first.
+- A stub's XML or TSDoc comment is its specification. If you need to change a public contract, ask before you do.
+- When you implement a stub, remove its `TODO(WS-n)` tag and un-skip its tests. Never weaken or delete a test.
+- A path ending in `/**` means the folder and everything in it. A more specific line overrides a broader one.
 
-## Assignment handoff
+| WS | Name | Depends on |
+|---|---|---|
+| 1 | Domain rules | nothing |
+| 2 | Persistence and intake | WS1 |
+| 3 | FHIR boundary | WS2 (ingestor and envelope contracts) |
+| 4 | Outbox and notifications | WS1 (domain events), WS2 (outbox tables) |
+| 5 | Deadlines and escalation | WS1, WS2 |
+| 6 | Read endpoints and dashboard | WS2 (schema) |
+| 7 | HIS simulator | WS3 (FHIR contract and codes) |
+| 8 | Patient-channel simulator | WS3 (FHIR contract and codes), WS4 (notification delivery) |
+| 9 | AI handoff summary | WS2, WS6 |
+| 10 | Scenarios and end-to-end tests | all of the above |
 
-Copy this checklist into the work item for each assigned component:
+Because the contracts already exist, every workstream can start now against the stubs and fakes
+(`FakeClock`, `InMemoryCaseRepository`); "depends on" means "needs it to run end to end".
 
-- **Owner / reviewer:**
-- **Stories and FRs:**
-- **In scope / out of scope:**
-- **Inputs and outputs (contract version):**
-- **Data and authorization boundary:**
-- **Dependencies / decisions needed:**
-- **Acceptance evidence and tests:**
-- **Demo path / fallback:**
+---
 
-Every work item should identify the user-story outcomes it fulfills, the shared interface it consumes or produces, and what it will not decide or store. Raise changes to a story, clinical assumption, event contract, or ownership rule for team review instead of silently diverging.
+## WS1 Domain rules
+
+**Owns**
+
+- `src/api/CareLoop.Domain/**` (except the two deadline files listed under WS5)
+- `src/api/CareLoop.Api/Infrastructure/Pathways/**`
+- `tests/api/CareLoop.Tests/Domain/**` (except `DeadlinePolicyTests.cs`)
+
+**Stubs to implement**
+
+- `Cases/Case.cs`: every state-changing method (`RecordReview`, `MoveTo`, `SetNextAction`, `ProposeOwner`, `AcceptOwnership`, `RejectOwnership`, `AssignOwner`, the four `Begin...` methods, `FlagException`, `ClearException`, `Escalate`, `ResolveEscalations`, `RecordOutcomeEvidence`, `Close`)
+- `Tracks/*Track.cs`: `Advance`, `IsComplete`, and `NotificationTrack.RecordAttempt`
+- `Rules/TransitionRules.cs`, `Rules/OwnershipRules.cs`, `Rules/ClosureGate.cs`
+- `Infrastructure/Pathways/JsonPathwayProvider.cs`
+- `Infrastructure/Pathways/breast-screening.json`: replace placeholders only with values a clinical adviser has approved
+- `Infrastructure/Pathways/demo/breast-screening.json`: keep it equal to the file above with every duration divided by 1800 (`DemoPathwayFileTests` enforces this)
+
+## WS2 Persistence and intake
+
+**Owns**
+
+- `src/api/CareLoop.Api/Features/Events/**`
+- `src/api/CareLoop.Api/Contracts/Events/**`
+- `src/api/CareLoop.Api/Infrastructure/Persistence/**` (except `Summaries/` and `Configurations/HandoffSummaryRecordConfiguration.cs`)
+- `tests/api/CareLoop.Tests/Api/EventIngestorTests.cs`, `EventHandlerTests.cs`, `EfCaseRepositoryTests.cs`
+- `tests/api/CareLoop.Tests/Fakes/**`
+- `.config/dotnet-tools.json`
+
+**Stubs to implement**
+
+- `Features/Events/EventIngestor.cs`
+- `Features/Events/Handlers/*.cs` (eight handlers)
+- `Infrastructure/Persistence/EfCaseRepository.cs`
+- Audit record building in `InMemoryCaseRepository` once the projection format is decided
+
+## WS3 FHIR boundary
+
+**Owns**
+
+- `src/api/CareLoop.Api/Features/Fhir/**`
+- `src/api/CareLoop.Api/Infrastructure/Fhir/**`
+- `tests/api/CareLoop.Tests/Api/Fhir/**`
+
+**Stubs to implement**
+
+- `Features/Fhir/FhirEndpoints.cs`, `GetCapabilityStatement.cs`, `StatusMap.cs`
+- `Features/Fhir/Inbound/*.cs` (six mappers, starting with `DiagnosticReportMapper`)
+- `Features/Fhir/Outbound/*.cs` (three mappers and `FhirPublisher`)
+- `Infrastructure/Fhir/FhirHttpClient.cs`
+
+## WS4 Outbox and notifications
+
+**Owns**
+
+- `src/api/CareLoop.Api/Features/Outbox/**`
+- `src/api/CareLoop.Api/Features/Notifications/**`
+- `src/api/CareLoop.Api/Infrastructure/Notifications/**`
+- `src/api/CareLoop.Api/Infrastructure/Templates/**`
+- `tests/api/CareLoop.Tests/Api/Outbox/**`, `tests/api/CareLoop.Tests/Api/Notifications/**`
+
+**Stubs to implement**
+
+- `Features/Outbox/OutboxDispatcher.cs`
+- `Features/Notifications/NotificationRouter.cs`, `RecipientResolver.cs`, `NotificationSender.cs`, `TemplateRenderer.cs`
+- `Features/Notifications/ReceiveInboundNotification.cs` (the provider callback endpoint)
+- `Infrastructure/Notifications/SimulatorNotificationProvider.cs`, `SimulatorInboundNotificationHandler.cs`
+- Leave `SmsNotificationProvider` and `EmailNotificationProvider` as stubs: they are out of scope for now
+- Set `Outbox:Enabled` to `true` in `appsettings.json` when the dispatcher works
+
+## WS5 Deadlines and escalation
+
+**Owns**
+
+- `src/api/CareLoop.Api/Worker/**`
+- `src/api/CareLoop.Domain/Rules/DeadlinePolicy.cs`, `src/api/CareLoop.Domain/Rules/DeadlineStatus.cs`
+- `tests/api/CareLoop.Tests/Domain/DeadlinePolicyTests.cs`, `tests/api/CareLoop.Tests/Api/DeadlineWorkerTests.cs`
+
+**Stubs to implement**
+
+- `Rules/DeadlinePolicy.cs`: `ComputeDueAt`, `Classify`, `NextEscalationStep`
+- `Worker/DeadlineWorker.cs`: `ExecuteAsync`, `SweepAsync`
+- Set `DeadlineWorker:Enabled` to `true` in `appsettings.json` when the worker works
+
+## WS6 Read endpoints and dashboard
+
+**Owns**
+
+- `src/api/CareLoop.Api/Features/Cases/**`, `Features/Exceptions/**`, `Features/Metrics/GetMetrics.cs`, `Features/Common/**`
+- `src/api/CareLoop.Api/Contracts/Cases/**`, `Contracts/Exceptions/**`, `Contracts/Common/**`, `Contracts/Metrics/MetricsResponse.cs`
+- `contracts/openapi/**` (generated by the API build; commit it when routes or contracts change)
+- `tests/api/CareLoop.Tests/Api/ReadEndpointsTests.cs`
+- `src/web/**` (except `src/web/tests/e2e/**` and `src/web/playwright.config.ts`; the dashboard is a starter today, see `src/web/README.md`)
+
+**Stubs to implement**
+
+- `ListCases`, `GetCase`, `GetTimeline`, `GetExceptions`, `GetMetrics`
+- `src/web/src/features/exceptions`, `cases`, `metrics`: replace each placeholder page
+- Do not hand-edit `src/web/src/api/schema.d.ts`; run `corepack yarn generate:api`
+
+## WS7 HIS simulator
+
+**Owns**
+
+- `src/simulators/his/**`, `tests/simulators/his/**`
+
+**Stubs to implement**
+
+- `Outbound/`: the resource builders, `CareLoopFhirClient`, `OutboundEventSender`, clinician action endpoints
+- `Inbound/`: `InboundFhirReceiver`, FHIR, staff inbox and message log endpoints
+- `Scenarios/`: `ScenarioLoader`, `ScenarioRunner`, scenario endpoints
+- `State/SimulatorStore.cs`
+- `ClientApp/src/features/*`: scenario runner, staff inbox, FHIR log, clinician actions
+
+## WS8 Patient-channel simulator
+
+**Owns**
+
+- `src/simulators/patient-channel/**`, `tests/simulators/patient-channel/**`
+
+**Stubs to implement**
+
+- `Inbound/`: `CommunicationRequestReceiver`, `CommunicationRequestMapper`, `DeliverySimulator`, `AutomaticResponder`, and the inbox, patient behaviour, message log and case status endpoints
+- `Outbound/`: the five `Communication` builders, `CareLoopFhirClient`, `PatientResponseSender`, `CaseStatusReader`
+- `Scenarios/`: `ScenarioLoader`, `ScenarioRunner`, scenario endpoints
+- `State/SimulatorStore.cs`
+- `ClientApp/src/features/*`: inbox, case status, patient behaviours, scenario runner, message log
+
+## WS9 AI handoff summary
+
+**Owns**
+
+- `src/api/CareLoop.Api/Features/Summaries/**`
+- `src/api/CareLoop.Api/Contracts/Summaries/**`
+- `src/api/CareLoop.Api/Infrastructure/Ai/**`
+- `src/api/CareLoop.Api/Infrastructure/Persistence/Summaries/**`, `Infrastructure/Persistence/Configurations/HandoffSummaryRecordConfiguration.cs`
+- `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs`
+
+**Stubs to implement**
+
+- `Features/Summaries/DraftHandoffSummary.cs`, `ApproveSummary.cs`
+- `Infrastructure/Ai/AzureOpenAiProvider.cs` (ask before adding an SDK package; the stub uses plain `HttpClient`)
+- `NoOpAiProvider` already works and stays the default
+
+## WS10 Scenarios and end-to-end tests
+
+**Owns**
+
+- `src/simulators/scenarios/**`
+- `src/api/CareLoop.Api/Features/Metrics/RunSimulation.cs`
+- `src/api/CareLoop.Api/Contracts/Metrics/SimulationRequest.cs`, `SimulationResponse.cs`, `SimulationArmResponse.cs`
+- `tests/api/CareLoop.Tests/Api/Journeys/**`, `tests/api/CareLoop.Tests/Api/SimulationTests.cs`
+- `src/web/tests/e2e/**`, `src/web/playwright.config.ts`
+
+**Stubs to implement**
+
+- `RunSimulation`: the with-and-without-escalation comparison
+- The four journey test classes and the two Playwright specs
+- Changes to `scenario.schema.json` must be agreed with WS7 and WS8, whose scenario records mirror it
+
+---
+
+## Shared (change by agreement)
+
+These files are touched by several workstreams. Keep changes small and announce them.
+
+- `AGENTS.md`, `README.md`, `docs/workstreams.md`
+- `.editorconfig`, `.gitignore`, `.dockerignore`, `.env.example`, `docker-compose.yml`
+- `.github/**`
+- `CareLoop.sln`, `Directory.Build.props`, `global.json`, `src/api/CareLoop.Api/Dockerfile`, `src/api/README.md`, every `*.csproj` under `src/api/`
+- `src/api/CareLoop.Api/Program.cs`, `appsettings.json`, `appsettings.Development.json`, `Properties/launchSettings.json`
+- `src/api/CareLoop.Api/Infrastructure/DependencyInjection.cs` (one method per area; edit only your own method)
+- `src/api/CareLoop.Api/Infrastructure/Time/**`, `Infrastructure/Auth/**`
+- `tests/api/CareLoop.Tests/Api/WorkingInfrastructureTests.cs`, `ExternalSystemsConfigurationTests.cs`
+
+## Contract points to settle between workstreams
+
+The scaffold made these choices or left them open. Settle each one before both sides build on it.
+
+| Topic | Between | State |
+|---|---|---|
+| `PUT` route shape | WS3, WS7, WS8 | The API maps `PUT /fhir/{resourceType}/{id}` (standard FHIR update). `AGENTS.md` writes `PUT /fhir/{resourceType}`. Confirm. |
+| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. WS8 proposes codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`; `StatusMap` must match. |
+| External system identifiers | WS2, WS3, WS7 | `ExternalSystems:Systems` is keyed by system identifier, and the key must equal the source system identifier that system sends. The development settings use `his-simulator`; the HIS simulator does not yet send an agreed identifier. |
+| Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`), applied by the patient-channel simulator when a notification arrives. Cohort runs need a way to give each generated patient their scenario's behaviour. |
+| Time in a live run | WS1, WS5, WS7, WS8, WS10 | CareLoop runs on real time. A live run uses the demo pathway folder (`Pathways:Directory`), whose deadlines are divided by 1800, and both simulators pace scenarios with `Scenarios:RealSecondsPerScenarioHour` = 2. The three figures must stay equal. End-to-end tests should assert outcomes, not exact times, and leave headroom for slow machines. |
+| Simulator provider wire format | WS4, WS8 | Private to the simulator provider: a FHIR `CommunicationRequest` to the patient-channel simulator, and a FHIR `Communication` back to `POST /notifications/inbound/simulator`. Agree the `Communication.category` codes and how the notification attempt identifier is carried. |
+| Patient replies beyond acknowledgement | WS1, WS4, WS8 | A reply such as a patient accepting an appointment has no event or track status yet. Decide which replies exist and what each one means for the case before a handler translates them. |
+| Simulated marker on FHIR resources | WS7, WS8 | The simulators mark the resources they send (the API test samples use `meta.tag` in system `.../data-origin` with code `simulated`; WS8 planned `meta.security` `HTEST`; pick one). CareLoop neither requires nor emits a marker. |
+| Staff notification transport | WS4, WS7 | The HIS simulator offers both `POST /fhir/Task` and a plain `POST /staff-inbox/notifications`. Decide which `SimulatorNotificationProvider` uses and drop the other. |
+| Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. |
+| Eight event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`, so there are exactly eight source events and handlers. |
+| Internal events | WS2, WS5, WS9 | `DeadlineElapsed` and `HandoffSummaryApproved` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
+| Rejected events | WS1, WS2 | A refused event is saved with `Disposition = Rejected`, so the attempt is audited through the same write path. |

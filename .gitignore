@@ -3,12 +3,28 @@
 **/obj/
 *.user
 *.suo
+TestResults/
+*.trx
 
-# Node
+# Node / Yarn (Berry, node-modules linker)
 node_modules/
 dist/
 coverage/
 npm-debug.log*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+*.tsbuildinfo
+playwright-report/
+test-results/
+.vite/
+
+# Simulator ClientApp build output copied into wwwroot
+src/simulators/*/*/wwwroot/
 
 # Python
 .venv/
@@ -24,9 +40,12 @@ build/
 .env.*
 !.env.example
 appsettings.Local.json
+appsettings.*.local.json
 
 # Tooling and operating systems
 .vs/
 .idea/
+.vscode/*
+!.vscode/extensions.json
 .DS_Store
 Thumbs.db

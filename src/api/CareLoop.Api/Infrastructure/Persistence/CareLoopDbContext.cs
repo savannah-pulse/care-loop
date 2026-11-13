@@ -1,0 +1,51 @@
+using CareLoop.Api.Infrastructure.Persistence.Outbox;
+using CareLoop.Api.Infrastructure.Persistence.Summaries;
+using CareLoop.Domain.Cases;
+using CareLoop.Domain.Events;
+using Microsoft.EntityFrameworkCore;
+
+namespace CareLoop.Api.Infrastructure.Persistence;
+
+/// <summary>
+/// The CareLoop database: case projections, the append-only source and audit events, the outbox and handoff summaries.
+/// </summary>
+/// <remarks>
+/// Writes to case state happen only in <see cref="EfCaseRepository"/>. Read slices query this
+/// context directly with no-tracking projections. The mapping is provider-neutral: nothing here
+/// may depend on PostgreSQL-specific features, so Azure SQL remains an option.
+/// </remarks>
+public sealed class CareLoopDbContext : DbContext
+{
+    /// <summary>
+    /// Creates the context.
+    /// </summary>
+    /// <param name="options">Provider and connection settings.</param>
+    public CareLoopDbContext(DbContextOptions<CareLoopDbContext> options)
+        : base(options)
+    {
+    }
+
+    /// <summary>The current projection of every case.</summary>
+    public DbSet<Case> Cases => Set<Case>();
+
+    /// <summary>Every source event ever stored. Append-only.</summary>
+    public DbSet<SourceEvent> SourceEvents => Set<SourceEvent>();
+
+    /// <summary>The audit trail. Append-only.</summary>
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    /// <summary>Domain events waiting to be delivered to subscribers.</summary>
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    /// <summary>Per-subscriber delivery state of each outbox message.</summary>
+    public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
+
+    /// <summary>AI-drafted and human-approved handoff summaries.</summary>
+    public DbSet<HandoffSummaryRecord> HandoffSummaries => Set<HandoffSummaryRecord>();
+
+    /// <inheritdoc/>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CareLoopDbContext).Assembly);
+    }
+}

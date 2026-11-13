@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Domain references nothing: no EF Core, no ASP.NET, no FHIR library, no JSON attributes.
+    Shared settings (target framework, nullable, XML docs, CS1591 as error) come from the
+    repository-root Directory.Build.props.
+  -->
+  <PropertyGroup>
+    <RootNamespace>CareLoop.Domain</RootNamespace>
+  </PropertyGroup>
+
+</Project>

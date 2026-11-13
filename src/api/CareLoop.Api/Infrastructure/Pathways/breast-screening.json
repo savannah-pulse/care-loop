@@ -1,0 +1,47 @@
+{
+  "notice": "PLACEHOLDER PATHWAY - SYNTHETIC. Nothing in this file is clinically approved. Every code, role, duration and evidence rule is a placeholder to be replaced by values a clinical adviser signs off. Stage entry and exit rules are a proposal still to be confirmed by the team.",
+  "id": "breast-screening",
+  "version": "0.0.0-placeholder",
+  "displayName": "PLACEHOLDER - Breast screening follow-up (Abu Dhabi prototype)",
+  "isPlaceholder": true,
+  "urgencyCodes": ["PLACEHOLDER-URGENCY-A", "PLACEHOLDER-URGENCY-B"],
+  "unassignedQueueRole": "facility-lead",
+  "stages": [
+    { "stage": "Received", "leavesOn": ["ScreeningResultReceived"], "next": "ReviewPending", "allowedRoles": ["system"], "nextActionOnEntry": "assign-owner" },
+    { "stage": "ReviewPending", "leavesOn": ["ClinicalReviewCompleted"], "next": "FollowUpActive", "allowedRoles": ["clinician"], "nextActionOnEntry": "review-result" },
+    { "stage": "FollowUpActive", "leavesOn": ["OutcomeRecorded"], "next": "ClosureReview", "allowedRoles": ["clinician"], "nextActionOnEntry": "acknowledge-notification" },
+    { "stage": "ClosureReview", "leavesOn": ["ClosureDecided"], "next": "Closed", "allowedRoles": ["clinician"], "nextActionOnEntry": "decide-closure" },
+    { "stage": "Closed", "leavesOn": [], "next": null, "allowedRoles": [], "nextActionOnEntry": null }
+  ],
+  "tracks": [
+    { "kind": "Notification", "requiredForClosure": true, "nextActionOnException": "contact-patient-another-way" },
+    { "kind": "Consultation", "requiredForClosure": false, "nextActionOnException": "reassign-consultation" },
+    { "kind": "Referral", "requiredForClosure": false, "nextActionOnException": "arrange-alternative-referral" },
+    { "kind": "Appointment", "requiredForClosure": true, "nextActionOnException": "rebook-appointment" }
+  ],
+  "deadlines": [
+    { "nextAction": "assign-owner", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "review-result", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "acknowledge-notification", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "acknowledge-notification", "urgencyCode": "PLACEHOLDER-URGENCY-A", "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "respond-to-handoff", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "call-patient", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "contact-patient-another-way", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "reassign-consultation", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "arrange-alternative-referral", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "rebook-appointment", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false },
+    { "nextAction": "decide-closure", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false }
+  ],
+  "escalationLadder": [
+    { "level": 1, "escalateToRole": "facility-lead", "afterOverdue": "0.00:00:00", "clinicallyApproved": false },
+    { "level": 2, "escalateToRole": "coordinator", "afterOverdue": "1.00:00:00", "clinicallyApproved": false }
+  ],
+  "closureRules": [
+    { "reason": "Treated", "authorizedRoles": ["clinician"], "isException": false, "requiresEvidenceReference": true, "requiresExceptionNote": false, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 0 },
+    { "reason": "OnSurveillance", "authorizedRoles": ["clinician"], "isException": false, "requiresEvidenceReference": true, "requiresExceptionNote": false, "requiresNextSurveillanceDate": true, "minimumDocumentedAttempts": 0 },
+    { "reason": "NegativeOnConfirmation", "authorizedRoles": ["clinician"], "isException": false, "requiresEvidenceReference": true, "requiresExceptionNote": false, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 0 },
+    { "reason": "Declined", "authorizedRoles": ["clinician"], "isException": true, "requiresEvidenceReference": false, "requiresExceptionNote": true, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 0 },
+    { "reason": "TransferredAndAccepted", "authorizedRoles": ["clinician"], "isException": true, "requiresEvidenceReference": true, "requiresExceptionNote": true, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 0 },
+    { "reason": "Untraceable", "authorizedRoles": ["clinician"], "isException": true, "requiresEvidenceReference": false, "requiresExceptionNote": true, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 1 }
+  ]
+}

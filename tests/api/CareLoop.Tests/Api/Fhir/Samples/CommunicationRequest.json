@@ -1,0 +1,8 @@
+{
+  "resourceType": "CommunicationRequest",
+  "id": "SYN-COMMREQ-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "active",
+  "subject": { "reference": "Patient/SYN-PT-0001" },
+  "payload": [ { "contentString": "[SIMULATED MESSAGE - PLACEHOLDER WORDING]" } ]
+}

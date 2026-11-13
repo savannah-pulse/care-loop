@@ -24,7 +24,9 @@ jobs:
         with:
           python-version: "3.13"
       - run: dotnet restore CareLoop.sln
-      - run: dotnet publish src/api/CareLoop.Api/CareLoop.Api.csproj --configuration Release --no-restore --output artifacts/api
+      - run: dotnet publish src/api/CareLoop.Api/CareLoop.Api.csproj --configuration Release --no-restore --output artifacts/api -p:OpenApiGenerateDocuments=false
+      - run: dotnet publish src/simulators/his/HisSimulator/HisSimulator.csproj --configuration Release --no-restore --output artifacts/his-simulator
+      - run: dotnet publish src/simulators/patient-channel/PatientChannelSimulator/PatientChannelSimulator.csproj --configuration Release --no-restore --output artifacts/patient-channel-simulator
       - run: npm ci
         working-directory: src/web
       - run: npm run build
@@ -39,7 +41,7 @@ jobs:
           cp -R src/web/dist artifacts/web
           cp LICENSE README.md artifacts/
           cd artifacts
-          zip -r "../care-loop-${GITHUB_REF_NAME}.zip" api web careloop_ai_workflow-*.whl LICENSE README.md
+          zip -r "../care-loop-${GITHUB_REF_NAME}.zip" api his-simulator patient-channel-simulator web careloop_ai_workflow-*.whl LICENSE README.md
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         env:

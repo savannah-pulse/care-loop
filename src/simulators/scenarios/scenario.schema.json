@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://careloop.invalid/schemas/scenario.schema.json",
+  "title": "CareLoop simulator scenario",
+  "description": "A SYNTHETIC test journey in two parts. The steps are hospital-system events that the HIS simulator replays against CareLoop's FHIR boundary. The behaviour on each patient says how that patient reacts when CareLoop notifies them, which the patient-channel simulator applies when a notification actually arrives. Clinical values (result category, urgency, closure reason) are placeholder codes that must exist in the pathway definition; a scenario never invents clinical content.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "synthetic", "description", "pathwayId"],
+  "oneOf": [
+    { "required": ["patients", "steps"] },
+    { "required": ["cohort"] }
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "pattern": "^[a-z0-9-]+$", "description": "Scenario key; equals the file name without extension." },
+    "synthetic": { "const": true, "description": "Must be true. Marks every record produced by the scenario as simulated." },
+    "description": { "type": "string" },
+    "pathwayId": { "type": "string", "description": "Identifier of the pathway definition the scenario runs against." },
+    "patients": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/patient" }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "cohort": { "$ref": "#/$defs/cohort" },
+    "expect": { "$ref": "#/$defs/expectation" }
+  },
+  "$defs": {
+    "patient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "syntheticId", "displayName", "language", "behaviour"],
+      "properties": {
+        "ref": { "type": "string", "description": "Local handle used by steps." },
+        "syntheticId": { "type": "string", "pattern": "^SYN-", "description": "Synthetic patient identifier; always prefixed SYN-." },
+        "displayName": { "type": "string", "pattern": "^Synthetic ", "description": "Visibly synthetic display name." },
+        "language": { "type": "string", "description": "BCP 47 language tag used to pick message templates." },
+        "behaviour": { "$ref": "#/$defs/patientBehaviour" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "at", "actor", "action", "caseRef"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable step identifier; used to build a deterministic source event ID." },
+        "at": { "type": "string", "description": "ISO 8601 duration offset from scenario start, for example PT0S or P2D." },
+        "actor": { "enum": ["his"], "description": "Which simulator performs the step. Only the HIS simulator performs steps: a patient's reactions are never scripted as steps, they follow from patients[].behaviour when a notification arrives." },
+        "action": {
+          "enum": [
+            "screening-result",
+            "clinical-review",
+            "consultation-update",
+            "referral-update",
+            "appointment-update",
+            "outcome",
+            "closure"
+          ],
+          "description": "The kind of event to emit. One value per event type a hospital system sends to CareLoop."
+        },
+        "caseRef": { "type": "string", "description": "Local handle for the case (one actionable result) the step belongs to." },
+        "patientRef": { "type": "string", "description": "Required on screening-result; refers to patients[].ref." },
+        "status": { "type": "string", "description": "Track or task status carried by the step, for example accepted, rejected, fulfilled, noshow." },
+        "performer": { "$ref": "#/$defs/staff" },
+        "params": {
+          "type": "object",
+          "description": "Action-specific values. Clinical values must be placeholder codes from the pathway definition.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "patientBehaviour": {
+      "type": "object",
+      "description": "How the simulated patient reacts when CareLoop notifies them. The patient-channel simulator applies it each time a notification for this patient arrives. It is a reaction, not a timetable: if CareLoop never sends a notification, nothing is reported and nothing is acknowledged.",
+      "additionalProperties": false,
+      "required": ["delivery", "response"],
+      "properties": {
+        "delivery": { "enum": ["deliver", "fail", "silent"], "description": "What the channel reports for a notification: deliver = delivered; fail = delivery failed, with failureReason; silent = the message is accepted but no delivery report is ever sent." },
+        "failureReason": { "type": "string", "description": "Why delivery failed. Required when delivery is fail." },
+        "response": { "enum": ["none", "acknowledge", "understand", "call-me"], "description": "What the patient does after a delivered notification: none = stays silent; acknowledge = confirms they saw it; understand = confirms they understood (teach-back); call-me = asks for a call. Only possible when delivery is deliver." },
+        "respondAfter": { "type": "string", "description": "ISO 8601 duration between delivery and the response, for example PT1H. Defaults to PT0S." },
+        "respondToNotification": { "type": "integer", "minimum": 1, "description": "Which notification the patient responds to, counting the notifications this patient has received. 1 (the default) is the first; 2 describes a patient who only reacts to a reminder. Earlier notifications get the delivery behaviour and no response." }
+      },
+      "allOf": [
+        { "if": { "properties": { "delivery": { "const": "fail" } } }, "then": { "required": ["failureReason"] } },
+        { "if": { "properties": { "delivery": { "enum": ["fail", "silent"] } } }, "then": { "properties": { "response": { "const": "none" } } } }
+      ]
+    },
+    "staff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["syntheticId", "role"],
+      "properties": {
+        "syntheticId": { "type": "string", "pattern": "^SYN-" },
+        "role": { "type": "string", "description": "Demo role key, for example clinician, coordinator, facility-lead." },
+        "facility": { "type": "string", "pattern": "^SYN-" }
+      }
+    },
+    "cohort": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["size", "seed", "mix"],
+      "properties": {
+        "size": { "type": "integer", "minimum": 1 },
+        "seed": { "type": "integer", "description": "Random seed so a cohort replays identically." },
+        "mix": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scenario", "weight"],
+            "properties": {
+              "scenario": { "type": "string", "description": "Name of a step-based scenario in this folder." },
+              "weight": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "description": "What the journey and end-to-end tests assert after the scenario has run.",
+      "additionalProperties": false,
+      "properties": {
+        "finalStage": { "enum": ["Received", "ReviewPending", "FollowUpActive", "ClosureReview", "Closed"] },
+        "escalated": { "type": "boolean" },
+        "exceptions": { "type": "array", "items": { "type": "string" } },
+        "closureAccepted": { "type": "boolean" }
+      }
+    }
+  }
+}
