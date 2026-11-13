@@ -10,7 +10,6 @@
 - [ ] **Nothing real in the repository:** no real patient data, credentials or live endpoint addresses are committed; the API and dashboard carry no simulated-data flags or labels (that is the simulators' job).
 - [ ] **Constraints:** no clinical decision, no hard-coded clinical deadline, no closure without an authorized human event, AI output remains a draft.
 - [ ] **Scope:** I only edited files my workstream owns (see `docs/workstreams.md`), or I agreed the change with the owning workstream.
-- [ ] **Dependencies:** no new package beyond those listed in `AGENTS.md`, or it was agreed first.
 - [ ] I removed the `TODO(WS-n)` tags for the stubs I implemented.
 
 ## How I tested it
