@@ -378,14 +378,16 @@ Hessa's journey:
 
 ## Proposed code items
 
-The screens shown in the hackathon raise four gaps that C1 to C13 do not cover. Each one is proposed for the engineering team to accept, change or turn down.
+The screens shown in the hackathon raise six gaps that C1 to C13 do not cover. C20 to C22 were found while starting the CareLoop web app against the contract. Each one is proposed for the engineering team to accept, change or turn down.
 
 | # | Screens | Gap | Proposed change | Workstreams |
 |---|---|---|---|---|
 | C4, added | 14 | Opening a case outside your team asks for a reason, which has no endpoint (P4) | Keep the prompt. Add the reason to the case read in C4, and record it in the same audit entry as the view. | WS6 |
 | C15 | 2, 17 | An escalation cannot be acknowledged | Record who acknowledged an escalation, and when, from the web app | WS1, WS5, WS6 |
 | C19 | 18 | Doctors cannot see a patient's other cases | Add a `patientReference` filter to `GET /cases`, allowed for `clinician` and `receiving-clinician` only, that returns each case's programme, dates, stage and closure reason | WS6 |
-| C20 | 1, 2, 17, 18 | Staff screens show the patient's name and a second identifier (date of birth or MRN), but case reads return only `patientReference` | Either return a display name and MRN with each case read for staff roles, taken from the result event or from the hospital system's FHIR `Patient`, or agree that staff screens show the reference only. Storing names in CareLoop widens what it holds, so decide this as a team. | WS1, WS2, WS3, WS6 |
+| C20 | 1, 2, 17, 18 | Staff screens show names: the patient's name with a second identifier (date of birth or MRN), and each owner's name and role. Case reads and the timeline return only references. | Either return display names with each case read for staff roles, taken from the result event or from the hospital system's FHIR `Patient` and `Practitioner`, or agree that staff screens show references only. Storing names in CareLoop widens what it holds, so decide this as a team. | WS1, WS2, WS3, WS6 |
+| C21 | 1 | The worklist shows each case's display stage (one of ten), which needs track statuses, but `CaseSummaryResponse` has the code stage only | Add the four track statuses, or the computed display stage, to `CaseSummaryResponse` | WS6 |
+| C22 | 13, 18 | A summary cannot be read back after drafting, and a person cannot submit a summary they wrote when there is no AI draft or after rejecting one | Add a read of the case's latest summary, and a way to submit a summary written by a person for approval | WS6, WS9 |
 
 Withdrawn after the 13 November call: C14, C17 and C18 served hospital-system screens, which are now simulated. C16 is covered by #27, which adds the rejection endpoint.
 
