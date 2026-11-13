@@ -75,6 +75,7 @@ These are changes to [ui-design/README.md](ui-design/README.md) and the screen i
 | P6 | Screen 3 | List the exact measures with their denominators so WS6 can build C5 to them. Name which come from `GET /metrics` and which from `POST /metrics/simulation`. |
 | P7 | Screen 4 | Change `GET /programmes`\* to `GET /programmes` and `GET /programmes/{pathwayId}` (C1). State that citations and change history depend on C2. |
 | P8 | Screen 5 | A patient's question arrives as `NotificationUpdated/CallRequested`, which raises a `CallRequested` task for the case owner with a due time from the `call-patient` deadline. There is no "answered" event for a call-back; the nurse records `Acknowledged` or `Understood` after the call. Reword. Colleague questions use the `answer-consultation` deadline and referrals the `respond-to-referral` deadline, both placeholders (decision 6, C12). |
+| P19 | Screen 2 | The case screen drafts, approves **and rejects** the AI summary (decision 10), and shows the sources behind each section so reviewing means checking, not trusting. |
 | P9 | Screen 6 | Move "Approve summary" to the CareLoop case screen (screen 2) and show the approved text as read-only on screen 6 (decision 4). The HIS receives the approved summary as a `DocumentReference`. |
 | P10 | Screen 7 | `ReferralAccepted` and `AppointmentScheduled` exist as `ReferralUpdated/Accepted` and `AppointmentUpdated/Scheduled`. Labs using the same screen for test requests has no distinct event; a test request is a consultation or referral. Say which. |
 | P11 | Screen 8 | Matches. Rename `ClosureAuthorised` to `ClosureDecided` and `EvidenceAttached` to `OutcomeRecorded`. |
@@ -99,6 +100,10 @@ Taken by the product owner on 13 November 2026 after the engineering recommendat
 | 5 | Roles | Add `nurse-navigator`, `receiving-clinician` and `lab`. | C11, across WS1, WS6 and WS7, plus the shared `DemoRoles` file. Recommendation was three roles; the owner wants the personas enforced by the API, not only shown. |
 | 6 | Consultation reply deadline | Per-kind deadlines. | C12 in WS1 and WS2. Both values stay placeholders until a clinical adviser approves them. |
 | 7 | Caregiver and consent | Build it. | C13, across WS1, WS2, WS3, WS4 and WS8. Recommendation was to defer; the owner wants screen 12 in the prototype. Real email stays out of scope: the caregiver message is shown in the patient-channel simulator. |
+| 8 | Which component calls the model | The Python AI workflow service calls Foundry; the API calls it. A direct Foundry provider stays in the API as a second route. | `Ai:Provider` takes `NoOp` (default), `AiWorkflow` or `FoundryDirect`. The Python service owns the prompt, schema and credentials; the API holds no model credential. WS9 owns `src/ai_workflow/**`. |
+| 9 | Clinical text in a prompt | Allowed, when a clinician finalized it. | Facts are typed and cited, with a source reference and review status; `HandoffFactCollector` is the single data boundary. Clinical facts are read for one draft and never written to the coordination store. Names, contact details, images and unfinalized or conflicting readings are never sent. |
+| 10 | Draft shape and reviewer decision | Structured and cited, with a `Rejected` status. | Sections carry the fact identifiers they rest on; the record keeps deployment, prompt and policy versions; `POST .../rejection` is new. Needs a migration (WS2). The case screen gains a reject control. |
+| 11 | When a draft is produced | On request, and when a handoff is proposed. | `AutoDraftOnHandoff` subscribes to `HandoffProposed` behind `Ai:AutoDraftOnHandoff`, off by default. It drafts once per case and never fails the handoff. |
 
 ## Section 6: Other documents to align
 
@@ -107,6 +112,8 @@ Taken by the product owner on 13 November 2026 after the engineering recommendat
 | [architecture.md](architecture.md) | The ten-stage table is now the display vocabulary over the five Domain stages (decision 1). A note says so. |
 | [contracts/README.md](../contracts/README.md) | The stage-entry event names are display labels; the nine `CaseEventType` values are the contract (decision 1). A note says so. |
 | [workstreams.md](workstreams.md) | Items C1 to C13 are listed under their workstreams, and decisions 1 to 7 are in the contract points table as settled. |
+| [api-ai-workflow-handoff.md](api-ai-workflow-handoff.md) | New. The contract for the AI handoff summary: the boundary, which component calls the model, what is sent, how a draft is validated and what happens when it fails (decisions 8 to 11). |
+| [ai-spec.md](ai-spec.md) | No change; it stays as its author wrote it. It is the design proposal, and decisions 8 to 11 supersede it where the two differ. Its patient-facing drafts, Arabic translation and periodic insight narrative are deferred, as `AGENTS.md` records under "Not in scope yet". |
 | [component-register.md](component-register.md) | Its ten-stage and caregiver wording now matches decisions 1 and 7. A note points here. |
 | `src/web/README.md` | Says the dashboard is read-only. Add that the case screen drafts and approves the AI summary (decision 4). |
 | [AGENTS.md](../AGENTS.md) | "Not in scope yet" keeps real email out. Add a line that caregiver messages are simulated in the prototype (decision 7). Shared file; agree first. |

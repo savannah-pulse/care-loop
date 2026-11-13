@@ -219,14 +219,24 @@ Because the contracts already exist, every workstream can start now against the 
 - `src/api/CareLoop.Api/Infrastructure/Ai/**`
 - `src/api/CareLoop.Api/Infrastructure/Persistence/Summaries/**`, `Infrastructure/Persistence/Configurations/HandoffSummaryRecordConfiguration.cs`
 - `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs`
+- `src/ai_workflow/**` (decision 8: the Python service calls Foundry, so one workstream owns the whole summary path)
 
 **Stubs to implement**
 
-- `Features/Summaries/DraftHandoffSummary.cs`, `ApproveSummary.cs`
-- `Infrastructure/Ai/AzureOpenAiProvider.cs` (ask before adding an SDK package; the stub uses plain `HttpClient`)
-- `NoOpAiProvider` already works and stays the default
+- `Features/Summaries/DraftHandoffSummary.cs`, `ApproveSummary.cs`, `RejectSummary.cs`
+- `Features/Summaries/HandoffFactCollector.cs`: the single data boundary. Everything a model may write about passes through it
+- `Features/Summaries/HandoffSummaryDrafter.cs`: the single draft path, shared by both triggers, validating every cited fact before anything is stored
+- `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
+- `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
+- `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
+- `POST /summaries/handoff` in `src/ai_workflow/`: owns the prompt, the response schema and the Foundry call. Specified in [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md); not built
+- `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
-**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. See [`ai-spec.md`](ai-spec.md) for the full AI contract and governed extensions.
+Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. Neither route has an API key: both authenticate with Entra ID.
+
+The `HandoffSummaries` table needs a migration for the provenance columns (suggested name `HandoffSummaryProvenance`). Migrations are WS2's folder; agree who writes it.
+
+**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-spec.md`](ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
 
 ## WS10 Scenarios and end-to-end tests
 
@@ -288,7 +298,13 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Stage model | WS1, WS6 | Settled (decision 1): five stages in the Domain; the design's ten stages are display labels the web app derives from stage plus track statuses. |
 | Patient appointment confirmation | WS1, WS4, WS8 | Settled (decision 2): dropped. "I will come" is an acknowledgement; a patient reply never changes appointment status. |
 | Confidence rating | WS1, WS2, WS3, WS4, WS6, WS8, WS10 | Settled (decision 3): build it (C10). `NotificationUpdateKind.ConfidenceRated` with a 1 to 5 value; `Communication.category` `confidence-rating`. |
-| Where the AI summary is approved | WS6, WS7, WS9 | Settled (decision 4): the CareLoop web app case screen drafts and approves; the HIS simulator receives the approved `DocumentReference` only. |
+| Where the AI summary is approved | WS6, WS7, WS9 | Settled (decision 4): the CareLoop web app case screen drafts and approves; the HIS simulator receives the approved `DocumentReference` only. The case screen also rejects (decision 10). |
+| Where the model is called | WS9 | Settled (decision 8): the Python AI workflow service calls Foundry and the API calls it; `FoundryDirect` is a second route from the API. Both sit behind `IAiProvider`, whose `NoOp` default keeps AI off. |
+| Clinical text in a prompt | WS2, WS9 | Settled (decision 9): clinician-finalized clinical facts may be summarized, as typed facts with a source reference and review status. They are read for one draft and never written to the coordination store. Patient names, contact details, images and unfinalized or conflicting readings are never sent. |
+| Draft shape and reviewer decision | WS6, WS9 | Settled (decision 10): sections cite the fact identifiers they rest on; the record keeps deployment, prompt and policy versions; `Rejected` is a stored status beside `Draft` and `Approved`. |
+| When a draft is produced | WS9 | Settled (decision 11): on request, and when a handoff is proposed behind `Ai:AutoDraftOnHandoff`, off by default. |
+| Summary approver roles | WS1, WS9 | Open. Proposed as `summaryApproverRoles` in the pathway definition, so the rule stays configuration like every other role rule, rather than a constant in `DemoRoles`. |
+| AI settings in the shared config files | WS9, plus whoever owns the file | Open. `appsettings.json`, `.env.example` and `docker-compose.yml` still carry the removed `Ai:AzureOpenAi` section and an API key setting. |
 | Roles | WS1, WS6, WS7 | Settled (decision 5): add `nurse-navigator`, `receiving-clinician` and `lab` (C11). `DemoRoles` is shared; WS6 edits it after announcing. |
 | Consultation reply deadline | WS1, WS2 | Settled (decision 6): `answer-consultation` and `respond-to-referral` replace `respond-to-handoff`; both placeholders (C12). |
 | Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the patient-channel simulator's `Email` channel; real email stays out of scope. |

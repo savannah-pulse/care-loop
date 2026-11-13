@@ -25,8 +25,9 @@ If a task appears to conflict with any of these, stop and ask.
 These are deferred, not forbidden. Build the seams for them now and leave the implementations for later.
 
 - **Real SMS and email delivery.** For now the simulator notification provider is the only one enabled. SMS and email providers come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
-- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed.
+- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. An unsupported language tag fails rather than falling back to English.
 - **Live HIS, Malaffi or patient-channel integration.** The simulators stand in for these.
+- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-spec.md`](docs/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
 
 ## Before real patient data
 
@@ -56,6 +57,7 @@ care-loop/
 │   ├── workstreams.md                  who owns which files (WS1 to WS10)
 │   ├── architecture.md, development.md, releasing.md, component-register.md
 │   ├── api-ai-workflow-handoff.md      what AI may do, and how the API and the Python service share the work
+│   ├── ai-spec.md                      the AI design proposal; the handoff doc above is the contract
 │   └── ui-design/                      screen designs
 │
 ├── src/
@@ -111,7 +113,8 @@ care-loop/
 │   │
 │   ├── web/                            CareLoop dashboard only (React, TypeScript, Vite); a starter today
 │   │
-│   ├── ai_workflow/                    Python AI workflow service (see its README); proposes, never decides
+│   ├── ai_workflow/                    Python AI workflow service (see its README); proposes, never decides.
+│   │                                   Owned by WS9; it owns the handoff summary prompt and the Foundry call
 │   │
 │   ├── worker/                         README only: the deadline worker lives in CareLoop.Api/Worker
 │   │
