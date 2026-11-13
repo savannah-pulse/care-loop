@@ -982,6 +982,7 @@
           "AppointmentUpdated",
           "OutcomeRecorded",
           "ClosureDecided",
+          "ConsentRecorded",
           "DeadlineElapsed",
           "HandoffSummaryApproved"
         ],

@@ -124,6 +124,46 @@ public sealed class NotificationTrackTests
         Assert.True(track.IsComplete());
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(5)]
+    public void Confidence_rating_is_stored_without_changing_the_status(int rating)
+    {
+        var track = new NotificationTrack(_clock.UtcNow);
+        track.Advance(NotificationStatus.Delivered, _clock.UtcNow, null);
+
+        track.RateConfidence(rating, _clock.UtcNow, "SYN-COMM-0005");
+
+        Assert.Equal(rating, track.Confidence);
+        Assert.Equal(NotificationStatus.Delivered, track.Status);
+        Assert.False(track.IsComplete(), "feeling confident is not an acknowledgement");
+        Assert.Equal("SYN-COMM-0005", track.SourceReference);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6)]
+    [InlineData(-1)]
+    public void Confidence_rating_outside_one_to_five_is_refused(int rating)
+    {
+        var track = new NotificationTrack(_clock.UtcNow);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => track.RateConfidence(rating, _clock.UtcNow, null));
+        Assert.Null(track.Confidence);
+    }
+
+    [Fact]
+    public void Later_confidence_rating_replaces_the_earlier_one()
+    {
+        var track = new NotificationTrack(_clock.UtcNow);
+        track.RateConfidence(2, _clock.UtcNow, null);
+
+        track.RateConfidence(4, _clock.UtcNow, null);
+
+        Assert.Equal(4, track.Confidence);
+    }
+
     [Fact]
     public void Invalid_status_move_throws()
     {

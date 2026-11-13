@@ -195,7 +195,10 @@ public sealed class EfCaseRepositoryTests : IDisposable
             ProviderMessageId = "SYN-MSG-0001",
         });
         @case.Notification.RecordCallRequest(_clock.UtcNow, "SYN-COMM-0002");
+        @case.Notification.RateConfidence(3, _clock.UtcNow, "SYN-COMM-0004");
         @case.Notification.Advance(NotificationStatus.Acknowledged, _clock.UtcNow, "SYN-COMM-0003");
+        @case.RecordConsent(new ContactPoint { Channel = NotificationChannel.Email, Address = "SYN-CAREGIVER-INBOX-0001" }, "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        @case.WithdrawConsent("Consent/SYN-CONSENT-0001/_history/2", _clock.UtcNow);
         @case.BeginConsultation("SYN-SR-0001", _clock.UtcNow).Advance(ConsultationStatus.Accepted, _clock.UtcNow, "SYN-TASK-0001");
         @case.BeginReferral("SYN-REF-0001", _clock.UtcNow).Reject("PLACEHOLDER: wrong service", _clock.UtcNow, "SYN-TASK-0002");
         @case.BeginAppointment("SYN-APPT-0001", _clock.UtcNow.AddDays(2), _clock.UtcNow).Advance(AppointmentStatus.Attended, _clock.UtcNow, null);
@@ -228,6 +231,10 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(@case.Owner, loaded.Owner);
         Assert.Equal(NotificationStatus.Acknowledged, loaded.Notification!.Status);
         Assert.True(loaded.Notification.CallRequested);
+        Assert.Equal(3, loaded.Notification.Confidence);
+        Assert.Equal(@case.CaregiverConsent, loaded.CaregiverConsent);
+        Assert.False(loaded.CaregiverConsent!.IsActive);
+        Assert.Equal("SYN-CAREGIVER-INBOX-0001", loaded.CaregiverConsent.CaregiverContactPoint.Address);
         var attempt = Assert.Single(loaded.Notification.Attempts);
         Assert.Equal("SYN-MSG-0001", attempt.ProviderMessageId);
         Assert.Equal(ConsultationStatus.Accepted, loaded.Consultation!.Status);

@@ -70,6 +70,9 @@ public sealed record CaseProjection
     /// <summary>The closure decision, once closed.</summary>
     public ClosureDecision? Closure { get; init; }
 
+    /// <summary>The caregiver consent, once one has been recorded, without the caregiver's address.</summary>
+    public ConsentSnapshot? CaregiverConsent { get; init; }
+
     /// <summary>When the case last changed.</summary>
     public required DateTimeOffset UpdatedAt { get; init; }
 
@@ -101,19 +104,22 @@ public sealed record CaseProjection
             IsEscalated = @case.IsEscalated,
             Escalations = @case.Escalations.ToList(),
             Notification = @case.Notification is { } n
-                ? new TrackSnapshot(n.Status.ToString(), n.SourceReference, n.UpdatedAt, n.IsComplete(), n.Attempts.Count, n.CallRequested)
+                ? new TrackSnapshot(n.Status.ToString(), n.SourceReference, n.UpdatedAt, n.IsComplete(), n.Attempts.Count, n.CallRequested, n.Confidence)
                 : null,
             Consultation = @case.Consultation is { } c
-                ? new TrackSnapshot(c.Status.ToString(), c.SourceReference, c.UpdatedAt, c.IsComplete(), null, null)
+                ? new TrackSnapshot(c.Status.ToString(), c.SourceReference, c.UpdatedAt, c.IsComplete(), null, null, null)
                 : null,
             Referral = @case.Referral is { } r
-                ? new TrackSnapshot(r.Status.ToString(), r.SourceReference, r.UpdatedAt, r.IsComplete(), null, null)
+                ? new TrackSnapshot(r.Status.ToString(), r.SourceReference, r.UpdatedAt, r.IsComplete(), null, null, null)
                 : null,
             Appointment = @case.Appointment is { } a
-                ? new TrackSnapshot(a.Status.ToString(), a.SourceReference, a.UpdatedAt, a.IsComplete(), null, null)
+                ? new TrackSnapshot(a.Status.ToString(), a.SourceReference, a.UpdatedAt, a.IsComplete(), null, null, null)
                 : null,
             OutcomeEvidenceReference = @case.OutcomeEvidenceReference,
             Closure = @case.Closure,
+            CaregiverConsent = @case.CaregiverConsent is { } consent
+                ? new ConsentSnapshot(consent.CaregiverContactPoint.Channel.ToString(), consent.GrantedAt, consent.WithdrawnAt, consent.IsActive, consent.EvidenceReference, consent.WithdrawalEvidenceReference)
+                : null,
             UpdatedAt = @case.UpdatedAt,
             Version = @case.Version,
         };
@@ -156,10 +162,30 @@ public sealed record CaseProjection
 /// <param name="IsComplete">Whether the track has reached its completing status.</param>
 /// <param name="Attempts">How many sends were made; notification track only.</param>
 /// <param name="CallRequested">Whether the patient asked to be called; notification track only.</param>
+/// <param name="Confidence">The patient's confidence rating, 1 to 5, once given; notification track only.</param>
 public sealed record TrackSnapshot(
     string Status,
     string? SourceReference,
     DateTimeOffset UpdatedAt,
     bool IsComplete,
     int? Attempts,
-    bool? CallRequested);
+    bool? CallRequested,
+    int? Confidence);
+
+/// <summary>
+/// The audit-trail view of the caregiver consent: whether a caregiver may be contacted and on what
+/// evidence, never the caregiver's address.
+/// </summary>
+/// <param name="Channel">The channel the caregiver is reached on, as a name.</param>
+/// <param name="GrantedAt">When the patient granted the consent.</param>
+/// <param name="WithdrawnAt">When it was withdrawn, or <see langword="null"/> while active.</param>
+/// <param name="IsActive">Whether a caregiver message may currently be sent.</param>
+/// <param name="EvidenceReference">Reference to the record of the consent.</param>
+/// <param name="WithdrawalEvidenceReference">Reference to the record of the withdrawal, when there is one.</param>
+public sealed record ConsentSnapshot(
+    string Channel,
+    DateTimeOffset GrantedAt,
+    DateTimeOffset? WithdrawnAt,
+    bool IsActive,
+    string EvidenceReference,
+    string? WithdrawalEvidenceReference);

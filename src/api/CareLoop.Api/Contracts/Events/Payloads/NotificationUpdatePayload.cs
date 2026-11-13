@@ -10,7 +10,7 @@ namespace CareLoop.Contracts.Events.Payloads;
 /// </summary>
 public sealed record NotificationUpdatePayload : EventPayload
 {
-    /// <summary>Whether this is a delivery, a failure, an acknowledgement, a teach-back or a call-me request.</summary>
+    /// <summary>Whether this is a delivery, a failure, an acknowledgement, a teach-back, a call-me request or a confidence rating.</summary>
     public required NotificationUpdateKind Kind { get; init; }
 
     /// <summary>The channel the report or response came from.</summary>
@@ -24,4 +24,7 @@ public sealed record NotificationUpdatePayload : EventPayload
 
     /// <summary>The failure reason, when <see cref="Kind"/> is <see cref="NotificationUpdateKind.Failed"/>.</summary>
     public string? FailureReason { get; init; }
+
+    /// <summary>The patient's rating from 1 to 5, when <see cref="Kind"/> is <see cref="NotificationUpdateKind.ConfidenceRated"/>; otherwise <see langword="null"/>.</summary>
+    public int? Confidence { get; init; }
 }

@@ -56,11 +56,11 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps (follow-up; WS1 is otherwise complete)**
 
-- C2: add optional `citation` to `DeadlineDefinition` and `ClosureEvidenceRule`, a `changeLog` list on `PathwayDefinition`, and an `ownerRole` per next action, for the Programmes screen. Mirror in `demo/breast-screening.json`.
-- C10: `Confidence` on `NotificationTrack`, set by a new `NotificationUpdateKind.ConfidenceRated`.
-- C11: `nurse-navigator`, `receiving-clinician` and `lab` in the pathway's `allowedRoles` and `closureRules.authorizedRoles`, and in `OwnershipRules`.
-- C12: replace `respond-to-handoff` with `answer-consultation` and `respond-to-referral` deadlines, placeholders.
-- C13: `RecipientKind.Caregiver` and a `Consent` record on `Case` (granted, withdrawn, evidence reference).
+- C2: add optional `citation` to `DeadlineDefinition` and `ClosureEvidenceRule`, a `changeLog` list on `PathwayDefinition`, and an `ownerRole` per next action, for the Programmes screen. Mirror in `demo/breast-screening.json`. Done.
+- C10: `Confidence` on `NotificationTrack`, set by a new `NotificationUpdateKind.ConfidenceRated`. Done.
+- C11: `nurse-navigator`, `receiving-clinician` and `lab` in the pathway's `allowedRoles` and `closureRules.authorizedRoles`, and in `OwnershipRules` (`MayOwn` reads the owning roles from the pathway). Done.
+- C12: replace `respond-to-handoff` with `answer-consultation` and `respond-to-referral` deadlines, placeholders. Done.
+- C13: `RecipientKind.Caregiver` and a `Consent` record on `Case` (granted, withdrawn, evidence reference). Done.
 
 ## WS2 Persistence and intake
 
@@ -76,15 +76,15 @@ Because the contracts already exist, every workstream can start now against the 
 **Stubs to implement**
 
 - `Features/Events/EventIngestor.cs`
-- `Features/Events/Handlers/*.cs` (eight handlers)
+- `Features/Events/Handlers/*.cs` (nine handlers; `ConsentHandler` was added for C13)
 - `Infrastructure/Persistence/EfCaseRepository.cs`
 - Audit record building in `InMemoryCaseRepository` once the projection format is decided
 
 **Design gaps**
 
-- C10: `ConfidenceRated` kind and value on `NotificationUpdatePayload`, handled in `NotificationUpdateHandler`.
-- C12: set `answer-consultation` and `respond-to-referral` as next actions in `ConsultationUpdateHandler` and `ReferralUpdateHandler`.
-- C13: carry caregiver consent on `ScreeningResultPayload` or a new `ConsentRecorded` event; persist it.
+- C10: `ConfidenceRated` kind and value on `NotificationUpdatePayload`, handled in `NotificationUpdateHandler`. Done.
+- C12: set `answer-consultation` and `respond-to-referral` as next actions in `ConsultationUpdateHandler` and `ReferralUpdateHandler`. Done.
+- C13: caregiver consent is its own event, `CaseEventType.ConsentRecorded`, carried by `ConsentPayload` (granted or withdrawn, caregiver contact point, consent reference) and applied by `ConsentHandler`; persisted on the case by migration `CaregiverConsentAndConfidence`. Done.
 
 ## WS3 FHIR boundary
 
@@ -103,7 +103,8 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C10: map `Communication.category` `confidence-rating` (with its value) in `StatusMap.ToNotificationUpdateKind`.
+- C10: map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` in `StatusMap.ToNotificationUpdateKind`, and carry the 1 to 5 value into `NotificationUpdatePayload.Confidence` (the handler refuses a missing or out-of-range value).
+- C13: add a seventh inbound mapper, `ConsentMapper`, that turns a FHIR `Consent` resource into a `ConsentRecorded` envelope with a `ConsentPayload`: `status` `active` is `Granted` (with the caregiver's contact point read from the resource), `inactive` or `rejected` is `Withdrawn`; the resource identifier plus version is the source event ID. Register it with the other mappers.
 
 ## WS4 Outbox and notifications
 
@@ -279,7 +280,7 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Simulated marker on FHIR resources | WS7, WS8 | The simulators mark the resources they send (the API test samples use `meta.tag` in system `.../data-origin` with code `simulated`; WS8 planned `meta.security` `HTEST`; pick one). CareLoop neither requires nor emits a marker. |
 | Staff notification transport | WS4, WS7 | The HIS simulator offers both `POST /fhir/Task` and a plain `POST /staff-inbox/notifications`. Decide which `SimulatorNotificationProvider` uses and drop the other. |
 | Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. |
-| Eight event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`, so there are exactly eight source events and handlers. |
+| Nine event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`. Caregiver consent is its own event, `ConsentRecorded` (C13), so there are exactly nine source events and handlers. |
 | Internal events | WS2, WS5, WS9 | `DeadlineElapsed` and `HandoffSummaryApproved` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
 | Rejected events | WS1, WS2 | A refused event is saved with `Disposition = Rejected`, so the attempt is audited through the same write path. |
 | Stage model | WS1, WS6 | Settled (decision 1): five stages in the Domain; the design's ten stages are display labels the web app derives from stage plus track statuses. |

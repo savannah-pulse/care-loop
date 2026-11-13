@@ -160,6 +160,60 @@ public sealed class JsonPathwayProviderTests : IDisposable
         Assert.Contains(pathway.Deadlines, d => d.NextAction == "acknowledge-notification" && d.UrgencyCode == "PLACEHOLDER-URGENCY-A");
     }
 
+    [Fact]
+    public void Citations_owner_roles_and_change_log_are_parsed_from_the_file()
+    {
+        var pathway = DomainTestData.Provider().Get("breast-screening");
+
+        var acknowledge = pathway.Deadlines.First(d => d.NextAction == "acknowledge-notification");
+        Assert.Equal("nurse-navigator", acknowledge.OwnerRole);
+        Assert.Contains("PLACEHOLDER", acknowledge.Citation);
+        Assert.All(pathway.ClosureRules, r => Assert.Contains("PLACEHOLDER", r.Citation));
+        var entry = Assert.Single(pathway.ChangeLog);
+        Assert.Equal(pathway.Version, entry.Version);
+        Assert.Equal(new DateOnly(2026, 11, 13), entry.Date);
+        Assert.Contains("PLACEHOLDER", entry.Approver);
+        Assert.False(string.IsNullOrWhiteSpace(entry.Summary));
+    }
+
+    [Fact]
+    public void Definition_without_a_consultation_answer_deadline_fails_loudly()
+    {
+        var definition = LoadRealDefinition();
+        var deadlines = definition["deadlines"]!.AsArray();
+        var answer = deadlines.First(d => d!["nextAction"]!.GetValue<string>() == "answer-consultation");
+        deadlines.Remove(answer);
+        WriteTempDefinition("incomplete.json", definition);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => DomainTestData.Provider(_tempDirectory).GetAll());
+
+        Assert.Contains("answer-consultation", exception.Message);
+    }
+
+    [Fact]
+    public void Change_log_entry_without_an_approver_fails_loudly()
+    {
+        var definition = LoadRealDefinition();
+        definition["changeLog"]![0]!["approver"] = " ";
+        WriteTempDefinition("incomplete.json", definition);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => DomainTestData.Provider(_tempDirectory).GetAll());
+
+        Assert.Contains("change log", exception.Message);
+    }
+
+    [Fact]
+    public void Definition_without_a_change_log_still_loads()
+    {
+        var definition = LoadRealDefinition();
+        definition.AsObject().Remove("changeLog");
+        WriteTempDefinition("no-log.json", definition);
+
+        var pathway = DomainTestData.Provider(_tempDirectory).Get("breast-screening");
+
+        Assert.Empty(pathway.ChangeLog);
+    }
+
     private static JsonNode LoadRealDefinition()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Infrastructure", "Pathways", "breast-screening.json");

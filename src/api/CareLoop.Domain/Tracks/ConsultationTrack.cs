@@ -22,6 +22,14 @@ namespace CareLoop.Domain.Tracks;
 public sealed class ConsultationTrack
 {
     /// <summary>
+    /// Key of the next action the case carries while a consultation awaits an answer; names the
+    /// answer deadline in the pathway's deadlines. Also the deadline a proposed owner has to respond
+    /// to a handoff, since a handoff is carried by a consultation.
+    /// </summary>
+    /// <remarks>This is a key into the pathway definition, not a duration: how long the answer may take is configuration.</remarks>
+    public const string AnswerAction = "answer-consultation";
+
+    /// <summary>
     /// Which statuses may follow which. A status not listed as a key is final.
     /// </summary>
     private static readonly IReadOnlyDictionary<ConsultationStatus, ConsultationStatus[]> AllowedMoves =

@@ -67,7 +67,7 @@ public static class Envelopes
     /// find the case. An inbound notification handler must therefore stamp the result's source system,
     /// not the channel's, when it translates a report.
     /// </remarks>
-    public static EventEnvelope Notification(DateTimeOffset at, NotificationUpdateKind kind, NotificationChannel channel = NotificationChannel.Simulator, Guid? attemptId = null, string resultId = ResultId) =>
+    public static EventEnvelope Notification(DateTimeOffset at, NotificationUpdateKind kind, NotificationChannel channel = NotificationChannel.Simulator, Guid? attemptId = null, string resultId = ResultId, int? confidence = null) =>
         new()
         {
             SourceSystem = TestData.SourceSystem,
@@ -83,6 +83,29 @@ public static class Envelopes
                 CommunicationReference = $"Communication/SYN-COMM-{kind}-{channel}",
                 AttemptId = attemptId,
                 FailureReason = kind == NotificationUpdateKind.Failed ? "PLACEHOLDER: channel unreachable" : null,
+                Confidence = confidence,
+            },
+        };
+
+    /// <summary>The synthetic caregiver contact point used by <see cref="Consent"/>.</summary>
+    public static ContactPoint CaregiverContact() =>
+        new() { Channel = NotificationChannel.Email, Address = "SYN-CAREGIVER-INBOX-0001" };
+
+    /// <summary>A caregiver consent granted or withdrawn by the patient.</summary>
+    public static EventEnvelope Consent(DateTimeOffset at, ConsentUpdateKind kind, ContactPoint? caregiver = null, bool noContact = false, string consentReference = "Consent/SYN-CONSENT-0001", string resultId = ResultId) =>
+        new()
+        {
+            SourceSystem = TestData.SourceSystem,
+            SourceEventId = NextEventId(),
+            Type = CaseEventType.ConsentRecorded,
+            SourceResultId = resultId,
+            OccurredAt = at,
+            Actor = null,
+            Payload = new ConsentPayload
+            {
+                Kind = kind,
+                ConsentReference = consentReference,
+                CaregiverContactPoint = noContact ? null : caregiver ?? CaregiverContact(),
             },
         };
 

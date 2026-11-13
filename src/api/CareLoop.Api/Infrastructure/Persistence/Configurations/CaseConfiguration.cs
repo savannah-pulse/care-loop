@@ -8,7 +8,7 @@ namespace CareLoop.Api.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// Maps the <see cref="Case"/> aggregate: the case row, its owner, pending handoff, the four tracks,
-/// escalations and closure decision.
+/// escalations, closure decision and caregiver consent.
 /// </summary>
 /// <remarks>
 /// The Domain has no persistence attributes, so the whole mapping lives here. Value objects are
@@ -102,6 +102,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
                 attempt.Property(a => a.FailureReason).HasMaxLength(500);
             });
             track.Navigation(t => t.Attempts).UsePropertyAccessMode(PropertyAccessMode.Field);
+            track.Property(t => t.Confidence);
         });
 
         builder.OwnsOne(c => c.Consultation, track =>
@@ -143,6 +144,21 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
                 actor.Property(a => a.Role).HasMaxLength(100);
                 actor.Property(a => a.FacilityId).HasMaxLength(100);
             });
+        });
+
+        // The caregiver's contact point is the one piece of contact data a case holds; it lives and
+        // dies with the consent, so it is part of the same owned record.
+        builder.OwnsOne(c => c.CaregiverConsent, consent =>
+        {
+            consent.Ignore(x => x.IsActive);
+            consent.Property(x => x.EvidenceReference).HasMaxLength(200).IsRequired();
+            consent.Property(x => x.WithdrawalEvidenceReference).HasMaxLength(200);
+            consent.OwnsOne(x => x.CaregiverContactPoint, contact =>
+            {
+                contact.Property(p => p.Channel).HasConversion<string>().HasMaxLength(40).IsRequired();
+                contact.Property(p => p.Address).HasMaxLength(500).IsRequired();
+            });
+            consent.Navigation(x => x.CaregiverContactPoint).IsRequired();
         });
     }
 }

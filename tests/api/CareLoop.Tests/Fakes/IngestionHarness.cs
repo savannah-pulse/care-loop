@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace CareLoop.Tests.Fakes;
 
 /// <summary>
-/// The intake engine wired for tests: the real ingestor and the eight real handlers over the
+/// The intake engine wired for tests: the real ingestor and the nine real handlers over the
 /// in-memory repository, the fake clock and the placeholder pathway. No FHIR, no database.
 /// </summary>
 public sealed class IngestionHarness
@@ -30,6 +30,7 @@ public sealed class IngestionHarness
             new AppointmentUpdateHandler(Pathways, Clock),
             new OutcomeHandler(Pathways, Clock),
             new ClosureHandler(Pathways, Clock),
+            new ConsentHandler(),
         ];
         Ingestor = new EventIngestor(Repository, Handlers, Clock, NullLogger<EventIngestor>.Instance);
     }
@@ -43,7 +44,7 @@ public sealed class IngestionHarness
     /// <summary>The pathway provider reading the placeholder definitions.</summary>
     public IPathwayProvider Pathways { get; }
 
-    /// <summary>The eight real handlers.</summary>
+    /// <summary>The nine real handlers.</summary>
     public IReadOnlyList<IEventHandler> Handlers { get; }
 
     /// <summary>The real ingestor.</summary>

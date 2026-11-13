@@ -23,6 +23,13 @@ namespace CareLoop.Domain.Tracks;
 public sealed class ReferralTrack
 {
     /// <summary>
+    /// Key of the next action the case carries while a sent referral awaits the receiving service's
+    /// response; names the response deadline in the pathway's deadlines.
+    /// </summary>
+    /// <remarks>This is a key into the pathway definition, not a duration: how long the response may take is configuration.</remarks>
+    public const string RespondAction = "respond-to-referral";
+
+    /// <summary>
     /// Which statuses may follow which. A status not listed as a key is final.
     /// </summary>
     private static readonly IReadOnlyDictionary<ReferralStatus, ReferralStatus[]> AllowedMoves =

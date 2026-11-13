@@ -4,7 +4,7 @@ namespace CareLoop.Domain.Events;
 /// The kinds of event that can change a case.
 /// </summary>
 /// <remarks>
-/// The first eight members are source events that arrive through the FHIR boundary and each has
+/// The first nine members are source events that arrive through the FHIR boundary and each has
 /// exactly one event handler. The remaining members are raised inside CareLoop (by the deadline
 /// worker or the dashboard) and are persisted through the same single write path so the audit
 /// trail stays complete.
@@ -34,6 +34,9 @@ public enum CaseEventType
 
     /// <summary>An authorized person decided to close the case (case <c>Task</c> completed plus <c>Provenance</c>).</summary>
     ClosureDecided = 7,
+
+    /// <summary>The patient granted or withdrew consent for a caregiver to be told about appointments (FHIR <c>Consent</c>). Not pathway progress: it changes no stage, owner or deadline.</summary>
+    ConsentRecorded = 8,
 
     /// <summary>Internal: a deadline was approaching or passed and the deadline worker warned or escalated.</summary>
     DeadlineElapsed = 100,

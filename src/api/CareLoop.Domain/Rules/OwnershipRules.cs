@@ -2,6 +2,7 @@ using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
 using CareLoop.Domain.Time;
+using CareLoop.Domain.Tracks;
 
 namespace CareLoop.Domain.Rules;
 
@@ -19,8 +20,18 @@ public static class OwnershipRules
     /// <summary>
     /// Key of the next action a proposed owner must take, which names the response deadline in the pathway's deadlines.
     /// </summary>
-    /// <remarks>This is a key into the pathway definition, not a duration: how long the proposed owner has is configuration.</remarks>
-    public const string RespondToHandoffAction = "respond-to-handoff";
+    /// <remarks>
+    /// A handoff is carried by a consultation, so the proposed owner's response deadline is the
+    /// consultation's answer deadline, <see cref="ConsultationTrack.AnswerAction"/>. This is a key
+    /// into the pathway definition, not a duration: how long the proposed owner has is configuration.
+    /// </remarks>
+    public const string RespondToHandoffAction = ConsultationTrack.AnswerAction;
+
+    /// <summary>
+    /// The role key under which CareLoop's own automation acts. It can never own a case.
+    /// </summary>
+    /// <remarks>A case always has a person or a staff queue accountable for it; automation is never accountable for a patient.</remarks>
+    public const string SystemRole = "system";
 
     /// <summary>
     /// Chooses the first owner of a newly opened case.
@@ -91,8 +102,9 @@ public static class OwnershipRules
     /// <para>
     /// Refuses when the case is closed, when another proposal is pending, when the proposed owner is
     /// a queue (queues are assigned with <see cref="Case.AssignOwner"/>, not proposed to), when the
-    /// proposed owner already owns the case, when the proposer may not hand over this case, or when
-    /// the pathway defines no deadline for <see cref="RespondToHandoffAction"/>.
+    /// proposed owner already owns the case, when the proposed owner's role is not one the pathway
+    /// lets hold a case (see <see cref="MayOwn"/>), when the proposer may not hand over this case,
+    /// or when the pathway defines no deadline for <see cref="RespondToHandoffAction"/>.
     /// </para>
     /// <para>
     /// The proposer may hand over the case when they are the current owner, when they hold the role
@@ -141,6 +153,12 @@ public static class OwnershipRules
         if (string.Equals(proposedOwner.Reference, @case.Owner.Reference, StringComparison.Ordinal))
         {
             return RuleResult.Deny($"'{proposedOwner.Reference}' already owns the case.");
+        }
+
+        if (!MayOwn(proposedOwner.Role, pathway))
+        {
+            return RuleResult.Deny(
+                $"Role '{proposedOwner.Role}' may not own a case on pathway '{pathway.Id}'; owning roles are {string.Join(", ", OwnerRoles(pathway))}.");
         }
 
         if (!MayHandOver(@case, proposedBy, pathway))
@@ -199,6 +217,40 @@ public static class OwnershipRules
 
         return RuleResult.Allow();
     }
+
+    /// <summary>
+    /// Decides whether a role may hold ownership of a case on a pathway.
+    /// </summary>
+    /// <param name="role">The role key of the would-be owner.</param>
+    /// <param name="pathway">The pathway definition naming the roles.</param>
+    /// <returns><see langword="true"/> when the pathway names the role as an owner.</returns>
+    /// <remarks>
+    /// The owning roles are read from the pathway, never listed in code: every role named as a
+    /// deadline's <see cref="DeadlineDefinition.OwnerRole"/>, as a stage's
+    /// <see cref="StageDefinition.AllowedRoles"/> or as the <see cref="PathwayDefinition.UnassignedQueueRole"/>
+    /// may own a case, so adding a persona such as a nurse navigator is a pathway edit. The
+    /// <see cref="SystemRole"/> never may, whatever the pathway says, because automation is never
+    /// accountable for a patient.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="pathway"/> is <see langword="null"/>.</exception>
+    public static bool MayOwn(string role, PathwayDefinition pathway)
+    {
+        ArgumentNullException.ThrowIfNull(pathway);
+
+        return !string.IsNullOrWhiteSpace(role)
+            && !string.Equals(role, SystemRole, StringComparison.OrdinalIgnoreCase)
+            && OwnerRoles(pathway).Contains(role, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IReadOnlyList<string> OwnerRoles(PathwayDefinition pathway) =>
+        pathway.Deadlines.Select(d => d.OwnerRole)
+            .Concat(pathway.Stages.SelectMany(s => s.AllowedRoles))
+            .Append(pathway.UnassignedQueueRole)
+            .Where(r => !string.IsNullOrWhiteSpace(r) && !string.Equals(r, SystemRole, StringComparison.OrdinalIgnoreCase))
+            .Select(r => r!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private static bool MayHandOver(Case @case, Actor proposedBy, PathwayDefinition pathway)
     {

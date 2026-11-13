@@ -19,4 +19,7 @@ public enum NotificationUpdateKind
 
     /// <summary>The patient asked to be called. Not an acknowledgement.</summary>
     CallRequested = 4,
+
+    /// <summary>The patient rated how confident they feel about what to do next, 1 to 5. A measure, not an acknowledgement; the value is in <see cref="NotificationUpdatePayload.Confidence"/>.</summary>
+    ConfidenceRated = 5,
 }

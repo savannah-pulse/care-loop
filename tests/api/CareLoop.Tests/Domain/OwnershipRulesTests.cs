@@ -221,6 +221,64 @@ public sealed class OwnershipRulesTests
         Assert.Contains(OwnershipRules.RespondToHandoffAction, verdict.Reason);
     }
 
+    [Fact]
+    public void Handoff_response_deadline_is_the_consultation_answer_deadline()
+    {
+        Assert.Equal(CareLoop.Domain.Tracks.ConsultationTrack.AnswerAction, OwnershipRules.RespondToHandoffAction);
+        Assert.Equal("answer-consultation", OwnershipRules.RespondToHandoffAction);
+        Assert.DoesNotContain(DomainTestData.Pathway.Deadlines, d => d.NextAction == "respond-to-handoff");
+    }
+
+    [Theory]
+    [InlineData("nurse-navigator")]
+    [InlineData("receiving-clinician")]
+    [InlineData("lab")]
+    [InlineData("clinician")]
+    [InlineData("facility-lead")]
+    public void Roles_the_pathway_names_may_hold_and_accept_ownership(string role)
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        var proposedOwner = new CaseOwner { Reference = $"SYN-STAFF-{role}", Role = role, FacilityId = "SYN-FAC-A" };
+
+        Assert.True(OwnershipRules.MayOwn(role, DomainTestData.Pathway));
+        var verdict = OwnershipRules.TryPropose(@case, proposedOwner, DomainTestData.ClinicianActor(), DomainTestData.Pathway, _clock, out var proposal);
+        Assert.True(verdict.Allowed, verdict.Reason);
+        @case.ProposeOwner(proposal!);
+        var acceptor = new CareLoop.Domain.Events.Actor { Reference = proposedOwner.Reference, Role = role, FacilityId = "SYN-FAC-A" };
+        Assert.True(OwnershipRules.CanRespond(@case, acceptor).Allowed);
+        @case.AcceptOwnership(acceptor, _clock.UtcNow);
+
+        Assert.Equal(proposedOwner, @case.Owner);
+    }
+
+    [Theory]
+    [InlineData("receptionist")]
+    [InlineData("system")]
+    [InlineData("")]
+    public void Roles_the_pathway_does_not_name_may_not_own_a_case(string role)
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        var proposedOwner = new CaseOwner { Reference = "SYN-STAFF-0077", Role = role, FacilityId = "SYN-FAC-A" };
+
+        Assert.False(OwnershipRules.MayOwn(role, DomainTestData.Pathway));
+        var verdict = OwnershipRules.TryPropose(@case, proposedOwner, DomainTestData.ClinicianActor(), DomainTestData.Pathway, _clock, out var proposal);
+
+        Assert.False(verdict.Allowed);
+        Assert.Null(proposal);
+        Assert.Contains("may not own", verdict.Reason);
+    }
+
+    [Fact]
+    public void System_role_may_never_own_even_if_the_pathway_lists_it()
+    {
+        var pathway = DomainTestData.Pathway with
+        {
+            Deadlines = [.. DomainTestData.Pathway.Deadlines, DomainTestData.Pathway.Deadlines[0] with { NextAction = "placeholder-automation", OwnerRole = "system" }],
+        };
+
+        Assert.False(OwnershipRules.MayOwn("system", pathway));
+    }
+
     private Case Proposed(out CaseOwner proposedOwner)
     {
         var @case = DomainTestData.InFollowUp(_clock);

@@ -31,4 +31,7 @@ public sealed record ClosureEvidenceRule
 
     /// <summary>The minimum number of documented contact attempts required; zero when none are needed.</summary>
     public required int MinimumDocumentedAttempts { get; init; }
+
+    /// <summary>The clinical or policy source the evidence requirement is taken from, or <see langword="null"/> while it is a placeholder with no source.</summary>
+    public string? Citation { get; init; }
 }

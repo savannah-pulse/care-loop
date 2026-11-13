@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Tracks;
 using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Infrastructure.Pathways;
@@ -14,8 +15,10 @@ namespace CareLoop.Api.Infrastructure.Pathways;
 /// it to a <see cref="PathwayDefinition"/> (camelCase names, enums as strings, durations as
 /// <c>d.hh:mm:ss</c>) and caches it for the lifetime of the provider. Fails loudly on a malformed
 /// file, on a duplicate pathway identifier, or on a definition missing a rule for any stage or
-/// closure reason or a deadline for any next action it names, because a silently incomplete pathway
-/// would let cases stall without a deadline. A failed load is not cached, so a corrected file is
+/// closure reason or a deadline for any next action it names (including the consultation answer and
+/// referral response actions the handlers set), because a silently incomplete pathway would let
+/// cases stall without a deadline. A change log entry with no version, approver or summary also
+/// fails, because an unattributed rule cannot be traced. A failed load is not cached, so a corrected file is
 /// picked up on the next call.
 /// </remarks>
 public sealed class JsonPathwayProvider : IPathwayProvider
@@ -191,6 +194,8 @@ public sealed class JsonPathwayProvider : IPathwayProvider
         var namedActions = definition.Stages
             .Select(s => s.NextActionOnEntry)
             .Concat(definition.Tracks.Select(t => t.NextActionOnException))
+            .Append(ConsultationTrack.AnswerAction)
+            .Append(ReferralTrack.RespondAction)
             .Where(a => !string.IsNullOrWhiteSpace(a))
             .Select(a => a!)
             .Distinct(StringComparer.OrdinalIgnoreCase);
@@ -208,6 +213,19 @@ public sealed class JsonPathwayProvider : IPathwayProvider
         foreach (var deadline in definition.Deadlines.Where(d => d.UrgencyCode is not null && !definition.UrgencyCodes.Contains(d.UrgencyCode, StringComparer.Ordinal)))
         {
             problems.Add($"gives next action '{deadline.NextAction}' a deadline for unknown urgency code '{deadline.UrgencyCode}'");
+        }
+
+        foreach (var deadline in definition.Deadlines.Where(d => d.OwnerRole is not null && string.IsNullOrWhiteSpace(d.OwnerRole)))
+        {
+            problems.Add($"gives next action '{deadline.NextAction}' a blank ownerRole");
+        }
+
+        foreach (var (entry, index) in definition.ChangeLog.Select((e, i) => (e, i)))
+        {
+            if (string.IsNullOrWhiteSpace(entry.Version) || string.IsNullOrWhiteSpace(entry.Approver) || string.IsNullOrWhiteSpace(entry.Summary))
+            {
+                problems.Add($"has a change log entry (index {index}) without a version, approver or summary");
+            }
         }
 
         if (definition.EscalationLadder.Count == 0)

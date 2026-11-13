@@ -48,7 +48,7 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the intake pipeline and its eight event handlers.
+    /// Registers the intake pipeline and its nine event handlers.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The same service collection, for chaining.</returns>
@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IEventHandler, AppointmentUpdateHandler>();
         services.AddScoped<IEventHandler, OutcomeHandler>();
         services.AddScoped<IEventHandler, ClosureHandler>();
+        services.AddScoped<IEventHandler, ConsentHandler>();
 
         return services;
     }

@@ -1,5 +1,6 @@
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Events.DomainEvents;
+using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Tracks;
 
 namespace CareLoop.Domain.Cases;
@@ -25,6 +26,7 @@ namespace CareLoop.Domain.Cases;
 /// <item><description><b>Tracks</b>: <see cref="Notification"/>, <see cref="Consultation"/>, <see cref="Referral"/> and <see cref="Appointment"/> are the strands of follow-up work that run in parallel (see <see cref="TrackKind"/>). Each is <see langword="null"/> until it starts.</description></item>
 /// <item><description><b>Exceptions and escalation</b>: <see cref="Exceptions"/> flags what is currently wrong (overdue, rejected, unreachable and so on) and <see cref="IsEscalated"/> says oversight has been brought in. Both are flags, not stages, so the case keeps its place in the pathway.</description></item>
 /// <item><description><b>Ending</b>: <see cref="OutcomeEvidenceReference"/> points at the outcome evidence in the hospital system and <see cref="Closure"/> is the authorized human decision that closed the case.</description></item>
+/// <item><description><b>Caregiver consent</b>: <see cref="CaregiverConsent"/> records, with evidence, that the patient agreed for one caregiver to receive appointment reminders. It is the only contact data a case holds, and it goes when the consent is withdrawn.</description></item>
 /// </list>
 /// <para>
 /// <b>How a case changes.</b> Only through the methods on this class, which the rules in
@@ -161,6 +163,9 @@ public sealed class Case
 
     /// <summary>The accepted closure decision, or <see langword="null"/> while the case is open.</summary>
     public ClosureDecision? Closure { get; private set; }
+
+    /// <summary>The patient's consent for a caregiver to be told about appointments, or <see langword="null"/> when none was ever recorded. Check <see cref="Consent.IsActive"/> before contacting the caregiver.</summary>
+    public Consent? CaregiverConsent { get; private set; }
 
     /// <summary>When the case was opened.</summary>
     public DateTimeOffset CreatedAt { get; private set; }
@@ -567,6 +572,63 @@ public sealed class Case
             Reason = decision.Reason,
             AuthorizedBy = decision.AuthorizedBy,
         });
+    }
+
+    /// <summary>
+    /// Records the patient's consent for a caregiver to receive appointment reminders.
+    /// </summary>
+    /// <param name="caregiverContactPoint">How the caregiver is reached.</param>
+    /// <param name="evidenceReference">Reference to the record of the consent in the source system.</param>
+    /// <param name="at">When the patient granted the consent according to the source.</param>
+    /// <remarks>
+    /// Consent is recorded only from an event that carries evidence; CareLoop never infers it. One
+    /// active consent at a time: a change of caregiver is a withdrawal followed by a new consent, so
+    /// the audit trail shows both decisions. The change is audited by the repository when the event
+    /// that carried it is saved. Recording consent changes nothing else about the case.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="caregiverContactPoint"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="evidenceReference"/> is empty.</exception>
+    /// <exception cref="InvalidOperationException">An active consent already exists, or the case is closed.</exception>
+    public void RecordConsent(ContactPoint caregiverContactPoint, string evidenceReference, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(caregiverContactPoint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(evidenceReference);
+        ThrowIfClosed();
+        if (CaregiverConsent is { IsActive: true })
+        {
+            throw new InvalidOperationException(
+                "A caregiver consent is already active on this case; it must be withdrawn before another is recorded.");
+        }
+
+        CaregiverConsent = new Consent
+        {
+            CaregiverContactPoint = caregiverContactPoint,
+            GrantedAt = at,
+            EvidenceReference = evidenceReference,
+        };
+        Touch(at);
+    }
+
+    /// <summary>
+    /// Records that the patient withdrew the caregiver consent. No further caregiver message may be sent.
+    /// </summary>
+    /// <param name="evidenceReference">Reference to the record of the withdrawal in the source system, when there is one.</param>
+    /// <param name="at">When the consent was withdrawn according to the source.</param>
+    /// <remarks>
+    /// Withdrawal is allowed even on a closed case, because a consent the patient has taken back
+    /// must never look active. The change is audited by the repository when the event that carried
+    /// it is saved.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">No active consent exists.</exception>
+    public void WithdrawConsent(string? evidenceReference, DateTimeOffset at)
+    {
+        if (CaregiverConsent is not { IsActive: true } consent)
+        {
+            throw new InvalidOperationException("No caregiver consent is active on this case, so there is nothing to withdraw.");
+        }
+
+        CaregiverConsent = consent with { WithdrawnAt = at, WithdrawalEvidenceReference = evidenceReference };
+        Touch(at);
     }
 
     private void Touch(DateTimeOffset at) => UpdatedAt = at > UpdatedAt ? at : UpdatedAt;

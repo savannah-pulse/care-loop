@@ -21,7 +21,8 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// <see cref="CallRequested"/>. Delivery never completes the track, transfers ownership or stops a
 /// clock. An acknowledgement that completes the pending acknowledgement action gives the owner the
 /// follow-up action (<see cref="HandlerSupport.ArrangeFollowUpAction"/>) with its own deadline and
-/// resolves any escalation raised while the patient was silent.
+/// resolves any escalation raised while the patient was silent. A confidence rating is stored on the
+/// track as a measure and changes nothing else.
 /// </remarks>
 public sealed class NotificationUpdateHandler : IEventHandler
 {
@@ -72,6 +73,7 @@ public sealed class NotificationUpdateHandler : IEventHandler
             NotificationUpdateKind.Acknowledged => Acknowledge(@case, track, payload, envelope, pathway, NotificationStatus.Acknowledged),
             NotificationUpdateKind.Understood => Acknowledge(@case, track, payload, envelope, pathway, NotificationStatus.Understood),
             NotificationUpdateKind.CallRequested => RequestCall(@case, track, payload, envelope, pathway),
+            NotificationUpdateKind.ConfidenceRated => RateConfidence(@case, track, payload, envelope),
             _ => HandlerSupport.Refused(@case, $"Notification update kind {payload.Kind} is not understood."),
         };
     }
@@ -173,6 +175,27 @@ public sealed class NotificationUpdateHandler : IEventHandler
             DueAt = @case.DueAt!.Value,
         });
 
+        return HandlerSupport.Applied(@case, payload.CommunicationReference);
+    }
+
+    private static Task<EventHandlingResult> RateConfidence(
+        Case @case,
+        NotificationTrack track,
+        NotificationUpdatePayload payload,
+        EventEnvelope envelope)
+    {
+        if (payload.Confidence is not { } confidence)
+        {
+            return HandlerSupport.Refused(@case, "A confidence rating must carry a value.");
+        }
+
+        if (confidence is < NotificationTrack.MinimumConfidence or > NotificationTrack.MaximumConfidence)
+        {
+            return HandlerSupport.Refused(@case,
+                $"A confidence rating must be between {NotificationTrack.MinimumConfidence} and {NotificationTrack.MaximumConfidence}; {confidence} given.");
+        }
+
+        track.RateConfidence(confidence, envelope.OccurredAt, payload.CommunicationReference);
         return HandlerSupport.Applied(@case, payload.CommunicationReference);
     }
 

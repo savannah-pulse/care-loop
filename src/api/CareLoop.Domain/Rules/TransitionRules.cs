@@ -55,7 +55,8 @@ public static class TransitionRules
     /// the stage names allowed roles. Track events (notification, consultation, referral,
     /// appointment) are allowed during follow-up and closure review without changing the stage.
     /// CareLoop's own internal events (<see cref="CaseEventType.DeadlineElapsed"/>,
-    /// <see cref="CaseEventType.HandoffSummaryApproved"/>) are allowed on any open case without
+    /// <see cref="CaseEventType.HandoffSummaryApproved"/>) and a consent record
+    /// (<see cref="CaseEventType.ConsentRecorded"/>) are allowed on any open case without
     /// changing the stage, because they are coordination, not pathway progress.
     /// </para>
     /// <para>This method never mutates the case.</para>
@@ -112,7 +113,7 @@ public static class TransitionRules
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }
 
-        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved)
+        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved or CaseEventType.ConsentRecorded)
         {
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }

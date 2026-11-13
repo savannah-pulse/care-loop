@@ -1,5 +1,6 @@
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events.DomainEvents;
+using CareLoop.Domain.Recipients;
 using CareLoop.Tests.Fakes;
 
 namespace CareLoop.Tests.Domain;
@@ -164,5 +165,91 @@ public sealed class CaseTests
         var appointment = @case.BeginAppointment("SYN-APPT-0001", _clock.UtcNow.AddDays(1), _clock.UtcNow);
 
         Assert.Equal("SYN-PROC-0001", appointment.OutcomeReference);
+    }
+
+    private static ContactPoint CaregiverContact() =>
+        new() { Channel = NotificationChannel.Email, Address = "SYN-CAREGIVER-INBOX-0001" };
+
+    [Fact]
+    public void Recording_consent_stores_the_caregiver_contact_and_evidence_and_is_active()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        var stage = @case.Stage;
+        var owner = @case.Owner;
+        var dueAt = @case.DueAt;
+
+        @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+
+        var consent = Assert.IsType<Consent>(@case.CaregiverConsent);
+        Assert.True(consent.IsActive);
+        Assert.Equal(CaregiverContact(), consent.CaregiverContactPoint);
+        Assert.Equal("Consent/SYN-CONSENT-0001", consent.EvidenceReference);
+        Assert.Equal(_clock.UtcNow, consent.GrantedAt);
+        Assert.Null(consent.WithdrawnAt);
+        Assert.Equal(stage, @case.Stage);
+        Assert.Equal(owner, @case.Owner);
+        Assert.Equal(dueAt, @case.DueAt);
+    }
+
+    [Fact]
+    public void Consent_needs_evidence_and_a_contact_point()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+
+        Assert.Throws<ArgumentException>(() => @case.RecordConsent(CaregiverContact(), " ", _clock.UtcNow));
+        Assert.Throws<ArgumentNullException>(() => @case.RecordConsent(null!, "Consent/SYN-CONSENT-0001", _clock.UtcNow));
+        Assert.Null(@case.CaregiverConsent);
+    }
+
+    [Fact]
+    public void Withdrawing_consent_keeps_the_record_but_makes_it_inactive()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        _clock.Advance(TimeSpan.FromDays(2));
+
+        @case.WithdrawConsent("Consent/SYN-CONSENT-0001/_history/2", _clock.UtcNow);
+
+        var consent = @case.CaregiverConsent!;
+        Assert.False(consent.IsActive);
+        Assert.Equal(_clock.UtcNow, consent.WithdrawnAt);
+        Assert.Equal("Consent/SYN-CONSENT-0001/_history/2", consent.WithdrawalEvidenceReference);
+        Assert.Equal("Consent/SYN-CONSENT-0001", consent.EvidenceReference);
+    }
+
+    [Fact]
+    public void Second_consent_while_one_is_active_is_refused_but_allowed_after_withdrawal()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() => @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0002", _clock.UtcNow));
+
+        @case.WithdrawConsent(null, _clock.UtcNow);
+        @case.RecordConsent(CaregiverContact() with { Address = "SYN-CAREGIVER-INBOX-0002" }, "Consent/SYN-CONSENT-0002", _clock.UtcNow);
+
+        Assert.True(@case.CaregiverConsent!.IsActive);
+        Assert.Equal("SYN-CAREGIVER-INBOX-0002", @case.CaregiverConsent.CaregiverContactPoint.Address);
+    }
+
+    [Fact]
+    public void Withdrawal_without_an_active_consent_is_refused()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+
+        Assert.Throws<InvalidOperationException>(() => @case.WithdrawConsent(null, _clock.UtcNow));
+    }
+
+    [Fact]
+    public void Consent_cannot_be_recorded_on_a_closed_case_but_can_be_withdrawn()
+    {
+        var @case = DomainTestData.ReadyForClosure(_clock);
+        @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        @case.Close(DomainTestData.TreatedDecision(_clock), _clock.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() => @case.RecordConsent(CaregiverContact(), "Consent/SYN-CONSENT-0002", _clock.UtcNow));
+        @case.WithdrawConsent(null, _clock.UtcNow);
+
+        Assert.False(@case.CaregiverConsent!.IsActive);
     }
 }
