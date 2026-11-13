@@ -38,6 +38,38 @@ public sealed class TransitionRulesTests
     }
 
     [Fact]
+    public void Further_outcome_during_closure_review_is_allowed_without_leaving_the_stage()
+    {
+        var @case = DomainTestData.ReadyForClosure(_clock);
+
+        var result = TransitionRules.Evaluate(@case, CaseEventType.OutcomeRecorded, DomainTestData.ClinicianActor(), DomainTestData.Pathway);
+
+        Assert.True(result.Verdict.Allowed, result.Verdict.Reason);
+        Assert.Null(result.NextStage);
+        Assert.Null(result.NextAction);
+    }
+
+    [Fact]
+    public void Further_outcome_during_closure_review_still_needs_a_role_allowed_to_record_outcomes()
+    {
+        var @case = DomainTestData.ReadyForClosure(_clock);
+
+        Assert.False(TransitionRules.Evaluate(@case, CaseEventType.OutcomeRecorded, DomainTestData.ReceptionistActor(), DomainTestData.Pathway).Verdict.Allowed);
+        Assert.False(TransitionRules.Evaluate(@case, CaseEventType.OutcomeRecorded, null, DomainTestData.Pathway).Verdict.Allowed);
+        Assert.True(TransitionRules.Evaluate(@case, CaseEventType.OutcomeRecorded, new Actor { Reference = "SYN-LAB-0001", Role = "lab", FacilityId = "SYN-FAC-A" }, DomainTestData.Pathway).Verdict.Allowed);
+    }
+
+    [Fact]
+    public void Outcome_before_follow_up_is_still_refused()
+    {
+        var @case = DomainTestData.InReviewPending(_clock);
+
+        var result = TransitionRules.Evaluate(@case, CaseEventType.OutcomeRecorded, DomainTestData.ClinicianActor(), DomainTestData.Pathway);
+
+        Assert.False(result.Verdict.Allowed);
+    }
+
+    [Fact]
     public void Outcome_moves_follow_up_active_to_closure_review()
     {
         var @case = DomainTestData.InFollowUp(_clock);

@@ -20,7 +20,7 @@ namespace CareLoop.Api.Features.Events;
 public sealed class EventIngestor
 {
     /// <summary>
-    /// The payload type each source event must carry. The two internal event types are absent on
+    /// The payload type each source event must carry. The internal event types are absent on
     /// purpose: they are saved through the repository directly, never ingested.
     /// </summary>
     private static readonly IReadOnlyDictionary<CaseEventType, Type> PayloadTypes = new Dictionary<CaseEventType, Type>

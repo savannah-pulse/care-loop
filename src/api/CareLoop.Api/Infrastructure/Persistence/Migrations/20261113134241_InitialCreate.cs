@@ -43,6 +43,8 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     SourceSystem = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     SourceResultId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     PatientReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    PatientDisplayName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    PatientSecondaryIdentifier = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     PathwayId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     FacilityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Urgency = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
@@ -72,6 +74,7 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     Notification_StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Notification_UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Notification_CallRequested = table.Column<bool>(type: "boolean", nullable: true),
+                    Notification_Confidence = table.Column<int>(type: "integer", nullable: true),
                     Consultation_Status = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
                     Consultation_SourceReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     Consultation_StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -86,7 +89,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     Appointment_StartedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Appointment_UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Appointment_ScheduledFor = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Appointment_OutcomeReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     OutcomeEvidenceReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    OutcomeEvidenceKind = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     Closure_Reason = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
                     Closure_AuthorizedBy_Reference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     Closure_AuthorizedBy_Role = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
@@ -96,6 +101,12 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     Closure_ExceptionNote = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     Closure_NextSurveillanceDate = table.Column<DateOnly>(type: "date", nullable: true),
                     Closure_DocumentedAttemptReferences = table.Column<string>(type: "text", nullable: true),
+                    CaregiverConsent_CaregiverContactPoint_Channel = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true),
+                    CaregiverConsent_CaregiverContactPoint_Address = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CaregiverConsent_GrantedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CaregiverConsent_WithdrawnAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CaregiverConsent_EvidenceReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CaregiverConsent_WithdrawalEvidenceReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     Version = table.Column<int>(type: "integer", nullable: false)
@@ -111,12 +122,24 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     CaseId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RequestId = table.Column<Guid>(type: "uuid", nullable: false),
                     Status = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
+                    SectionsJson = table.Column<string>(type: "jsonb", nullable: false),
                     Text = table.Column<string>(type: "text", nullable: false),
+                    MissingOrConflictingFactsJson = table.Column<string>(type: "jsonb", nullable: false),
+                    SourceFactReferencesJson = table.Column<string>(type: "jsonb", nullable: false),
                     DraftedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    ModelDeployment = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    PromptVersion = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
+                    PolicyVersion = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
+                    Trigger = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
+                    Language = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     DraftedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     ApprovedBy = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    ApprovedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                    ApprovedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RejectedBy = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    RejectedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RejectionReason = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -176,6 +199,10 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     EscalatedTo_IsQueue = table.Column<bool>(type: "boolean", nullable: false),
                     RaisedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     Reason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    AcknowledgedBy_Reference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    AcknowledgedBy_Role = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    AcknowledgedBy_FacilityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    AcknowledgedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     ResolvedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CaseId = table.Column<Guid>(type: "uuid", nullable: false)
                 },
@@ -274,6 +301,11 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 name: "IX_HandoffSummaries_CaseId",
                 table: "HandoffSummaries",
                 column: "CaseId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_HandoffSummaries_CaseId_Status",
+                table: "HandoffSummaries",
+                columns: new[] { "CaseId", "Status" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_NotificationAttempts_CaseId",

@@ -107,9 +107,25 @@ public sealed class CaseTests
         @case.RecordOutcomeEvidence("SYN-PROC-0001", _clock.UtcNow);
 
         Assert.Equal("SYN-PROC-0001", @case.OutcomeEvidenceReference);
+        Assert.Null(@case.OutcomeEvidenceKind);
         Assert.NotEqual(CaseStage.Closed, @case.Stage);
         Assert.Null(@case.Closure);
         Assert.Empty(@case.DomainEvents.OfType<CaseClosed>());
+    }
+
+    [Fact]
+    public void Successive_outcomes_replace_the_reference_and_kind_held_on_the_case()
+    {
+        var @case = DomainTestData.ReadyForClosure(_clock);
+        _clock.Advance(TimeSpan.FromDays(1));
+
+        @case.RecordOutcomeEvidence("SYN-PROC-0002", _clock.UtcNow, "treatment-plan");
+
+        Assert.Equal("SYN-PROC-0002", @case.OutcomeEvidenceReference);
+        Assert.Equal("treatment-plan", @case.OutcomeEvidenceKind);
+        Assert.Equal("SYN-PROC-0002", @case.Appointment!.OutcomeReference);
+        Assert.Equal(CaseStage.ClosureReview, @case.Stage);
+        Assert.Null(@case.Closure);
     }
 
     [Fact]

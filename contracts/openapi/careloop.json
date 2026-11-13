@@ -1088,7 +1088,8 @@
           "ClosureDecided",
           "ConsentRecorded",
           "DeadlineElapsed",
-          "HandoffSummaryApproved"
+          "HandoffSummaryApproved",
+          "EscalationAcknowledged"
         ],
         "description": "The kinds of event that can change a case."
       },

@@ -13,6 +13,20 @@ public sealed record ScreeningResultPayload : EventPayload
     /// <summary>Source-system reference of the patient. Never a name.</summary>
     public required string PatientReference { get; init; }
 
+    /// <summary>
+    /// The patient's display name as the source system shows it, or <see langword="null"/> when the
+    /// source did not supply one. Demographic, not clinical: it lets staff recognise who a case is
+    /// about and is returned to staff roles only, never to a patient-facing or system channel.
+    /// </summary>
+    public string? PatientDisplayName { get; init; }
+
+    /// <summary>
+    /// A second identifier of the patient, typically the medical record number (MRN) of the facility,
+    /// or <see langword="null"/> when the source did not supply one. Demographic, not clinical; shown
+    /// to staff roles only so they can match the case to the record in front of them.
+    /// </summary>
+    public string? PatientSecondaryIdentifier { get; init; }
+
     /// <summary>Identifier of the pathway the result belongs to.</summary>
     public required string PathwayId { get; init; }
 

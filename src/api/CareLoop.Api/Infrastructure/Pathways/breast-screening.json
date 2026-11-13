@@ -1,7 +1,7 @@
 {
   "notice": "PLACEHOLDER PATHWAY - SYNTHETIC. Nothing in this file is clinically approved. Every code, role, duration and evidence rule is a placeholder to be replaced by values a clinical adviser signs off. Stage entry and exit rules are a proposal still to be confirmed by the team.",
   "id": "breast-screening",
-  "version": "0.0.0-placeholder",
+  "version": "0.0.1-placeholder",
   "displayName": "PLACEHOLDER - Breast screening follow-up (Abu Dhabi prototype)",
   "isPlaceholder": true,
   "urgencyCodes": ["PLACEHOLDER-URGENCY-A", "PLACEHOLDER-URGENCY-B"],
@@ -24,14 +24,15 @@
     { "nextAction": "review-result", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "nextAction": "acknowledge-notification", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "nurse-navigator", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "nextAction": "acknowledge-notification", "urgencyCode": "PLACEHOLDER-URGENCY-A", "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "nurse-navigator", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
-    { "nextAction": "answer-consultation", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
-    { "nextAction": "respond-to-referral", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
+    { "nextAction": "answer-consultation", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - taken from screen 4 of the design, not from a clinical source; to be cited by the clinical adviser. The design states the value in working hours, but CareLoop has no working-hours calendar, so the duration is clock time" },
+    { "nextAction": "respond-to-referral", "urgencyCode": null, "duration": "0.04:00:00", "warnBefore": "0.01:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - taken from screen 4 of the design, not from a clinical source; to be cited by the clinical adviser. The design states the value in working hours, but CareLoop has no working-hours calendar, so the duration is clock time" },
     { "nextAction": "arrange-follow-up", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
-    { "nextAction": "call-patient", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "nurse-navigator", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
+    { "nextAction": "call-patient", "urgencyCode": null, "duration": "0.02:00:00", "warnBefore": "0.00:30:00", "clinicallyApproved": false, "ownerRole": "nurse-navigator", "citation": "PLACEHOLDER - taken from screen 4 of the design, not from a clinical source; to be cited by the clinical adviser. The design states the value in working hours, but CareLoop has no working-hours calendar, so the duration is clock time" },
     { "nextAction": "contact-patient-another-way", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "nurse-navigator", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "nextAction": "reassign-consultation", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "nextAction": "arrange-alternative-referral", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "nextAction": "rebook-appointment", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
+    { "nextAction": "start-treatment", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser. Clock time, not working hours" },
     { "nextAction": "decide-closure", "urgencyCode": null, "duration": "1.00:00:00", "warnBefore": "0.06:00:00", "clinicallyApproved": false, "ownerRole": "receiving-clinician", "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" }
   ],
   "escalationLadder": [
@@ -46,7 +47,14 @@
     { "reason": "TransferredAndAccepted", "authorizedRoles": ["clinician", "receiving-clinician"], "isException": true, "requiresEvidenceReference": true, "requiresExceptionNote": true, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 0, "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" },
     { "reason": "Untraceable", "authorizedRoles": ["clinician", "receiving-clinician"], "isException": true, "requiresEvidenceReference": false, "requiresExceptionNote": true, "requiresNextSurveillanceDate": false, "minimumDocumentedAttempts": 1, "citation": "PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser" }
   ],
+  "evidenceKinds": [
+    { "kind": "diagnosis", "description": "PLACEHOLDER - a confirmed diagnosis was documented at the source", "clinicallyApproved": false, "nextAction": null },
+    { "kind": "treatment-plan", "description": "PLACEHOLDER - a treatment plan was documented; treatment must then start by the start-treatment deadline", "clinicallyApproved": false, "nextAction": "start-treatment" },
+    { "kind": "treatment-started", "description": "PLACEHOLDER - treatment started; the case returns to closure review", "clinicallyApproved": false, "nextAction": "decide-closure" },
+    { "kind": "surveillance-started", "description": "PLACEHOLDER - the patient was placed on surveillance; the case returns to closure review", "clinicallyApproved": false, "nextAction": "decide-closure" }
+  ],
   "changeLog": [
-    { "version": "0.0.0-placeholder", "date": "2026-11-13", "approver": "PLACEHOLDER - not clinically approved; drafted by the engineering team", "summary": "Placeholder definition for the prototype. Adds per-kind reply deadlines (answer-consultation, respond-to-referral), the nurse-navigator, receiving-clinician and lab roles, an owner role per next action and citation placeholders." }
+    { "version": "0.0.0-placeholder", "date": "2026-11-13", "approver": "PLACEHOLDER - not clinically approved; drafted by the engineering team", "summary": "Placeholder definition for the prototype. Adds per-kind reply deadlines (answer-consultation, respond-to-referral), the nurse-navigator, receiving-clinician and lab roles, an owner role per next action and citation placeholders." },
+    { "version": "0.0.1-placeholder", "date": "2026-11-13", "approver": "PLACEHOLDER - not clinically approved; drafted by the engineering team", "summary": "Reply deadline placeholders follow screen 4 of the design (decision 18): respond-to-referral 4 hours, answer-consultation 1 day, call-patient 2 hours, as clock time because no working-hours calendar exists. Declares the evidence kinds an outcome may carry (diagnosis, treatment-plan, treatment-started, surveillance-started; decision 20) and a start-treatment deadline that follows a treatment plan." }
   ]
 }

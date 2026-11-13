@@ -169,7 +169,8 @@ public sealed class JsonPathwayProviderTests : IDisposable
         Assert.Equal("nurse-navigator", acknowledge.OwnerRole);
         Assert.Contains("PLACEHOLDER", acknowledge.Citation);
         Assert.All(pathway.ClosureRules, r => Assert.Contains("PLACEHOLDER", r.Citation));
-        var entry = Assert.Single(pathway.ChangeLog);
+        Assert.NotEmpty(pathway.ChangeLog);
+        var entry = pathway.ChangeLog[^1];
         Assert.Equal(pathway.Version, entry.Version);
         Assert.Equal(new DateOnly(2026, 11, 13), entry.Date);
         Assert.Contains("PLACEHOLDER", entry.Approver);
@@ -188,6 +189,42 @@ public sealed class JsonPathwayProviderTests : IDisposable
         var exception = Assert.Throws<InvalidOperationException>(() => DomainTestData.Provider(_tempDirectory).GetAll());
 
         Assert.Contains("answer-consultation", exception.Message);
+    }
+
+    [Fact]
+    public void Evidence_kinds_are_parsed_from_the_file()
+    {
+        var pathway = DomainTestData.Provider().Get("breast-screening");
+
+        var plan = Assert.Single(pathway.EvidenceKinds, k => k.Kind == "treatment-plan");
+        Assert.Equal("start-treatment", plan.NextAction);
+        Assert.False(plan.ClinicallyApproved);
+        Assert.Contains(pathway.EvidenceKinds, k => k.Kind == "diagnosis" && k.NextAction is null);
+    }
+
+    [Fact]
+    public void Definition_without_evidence_kinds_fails_loudly()
+    {
+        var definition = LoadRealDefinition();
+        definition["evidenceKinds"] = new JsonArray();
+        WriteTempDefinition("no-kinds.json", definition);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => DomainTestData.Provider(_tempDirectory).GetAll());
+
+        Assert.Contains("evidence kinds", exception.Message);
+    }
+
+    [Fact]
+    public void Evidence_kind_naming_a_next_action_without_a_deadline_fails_loudly()
+    {
+        var definition = LoadRealDefinition();
+        var plan = definition["evidenceKinds"]!.AsArray().First(k => k!["kind"]!.GetValue<string>() == "treatment-plan");
+        plan!["nextAction"] = "begin-treatment-with-no-deadline";
+        WriteTempDefinition("dangling-kind.json", definition);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => DomainTestData.Provider(_tempDirectory).GetAll());
+
+        Assert.Contains("begin-treatment-with-no-deadline", exception.Message);
     }
 
     [Fact]
