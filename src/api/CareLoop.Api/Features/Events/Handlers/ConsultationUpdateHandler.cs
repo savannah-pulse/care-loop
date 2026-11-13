@@ -19,6 +19,9 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// <see cref="Case.AcceptOwnership"/>; on rejection it returns the next action to the current owner
 /// with a new deadline and flags the exception. When the source names no actor for a response, the
 /// proposed owner is taken to be responding, because the consultation task belongs to them.
+/// A request gives the case the <see cref="ConsultationTrack.AnswerAction"/> next action with the
+/// pathway's answer deadline; the answer (acceptance or recorded outcome) completes that action,
+/// resolves any escalation raised while it was overdue and hands the owner the follow-up action.
 /// </remarks>
 public sealed class ConsultationUpdateHandler : IEventHandler
 {
@@ -55,17 +58,22 @@ public sealed class ConsultationUpdateHandler : IEventHandler
 
         return payload.Status switch
         {
-            ConsultationStatus.Requested => Request(@case, payload, envelope),
+            ConsultationStatus.Requested => Request(@case, payload, envelope, pathway),
             ConsultationStatus.OwnerProposed => Propose(@case, payload, envelope, pathway),
-            ConsultationStatus.Accepted => Accept(@case, payload, envelope),
+            ConsultationStatus.Accepted => Accept(@case, payload, envelope, pathway),
             ConsultationStatus.Rejected => Reject(@case, payload, envelope, pathway),
-            ConsultationStatus.OutcomeRecorded => RecordOutcome(@case, payload, envelope),
+            ConsultationStatus.OutcomeRecorded => RecordOutcome(@case, payload, envelope, pathway),
             _ => HandlerSupport.Refused(@case, $"Consultation status {payload.Status} is not understood."),
         };
     }
 
-    private Task<EventHandlingResult> Request(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope)
+    private Task<EventHandlingResult> Request(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope, PathwayDefinition pathway)
     {
+        if (!HandlerSupport.HasDeadline(@case, ConsultationTrack.AnswerAction, pathway, out var missing))
+        {
+            return HandlerSupport.Refused(@case, missing!);
+        }
+
         var track = @case.Consultation;
         if (track is null)
         {
@@ -77,7 +85,31 @@ public sealed class ConsultationUpdateHandler : IEventHandler
             @case.ClearException(CaseExceptions.Rejected, envelope.OccurredAt);
         }
 
+        HandlerSupport.SetNextAction(@case, ConsultationTrack.AnswerAction, pathway, _clock);
+
         return HandlerSupport.Applied(@case, payload.TaskReference);
+    }
+
+    /// <summary>
+    /// When the case was waiting for the consultation answer, the answer has arrived: the owner gets
+    /// the follow-up action and any escalation raised while the answer was overdue is resolved.
+    /// </summary>
+    private bool TryCompleteAnswer(Case @case, PathwayDefinition pathway, DateTimeOffset at, out string? missing)
+    {
+        missing = null;
+        if (!string.Equals(@case.NextAction, ConsultationTrack.AnswerAction, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out missing))
+        {
+            return false;
+        }
+
+        @case.ResolveEscalations(at);
+        HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
+        return true;
     }
 
     private Task<EventHandlingResult> Propose(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope, PathwayDefinition pathway)
@@ -107,8 +139,14 @@ public sealed class ConsultationUpdateHandler : IEventHandler
         return HandlerSupport.Applied(@case, payload.TaskReference);
     }
 
-    private Task<EventHandlingResult> Accept(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope)
+    private Task<EventHandlingResult> Accept(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope, PathwayDefinition pathway)
     {
+        if (string.Equals(@case.NextAction, ConsultationTrack.AnswerAction, StringComparison.OrdinalIgnoreCase)
+            && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var missing))
+        {
+            return HandlerSupport.Refused(@case, missing!);
+        }
+
         var pending = @case.PendingAssignment;
         if (pending is not null)
         {
@@ -129,6 +167,8 @@ public sealed class ConsultationUpdateHandler : IEventHandler
             var track = @case.Consultation ?? @case.BeginConsultation(payload.ServiceRequestReference, envelope.OccurredAt);
             track.Advance(ConsultationStatus.Accepted, envelope.OccurredAt, payload.TaskReference);
         }
+
+        TryCompleteAnswer(@case, pathway, envelope.OccurredAt, out _);
 
         return HandlerSupport.Applied(@case, payload.TaskReference);
     }
@@ -171,7 +211,7 @@ public sealed class ConsultationUpdateHandler : IEventHandler
         return HandlerSupport.Applied(@case, payload.TaskReference);
     }
 
-    private static Task<EventHandlingResult> RecordOutcome(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope)
+    private Task<EventHandlingResult> RecordOutcome(Case @case, ConsultationUpdatePayload payload, EventEnvelope envelope, PathwayDefinition pathway)
     {
         var track = @case.Consultation;
         if (track is null)
@@ -179,7 +219,14 @@ public sealed class ConsultationUpdateHandler : IEventHandler
             return HandlerSupport.Refused(@case, "No consultation was requested on this case, so no consultation outcome can be recorded.");
         }
 
+        if (string.Equals(@case.NextAction, ConsultationTrack.AnswerAction, StringComparison.OrdinalIgnoreCase)
+            && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var missing))
+        {
+            return HandlerSupport.Refused(@case, missing!);
+        }
+
         track.Advance(ConsultationStatus.OutcomeRecorded, envelope.OccurredAt, payload.TaskReference);
+        TryCompleteAnswer(@case, pathway, envelope.OccurredAt, out _);
         return HandlerSupport.Applied(@case, payload.TaskReference);
     }
 

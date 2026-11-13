@@ -1,6 +1,6 @@
 # Component workstreams
 
-Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API, web UI, and Python workflow service are scaffolds; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned.
+Use this register to split implementation into owned components while keeping one case engine and a shared event contract. Story and functional-requirement (FR) references come from the supplied user stories and solution design. The API, web UI, and Python workflow service are scaffolds; a component owner should confirm boundaries and dependencies before implementing the remaining features. Names are intentionally left unassigned. Where this register and [workstreams.md](workstreams.md) differ, the workstreams file is current; the gaps found between the screen designs and the code are in [ui-design-gap-analysis.md](ui-design-gap-analysis.md).
 
 | Workstream | Scope and first deliverable | Stories / requirements | Depends on |
 |---|---|---|---|

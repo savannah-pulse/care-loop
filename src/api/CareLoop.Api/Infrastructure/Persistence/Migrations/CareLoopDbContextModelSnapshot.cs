@@ -534,6 +534,60 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                                 .IsRequired();
                         });
 
+                    b.OwnsOne("CareLoop.Domain.Cases.Consent", "CaregiverConsent", b1 =>
+                        {
+                            b1.Property<Guid>("CaseId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("EvidenceReference")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
+                            b1.Property<DateTimeOffset>("GrantedAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<string>("WithdrawalEvidenceReference")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
+                            b1.Property<DateTimeOffset?>("WithdrawnAt")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.HasKey("CaseId");
+
+                            b1.ToTable("Cases");
+
+                            b1.WithOwner()
+                                .HasForeignKey("CaseId");
+
+                            b1.OwnsOne("CareLoop.Domain.Recipients.ContactPoint", "CaregiverContactPoint", b2 =>
+                                {
+                                    b2.Property<Guid>("ConsentCaseId")
+                                        .HasColumnType("uuid");
+
+                                    b2.Property<string>("Address")
+                                        .IsRequired()
+                                        .HasMaxLength(500)
+                                        .HasColumnType("character varying(500)");
+
+                                    b2.Property<string>("Channel")
+                                        .IsRequired()
+                                        .HasMaxLength(40)
+                                        .HasColumnType("character varying(40)");
+
+                                    b2.HasKey("ConsentCaseId");
+
+                                    b2.ToTable("Cases");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("ConsentCaseId");
+                                });
+
+                            b1.Navigation("CaregiverContactPoint")
+                                .IsRequired();
+                        });
+
                     b.OwnsMany("CareLoop.Domain.Cases.Escalation", "Escalations", b1 =>
                         {
                             b1.Property<int>("Id")
@@ -674,6 +728,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                             b1.Property<bool>("CallRequested")
                                 .HasColumnType("boolean");
 
+                            b1.Property<int?>("Confidence")
+                                .HasColumnType("integer");
+
                             b1.Property<string>("SourceReference")
                                 .HasMaxLength(200)
                                 .HasColumnType("character varying(200)");
@@ -774,6 +831,8 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         });
 
                     b.Navigation("Appointment");
+
+                    b.Navigation("CaregiverConsent");
 
                     b.Navigation("Closure");
 

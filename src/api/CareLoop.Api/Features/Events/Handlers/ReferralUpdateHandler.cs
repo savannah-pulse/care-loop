@@ -18,7 +18,10 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// counted as completed care, so the case stays in follow-up with its next action unchanged. A
 /// rejected referral raises <see cref="ReferralRejected"/>, flags the exception and gives the
 /// current owner a new next action and deadline. A referral reported as sent again after a
-/// rejection clears the exception.
+/// rejection clears the exception. A sent referral gives the case the
+/// <see cref="ReferralTrack.RespondAction"/> next action with the pathway's response deadline;
+/// the receiving service's acceptance completes that action, resolves any escalation raised while
+/// it was overdue and hands the owner the follow-up action.
 /// </remarks>
 public sealed class ReferralUpdateHandler : IEventHandler
 {
@@ -56,6 +59,11 @@ public sealed class ReferralUpdateHandler : IEventHandler
         switch (payload.Status)
         {
             case ReferralStatus.Sent:
+                if (!HandlerSupport.HasDeadline(@case, ReferralTrack.RespondAction, pathway, out var noResponseDeadline))
+                {
+                    return HandlerSupport.Refused(@case, noResponseDeadline!);
+                }
+
                 if (@case.Referral is { } sent)
                 {
                     sent.Advance(ReferralStatus.Sent, envelope.OccurredAt, payload.ServiceRequestReference);
@@ -66,12 +74,25 @@ public sealed class ReferralUpdateHandler : IEventHandler
                     @case.BeginReferral(payload.ServiceRequestReference, envelope.OccurredAt);
                 }
 
+                HandlerSupport.SetNextAction(@case, ReferralTrack.RespondAction, pathway, _clock);
                 break;
 
             case ReferralStatus.Accepted:
+                var awaitingResponse = string.Equals(@case.NextAction, ReferralTrack.RespondAction, StringComparison.OrdinalIgnoreCase);
+                if (awaitingResponse && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var noFollowUpDeadline))
+                {
+                    return HandlerSupport.Refused(@case, noFollowUpDeadline!);
+                }
+
                 var accepted = @case.Referral ?? @case.BeginReferral(payload.ServiceRequestReference, envelope.OccurredAt);
                 accepted.Advance(ReferralStatus.Accepted, envelope.OccurredAt, payload.TaskReference);
                 @case.ClearException(CaseExceptions.Rejected, envelope.OccurredAt);
+                if (awaitingResponse)
+                {
+                    @case.ResolveEscalations(envelope.OccurredAt);
+                    HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
+                }
+
                 break;
 
             case ReferralStatus.Rejected:

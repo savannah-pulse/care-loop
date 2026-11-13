@@ -19,6 +19,7 @@ namespace CareLoop.Domain.Pathways;
 /// <item><description><b>Escalation ladder</b> (<see cref="EscalationLadder"/>): who is told, and in what order, when a deadline passes.</description></item>
 /// <item><description><b>Closure rules</b> (<see cref="ClosureRules"/>): for each closure reason, who may authorize it and what evidence or documented exception it needs.</description></item>
 /// <item><description><b>Unassigned queue</b> (<see cref="UnassignedQueueRole"/>): the role that owns a case when no named person does.</description></item>
+/// <item><description><b>Change log</b> (<see cref="ChangeLog"/>): which version was approved by whom and when, so a decision can be traced to the rules in force.</description></item>
 /// </list>
 /// <para>
 /// <b>Why it is configuration.</b> These are decisions for a clinical adviser, not for engineers.
@@ -64,4 +65,7 @@ public sealed record PathwayDefinition
 
     /// <summary>What each closure reason requires.</summary>
     public required IReadOnlyList<ClosureEvidenceRule> ClosureRules { get; init; }
+
+    /// <summary>The history of the definition, oldest first. Empty when no history has been recorded.</summary>
+    public IReadOnlyList<PathwayChangeLogEntry> ChangeLog { get; init; } = [];
 }

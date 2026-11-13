@@ -1,7 +1,7 @@
 namespace CareLoop.Contracts.Events.Payloads;
 
 /// <summary>
-/// Base type of the eight event payloads carried by an <see cref="EventEnvelope"/>.
+/// Base type of the nine event payloads carried by an <see cref="EventEnvelope"/>.
 /// </summary>
 /// <remarks>
 /// Each derived record corresponds to exactly one <see cref="CareLoop.Domain.Events.CaseEventType"/>

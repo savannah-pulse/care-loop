@@ -17,6 +17,8 @@ Use `(sourceSystem, sourceEventId)` as the initial idempotency key unless the te
 
 ## Event families in the solution design
 
+> **Current contract.** The API implements nine source event types (`CareLoop.Domain.Events.CaseEventType`) and track statuses. The stage-entry events named below are display labels, not events (decision 1 and section 2 of [docs/ui-design-gap-analysis.md](../docs/ui-design-gap-analysis.md)). The OpenAPI document in `openapi/careloop.json` is the contract.
+
 The design names result, review, patient-channel, consultation, referral, appointment, outcome, and closure families. It also names stage-entry events (`ResultReceived`, `CaseCreated`, `OwnerAssigned`, `PatientNotified`, `PatientAcknowledged`, `ConsultationRequested`, `FollowUpStarted`, `OutcomeDocumented`, `ClosureReviewRequested`, `ClosureAuthorised`) and supporting events such as rejection, missed appointment, evidence attachment, and escalation.
 
 The API owns the mapping from accepted source events to case transitions. Not every event advances a stage: escalation and most exception events add a flag or owned task while the case remains in its current stage. Keep referral sent/accepted separate from attended care, and keep a proposed owner separate from an accepted transfer.

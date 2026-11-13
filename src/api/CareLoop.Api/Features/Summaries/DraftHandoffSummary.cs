@@ -1,12 +1,6 @@
 using CareLoop.Api.Features.Common;
-using CareLoop.Api.Infrastructure.Auth;
-using CareLoop.Contracts.Cases;
 using CareLoop.Contracts.Common;
-using CareLoop.Contracts.Exceptions;
-using CareLoop.Contracts.Metrics;
 using CareLoop.Contracts.Summaries;
-using CareLoop.Domain.Cases;
-using Microsoft.AspNetCore.Mvc;
 
 namespace CareLoop.Api.Features.Summaries;
 
@@ -14,7 +8,15 @@ namespace CareLoop.Api.Features.Summaries;
 /// Slice for <c>POST /cases/{caseId}/handoff-summary</c>: asks AI to draft a handoff summary.
 /// </summary>
 /// <remarks>
-/// AI output is a draft. Will build a request from coordination facts only (stage, owner, next action, deadline, timeline), call <c>IAiProvider</c>, and store the result as a draft that is never sent or published until a person approves it. With the no-op provider the endpoint answers 409 because AI is switched off.
+/// AI output is a draft. Will collect the eligible facts, call the configured provider through
+/// <see cref="HandoffSummaryDrafter"/> and store the result as a draft that is never sent or
+/// published until a person approves it. With the no-op provider the endpoint answers 409 because
+/// AI is switched off; when the provider fails it answers 503, because "no draft" and "a draft
+/// that may be wrong" must never look the same to the person reading the screen.
+/// <para>
+/// A draft may already exist for the case, produced when the handoff was proposed (decision 11).
+/// Asking again replaces an unapproved draft and is refused once one is approved.
+/// </para>
 /// </remarks>
 public static class DraftHandoffSummary
 {
@@ -31,6 +33,7 @@ public static class DraftHandoffSummary
             .Produces<HandoffSummaryResponse>(StatusCodes.Status201Created)
             .Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable)
             .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
         return routes;
     }
@@ -40,10 +43,11 @@ public static class DraftHandoffSummary
     /// </summary>
     /// <param name="caseId">The case to summarise.</param>
     /// <param name="ct">Cancels the request.</param>
-    /// <returns>201 with the draft; 404 when the case does not exist; 409 when AI is switched off.</returns>
+    /// <returns>201 with the draft; 404 when the case does not exist; 409 when AI is switched off or the case already has an approved summary; 503 when the provider could not produce a valid draft.</returns>
     public static IResult Handle(Guid caseId, CancellationToken ct)
     {
-        // TODO(WS-9): load the case and timeline no-tracking, call IAiProvider.DraftHandoffSummaryAsync, store a HandoffSummaryRecord in status Draft.
+        // TODO(WS-9): load the case, call HandoffSummaryDrafter.DraftAsync with trigger Requested,
+        // and map AiDraftUnavailableException to 503 carrying the reason.
         return NotImplementedResults.For("WS9", "DraftHandoffSummary");
     }
 }

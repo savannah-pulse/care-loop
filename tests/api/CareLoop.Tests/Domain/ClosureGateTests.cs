@@ -1,4 +1,5 @@
 using CareLoop.Domain.Cases;
+using CareLoop.Domain.Events;
 using CareLoop.Domain.Rules;
 using CareLoop.Domain.Tracks;
 using CareLoop.Tests.Fakes;
@@ -238,5 +239,20 @@ public sealed class ClosureGateTests
         Assert.Null(@case.Closure);
         Assert.Equal(updatedAt, @case.UpdatedAt);
         Assert.Empty(@case.DomainEvents);
+    }
+
+    [Fact]
+    public void Receiving_clinician_may_close_but_nurse_navigator_and_lab_may_not()
+    {
+        var @case = DomainTestData.ReadyForClosure(_clock);
+        Actor Role(string role) => new() { Reference = $"SYN-STAFF-{role}", Role = role, FacilityId = "SYN-FAC-A" };
+
+        var receiving = ClosureGate.Evaluate(@case, DomainTestData.TreatedDecision(_clock, authorizedBy: Role("receiving-clinician")), DomainTestData.Pathway);
+        var nurse = ClosureGate.Evaluate(@case, DomainTestData.TreatedDecision(_clock, authorizedBy: Role("nurse-navigator")), DomainTestData.Pathway);
+        var lab = ClosureGate.Evaluate(@case, DomainTestData.TreatedDecision(_clock, authorizedBy: Role("lab")), DomainTestData.Pathway);
+
+        Assert.True(receiving.Allowed, receiving.Reason);
+        Assert.False(nurse.Allowed);
+        Assert.False(lab.Allowed);
     }
 }

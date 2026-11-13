@@ -41,6 +41,8 @@ The backend coordinates the ten-stage journey. The Python AI service is invoked 
 
 ## Ten-stage case lifecycle
 
+> **Display vocabulary.** The Domain as built (`CareLoop.Domain.Cases.CaseStage`) has five stages with four tracks. The ten below are the labels the dashboard shows, derived from stage plus track statuses (decision 1 in [ui-design-gap-analysis.md](ui-design-gap-analysis.md)). The code is the reference for transitions.
+
 Stages advance only on validated, authorized events. Supporting events and exception flags do not create extra stages.
 
 | # | Stage | Entry / progression evidence |

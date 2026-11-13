@@ -11,7 +11,7 @@ using CareLoop.Tests.Fakes;
 namespace CareLoop.Tests.Api;
 
 /// <summary>
-/// Each of the eight handlers applies its event through the Domain rules.
+/// Each of the nine handlers applies its event through the Domain rules.
 /// </summary>
 public sealed class EventHandlerTests
 {
@@ -345,6 +345,157 @@ public sealed class EventHandlerTests
         Assert.Equal(IngestOutcome.Rejected, result.Outcome);
         Assert.Equal(CaseStage.FollowUpActive, _harness.TheCase().Stage);
         Assert.Null(_harness.TheCase().Closure);
+    }
+
+    [Fact]
+    public async Task Confidence_rating_is_stored_on_the_track_and_changes_nothing_else()
+    {
+        await _harness.ReviewedCaseAsync();
+        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Delivered));
+        var before = _harness.TheCase();
+        var (stage, owner, nextAction, dueAt) = (before.Stage, before.Owner, before.NextAction, before.DueAt);
+        var publishedBefore = _harness.Repository.PublishedDomainEvents.Count;
+
+        var @case = await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.ConfidenceRated, confidence: 4));
+
+        Assert.Equal(4, @case.Notification!.Confidence);
+        Assert.Equal(NotificationStatus.Delivered, @case.Notification.Status);
+        Assert.False(@case.Notification.IsComplete(), "a confidence rating is not an acknowledgement");
+        Assert.Equal((stage, owner, nextAction, dueAt), (@case.Stage, @case.Owner, @case.NextAction, @case.DueAt));
+        Assert.Equal(publishedBefore, _harness.Repository.PublishedDomainEvents.Count);
+        Assert.Contains("\"confidence\":4", _harness.Repository.AuditEvents.Last().NewProjectionJson);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6)]
+    [InlineData(null)]
+    public async Task Confidence_rating_without_a_value_from_one_to_five_is_refused(int? confidence)
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var result = await _harness.IngestAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.ConfidenceRated, confidence: confidence));
+
+        Assert.Equal(IngestOutcome.Rejected, result.Outcome);
+        Assert.Null(_harness.TheCase().Notification!.Confidence);
+        Assert.Equal(SourceEventDisposition.Rejected, _harness.Repository.Events.Last().Disposition);
+    }
+
+    [Fact]
+    public async Task Consultation_request_sets_the_answer_deadline_and_the_answer_hands_back_follow_up()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var @case = await _harness.ApplyAsync(Envelopes.Consultation(_harness.Clock.UtcNow, ConsultationStatus.Requested, actor: Envelopes.Clinician()));
+
+        Assert.Equal(ConsultationTrack.AnswerAction, @case.NextAction);
+        Assert.Equal("answer-consultation", @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+
+        _harness.Clock.Advance(TimeSpan.FromHours(3));
+        await _harness.ApplyAsync(Envelopes.Consultation(_harness.Clock.UtcNow, ConsultationStatus.Accepted, actor: Envelopes.Clinician("SYN-STAFF-0002")));
+
+        Assert.Equal(HandlerSupport.ArrangeFollowUpAction, @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+    }
+
+    [Fact]
+    public async Task Referral_sent_sets_the_response_deadline_and_acceptance_hands_back_follow_up()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var @case = await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Sent));
+
+        Assert.Equal(ReferralTrack.RespondAction, @case.NextAction);
+        Assert.Equal("respond-to-referral", @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+
+        _harness.Clock.Advance(TimeSpan.FromHours(4));
+        await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Accepted));
+
+        Assert.True(@case.Referral!.IsComplete());
+        Assert.Equal(HandlerSupport.ArrangeFollowUpAction, @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+        Assert.Equal(CaseStage.FollowUpActive, @case.Stage);
+    }
+
+    [Fact]
+    public async Task Consent_granted_is_recorded_with_evidence_and_audited()
+    {
+        await _harness.ReviewedCaseAsync();
+        var before = _harness.TheCase();
+        var (stage, owner, nextAction, dueAt) = (before.Stage, before.Owner, before.NextAction, before.DueAt);
+
+        var @case = await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted));
+
+        var consent = Assert.IsType<Consent>(@case.CaregiverConsent);
+        Assert.True(consent.IsActive);
+        Assert.Equal(Envelopes.CaregiverContact(), consent.CaregiverContactPoint);
+        Assert.Equal("Consent/SYN-CONSENT-0001", consent.EvidenceReference);
+        Assert.Equal((stage, owner, nextAction, dueAt), (@case.Stage, @case.Owner, @case.NextAction, @case.DueAt));
+        var audit = _harness.Repository.AuditEvents.Last();
+        Assert.Equal(CaseEventType.ConsentRecorded, audit.EventType);
+        Assert.Equal(SourceEventDisposition.Applied, audit.Disposition);
+        Assert.Equal("Consent/SYN-CONSENT-0001", audit.EvidenceReference);
+        Assert.Contains("\"isActive\":true", audit.NewProjectionJson);
+        Assert.DoesNotContain("SYN-CAREGIVER-INBOX-0001", audit.NewProjectionJson);
+    }
+
+    [Fact]
+    public async Task Consent_withdrawal_stops_further_caregiver_contact_and_is_audited()
+    {
+        await _harness.ReviewedCaseAsync();
+        await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted));
+        _harness.Clock.Advance(TimeSpan.FromDays(1));
+
+        var @case = await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Withdrawn, consentReference: "Consent/SYN-CONSENT-0001/_history/2"));
+
+        Assert.False(@case.CaregiverConsent!.IsActive);
+        Assert.Equal(_harness.Clock.UtcNow, @case.CaregiverConsent.WithdrawnAt);
+        Assert.Equal("Consent/SYN-CONSENT-0001/_history/2", @case.CaregiverConsent.WithdrawalEvidenceReference);
+        var audit = _harness.Repository.AuditEvents.Last();
+        Assert.Contains("\"isActive\":true", audit.PriorProjectionJson);
+        Assert.Contains("\"isActive\":false", audit.NewProjectionJson);
+    }
+
+    [Fact]
+    public async Task Consent_without_a_contact_point_or_while_one_is_active_is_refused()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var missing = await _harness.IngestAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted, noContact: true));
+        Assert.Equal(IngestOutcome.Rejected, missing.Outcome);
+        Assert.Null(_harness.TheCase().CaregiverConsent);
+
+        await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted));
+        var second = await _harness.IngestAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted, consentReference: "Consent/SYN-CONSENT-0002"));
+
+        Assert.Equal(IngestOutcome.Rejected, second.Outcome);
+        Assert.Equal("Consent/SYN-CONSENT-0001", _harness.TheCase().CaregiverConsent!.EvidenceReference);
+    }
+
+    [Fact]
+    public async Task Withdrawal_without_an_active_consent_is_refused()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var result = await _harness.IngestAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Withdrawn));
+
+        Assert.Equal(IngestOutcome.Rejected, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Consent_can_be_withdrawn_but_not_granted_on_a_closed_case()
+    {
+        await _harness.CaseInClosureReviewAsync();
+        await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted));
+        await _harness.ApplyAsync(Envelopes.Closure(_harness.Clock.UtcNow));
+
+        var withdrawn = await _harness.ApplyAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Withdrawn));
+        Assert.False(withdrawn.CaregiverConsent!.IsActive);
+
+        var granted = await _harness.IngestAsync(Envelopes.Consent(_harness.Clock.UtcNow, ConsentUpdateKind.Granted, consentReference: "Consent/SYN-CONSENT-0002"));
+        Assert.Equal(IngestOutcome.Rejected, granted.Outcome);
     }
 
     private async Task<CaseOwner> ProposeConsultationAsync()

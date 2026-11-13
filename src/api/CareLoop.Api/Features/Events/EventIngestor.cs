@@ -33,6 +33,7 @@ public sealed class EventIngestor
         [CaseEventType.AppointmentUpdated] = typeof(AppointmentUpdatePayload),
         [CaseEventType.OutcomeRecorded] = typeof(OutcomePayload),
         [CaseEventType.ClosureDecided] = typeof(ClosurePayload),
+        [CaseEventType.ConsentRecorded] = typeof(ConsentPayload),
     };
 
     private static readonly JsonSerializerOptions PayloadSerializerOptions = CreatePayloadSerializerOptions();

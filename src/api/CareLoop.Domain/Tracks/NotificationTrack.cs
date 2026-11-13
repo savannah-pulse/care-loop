@@ -77,6 +77,18 @@ public sealed class NotificationTrack
     /// <summary><see langword="true"/> when the patient has asked to be called; the request is a next action for the owner, not an acknowledgement.</summary>
     public bool CallRequested { get; private set; }
 
+    /// <summary>The lowest rating the patient may give for how confident they feel about what to do next.</summary>
+    public const int MinimumConfidence = 1;
+
+    /// <summary>The highest rating the patient may give for how confident they feel about what to do next.</summary>
+    public const int MaximumConfidence = 5;
+
+    /// <summary>
+    /// How confident the patient said they feel about what to do next, from <see cref="MinimumConfidence"/>
+    /// to <see cref="MaximumConfidence"/>, or <see langword="null"/> until they rate it.
+    /// </summary>
+    public int? Confidence { get; private set; }
+
     /// <summary>
     /// Records one send on one channel and recomputes the overall status.
     /// </summary>
@@ -137,6 +149,31 @@ public sealed class NotificationTrack
         CallRequested = true;
         SourceReference = sourceReference ?? SourceReference;
         UpdatedAt = at;
+    }
+
+    /// <summary>
+    /// Records how confident the patient said they feel about what to do next.
+    /// </summary>
+    /// <param name="confidence">The rating, from <see cref="MinimumConfidence"/> to <see cref="MaximumConfidence"/>.</param>
+    /// <param name="at">When the rating arrived.</param>
+    /// <param name="sourceReference">Reference to the source resource carrying the rating.</param>
+    /// <remarks>
+    /// A confidence rating is a measure, not a status: it changes neither <see cref="Status"/> nor
+    /// whether the track is complete, because feeling confident is not the same as having
+    /// acknowledged the result. A later rating replaces an earlier one, so the latest view stands.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="confidence"/> is outside the allowed range.</exception>
+    public void RateConfidence(int confidence, DateTimeOffset at, string? sourceReference)
+    {
+        if (confidence is < MinimumConfidence or > MaximumConfidence)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(confidence), confidence, $"A confidence rating must be between {MinimumConfidence} and {MaximumConfidence}.");
+        }
+
+        Confidence = confidence;
+        SourceReference = sourceReference ?? SourceReference;
+        UpdatedAt = at > UpdatedAt ? at : UpdatedAt;
     }
 
     /// <summary>
