@@ -18,7 +18,7 @@ flowchart LR
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
     UI[Demo UI<br/>exception dashboard · patient view · impact view]
-    AIWORKFLOW[Python AI workflow<br/>stage agents and task coordination]
+    AIWORKFLOW[Python AI service<br/>on-demand summaries and stage insights]
     AIPROVIDER[Optional AI provider interface<br/>reviewable drafts]
     HUMAN[Authorized staff]
 
@@ -29,15 +29,15 @@ flowchart LR
     WORKER -->|escalation events; stage unchanged| API
     STORE --> UI
     HUMAN -->|reviewed actions and closure evidence| API
-    API -->|synthetic event references and coordination snapshot| AIWORKFLOW
-    AIWORKFLOW -->|action proposals; no direct case writes| API
-    AIWORKFLOW -->|optional structured facts for a draft| AIPROVIDER
-    AIPROVIDER -->|draft for human review| AIWORKFLOW
+    API -->|approved minimum facts or aggregate metrics| AIWORKFLOW
+    AIWORKFLOW -->|reviewable summary or narrative draft| API
+    AIWORKFLOW -->|inference request| AIPROVIDER
+    AIPROVIDER -->|generated draft| AIWORKFLOW
 ```
 
 The event log is the source for audit and timeline reconstruction; the case projection supports worklist queries. FHIR-shaped exchange may be used at the adapter boundary, but the prototype's internal coordination model is not a clinical FHIR repository. The choice of relational database and local hosting method is still a team decision.
 
-The Python workflow coordinates the journey across its ten stages through stage-specific agent interfaces. It may propose task creation, approved-template drafts, summaries, and exception follow-up from synthetic coordination facts. All proposals return through the .NET API, which remains the authoritative case-state, authorization, audit, and closure gate. Human review is required for communications and clinical actions. The scaffold does not configure a model provider, persist Python-owned case state, or implement an autonomous clinical agent.
+The backend coordinates the ten-stage journey. The Python AI service is invoked on demand for the FR-11 clinician handoff summary and, as governed extensions, patient-friendly drafts, reviewed English-to-UAE-Arabic translation, and descriptive narratives over backend-computed aggregate metrics. It does not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Outputs are drafts with source references and require authorized human review. The .NET API remains the case-state, authorization, audit, and closure gate. See the [AI specification](ai-spec.md).
 
 ## Ten-stage case lifecycle
 
@@ -68,7 +68,7 @@ sequenceDiagram
     participant HIS as HIS simulator
     participant API as Orchestration API
     participant Store as Coordination store
-    participant AI as Python AI workflow
+    participant AI as Python AI service
     participant Channel as Patient-channel simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
@@ -76,12 +76,10 @@ sequenceDiagram
     HIS->>API: Result event (source, patient, result, reviewed urgency)
     API->>API: Validate, correlate, deduplicate
     API->>Store: Append event, create case, assign owner or queue
-    loop Each accepted event through the ten-stage journey
-        API->>AI: Synthetic references and current coordination snapshot
-        AI-->>API: Human-reviewable task or draft proposal
-        Staff->>API: Review proposal and authorize any permitted action
-        API->>API: Authorize proposal before any state change
-    end
+    API->>AI: Approved report facts and recorded stage outcomes
+    AI-->>API: Source-linked clinician handoff summary draft
+    Staff->>API: Review, edit, approve, or reject draft
+    API->>Store: Audit review decision
     API-->>Channel: Approved simulated communication request
     Channel->>API: Delivery / failure / acknowledgement / call request
     API->>Store: Append attributed event; update coordination projection
@@ -90,6 +88,9 @@ sequenceDiagram
     Worker->>Store: Check approved clocks and missing events
     Worker->>API: Owned escalation event (does not advance stage)
     UI->>API: Read case, timeline, exceptions, synthetic metrics
+    API->>AI: Precomputed, privacy-reviewed aggregate metrics (scheduled)
+    AI-->>API: Descriptive stage-insight narrative draft
+    Staff->>API: Review narrative before publication
     Staff->>API: Authorized decision with evidence or documented exception
     API->>Store: Guard transition, append audit; close only if valid
 ```
@@ -103,7 +104,7 @@ sequenceDiagram
 - Patient receipt, understanding, help request, and consent are distinct. A caregiver's action is attributed to the caregiver and limited to approved permissions.
 - Clinical records stay in source systems. The coordination store keeps references, evidence references, workflow status, deadlines, and audit events.
 - Only an authorized human can record a clinical disposition or close a case; the API enforces the gate and records the decision.
-- Python agents return constrained proposals only. They cannot diagnose, set urgency, infer consent, send patient messages, accept referrals, change case state, or close cases.
+- Python returns source-linked summary and narrative drafts only. It cannot diagnose, set urgency, infer consent, send patient messages, accept referrals, change case state, calculate metrics, or close cases.
 - Deadline checks are deterministic and configured from approved rules. Missing configuration must surface review work rather than inventing a deadline or urgency.
 - Mark all simulator data, AI drafts, and impact metrics as synthetic. Report cohort denominators and assumptions; do not claim real clinical improvement.
 
