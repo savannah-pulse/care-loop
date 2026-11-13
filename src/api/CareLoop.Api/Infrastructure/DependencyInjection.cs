@@ -11,6 +11,7 @@ using CareLoop.Api.Infrastructure.Fhir;
 using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Pathways;
 using CareLoop.Api.Infrastructure.Persistence;
+using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Api.Infrastructure.Time;
 using CareLoop.Api.Worker;
 using CareLoop.Domain.Cases;
@@ -40,6 +41,7 @@ public static class DependencyInjection
 
         services.AddDbContext<CareLoopDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("CareLoop")));
+        services.AddScoped(OutboxSubscriberRegistry.FromServices);
         services.AddScoped<ICaseRepository, EfCaseRepository>();
 
         return services;

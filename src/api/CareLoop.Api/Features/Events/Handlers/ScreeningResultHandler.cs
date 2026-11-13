@@ -3,6 +3,7 @@ using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Rules;
 using CareLoop.Domain.Time;
 
 namespace CareLoop.Api.Features.Events.Handlers;
@@ -11,7 +12,14 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// Opens a case for a new actionable screening result.
 /// </summary>
 /// <remarks>
-/// Will create the <see cref="Case"/> with the owner chosen by <see cref="CareLoop.Domain.Rules.OwnershipRules.InitialOwner"/> (the facility lead queue when nobody is named, flagging it unassigned), move it to review pending, and set the first next action and deadline from the pathway definition. A result for which a case already exists is refused rather than opening a second case.
+/// Creates the <see cref="Case"/> with the owner chosen by <see cref="OwnershipRules.InitialOwner"/>
+/// (the facility lead queue when nobody is named, flagging it unassigned), moves it to review pending
+/// and sets the first next action and deadline from the pathway definition. A queue-owned case gets
+/// the Received stage's own next action (assigning an owner) because nobody can review a result
+/// nobody owns; a case with a named owner gets the review-pending stage's. A result for which a case
+/// already exists, or that names an unknown pathway, is refused rather than opening a second case.
+/// The patient's language and contact points in the payload are not stored: a case holds no contact
+/// data, and the notification feature resolves recipients when it sends.
 /// </remarks>
 public sealed class ScreeningResultHandler : IEventHandler
 {
@@ -36,7 +44,54 @@ public sealed class ScreeningResultHandler : IEventHandler
     /// <remarks>Expects the envelope's payload to be a <see cref="ScreeningResultPayload"/>.</remarks>
     public Task<EventHandlingResult> HandleAsync(Case? existing, EventEnvelope envelope, CancellationToken ct)
     {
-        // TODO(WS-2): open the case, assign the initial owner, set stage, next action and due time from the pathway.
-        throw new NotImplementedException("WS2: ScreeningResultHandler.HandleAsync");
+        var payload = HandlerSupport.Payload<ScreeningResultPayload>(envelope);
+
+        if (existing is not null)
+        {
+            return HandlerSupport.Refused(existing,
+                $"A case already exists for result '{envelope.SourceSystem}/{envelope.SourceResultId}'; one result opens one case.");
+        }
+
+        PathwayDefinition pathway;
+        try
+        {
+            pathway = _pathways.Get(payload.PathwayId);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Screening result names unknown pathway '{payload.PathwayId}'.", ex);
+        }
+
+        var owner = OwnershipRules.InitialOwner(payload.FacilityId, payload.NamedOwner, pathway);
+        var @case = new Case(
+            Guid.NewGuid(),
+            envelope.SourceSystem,
+            envelope.SourceResultId,
+            payload.PatientReference,
+            payload.PathwayId,
+            payload.FacilityId,
+            owner,
+            _clock.UtcNow);
+
+        var transition = TransitionRules.Evaluate(@case, EventType, HandlerSupport.ActorOrSource(envelope), pathway);
+        if (!transition.Verdict.Allowed)
+        {
+            throw new InvalidOperationException(transition.Verdict.Reason);
+        }
+
+        var receivedStage = pathway.Stages.First(s => s.Stage == CaseStage.Received);
+        var nextAction = (owner.IsQueue ? receivedStage.NextActionOnEntry : null) ?? transition.NextAction;
+
+        if (transition.NextStage is { } next)
+        {
+            @case.MoveTo(next, envelope.OccurredAt);
+        }
+
+        if (nextAction is not null)
+        {
+            HandlerSupport.SetNextAction(@case, nextAction, pathway, _clock);
+        }
+
+        return HandlerSupport.Applied(@case, payload.ResultReference);
     }
 }

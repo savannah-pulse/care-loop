@@ -608,6 +608,10 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                             b1.Property<Guid>("CaseId")
                                 .HasColumnType("uuid");
 
+                            b1.Property<string>("OutcomeReference")
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)");
+
                             b1.Property<DateTimeOffset?>("ScheduledFor")
                                 .HasColumnType("timestamp with time zone");
 

@@ -17,16 +17,64 @@ namespace CareLoop.Domain.Rules;
 public static class OwnershipRules
 {
     /// <summary>
+    /// Key of the next action a proposed owner must take, which names the response deadline in the pathway's deadlines.
+    /// </summary>
+    /// <remarks>This is a key into the pathway definition, not a duration: how long the proposed owner has is configuration.</remarks>
+    public const string RespondToHandoffAction = "respond-to-handoff";
+
+    /// <summary>
     /// Chooses the first owner of a newly opened case.
     /// </summary>
     /// <param name="facilityId">The facility that produced the result.</param>
     /// <param name="namedOwner">The responsible person named by the source, or <see langword="null"/> when none was named.</param>
     /// <param name="pathway">The pathway definition naming the unassigned queue role.</param>
     /// <returns>The named owner, or the facility lead queue of <paramref name="facilityId"/> when none was named.</returns>
+    /// <remarks>
+    /// The queue owner's reference is <c>{queue role}:{facility}</c>, so every facility has one
+    /// queue per pathway role and the dashboard can list the queue's cases by that reference.
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="facilityId"/> is empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="pathway"/> is <see langword="null"/>.</exception>
     public static CaseOwner InitialOwner(string facilityId, Actor? namedOwner, PathwayDefinition pathway)
     {
-        // TODO(WS-1): map the named actor to a CaseOwner, or build the facility lead queue owner (IsQueue = true).
-        throw new NotImplementedException("WS1: OwnershipRules.InitialOwner");
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+        ArgumentNullException.ThrowIfNull(pathway);
+
+        if (namedOwner is not null && !string.IsNullOrWhiteSpace(namedOwner.Reference))
+        {
+            return new CaseOwner
+            {
+                Reference = namedOwner.Reference,
+                Role = namedOwner.Role,
+                FacilityId = namedOwner.FacilityId ?? facilityId,
+                IsQueue = false,
+            };
+        }
+
+        return QueueOwner(facilityId, pathway);
+    }
+
+    /// <summary>
+    /// Builds the facility lead queue owner for a facility.
+    /// </summary>
+    /// <param name="facilityId">The facility whose queue owns the case.</param>
+    /// <param name="pathway">The pathway definition naming the unassigned queue role.</param>
+    /// <returns>A queue owner (<see cref="CaseOwner.IsQueue"/> is <see langword="true"/>) for the facility.</returns>
+    /// <remarks>Used for the first owner when nobody is named, and whenever a case must go back to the queue, so "nobody" is never the answer to "who is accountable?".</remarks>
+    /// <exception cref="ArgumentException"><paramref name="facilityId"/> is empty.</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="pathway"/> is <see langword="null"/>.</exception>
+    public static CaseOwner QueueOwner(string facilityId, PathwayDefinition pathway)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+        ArgumentNullException.ThrowIfNull(pathway);
+
+        return new CaseOwner
+        {
+            Reference = $"{pathway.UnassignedQueueRole}:{facilityId}",
+            Role = pathway.UnassignedQueueRole,
+            FacilityId = facilityId,
+            IsQueue = true,
+        };
     }
 
     /// <summary>
@@ -39,7 +87,25 @@ public static class OwnershipRules
     /// <param name="clock">Supplies the proposal time.</param>
     /// <param name="proposal">The proposal to pass to <see cref="Case.ProposeOwner"/> when allowed; otherwise <see langword="null"/>.</param>
     /// <returns>Whether the proposal is allowed and, if not, why.</returns>
-    /// <remarks>Must refuse when the case is closed, when another proposal is pending, or when the proposer may not hand over this case.</remarks>
+    /// <remarks>
+    /// <para>
+    /// Refuses when the case is closed, when another proposal is pending, when the proposed owner is
+    /// a queue (queues are assigned with <see cref="Case.AssignOwner"/>, not proposed to), when the
+    /// proposed owner already owns the case, when the proposer may not hand over this case, or when
+    /// the pathway defines no deadline for <see cref="RespondToHandoffAction"/>.
+    /// </para>
+    /// <para>
+    /// The proposer may hand over the case when they are the current owner, when they hold the role
+    /// of the queue that currently owns it (a facility lead picking a case from the queue), or when
+    /// they hold a role the pathway allows to act in the case's current stage.
+    /// </para>
+    /// <para>
+    /// The response deadline is read from the pathway's deadline for <see cref="RespondToHandoffAction"/>,
+    /// preferring an urgency-specific entry, which is the same lookup <see cref="DeadlinePolicy.ComputeDueAt"/>
+    /// performs. It is repeated here so this rule can be evaluated on its own.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">A required argument is <see langword="null"/>.</exception>
     public static RuleResult TryPropose(
         Case @case,
         CaseOwner proposedOwner,
@@ -48,8 +114,58 @@ public static class OwnershipRules
         IClock clock,
         out Assignment? proposal)
     {
-        // TODO(WS-1): validate, then build an Assignment with RespondBy from DeadlinePolicy.
-        throw new NotImplementedException("WS1: OwnershipRules.TryPropose");
+        ArgumentNullException.ThrowIfNull(@case);
+        ArgumentNullException.ThrowIfNull(proposedOwner);
+        ArgumentNullException.ThrowIfNull(proposedBy);
+        ArgumentNullException.ThrowIfNull(pathway);
+        ArgumentNullException.ThrowIfNull(clock);
+
+        proposal = null;
+
+        if (@case.IsClosed)
+        {
+            return RuleResult.Deny("Case is closed; ownership of a closed case cannot be proposed.");
+        }
+
+        if (@case.PendingAssignment is not null)
+        {
+            return RuleResult.Deny(
+                $"A handoff to '{@case.PendingAssignment.ProposedOwner.Reference}' is already pending and must be accepted or rejected first.");
+        }
+
+        if (proposedOwner.IsQueue)
+        {
+            return RuleResult.Deny("Ownership cannot be proposed to a queue; a queue is assigned directly.");
+        }
+
+        if (string.Equals(proposedOwner.Reference, @case.Owner.Reference, StringComparison.Ordinal))
+        {
+            return RuleResult.Deny($"'{proposedOwner.Reference}' already owns the case.");
+        }
+
+        if (!MayHandOver(@case, proposedBy, pathway))
+        {
+            return RuleResult.Deny(
+                $"'{proposedBy.Reference}' ({proposedBy.Role}) may not hand over a case owned by '{@case.Owner.Reference}'.");
+        }
+
+        var deadline = FindDeadline(pathway, RespondToHandoffAction, @case.Urgency);
+        if (deadline is null)
+        {
+            return RuleResult.Deny($"Pathway '{pathway.Id}' defines no deadline for '{RespondToHandoffAction}'.");
+        }
+
+        var now = clock.UtcNow;
+        proposal = new Assignment
+        {
+            ProposedOwner = proposedOwner,
+            ProposedBy = proposedBy,
+            ProposedAt = now,
+            RespondBy = now.Add(deadline.Duration),
+            Status = AssignmentStatus.Proposed,
+        };
+
+        return RuleResult.Allow();
     }
 
     /// <summary>
@@ -58,10 +174,55 @@ public static class OwnershipRules
     /// <param name="case">The case in its current state.</param>
     /// <param name="respondedBy">Who is responding.</param>
     /// <returns>Whether the response is allowed and, if not, why.</returns>
-    /// <remarks>Must refuse when no proposal is pending or when the responder is not the proposed owner: nobody can accept a case on another person's behalf.</remarks>
+    /// <remarks>Refuses when the case is closed, when no proposal is pending or when the responder is not the proposed owner: nobody can accept a case on another person's behalf.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="case"/> or <paramref name="respondedBy"/> is <see langword="null"/>.</exception>
     public static RuleResult CanRespond(Case @case, Actor respondedBy)
     {
-        // TODO(WS-1): check PendingAssignment exists and its ProposedOwner matches the responder.
-        throw new NotImplementedException("WS1: OwnershipRules.CanRespond");
+        ArgumentNullException.ThrowIfNull(@case);
+        ArgumentNullException.ThrowIfNull(respondedBy);
+
+        if (@case.IsClosed)
+        {
+            return RuleResult.Deny("Case is closed; there is no handoff to respond to.");
+        }
+
+        if (@case.PendingAssignment is null)
+        {
+            return RuleResult.Deny("No handoff is pending on this case.");
+        }
+
+        if (!string.Equals(@case.PendingAssignment.ProposedOwner.Reference, respondedBy.Reference, StringComparison.Ordinal))
+        {
+            return RuleResult.Deny(
+                $"The handoff was proposed to '{@case.PendingAssignment.ProposedOwner.Reference}', not to '{respondedBy.Reference}'; nobody can respond on another person's behalf.");
+        }
+
+        return RuleResult.Allow();
+    }
+
+    private static bool MayHandOver(Case @case, Actor proposedBy, PathwayDefinition pathway)
+    {
+        if (string.Equals(proposedBy.Reference, @case.Owner.Reference, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (@case.Owner.IsQueue && string.Equals(proposedBy.Role, @case.Owner.Role, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var stage = pathway.Stages.FirstOrDefault(s => s.Stage == @case.Stage);
+        return stage is not null && stage.AllowedRoles.Contains(proposedBy.Role, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static DeadlineDefinition? FindDeadline(PathwayDefinition pathway, string nextAction, string? urgencyCode)
+    {
+        var candidates = pathway.Deadlines
+            .Where(d => string.Equals(d.NextAction, nextAction, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return candidates.FirstOrDefault(d => urgencyCode is not null && string.Equals(d.UrgencyCode, urgencyCode, StringComparison.OrdinalIgnoreCase))
+            ?? candidates.FirstOrDefault(d => d.UrgencyCode is null);
     }
 }

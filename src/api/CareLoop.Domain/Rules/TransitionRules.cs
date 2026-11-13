@@ -16,6 +16,31 @@ namespace CareLoop.Domain.Rules;
 public static class TransitionRules
 {
     /// <summary>
+    /// The events that report progress on a parallel track rather than moving the case between stages.
+    /// </summary>
+    private static readonly CaseEventType[] TrackEvents =
+    [
+        CaseEventType.NotificationUpdated,
+        CaseEventType.ConsultationUpdated,
+        CaseEventType.ReferralUpdated,
+        CaseEventType.AppointmentUpdated,
+    ];
+
+    /// <summary>
+    /// The stages during which track events are accepted without changing the stage.
+    /// </summary>
+    /// <remarks>
+    /// Follow-up is where the tracks run. Closure review is included because the hospital system
+    /// may report an attendance or acknowledgement after the outcome that moved the case there,
+    /// and refusing that report would leave a required track incomplete through no fault of anyone.
+    /// </remarks>
+    private static readonly CaseStage[] StagesAcceptingTrackEvents =
+    [
+        CaseStage.FollowUpActive,
+        CaseStage.ClosureReview,
+    ];
+
+    /// <summary>
     /// Decides whether an event may be applied to a case and which stage results.
     /// </summary>
     /// <param name="case">The case in its current state.</param>
@@ -24,14 +49,80 @@ public static class TransitionRules
     /// <param name="pathway">The pathway definition supplying the stage rules and allowed roles.</param>
     /// <returns>Whether the event is allowed, the resulting stage and the next action to set.</returns>
     /// <remarks>
-    /// Must refuse: any event on a closed case; an event whose type does not leave or belong to the
-    /// current stage; an actor whose role is not allowed for the transition. Track events
-    /// (notification, consultation, referral, appointment) are allowed during follow-up without
-    /// changing the stage. This method never mutates the case.
+    /// <para>
+    /// Refuses: any event on a closed case; an event whose type does not leave or belong to the
+    /// current stage; an actor whose role is not allowed for the transition, or no actor at all when
+    /// the stage names allowed roles. Track events (notification, consultation, referral,
+    /// appointment) are allowed during follow-up and closure review without changing the stage.
+    /// CareLoop's own internal events (<see cref="CaseEventType.DeadlineElapsed"/>,
+    /// <see cref="CaseEventType.HandoffSummaryApproved"/>) are allowed on any open case without
+    /// changing the stage, because they are coordination, not pathway progress.
+    /// </para>
+    /// <para>This method never mutates the case.</para>
     /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="case"/> or <paramref name="pathway"/> is <see langword="null"/>.</exception>
     public static TransitionResult Evaluate(Case @case, CaseEventType eventType, Actor? actor, PathwayDefinition pathway)
     {
-        // TODO(WS-1): look up the stage definition, check LeavesOn and AllowedRoles, return the verdict.
-        throw new NotImplementedException("WS1: TransitionRules.Evaluate");
+        ArgumentNullException.ThrowIfNull(@case);
+        ArgumentNullException.ThrowIfNull(pathway);
+
+        if (@case.IsClosed)
+        {
+            return Refuse($"Case is closed; a closed case accepts no further events ({eventType} refused).");
+        }
+
+        var current = pathway.Stages.FirstOrDefault(s => s.Stage == @case.Stage);
+        if (current is null)
+        {
+            return Refuse($"Pathway '{pathway.Id}' defines no rule for stage {@case.Stage}.");
+        }
+
+        if (current.LeavesOn.Contains(eventType))
+        {
+            if (current.AllowedRoles.Count > 0)
+            {
+                if (actor is null)
+                {
+                    return Refuse($"{eventType} must name who performed it; stage {@case.Stage} allows roles {Join(current.AllowedRoles)}.");
+                }
+
+                if (!current.AllowedRoles.Contains(actor.Role, StringComparer.OrdinalIgnoreCase))
+                {
+                    return Refuse($"Role '{actor.Role}' may not perform {eventType} in stage {@case.Stage}; allowed roles are {Join(current.AllowedRoles)}.");
+                }
+            }
+
+            if (current.Next is null)
+            {
+                return Refuse($"Pathway '{pathway.Id}' names no next stage after {@case.Stage} for {eventType}.");
+            }
+
+            var next = pathway.Stages.FirstOrDefault(s => s.Stage == current.Next.Value);
+
+            return new TransitionResult
+            {
+                Verdict = RuleResult.Allow(),
+                NextStage = current.Next,
+                NextAction = next?.NextActionOnEntry,
+            };
+        }
+
+        if (TrackEvents.Contains(eventType) && StagesAcceptingTrackEvents.Contains(@case.Stage))
+        {
+            return new TransitionResult { Verdict = RuleResult.Allow() };
+        }
+
+        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved)
+        {
+            return new TransitionResult { Verdict = RuleResult.Allow() };
+        }
+
+        return Refuse($"{eventType} neither leaves nor belongs to stage {@case.Stage}; the stage leaves on {Join(current.LeavesOn.Select(e => e.ToString()).ToList())}.");
     }
+
+    private static TransitionResult Refuse(string reason) =>
+        new() { Verdict = RuleResult.Deny(reason) };
+
+    private static string Join(IReadOnlyList<string> values) =>
+        values.Count == 0 ? "(none)" : string.Join(", ", values);
 }
