@@ -25,7 +25,7 @@ public sealed class ConsentMapperTests
         var payload = Assert.IsType<ConsentPayload>(envelope.Payload);
         Assert.Equal(ConsentUpdateKind.Granted, payload.Kind);
         Assert.Equal("Consent/SYN-CONSENT-0001", payload.ConsentReference);
-        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Email, Address = "SYN-CG-INBOX-0001" }, payload.CaregiverContactPoint);
+        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-CG-INBOX-0001" }, payload.CaregiverContactPoint);
     }
 
     [Theory]
@@ -41,6 +41,44 @@ public sealed class ConsentMapperTests
 
         Assert.Equal(ConsentUpdateKind.Withdrawn, payload.Kind);
         Assert.Null(payload.CaregiverContactPoint);
+    }
+
+    [Fact]
+    public void Active_consent_that_denies_maps_to_a_withdrawal()
+    {
+        var consent = Sample<Consent>("Consent");
+        consent.Provision!.Type = Consent.ConsentProvisionType.Deny;
+
+        var payload = Assert.IsType<ConsentPayload>(Assert.Single(Map(Mapper, consent)).Payload);
+
+        Assert.Equal(ConsentUpdateKind.Withdrawn, payload.Kind);
+        Assert.Null(payload.CaregiverContactPoint);
+    }
+
+    [Fact]
+    public void Staff_performer_is_the_actor_and_a_patient_performer_is_not()
+    {
+        var consent = Sample<Consent>("Consent");
+        consent.Performer =
+        [
+            new ResourceReference("Patient/SYN-PT-0001"),
+            new ResourceReference("Practitioner/SYN-STAFF-0003").WithRole("nurse-navigator"),
+        ];
+
+        var actor = Assert.Single(Map(Mapper, consent)).Actor;
+
+        Assert.NotNull(actor);
+        Assert.Equal("SYN-STAFF-0003", actor.Reference);
+        Assert.Equal("nurse-navigator", actor.Role);
+    }
+
+    [Fact]
+    public void Consent_performed_by_the_patient_alone_names_no_actor()
+    {
+        var consent = Sample<Consent>("Consent");
+        consent.Performer = [new ResourceReference("Patient/SYN-PT-0001")];
+
+        Assert.Null(Assert.Single(Map(Mapper, consent)).Actor);
     }
 
     [Theory]

@@ -40,7 +40,7 @@ domain to replace before live exchange.
 | `Procedure`, `completed` | Outcome evidence | `reasonReference` | `code` in `B/CodeSystem/evidence-kind`; `performer.actor` with role |
 | `Provenance` containing the case `Task` (`target` = `#id`) | Closure decision | the contained task's `basedOn` | `agent.who` with role = the authorizer; the contained task's `statusReason` in `B/CodeSystem/status-reason` (closure reason) and `output`s typed in `B/CodeSystem/closure-output`: `evidence`, `next-surveillance-date`, `documented-attempt`, `exception-note` |
 | `Task` with `code` `#case`, `completed`, `relevantHistory` = contained `Provenance` | Closure decision (same event as above) | `basedOn` | as above |
-| `Consent` | Caregiver consent (C13): `active` granted, `inactive` or `rejected` withdrawn | the `screening-result` extension | `provision.actor.reference` = contained `RelatedPerson`, whose first usable `telecom` is the caregiver contact point |
+| `Consent` | Caregiver consent (C13): `active` granted, `inactive` or `rejected` withdrawn | the `screening-result` extension | `provision.actor.reference` = contained `RelatedPerson`, whose first usable `telecom` is the caregiver contact point (`other` = simulator inbox, as for the patient; the patient-channel simulator shows it in its Email inbox) |
 
 **Responses.** 201 (applied, with `Location`), 200 (duplicate, or nothing CareLoop tracks), 400 (not FHIR, wrong
 type or id, no `meta.source`, a field above missing, no case for the result), 422 (a rule refused the event; it is still

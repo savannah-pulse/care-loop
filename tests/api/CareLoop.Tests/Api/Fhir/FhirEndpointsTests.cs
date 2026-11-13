@@ -5,7 +5,9 @@ using CareLoop.Api.Features.Fhir.Outbound;
 using CareLoop.Domain.Cases;
 using CareLoop.Tests.Fakes;
 using Hl7.Fhir.Model;
+using CareLoop.Api.Infrastructure.Fhir;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using static CareLoop.Tests.Api.Fhir.FhirTestSupport;
 using FhirTask = Hl7.Fhir.Model.Task;
 
@@ -28,6 +30,11 @@ public sealed class FhirEndpointsTests
         new ProvenanceMapper(),
         new ConsentMapper(),
     ];
+
+    private static readonly IOptions<ExternalSystemsOptions> Systems = Options.Create(new ExternalSystemsOptions
+    {
+        Systems = { [SourceSystemId] = new ExternalSystemEndpoint { BaseUrl = "http://his.invalid" } },
+    });
 
     [Fact]
     public async System.Threading.Tasks.Task Post_of_a_new_resource_returns_201()
@@ -65,6 +72,20 @@ public sealed class FhirEndpointsTests
 
         AssertOutcome(notJson, StatusCodes.Status400BadRequest);
         AssertOutcome(notFhir, StatusCodes.Status400BadRequest);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Resource_from_an_unconfigured_source_system_returns_403_and_changes_nothing()
+    {
+        var report = Sample<DiagnosticReport>("DiagnosticReport");
+        report.Meta!.Source = "SYN-UNKNOWN-SYSTEM";
+
+        var result = await PostAsync("DiagnosticReport", FhirJsonCodec.Serialize(report));
+
+        var outcome = AssertOutcome(result, StatusCodes.Status403Forbidden);
+        Assert.Equal(OperationOutcome.IssueType.Forbidden, outcome.Issue[0].Code);
+        Assert.Empty(_harness.Repository.Cases);
+        Assert.Empty(_harness.Repository.Events);
     }
 
     [Fact]
@@ -226,10 +247,10 @@ public sealed class FhirEndpointsTests
     }
 
     private async System.Threading.Tasks.Task<FhirResourceResult> PostAsync(string type, string body) =>
-        Assert.IsType<FhirResourceResult>(await FhirEndpoints.CreateResource(type, Request(body), Mappers, _harness.Ingestor, CancellationToken.None));
+        Assert.IsType<FhirResourceResult>(await FhirEndpoints.CreateResource(type, Request(body), Mappers, _harness.Ingestor, Systems, CancellationToken.None));
 
     private async System.Threading.Tasks.Task<FhirResourceResult> PutAsync(string type, string id, string body) =>
-        Assert.IsType<FhirResourceResult>(await FhirEndpoints.UpdateResource(type, id, Request(body), Mappers, _harness.Ingestor, CancellationToken.None));
+        Assert.IsType<FhirResourceResult>(await FhirEndpoints.UpdateResource(type, id, Request(body), Mappers, _harness.Ingestor, Systems, CancellationToken.None));
 
     private static HttpRequest Request(string body)
     {

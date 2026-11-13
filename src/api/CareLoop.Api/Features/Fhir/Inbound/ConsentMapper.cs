@@ -11,7 +11,10 @@ namespace CareLoop.Api.Features.Fhir.Inbound;
 /// </summary>
 /// <remarks>
 /// <c>status</c> <c>active</c> is a grant, <c>inactive</c> or <c>rejected</c> a withdrawal; other statuses produce no
-/// event. The caregiver is the <c>provision.actor</c>, a contained <c>RelatedPerson</c> whose first usable
+/// event. An <c>active</c> consent whose <c>provision.type</c> is <c>deny</c> records the patient refusing, so it is a
+/// withdrawal too: reading it as a grant would let CareLoop message a caregiver the patient said no to. Who recorded
+/// the consent is the first <c>performer</c> carrying a CareLoop role (staff acting for the patient), so the audit
+/// names them; a consent the patient performed alone names no actor. The caregiver is the <c>provision.actor</c>, a contained <c>RelatedPerson</c> whose first usable
 /// <c>telecom</c> is the contact point. Only that contact point and the consent reference cross the boundary, never
 /// the caregiver's name or the consent text. The consent names the screening result through the
 /// <see cref="StatusMap.ScreeningResultExtension"/>, because a <c>Consent</c> has no standard field for it.
@@ -28,6 +31,7 @@ public sealed class ConsentMapper : IFhirInboundMapper
 
         ConsentUpdateKind? kind = consent.Status switch
         {
+            Consent.ConsentState.Active when consent.Provision?.Type == Consent.ConsentProvisionType.Deny => ConsentUpdateKind.Withdrawn,
             Consent.ConsentState.Active => ConsentUpdateKind.Granted,
             Consent.ConsentState.Inactive or Consent.ConsentState.Rejected => ConsentUpdateKind.Withdrawn,
             _ => null,
@@ -48,7 +52,7 @@ public sealed class ConsentMapper : IFhirInboundMapper
                 Type = CaseEventType.ConsentRecorded,
                 SourceResultId = InboundSupport.RequireResultId(consent),
                 OccurredAt = InboundSupport.OccurredAt(consent, InboundSupport.Instant(consent.DateTimeElement)),
-                Actor = null,
+                Actor = consent.Performer.Select(InboundSupport.ReadActor).FirstOrDefault(a => a is not null),
                 Payload = new ConsentPayload
                 {
                     Kind = kind.Value,

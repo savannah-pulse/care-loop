@@ -487,6 +487,50 @@ public sealed class EventHandlerTests
     }
 
     [Fact]
+    public async Task Repeated_consultation_request_does_not_restart_the_answer_deadline()
+    {
+        await _harness.ReviewedCaseAsync();
+        var @case = await _harness.ApplyAsync(Envelopes.Consultation(_harness.Clock.UtcNow, ConsultationStatus.Requested, actor: Envelopes.Clinician()));
+        var dueAt = @case.DueAt;
+
+        _harness.Clock.Advance(TimeSpan.FromHours(20));
+        @case = await _harness.ApplyAsync(Envelopes.Consultation(_harness.Clock.UtcNow, ConsultationStatus.Requested, actor: Envelopes.Clinician()));
+
+        Assert.Equal(ConsultationTrack.AnswerAction, @case.NextAction);
+        Assert.Equal(dueAt, @case.DueAt);
+    }
+
+    [Fact]
+    public async Task Repeated_referral_sent_does_not_restart_the_response_deadline()
+    {
+        await _harness.ReviewedCaseAsync();
+        var @case = await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Sent));
+        var dueAt = @case.DueAt;
+
+        _harness.Clock.Advance(TimeSpan.FromHours(3));
+        @case = await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Sent));
+
+        Assert.Equal(ReferralTrack.RespondAction, @case.NextAction);
+        Assert.Equal(dueAt, @case.DueAt);
+    }
+
+    [Fact]
+    public async Task Referral_sent_again_after_a_rejection_restarts_the_response_deadline()
+    {
+        await _harness.ReviewedCaseAsync();
+        await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Sent));
+        _harness.Clock.Advance(TimeSpan.FromHours(1));
+        await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Rejected, reason: "No capacity"));
+
+        _harness.Clock.Advance(TimeSpan.FromHours(2));
+        var @case = await _harness.ApplyAsync(Envelopes.Referral(_harness.Clock.UtcNow, ReferralStatus.Sent));
+
+        var respondWithin = _harness.Pathway.Deadlines.Single(d => d.NextAction == ReferralTrack.RespondAction && d.UrgencyCode is null).Duration;
+        Assert.Equal(ReferralTrack.RespondAction, @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.Add(respondWithin), @case.DueAt);
+    }
+
+    [Fact]
     public async Task Referral_sent_sets_the_response_deadline_and_acceptance_hands_back_follow_up()
     {
         await _harness.ReviewedCaseAsync();

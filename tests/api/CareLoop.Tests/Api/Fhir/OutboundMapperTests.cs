@@ -40,15 +40,15 @@ public sealed class OutboundMapperTests
     [Fact]
     public void Approved_summary_maps_to_a_DocumentReference()
     {
-        var proposed = Proposed(Guid.NewGuid());
-        var summary = Summary(proposed.CaseId, HandoffSummaryStatus.Approved);
+        var summary = Summary(Guid.NewGuid(), HandoffSummaryStatus.Approved);
+        var approval = Approval(summary);
 
-        var document = new HandoffDocumentReferenceMapper().Map(proposed, summary);
+        var document = new HandoffDocumentReferenceMapper().Map(approval, summary);
 
         Assert.Equal($"handoff-{summary.Id:N}", document.Id);
         Assert.Equal(DocumentReferenceStatus.Current, document.Status);
         Assert.Equal("Practitioner/SYN-STAFF-0001", Assert.Single(document.Author).Reference);
-        Assert.Equal($"Task/{proposed.CaseId:D}", Assert.Single(document.Context!.Related).Reference);
+        Assert.Equal($"Task/{summary.CaseId:D}", Assert.Single(document.Context!.Related).Reference);
         var attachment = Assert.Single(document.Content).Attachment;
         Assert.Equal(summary.Text, Encoding.UTF8.GetString(attachment!.Data!));
     }
@@ -58,9 +58,18 @@ public sealed class OutboundMapperTests
     [InlineData(HandoffSummaryStatus.Rejected)]
     public void Draft_summary_is_never_published(HandoffSummaryStatus status)
     {
-        var proposed = Proposed(Guid.NewGuid());
+        var summary = Summary(Guid.NewGuid(), status);
 
-        Assert.Throws<InvalidOperationException>(() => new HandoffDocumentReferenceMapper().Map(proposed, Summary(proposed.CaseId, status)));
+        Assert.Throws<InvalidOperationException>(() => new HandoffDocumentReferenceMapper().Map(Approval(summary), summary));
+    }
+
+    [Fact]
+    public void A_summary_other_than_the_one_approved_is_never_published()
+    {
+        var approved = Summary(Guid.NewGuid(), HandoffSummaryStatus.Approved);
+        var other = Summary(approved.CaseId, HandoffSummaryStatus.Approved);
+
+        Assert.Throws<InvalidOperationException>(() => new HandoffDocumentReferenceMapper().Map(Approval(approved), other));
     }
 
     [Fact]
@@ -120,14 +129,13 @@ public sealed class OutboundMapperTests
         Assert.DoesNotContain("SYN-MRN-0001", json);
     }
 
-    private static HandoffProposed Proposed(Guid caseId) => new()
+    private static HandoffSummaryApproved Approval(HandoffSummaryRecord summary) => new()
     {
         EventId = Guid.NewGuid(),
-        CaseId = caseId,
+        CaseId = summary.CaseId,
         OccurredAt = At,
-        CurrentOwner = TestData.Clinician(),
-        ProposedOwner = TestData.Clinician("SYN-STAFF-0002"),
-        RespondBy = At.AddHours(4),
+        SummaryId = summary.Id,
+        ApprovedBy = Envelopes.Clinician(),
     };
 
     private static HandoffSummaryRecord Summary(Guid caseId, HandoffSummaryStatus status) => new()

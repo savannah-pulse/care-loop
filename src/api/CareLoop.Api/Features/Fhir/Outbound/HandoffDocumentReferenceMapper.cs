@@ -20,11 +20,11 @@ public sealed class HandoffDocumentReferenceMapper
     /// <summary>
     /// Builds the FHIR resource.
     /// </summary>
-    /// <param name="domainEvent">The handoff proposal the summary accompanies.</param>
+    /// <param name="domainEvent">The approval of the summary; names the case and the summary.</param>
     /// <param name="summary">The stored summary; must be approved.</param>
     /// <returns>A <c>DocumentReference</c> ready to send to the HIS.</returns>
-    /// <exception cref="InvalidOperationException">The summary is not approved, or has no approver.</exception>
-    public DocumentReference Map(HandoffProposed domainEvent, HandoffSummaryRecord summary)
+    /// <exception cref="InvalidOperationException">The summary is not approved, has no approver, or is not the summary the approval names.</exception>
+    public DocumentReference Map(HandoffSummaryApproved domainEvent, HandoffSummaryRecord summary)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
         ArgumentNullException.ThrowIfNull(summary);
@@ -32,6 +32,11 @@ public sealed class HandoffDocumentReferenceMapper
         if (summary.Status != HandoffSummaryStatus.Approved || string.IsNullOrWhiteSpace(summary.ApprovedBy))
         {
             throw new InvalidOperationException($"Handoff summary {summary.Id} is {summary.Status}; only an approved summary is ever published.");
+        }
+
+        if (summary.Id != domainEvent.SummaryId || summary.CaseId != domainEvent.CaseId)
+        {
+            throw new InvalidOperationException($"Handoff summary {summary.Id} is not the summary approved by event {domainEvent.EventId}.");
         }
 
         var approver = new ResourceReference(OutboundSupport.Typed("Practitioner", summary.ApprovedBy));

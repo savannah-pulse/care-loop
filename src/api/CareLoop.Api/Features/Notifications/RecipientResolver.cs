@@ -13,7 +13,7 @@ namespace CareLoop.Api.Features.Notifications;
 /// <see cref="HandoffProposed"/> to the proposed owner; <see cref="HandoffRejected"/>,
 /// <see cref="ReferralRejected"/>, <see cref="CallRequested"/> and <see cref="DeadlineApproaching"/> to the
 /// current owner; <see cref="EscalationRaised"/> to the facility lead and then the coordinator;
-/// <see cref="CaseClosed"/> to nobody. The Domain holds no contact data, so patient contact points are
+/// <see cref="CaseClosed"/> and <see cref="HandoffSummaryApproved"/> to nobody. The Domain holds no contact data, so patient contact points are
 /// read from the stored screening-result event and staff are addressed through their simulator inbox.
 /// </remarks>
 public sealed class RecipientResolver

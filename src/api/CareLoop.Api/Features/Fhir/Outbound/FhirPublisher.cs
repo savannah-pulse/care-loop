@@ -1,7 +1,6 @@
 using CareLoop.Api.Features.Outbox;
 using CareLoop.Api.Infrastructure.Fhir;
 using CareLoop.Api.Infrastructure.Persistence;
-using CareLoop.Contracts.Summaries;
 using CareLoop.Domain.Events.DomainEvents;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,8 +10,8 @@ namespace CareLoop.Api.Features.Fhir.Outbound;
 /// Outbox subscriber that publishes domain events to external systems as FHIR resources.
 /// </summary>
 /// <remarks>
-/// Sends: <see cref="HandoffProposed"/> as the case <c>Task</c> plus a <c>DocumentReference</c> (only when an approved
-/// summary exists at the time of sending); <see cref="HandoffRejected"/> and <see cref="ReferralRejected"/> as a case
+/// Sends: <see cref="HandoffProposed"/> as the case <c>Task</c>; <see cref="HandoffSummaryApproved"/> as a
+/// <c>DocumentReference</c> carrying exactly the summary that approval names; <see cref="HandoffRejected"/> and <see cref="ReferralRejected"/> as a case
 /// <c>Task</c> update; <see cref="CallRequested"/> and <see cref="EscalationRaised"/> as a notice <c>Task</c>;
 /// <see cref="CaseClosed"/> as the case <c>Task</c> completed. <see cref="NotificationRequested"/> and
 /// <see cref="DeadlineApproaching"/> publish nothing: reaching the patient is the notification providers' job, not the
@@ -79,22 +78,14 @@ public sealed class FhirPublisher : IDomainEventSubscriber
 
         switch (domainEvent)
         {
-            case HandoffProposed proposed:
-                await _client.SendAsync(system, _caseTasks.Map(@case), ct);
-
-                // Ordered in memory: a case has a handful of summaries, and not every provider orders by DateTimeOffset.
-                var approved = await _db.HandoffSummaries.AsNoTracking()
-                    .Where(s => s.CaseId == @case.Id && s.Status == HandoffSummaryStatus.Approved)
-                    .ToListAsync(ct);
-                var summary = approved.MaxBy(s => s.ApprovedAt);
-                if (summary is not null)
-                {
-                    await _client.SendAsync(system, _handoffDocuments.Map(proposed, summary), ct);
-                }
-
+            case HandoffSummaryApproved approval:
+                var summary = await _db.HandoffSummaries.AsNoTracking()
+                    .SingleOrDefaultAsync(s => s.Id == approval.SummaryId && s.CaseId == approval.CaseId, ct)
+                    ?? throw new InvalidOperationException($"Handoff summary {approval.SummaryId} named by {approval.EventId} does not exist on case {approval.CaseId}.");
+                await _client.SendAsync(system, _handoffDocuments.Map(approval, summary), ct);
                 break;
 
-            case HandoffRejected or ReferralRejected or CaseClosed:
+            case HandoffProposed or HandoffRejected or ReferralRejected or CaseClosed:
                 await _client.SendAsync(system, _caseTasks.Map(@case), ct);
                 break;
 

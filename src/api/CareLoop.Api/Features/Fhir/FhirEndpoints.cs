@@ -1,11 +1,13 @@
 using System.Text.Json;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Features.Fhir.Outbound;
+using CareLoop.Api.Infrastructure.Fhir;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Events;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
 namespace CareLoop.Api.Features.Fhir;
@@ -20,7 +22,9 @@ namespace CareLoop.Api.Features.Fhir;
 /// ingestor. There is deliberately no public <c>POST /events</c>.
 /// <para>
 /// The sending system identifies itself in <c>meta.source</c>; the value is the source system identifier,
-/// the same key it has under <c>ExternalSystems:Systems</c>, and is what replies are routed back to.
+/// the same key it has under <c>ExternalSystems:Systems</c>, and is what replies are routed back to. A resource
+/// from a system that is not configured there is refused, because CareLoop could never answer it: every reply
+/// to the case would fail. This is not authentication, which is a prerequisite before real patient data.
 /// </para>
 /// </remarks>
 public static class FhirEndpoints
@@ -52,6 +56,7 @@ public static class FhirEndpoints
             .Produces<JsonElement>(StatusCodes.Status201Created, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status200OK, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status400BadRequest, FhirJson)
+            .Produces<JsonElement>(StatusCodes.Status403Forbidden, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status422UnprocessableEntity, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status503ServiceUnavailable, FhirJson);
 
@@ -60,6 +65,7 @@ public static class FhirEndpoints
             .Accepts<JsonElement>(FhirJson, "application/json")
             .Produces<JsonElement>(StatusCodes.Status200OK, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status400BadRequest, FhirJson)
+            .Produces<JsonElement>(StatusCodes.Status403Forbidden, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status422UnprocessableEntity, FhirJson)
             .Produces<JsonElement>(StatusCodes.Status503ServiceUnavailable, FhirJson);
 
@@ -73,11 +79,13 @@ public static class FhirEndpoints
     /// <param name="request">The HTTP request; its body is the FHIR R4 resource as JSON.</param>
     /// <param name="mappers">The registered inbound mappers, one per supported resource type.</param>
     /// <param name="ingestor">The single intake pipeline.</param>
+    /// <param name="systems">The configured external systems; <c>meta.source</c> must name one of them.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
     /// 201 with the stored resource when the event was applied; 200 when it was a duplicate (same
     /// identifier and version) or represents no tracked transition; 400 with an <c>OperationOutcome</c> when the body
-    /// is not valid FHIR, names no source system, or no mapper exists for the type; 422 with an <c>OperationOutcome</c>
+    /// is not valid FHIR, names no source system, or no mapper exists for the type; 403 with an <c>OperationOutcome</c>
+    /// when the source system is not configured under <c>ExternalSystems:Systems</c>; 422 with an <c>OperationOutcome</c>
     /// when a domain rule refused the event; 503 when a resource it refers to could not be read from the source.
     /// </returns>
     public static Task<IResult> CreateResource(
@@ -85,8 +93,9 @@ public static class FhirEndpoints
         HttpRequest request,
         IEnumerable<IFhirInboundMapper> mappers,
         EventIngestor ingestor,
+        IOptions<ExternalSystemsOptions> systems,
         CancellationToken ct) =>
-        AcceptAsync(resourceType, id: null, request, mappers, ingestor, ct);
+        AcceptAsync(resourceType, id: null, request, mappers, ingestor, systems, ct);
 
     /// <summary>
     /// Accepts a new version of an existing FHIR resource from an external system.
@@ -96,9 +105,10 @@ public static class FhirEndpoints
     /// <param name="request">The HTTP request; its body is the FHIR R4 resource as JSON.</param>
     /// <param name="mappers">The registered inbound mappers.</param>
     /// <param name="ingestor">The single intake pipeline.</param>
+    /// <param name="systems">The configured external systems; <c>meta.source</c> must name one of them.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
-    /// 200 with the resource when the new state was applied or was a duplicate; 400, 422 or 503 with an
+    /// 200 with the resource when the new state was applied or was a duplicate; 400, 403, 422 or 503 with an
     /// <c>OperationOutcome</c> as for <see cref="CreateResource"/>.
     /// </returns>
     /// <remarks>An update is state, not an event: the mapper derives the transition and the resource version makes a resend idempotent.</remarks>
@@ -108,8 +118,9 @@ public static class FhirEndpoints
         HttpRequest request,
         IEnumerable<IFhirInboundMapper> mappers,
         EventIngestor ingestor,
+        IOptions<ExternalSystemsOptions> systems,
         CancellationToken ct) =>
-        AcceptAsync(resourceType, id, request, mappers, ingestor, ct);
+        AcceptAsync(resourceType, id, request, mappers, ingestor, systems, ct);
 
     /// <summary>
     /// Returns the current status of a case as a FHIR <c>Task</c>; also feeds the patient view.
@@ -142,6 +153,7 @@ public static class FhirEndpoints
         HttpRequest request,
         IEnumerable<IFhirInboundMapper> mappers,
         EventIngestor ingestor,
+        IOptions<ExternalSystemsOptions> systems,
         CancellationToken ct)
     {
         Resource resource;
@@ -169,6 +181,11 @@ public static class FhirEndpoints
         if (string.IsNullOrWhiteSpace(sourceSystem))
         {
             return Outcome(StatusCodes.Status400BadRequest, OperationOutcome.IssueType.Required, "meta.source must name the sending system.");
+        }
+
+        if (!systems.Value.Systems.ContainsKey(sourceSystem))
+        {
+            return Outcome(StatusCodes.Status403Forbidden, OperationOutcome.IssueType.Forbidden, $"The source system '{sourceSystem}' in meta.source is not configured under {ExternalSystemsOptions.SectionName}:Systems.");
         }
 
         var mapper = mappers.FirstOrDefault(m => string.Equals(m.ResourceType, resource.TypeName, StringComparison.Ordinal));

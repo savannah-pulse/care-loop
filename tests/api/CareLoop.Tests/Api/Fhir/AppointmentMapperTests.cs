@@ -34,6 +34,39 @@ public sealed class AppointmentMapperTests
     [Fact]
     public void Noshow_maps_to_missed() => Assert.Equal(AppointmentStatus.Missed, StatusAfter(FhirAppointmentStatus.Noshow));
 
+    [Fact]
+    public void A_booking_happened_when_it_was_made_not_at_the_appointment_time()
+    {
+        var envelope = Assert.Single(Map(Mapper, Sample<Appointment>("Appointment")));
+
+        Assert.Equal(new DateTimeOffset(2026, 1, 2, 10, 0, 0, TimeSpan.Zero), envelope.OccurredAt);
+    }
+
+    [Theory]
+    [InlineData(FhirAppointmentStatus.Fulfilled)]
+    [InlineData(FhirAppointmentStatus.Noshow)]
+    public void Attendance_and_no_show_happened_at_the_appointment_not_at_the_booking(FhirAppointmentStatus status)
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Status = status;
+
+        var envelope = Assert.Single(Map(Mapper, appointment));
+
+        Assert.Equal(new DateTimeOffset(2026, 1, 3, 8, 30, 0, TimeSpan.Zero), envelope.OccurredAt);
+    }
+
+    [Fact]
+    public void Attendance_without_an_end_happened_at_the_start()
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Status = FhirAppointmentStatus.Fulfilled;
+        appointment.End = null;
+
+        var envelope = Assert.Single(Map(Mapper, appointment));
+
+        Assert.Equal(new DateTimeOffset(2026, 1, 3, 8, 0, 0, TimeSpan.Zero), envelope.OccurredAt);
+    }
+
     [Theory]
     [InlineData(FhirAppointmentStatus.Proposed)]
     [InlineData(FhirAppointmentStatus.Pending)]
