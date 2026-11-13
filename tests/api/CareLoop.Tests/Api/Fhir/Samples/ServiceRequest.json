@@ -1,0 +1,10 @@
+{
+  "resourceType": "ServiceRequest",
+  "id": "SYN-SR-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "active",
+  "intent": "order",
+  "category": [ { "text": "PLACEHOLDER - synthetic, not a clinical code" } ],
+  "subject": { "reference": "Patient/SYN-PT-0001" },
+  "authoredOn": "2026-01-02T08:00:00Z"
+}

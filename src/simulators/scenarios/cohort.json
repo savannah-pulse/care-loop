@@ -1,0 +1,17 @@
+{
+  "$schema": "./scenario.schema.json",
+  "name": "cohort",
+  "synthetic": true,
+  "description": "SIMULATED. A small seeded cohort mixing the four step-based scenarios; used by the with-and-without-escalation comparison. Weights are illustrative placeholders, not observed rates.",
+  "pathwayId": "breast-screening",
+  "cohort": {
+    "size": 20,
+    "seed": 20260101,
+    "mix": [
+      { "scenario": "happy-path", "weight": 1 },
+      { "scenario": "silent-patient", "weight": 1 },
+      { "scenario": "rejected-referral", "weight": 1 },
+      { "scenario": "broken-handoff", "weight": 1 }
+    ]
+  }
+}

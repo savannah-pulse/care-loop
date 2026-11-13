@@ -8,6 +8,14 @@ updates:
     directory: /src/web
     schedule:
       interval: weekly
+  - package-ecosystem: npm
+    directory: /src/simulators/his/HisSimulator/ClientApp
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /src/simulators/patient-channel/PatientChannelSimulator/ClientApp
+    schedule:
+      interval: weekly
   - package-ecosystem: nuget
     directory: /
     schedule:

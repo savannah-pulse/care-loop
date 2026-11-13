@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  api:
-    name: API build and tests
+  dotnet:
+    name: API and simulators build and tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,8 +19,11 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet restore CareLoop.sln
-      - run: dotnet build CareLoop.sln --configuration Release --no-restore
+      - name: Build (warnings are errors, XML docs enforced)
+        run: dotnet build CareLoop.sln --configuration Release --no-restore
       - run: dotnet test CareLoop.sln --configuration Release --no-build
+      - name: OpenAPI document is up to date
+        run: git diff --exit-code -- contracts/openapi/careloop.json
 
   web:
     name: Web lint and build
@@ -38,6 +41,29 @@ jobs:
         working-directory: src/web
       - run: npm run build
         working-directory: src/web
+
+  simulator-client-apps:
+    name: Simulator ClientApp lint, tests and build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        client-app:
+          - src/simulators/his/HisSimulator/ClientApp
+          - src/simulators/patient-channel/PatientChannelSimulator/ClientApp
+    defaults:
+      run:
+        working-directory: ${{ matrix.client-app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack yarn install --immutable
+      - run: corepack yarn lint
+      - run: corepack yarn typecheck
+      - run: corepack yarn test
+      - run: corepack yarn build
 
   ai-workflow:
     name: Python workflow lint and tests

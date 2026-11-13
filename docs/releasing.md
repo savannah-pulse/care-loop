@@ -22,6 +22,6 @@ pytest
 
 ## Continuous delivery
 
-Pushing a `v*` tag runs the `Release` workflow. It publishes the API, builds the static web bundle and Python workflow wheel into a versioned zip, then attaches that artifact to a GitHub Release. This is a build-and-package delivery step; it does not deploy to a hosted runtime.
+Pushing a `v*` tag runs the `Release` workflow. It publishes the API and both simulators, builds the static web bundle and Python workflow wheel into a versioned zip, then attaches that artifact to a GitHub Release. This is a build-and-package delivery step; it does not deploy to a hosted runtime.
 
 No hosting platform, environment, approval policy, or release owner has been selected. Configure and review those with the team before adding automatic deployment or production credentials. Releases from this scaffold are not for handling real health data.

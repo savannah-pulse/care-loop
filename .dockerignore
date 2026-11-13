@@ -6,6 +6,12 @@
 **/obj
 **/node_modules
 **/dist
+**/wwwroot
+**/.yarn/cache
+**/.yarn/install-state.gz
+**/TestResults
+**/playwright-report
+**/test-results
 **/.env
 **/.env.*
 !**/.env.example

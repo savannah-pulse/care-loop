@@ -1,0 +1,12 @@
+{
+  "resourceType": "Task",
+  "id": "SYN-TASK-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "completed",
+  "intent": "order",
+  "code": { "text": "PLACEHOLDER - synthetic, not a clinical code" },
+  "focus": { "reference": "DiagnosticReport/SYN-RESULT-0001" },
+  "for": { "reference": "Patient/SYN-PT-0001" },
+  "owner": { "reference": "Practitioner/SYN-STAFF-0001" },
+  "lastModified": "2026-01-01T09:00:00Z"
+}

@@ -1,0 +1,8 @@
+{
+  "resourceType": "DocumentReference",
+  "id": "SYN-DOC-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "status": "current",
+  "subject": { "reference": "Patient/SYN-PT-0001" },
+  "content": [ { "attachment": { "contentType": "text/plain", "title": "[SIMULATED] Placeholder handoff summary" } } ]
+}

@@ -1,6 +1,0 @@
-@CareLoop.Api_HostAddress = http://localhost:5190
-
-GET {{CareLoop.Api_HostAddress}}/health
-Accept: application/json
-
-###

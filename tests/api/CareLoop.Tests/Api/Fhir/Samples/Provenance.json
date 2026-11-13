@@ -1,0 +1,8 @@
+{
+  "resourceType": "Provenance",
+  "id": "SYN-PROV-0001",
+  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "target": [ { "reference": "Task/SYN-TASK-0001" } ],
+  "recorded": "2026-01-03T10:00:00Z",
+  "agent": [ { "who": { "reference": "Practitioner/SYN-STAFF-0002" } } ]
+}
