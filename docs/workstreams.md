@@ -11,6 +11,8 @@ grep -rn "TODO(WS-4)" --include="*.cs" --include="*.ts" --include="*.tsx" .
 A second list, **Design gaps**, appears under some workstreams. These come from
 [`ui-design-gap-analysis.md`](ui-design-gap-analysis.md) (items C1 to C21), which compares the screen designs with the
 code. They are additive. The decisions in that document's section 5 (1 to 7 and 12 to 20) were taken on 13 November 2026.
+Every item, split by workstream with its status, is in the [design gap tracker](#design-gap-tracker) at the end of this
+file; update its row in the same change that finishes the work.
 
 Rules of the road:
 
@@ -24,7 +26,7 @@ Rules of the road:
 | 1 | Domain rules | nothing | Done |
 | 2 | Persistence and intake | WS1 | Done |
 | 3 | FHIR boundary | WS2 (ingestor and envelope contracts) | Done |
-| 4 | Outbox and notifications | WS1 (domain events), WS2 (outbox tables) | Open |
+| 4 | Outbox and notifications | WS1 (domain events), WS2 (outbox tables) | Done |
 | 5 | Deadlines and escalation | WS1, WS2 | Open |
 | 6 | Read endpoints and dashboard | WS2 (schema) | Open |
 | 7 | HIS simulator | WS3 (FHIR contract and codes) | Open |
@@ -69,8 +71,11 @@ Because the contracts already exist, every workstream can start now against the 
 - C15: `AcknowledgedBy` and `AcknowledgedAt` on `Escalation`; `Case.AcknowledgeEscalation` accepts only the role the latest open escalation went to, refuses a closed case or a second acknowledgement, and never touches exceptions, owner, next action or `DueAt`. Internal event `CaseEventType.EscalationAcknowledged` (102) carries it through the single write path. Done.
 - Decision 18: `respond-to-referral` 4 hours, `answer-consultation` 1 day and `call-patient` 2 hours in both pathway files, still unapproved; the citation text says durations are clock time, not working hours. Done.
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `Case`, demographic only. Done.
-- C21: `EvidenceKindDefinition` list on `PathwayDefinition` (kind, `clinicallyApproved`, optional `nextAction`: `treatment-plan` starts `start-treatment`, `treatment-started` and `surveillance-started` return to `decide-closure`); `JsonPathwayProvider` fails on missing or duplicate kinds; `TransitionRules` accepts `OutcomeRecorded` in `ClosureReview` without leaving the stage. Done. Migrations were scoped by hand because WS9's pending `HandoffSummaries` columns have no migration yet, and were not run against PostgreSQL.
+- C21: `EvidenceKindDefinition` list on `PathwayDefinition` (kind, `clinicallyApproved`, optional `nextAction`: `treatment-plan` starts `start-treatment`, `treatment-started` and `surveillance-started` return to `decide-closure`); `JsonPathwayProvider` fails on missing or duplicate kinds; `TransitionRules` accepts `OutcomeRecorded` in `ClosureReview` without leaving the stage. Done.
 - Decision 19: a pure function that derives one of the ten display labels from stage plus track statuses, for WS6 to return on reads and in metrics. Done (`CaseDisplayLabels.From(case, pathway)`).
+- C13 (caregiver appointment message): domain event `AppointmentScheduled` (`EventId`, `CaseId`, `OccurredAt`, `DateTimeOffset ScheduledFor`, `string? Location`), raised by `Case.ScheduleAppointment(sourceReference, scheduledFor, at, location)` on a first booking, a rebooking after a missed appointment, and a move to another time; a resend at the same time raises nothing. `Case.BeginAppointment` still raises nothing (it is used when the source first reports an appointment already attended or missed). The place travels on the event only and is not stored, so a change of place alone raises nothing. Done.
+- C15 (acknowledgement in escalation notices): `EscalationRaised` carries `string? AcknowledgedByRole` and `DateTimeOffset? AcknowledgedAt`, filled by `Case.Escalate` for level 2 and above from the most recent open escalation one level below, when it was acknowledged. The worker (WS5) only calls `Escalate`. Done.
+- C15 (escalation identifier): `Escalation.Id` (`Guid`, assigned by `Case.Escalate` when empty, unique on the case), `EscalationRaised.EscalationId`, and `Case.AcknowledgeEscalation(Guid escalationId, Actor, DateTimeOffset)`, which refuses an unknown, resolved or superseded escalation so a person is recorded as seeing only what they were shown. Done.
 
 ## WS2 Persistence and intake
 
@@ -94,10 +99,14 @@ Because the contracts already exist, every workstream can start now against the 
 
 - C10: `ConfidenceRated` kind and value on `NotificationUpdatePayload`, handled in `NotificationUpdateHandler`. Done.
 - C12: set `answer-consultation` and `respond-to-referral` as next actions in `ConsultationUpdateHandler` and `ReferralUpdateHandler`. Done.
-- C13: caregiver consent is its own event, `CaseEventType.ConsentRecorded`, carried by `ConsentPayload` (granted or withdrawn, caregiver contact point, consent reference) and applied by `ConsentHandler`; persisted on the case by migration `CaregiverConsentAndConfidence`. Done.
+- C13: caregiver consent is its own event, `CaseEventType.ConsentRecorded`, carried by `ConsentPayload` (granted or withdrawn, caregiver contact point, consent reference) and applied by `ConsentHandler`; persisted on the case. Done.
 - C15: persist the escalation acknowledgement (migration). Done; saved under the internal event `EscalationAcknowledged`.
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `ScreeningResultPayload`, copied to the case by `ScreeningResultHandler`; migration. Done.
 - C21: `OutcomeHandler` rejects an `EvidenceKind` the pathway does not declare (saved with `Disposition = Rejected`). Done; the case keeps the latest `OutcomeEvidenceKind`.
+- Migrations (14 November 2026): the migrations were squashed into a single `InitialCreate` holding the whole current schema, including the WS9 `HandoffSummaries` provenance columns and the outbox delivery lease (`OutboxDeliveries.LeaseOwner`, `LeasedUntil`, added for WS4 and regenerated into the same `InitialCreate`). Up and down were run against PostgreSQL 14 before the lease columns were added; the regenerated migration differs only by those two nullable columns. A database created from an earlier migration must be dropped and recreated (`docker compose down -v`); there is no upgrade path from the old history. Add later schema changes as new migrations after `InitialCreate`.
+- C13: `AppointmentUpdatePayload.Location` (`string?`); `AppointmentUpdateHandler` books and rebooks through `Case.ScheduleAppointment` with that place. Done.
+- C15: `Escalation.Id` persisted as a unique uuid column; the old int key stays as the primary key under the name `Sequence` so stored escalations keep their order. Done.
+- C4 and C19 (read audit storage): table `CaseReads`, entity `Infrastructure/Persistence/Audit/CaseReadRecord.cs` (`CaseId?`, actor reference, role and facility, `View`, `Query`, `OutsideTeam`, `Reason`, `ReadAt`), exposed as `CareLoopDbContext.CaseReads`. A read changes no case state, so it is not an `AuditEvent` and does not go through `SaveAsync`; WS6 appends a record per read. Done.
 
 ## WS3 FHIR boundary
 
@@ -120,6 +129,7 @@ Because the contracts already exist, every workstream can start now against the 
 - C13: add a seventh inbound mapper, `ConsentMapper`, that turns a FHIR `Consent` resource into a `ConsentRecorded` envelope with a `ConsentPayload`: `status` `active` is `Granted` (with the caregiver's contact point read from the resource), `inactive` or `rejected` is `Withdrawn`; the resource identifier plus version is the source event ID. Register it with the other mappers. Done: the caregiver is a contained `RelatedPerson` named in `provision.actor`, and the consent names its screening result through the `screening-result` extension.
 - C20: `DiagnosticReportMapper` reads the patient's display name and MRN from the referenced FHIR `Patient` (contained or resolved through `FhirHttpClient`) into `ScreeningResultPayload`; a sample with a `Patient` in `Fhir/Samples/`. Done: a contained `Patient` (`subject` = `#id`) is read directly; a literal `Patient/{id}` is read from the source system when it is configured, and otherwise the case opens without demographics. `Patient.json` and the contained patient in `DiagnosticReport.json` are the samples.
 - C21: `Procedure` and follow-up `DiagnosticReport` mappers set `OutcomePayload.EvidenceKind` to one of the pathway's declared kinds; agree the FHIR code to kind mapping in `StatusMap`. Done: the kind is the code in `https://careloop.invalid/fhir/CodeSystem/evidence-kind` on `Procedure.code` or the follow-up report's `code`, passed through unchanged; WS7 sends the pathway's kind names there.
+- C13: `AppointmentMapper` reads the place into `AppointmentUpdatePayload.Location` from the participant whose actor is a `Location` (`Location/...` reference, actor `type` `Location`, or a contained `Location`): `actor.display`, else the contained `Location.name`. `FhirPublisher` publishes nothing for `AppointmentScheduled`. Done; `Samples/Appointment.json` carries a synthetic `Location` participant.
 - Review follow-up (done): a `meta.source` not configured under `ExternalSystems:Systems` is refused with 403; attendance and a missed appointment are dated at the appointment (`end`, else `start`), a booking when it was made; a caregiver's contact point uses `telecom` system `other`, like the patient's; an `active` `Consent` with a `deny` provision is a withdrawal, and a staff `performer` is recorded as its actor; the approved summary's `DocumentReference` is sent on `HandoffSummaryApproved`, not on `HandoffProposed`. From the PR review: an appointment's time is `meta.lastUpdated` first; a closure's `Provenance` counts only when it targets that case `Task`; a handoff rejection is published as the case `Task` with status `rejected` and the reason, unless a newer handoff is pending. `AGENTS.md` (shared) now shows the `PUT` route, the `Consent` and `Patient` mappings and these rules.
 
 ## WS4 Outbox and notifications
@@ -143,11 +153,13 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C10 (decision 3): in `SimulatorInboundNotificationHandler`, map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` and the 1 to 5 value into `NotificationUpdatePayload.Confidence`, by calling WS3's `StatusMap.ToNotificationUpdateKind` and `StatusMap.ToConfidence`. A rating is a measure, never an acknowledgement. The WS1 to WS3 parts are done.
-- C13 (decision 7): `RecipientResolver` sends a caregiver with active consent the appointment date, time and place only, never the result. Add a caregiver template under `Templates/en/`, with a standard and an SMS-safe variant. Record each send as a `NotificationAttempt`. Check `Consent.IsActive` when the message is sent, not only when the event was raised, because the outbox may deliver after a withdrawal; a withdrawal stops every later send. `SimulatorNotificationProvider` marks the `CommunicationRequest` as a caregiver message on the `Email` channel, so the patient-channel simulator files it in its Email inbox (WS8). `EmailNotificationProvider` stays a stub. `Consent`, `RecipientKind.Caregiver`, `ConsentHandler` and `ConsentMapper` are done. **Blocked:** scheduling an appointment raises no domain event and the appointment payload carries no place (see "Caregiver appointment message" in the contract points below).
-- C15 (decision 13): each `EscalationRaised` staff notice says who acknowledged the previous level, if anyone (WS5 sends the event). This needs a field on `EscalationRaised` (WS1) and a placeholder in the staff template. Staff notices still carry no patient detail. See "Acknowledgement in escalation notices" in the contract points below.
+- C10 (decision 3): in `SimulatorInboundNotificationHandler`, map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` and the 1 to 5 value into `NotificationUpdatePayload.Confidence`, by calling WS3's `StatusMap.ToNotificationUpdateKind` and `StatusMap.ToConfidence`. A rating is a measure, never an acknowledgement. Done.
+- C13 (decision 7): `RecipientResolver` sends a caregiver with active consent the appointment date, time and place only, never the result. Add a caregiver template under `Templates/en/`, with a standard and an SMS-safe variant. Record each send as a `NotificationAttempt`. Check `Consent.IsActive` when the message is sent, not only when the event was raised, because the outbox may deliver after a withdrawal; a withdrawal stops every later send. `SimulatorNotificationProvider` marks the `CommunicationRequest` as a caregiver message on the `Email` channel, so the patient-channel simulator files it in its Email inbox (WS8). `EmailNotificationProvider` stays a stub. `Consent`, `RecipientKind.Caregiver`, `ConsentHandler` and `ConsentMapper` are done. Unblocked: route the new `AppointmentScheduled` domain event (`ScheduledFor`, `Location`, which may be null; WS1) to the caregiver, and to nobody else, while `Case.CaregiverConsent.IsActive`. The template shows date, time and place only; when `Location` is null it says the place will be confirmed rather than inventing one. Done when: `NotificationRouter` handles `AppointmentScheduled`; a test covers send with active consent, no send with none or withdrawn consent (including a withdrawal saved after the event was raised), the SMS-safe variant, and a `NotificationAttempt` per send. Done: templates `caregiver-appointment` and `caregiver-appointment-place-tbc`, whose SMS-safe variants leave out the place (a clinic name can say what the appointment is for). The caregiver's language is the patient's, falling back to English. Caregiver attempts are not recorded on the case's notification track, which follows the patient; the caregiver `CommunicationRequest` id is prefixed `caregiver-`, and reports based on it are ignored, so a caregiver's delivery or acknowledgement never counts as the patient's. A booking without a time raises no `AppointmentScheduled` (WS2), so nobody is told a time the source never gave.
+- C15 (decision 13): each `EscalationRaised` staff notice says who acknowledged the previous level, if anyone (WS5 sends the event). `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt` now exist (WS1, filled by `Case.Escalate`). Add a placeholder to the staff template that renders, for example, "Level 1 was acknowledged by facility-lead at 09:40", and nothing when both are null. Staff notices still carry no patient detail. Done when: a template test covers both cases. Done: `{{previousAcknowledgement}}` in both staff templates, filled by `NotificationRouter.PreviousAcknowledgementFor` (for example "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.").
 - Decision 2: a patient reply never changes appointment status. "I will come" arrives as `acknowledgement` and is translated to `Acknowledged` only.
-- Open contract points to settle before building: "Staff notification transport" (the HIS simulator already reads staff notices from FHIR `Task` codes) and "Simulator provider wire format" (how the notification attempt identifier and the recipient kind are carried).
+- Contract points settled by WS4: "Staff notification transport" and "Simulator provider wire format" (see the table below). Language: a template missing in the recipient's language falls back to English (`TemplateRenderer.FallbackLanguage`).
+- Delivery guarantees: several API instances can run the dispatcher; each delivery is claimed with one conditional update (`OutboxDelivery.LeaseOwner`, `LeasedUntil`, `Outbox:LeaseDuration`) and only the claim owner records the outcome. A staff or caregiver send a provider refused makes the router throw, so the outbox retries it (then parks it); a patient refusal is recorded on the case only when no channel accepted.
+- Known limits: `NotificationSendLog` (which remembers accepted attempts so a retry resends only failed channels) is in memory, so a restart, or a claim taken over by another instance, can send an accepted message again; attempt identifiers are deterministic, so the receiver can drop the repeat. A durable record needs a WS2 table. The caregiver message shows the time in the offset the hospital system sent; showing facility local time needs a configured time zone.
 
 ## WS5 Deadlines and escalation
 
@@ -165,7 +177,7 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue` and includes who acknowledged the previous level in each `EscalationRaised` notice; acknowledgement never stops the clock. `EscalationRaised` has no field for the acknowledgement yet; see "Acknowledgement in escalation notices" in the contract points below.
+- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue`; acknowledgement never stops the clock. Raise each step with `Case.Escalate`, which fills `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt` from the previous level and assigns `Escalation.Id`; do not build `EscalationRaised` yourself. Done when: a `DeadlineWorkerTests` case acknowledges level 1, sweeps past level 2's `afterOverdue`, and asserts level 2 is raised carrying the acknowledgement.
 - C21: `ComputeDueAt` handles the `start-treatment` deadline like any other next action; no special case.
 - C12 and decision 18: `answer-consultation` (1 day), `respond-to-referral` (4 hours) and `call-patient` (2 hours) are ordinary next-action deadlines. Durations are clock time: add no working-hours calendar, which stays future work.
 
@@ -187,15 +199,15 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C1: `GET /programmes` and `GET /programmes/{pathwayId}` with a `ProgrammeResponse` contract (new `Features/Programmes/`, `Contracts/Programmes/`).
-- C3: `SourceSystem` on `TimelineEntryResponse`.
-- C4: `facilityId` filter on `GET /cases`, refusal of case reads outside the caller's facility, an audit event per read, and `X-Demo-Facility` in `DemoRoles` (shared file; agree first). Added (decision 12): a read outside the caller's team requires a `reason` query parameter, stored in the same audit entry as the view.
+- C1: `GET /programmes` and `GET /programmes/{pathwayId}` with a `ProgrammeResponse` contract (new `Features/Programmes/`, `Contracts/Programmes/`). Source: `IPathwayProvider.GetAll()` and `Get(id)`; the C2 fields (`citation`, `changeLog`, `ownerRole`, `clinicallyApproved`, evidence kinds) are already on `PathwayDefinition`. An unknown id is 404.
+- C3: `SourceSystem` on `TimelineEntryResponse`. The timeline reads `AuditEvents`, which do not hold the source system: join `AuditEvent.SourceEventId` to `SourceEvent.SourceSystem`; internal events (`DeadlineElapsed`, `EscalationAcknowledged`, `HandoffSummaryApproved`) show CareLoop as their source.
+- C4: `facilityId` filter on `GET /cases`, refusal of case reads outside the caller's facility, a read audit per read, and `X-Demo-Facility` in `DemoRoles` (shared file; agree first). Added (decision 12): a read outside the caller's team requires a `reason` query parameter, stored in the same audit entry as the view. Storage exists: append a `CaseReadRecord` to `CareLoopDbContext.CaseReads` (WS2) for `GET /cases/{id}`, `/timeline` and filtered lists, with `OutsideTeam` and `Reason`. Done when: tests cover an in-team read, a refused out-of-team read without a reason, an allowed one with a reason, and one record per read.
 - C5: the screen 3 measures on `MetricsResponse`, each with its denominator (with WS10 for `SimulationArmResponse`): time-to-step medians, understanding rate, closures by reason, cases reaching each display label (decision 19), referral accepted and attended, appointments attended, treatment started by its deadline and time to care started (both from the C21 evidence kinds: denominator is cases with a `treatment-plan` outcome, numerator a `treatment-started` outcome before the `start-treatment` due time).
 - C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the handoff summary screen drafts, edits on approval and rejects (decisions 4 and 10); the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
 - C10: `confidenceRate` on `MetricsResponse`.
 - C11: add `nurse-navigator`, `receiving-clinician` and `lab` to `DemoRoles.HumanRoles` (shared file; agree first).
-- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. Only the role the escalation went to may acknowledge (the Domain enforces it); acknowledging never clears an exception, changes the owner or stops the clock.
-- C19: `patientReference` filter on `GET /cases`, allowed for `clinician` and `receiving-clinician` only, refused for other roles, audited as a read under C4.
+- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it); acknowledging never clears an exception, changes the owner or stops the clock.
+- C19: `patientReference` filter on `GET /cases`, allowed for `clinician` and `receiving-clinician` only, refused for other roles, audited as a read under C4 (`View` `case-list`, `Query` naming the filter).
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `CaseSummaryResponse`, `CaseDetailResponse` and `ExceptionItemResponse` for staff roles only; null for `coordinator`, whose screens show no names.
 - Decision 19: `DisplayLabel` on `CaseSummaryResponse` and `CaseDetailResponse`, from `CaseDisplayLabels.From`.
 
@@ -220,7 +232,7 @@ Because the contracts already exist, every workstream can start now against the 
 - C21: outcome resources carry an evidence kind from the pathway's vocabulary (agree the code with WS3).
 - C11: let `ActingStaff` take the roles `nurse-navigator`, `receiving-clinician` and `lab`, and offer them on the clinician actions page.
 - Decision 4: AI summaries are approved in the CareLoop web app. The HIS simulator only receives the approved `DocumentReference`; no CareLoop endpoint other than `/fhir` is called.
-- C13 (decision 7): a FHIR `Consent` builder (grant and withdrawal, with a synthetic caregiver contact point) and a matching `HisEventKind`, so a scenario can send `ConsentRecorded` (agree the resource shape with WS3, and the step action with WS10). If the "Caregiver appointment message" proposal is adopted, `AppointmentBuilder` also sends the place.
+- C13 (decision 7): a FHIR `Consent` builder (grant and withdrawal, with a synthetic caregiver contact point) and a matching `HisEventKind`, so a scenario can send `ConsentRecorded` (agree the resource shape with WS3, and the step action with WS10). `AppointmentBuilder` also sends the place as a participant whose `actor` is a `Location` reference with a synthetic `display` (for example `SYN Breast Imaging Clinic`); WS3's mapper reads it (settled; see `tests/api/CareLoop.Tests/Api/Fhir/Samples/Appointment.json`).
 - Contract points waiting on WS7 (see the table below): `PUT` route shape, external system identifier (`his-simulator`), urgency on the review `Task`, the simulated marker, staff notification transport, and the contact point channel (`telecom` system `other` for the patient and the caregiver).
 
 ## WS8 Patient-channel simulator
@@ -269,7 +281,7 @@ Because the contracts already exist, every workstream can start now against the 
 
 Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. Neither route has an API key: both authenticate with Entra ID.
 
-The `HandoffSummaries` table needs a migration for the provenance columns (suggested name `HandoffSummaryProvenance`). Migrations are WS2's folder; agree who writes it.
+The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
 
 Since decision 15 (C20), the case holds `PatientDisplayName` and `PatientSecondaryIdentifier`. `HandoffFactCollector` must never turn them into facts: decision 9 keeps names and identifiers out of every prompt.
 
@@ -300,7 +312,7 @@ Two contract points are still open for WS9 (see the table below): summary approv
 - C21: `happy-path.json` still sends `PLACEHOLDER-EVIDENCE-KIND`, which the API now refuses; change every scenario outcome to a kind the pathway declares.
 - C5: give `SimulationArmResponse` the same measures as `MetricsResponse` so the escalation-off comparison is like for like.
 - C10: a `rate-confidence` patient behaviour in `scenario.schema.json` (agree with WS7 and WS8).
-- C13: a scenario with a consented caregiver and one where consent is withdrawn. The schema's step `action` list has no consent action yet: add one (for example `consent`, with grant or withdraw) for the HIS simulator to send, agreed with WS7. The caregiver's appointment message also waits on the "Caregiver appointment message" contract point.
+- C13: a scenario with a consented caregiver and one where consent is withdrawn. The schema's step `action` list has no consent action yet: add one (for example `consent`, with grant or withdraw) for the HIS simulator to send, agreed with WS7. The consented-caregiver scenario books an appointment with a place and expects the caregiver's Email message (date, time and place only); the withdrawn one books after withdrawal and expects no caregiver message.
 - Decision 2: patient behaviours stay `acknowledge`, `understand` and `call-me` (plus `rate-confidence`). There is no appointment-confirmation behaviour.
 
 ## Shared (change by agreement)
@@ -327,10 +339,10 @@ The scaffold made these choices or left them open. Settle each one before both s
 | External system identifiers | WS2, WS3, WS7 | `ExternalSystems:Systems` is keyed by system identifier, and the key must equal the source system identifier that system sends. The development settings use `his-simulator`; the HIS simulator does not yet send an agreed identifier. WS3 proposal (implemented): the sender puts its identifier in `meta.source` on every resource, and a resource without it is refused with 400; one whose value is not configured under `ExternalSystems:Systems` is refused with 403, because no reply to it could be delivered. The case keeps that value as its source system, and replies are routed to it. WS7 to confirm and send `his-simulator`. |
 | Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`), applied by the patient-channel simulator when a notification arrives. Cohort runs need a way to give each generated patient their scenario's behaviour. |
 | Time in a live run | WS1, WS5, WS7, WS8, WS10 | CareLoop runs on real time. A live run uses the demo pathway folder (`Pathways:Directory`), whose deadlines are divided by 1800, and both simulators pace scenarios with `Scenarios:RealSecondsPerScenarioHour` = 2. The three figures must stay equal. End-to-end tests should assert outcomes, not exact times, and leave headroom for slow machines. |
-| Simulator provider wire format | WS4, WS8 | Private to the simulator provider: a FHIR `CommunicationRequest` to the patient-channel simulator, and a FHIR `Communication` back to `POST /notifications/inbound/simulator`. Agree the `Communication.category` codes and how the notification attempt identifier is carried. |
+| Simulator provider wire format | WS4, WS8 | Settled by WS4 (`SimulatorNotificationProvider`): `POST {PatientChannelBaseUrl}/fhir/CommunicationRequest` with the attempt identifier as the `https://careloop.invalid/fhir/sid/notification-attempt` identifier and as the id (prefixed `caregiver-` for a caregiver message), category `patient` or `caregiver` in `https://careloop.invalid/fhir/CodeSystem/recipient-kind` (a caregiver message belongs in the Email inbox), `recipient` naming the inbox, `about` the case `Task`, `payload` the text and `language`. The simulator answers with a `Communication` to `POST /notifications/inbound/simulator` whose `basedOn` is that request and `about` the case `Task`; reports based on a caregiver request are ignored. Each post must carry `X-CareLoop-Signature: sha256=` plus the lower-case hex HMAC-SHA256 of the raw UTF-8 body, keyed with the secret shared through `SIMULATOR_INBOUND_SECRET` (`Notifications:Simulator:InboundSecret` in the API); anything unsigned or wrongly signed gets 401. WS8 to sign in `CareLoopFhirClient.SendCommunicationAsync` and to confirm the `Communication.category` codes. |
 | Patient replies beyond acknowledgement | WS1, WS4, WS8 | Settled (decisions 2 and 3): the replies are acknowledgement, teach-back, call-me and confidence rating. Accepting an appointment is an acknowledgement; a patient reply never changes appointment status. |
 | Simulated marker on FHIR resources | WS7, WS8 | The simulators mark the resources they send (the API test samples use `meta.tag` in system `.../data-origin` with code `simulated`; WS8 planned `meta.security` `HTEST`; pick one). CareLoop neither requires nor emits a marker. |
-| Staff notification transport | WS4, WS7 | The HIS simulator offers both `POST /fhir/Task` and a plain `POST /staff-inbox/notifications`. Decide which `SimulatorNotificationProvider` uses and drop the other. |
+| Staff notification transport | WS4, WS7 | Settled by WS4: a FHIR `Task` with code `staff-notice`, sent with `PUT {StaffInboxBaseUrl}/fhir/Task/staff-notice-{attempt}` so a replay overwrites; `owner` names the staff inbox, `focus` the case `Task`, `description` the text. WS7 to drop `POST /staff-inbox/notifications` and accept the `PUT`. |
 | Urgency on the review `Task` | WS3, WS7 | `AGENTS.md` says `Task.priority`. Placeholder urgency codes do not fit the FHIR priority value set; decide between priority and an extension. WS3 implemented both, extension first: `TaskMapper` reads the `valueCode` of `https://careloop.invalid/fhir/StructureDefinition/reviewed-urgency` and, when it is absent, falls back to `Task.priority`. The value is stored unchanged. WS7 to confirm and send the extension. |
 | Nine event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`. Caregiver consent is its own event, `ConsentRecorded` (C13), so there are exactly nine source events and handlers. |
 | Internal events | WS2, WS5, WS6, WS9 | `DeadlineElapsed`, `HandoffSummaryApproved` and `EscalationAcknowledged` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
@@ -351,11 +363,69 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Roles | WS1, WS6, WS7 | Settled (decision 5): add `nurse-navigator`, `receiving-clinician` and `lab` (C11). `DemoRoles` is shared; WS6 edits it after announcing. |
 | Consultation reply deadline | WS1, WS2 | Settled (decision 6): `answer-consultation` and `respond-to-referral` replace `respond-to-handoff`; both placeholders (C12). |
 | Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the patient-channel simulator's `Email` channel; real email stays out of scope. |
-| Caregiver appointment message | WS1, WS2, WS3, WS4 | Open; blocks the WS4 part of C13. `Case.BeginAppointment` raises no domain event, so `NotificationRouter` is never told an appointment was booked. `AppointmentUpdatePayload` carries `ScheduledFor` but no place. Proposal: WS1 raises a domain event (for example `AppointmentScheduled`, carrying date, time and place) when the appointment track starts or is rebooked; WS2 adds the place to the payload; WS3 maps it from `Appointment` (for example the `Location` participant's display name). WS4 then routes it to the caregiver while consent is active. |
-| Acknowledgement in escalation notices | WS1, WS4, WS5 | Open. WS5 is to include who acknowledged the previous level in each `EscalationRaised` notice (C15), but `EscalationRaised` has no field for it and the staff template has only `{{hisLink}}`. Proposal: WS1 adds an optional acknowledged-by role and time to `EscalationRaised`, WS5 fills them, and WS4 adds a placeholder to the staff template. |
+| Caregiver appointment message | WS1, WS2, WS3, WS4, WS7 | Settled and built (WS1 to WS3): domain event `AppointmentScheduled` (`ScheduledFor`, `Location`) raised by `Case.ScheduleAppointment` on booking, rebooking and a change of time; `AppointmentUpdatePayload.Location`; `AppointmentMapper` reads the `Location` participant's `actor.display`; `FhirPublisher` ignores the event. WS4 routes it to the caregiver while consent is active, and `AGENTS.md`'s "Events and notifications" table has its row (no FHIR message; caregiver with active consent). A booking without a time raises nothing. Remaining: WS7 sends the `Location` participant. |
+| Acknowledgement in escalation notices | WS1, WS4, WS5 | Settled and built (WS1, WS4): `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt`, filled by `Case.Escalate` from the previous level, so WS5 only calls `Escalate`; WS4's staff templates show them through `{{previousAcknowledgement}}`. |
+| Escalation identifier | WS1, WS2, WS6 | Settled and built (WS1, WS2): `Escalation.Id` (uuid), carried on `EscalationRaised.EscalationId`, persisted unique; `Case.AcknowledgeEscalation(escalationId, ...)` refuses a superseded escalation. WS6's acknowledgement endpoint takes it as `{escalationId}`. |
+| Read audit | WS2, WS6 | Settled and built (WS2): staff reads are recorded in `CaseReads` (`CaseReadRecord`), not in `AuditEvents`, because a read changes no case state and has no source event. WS6 writes one per read (C4, C19). |
 | Escalation acknowledgement | WS1, WS2, WS5, WS6 | Settled (decision 13): C15. Only the role the escalation went to may acknowledge; it is audited and never clears an exception, changes the owner or stops the clock. |
 | Patient identifiers | WS1, WS2, WS3, WS6, WS7 | Settled (decision 15): C20. The screening result carries the patient's display name and MRN; the case stores them; staff roles read them, `coordinator` does not. `AGENTS.md` changes (shared; agree first). |
 | Display labels | WS1, WS6, WS10 | Settled (decision 19): the ten labels are computed by a Domain function and returned on reads and in metrics; the web app never recomputes them. |
 | Evidence kinds | WS1, WS2, WS3, WS6, WS7, WS10 | Settled (decision 20): C21. The pathway declares the kinds (placeholders); intake rejects others; a `treatment-plan` outcome starts the `start-treatment` deadline. The PM confirms the names; WS3 and WS7 agree the FHIR code mapping. |
 | Reply deadline placeholders | WS1 | Settled (decision 18): the pathway file follows screen 4 of the design. Clock time, not working hours; a working-hours calendar is future work. |
 | HIS simulator screens | WS7, WS10 | Settled (decision 16): screens stay (C6) and a headless mode is added; the demo runs headless. |
+
+## Design gap tracker
+
+One row per item and workstream, so no part is lost between owners. **Open** means not started or not merged;
+**Done** means built, tested and merged on `main` (or on this branch's pull request). Change a row only in the change
+that finishes it. Items come from [`ui-design-gap-analysis.md`](ui-design-gap-analysis.md); C14 and C16 to C18 were
+withdrawn.
+
+| Item | WS | Part | Status |
+|---|---|---|---|
+| C1 Programmes read model | WS6 | `GET /programmes`, `GET /programmes/{pathwayId}`, `ProgrammeResponse` | Open |
+| C1 | WS6 | Web: programmes screen (screen 4, part of C9) | Open |
+| C2 Pathway citations and change log | WS1 | `citation`, `changeLog`, `ownerRole` in both pathway files | Done |
+| C3 Source system on the timeline | WS6 | `TimelineEntryResponse.SourceSystem` via `SourceEvent` | Open |
+| C4 Team-scoped, audited reads | WS2 | `CaseReads` table and `CaseReadRecord` | Done |
+| C4 | WS6 | `facilityId` filter, out-of-team refusal, required `reason`, one `CaseReadRecord` per read | Open |
+| C4 | WS6 (shared) | `X-Demo-Facility` in `DemoRoles` | Open |
+| C5 Screen 3 measures | WS6 | `MetricsResponse` measures with denominators, incl. display-label counts and C21 treatment measures | Open |
+| C5 | WS10 | `SimulationArmResponse` with the same measures | Open |
+| C6 HIS clinician actions and headless mode | WS7 | `/actions/consultation-request`, `/consultation-answer`, `/referral`, `/appointment`, forms, headless mode | Open |
+| C7 SMS reply codes | WS8 | `1` acknowledge, `2` call-me on the `Sms` inbox | Open |
+| C8 Exception-path and demo scenarios | WS10 | Six exception scenarios with `expect` entries; demo scenario for screens 15, 16, 19 to 21 | Open |
+| C8 | WS10 | Replace `PLACEHOLDER-EVIDENCE-KIND` in `happy-path.json` with a declared kind (C21) | Open |
+| C9 Dashboard | WS6 | Screens 1 to 4, 17, 18; summary draft, edit-on-approve, reject; escalation acknowledge; other-cases card | Open |
+| C10 Confidence rating | WS1, WS2, WS3 | Domain, payload, handler, `StatusMap` | Done |
+| C10 | WS4 | `SimulatorInboundNotificationHandler` maps `confidence-rating` | Done |
+| C10 | WS6 | `confidenceRate` on `MetricsResponse` | Open |
+| C10 | WS8 | Inbox rating action and `confidence-rating` `Communication` builder | Open |
+| C10 | WS10 | `rate-confidence` behaviour in `scenario.schema.json` | Open |
+| C11 Roles | WS1 | Pathway `allowedRoles`, `authorizedRoles`, `OwnershipRules` | Done |
+| C11 | WS6 (shared) | `nurse-navigator`, `receiving-clinician`, `lab` in `DemoRoles.HumanRoles` | Open |
+| C11 | WS7 | `ActingStaff` roles and clinician actions page | Open |
+| C12 Per-kind reply deadlines | WS1, WS2 | Pathway deadlines and next actions | Done |
+| C12 | WS5 | Ordinary deadlines in `ComputeDueAt`, clock time | Open (with the WS5 stubs) |
+| C13 Caregiver and consent | WS1, WS2, WS3 | `Consent`, `ConsentRecorded`, `ConsentMapper`; `AppointmentScheduled`, `Location` on payload and mapper | Done |
+| C13 | WS4 | Route `AppointmentScheduled` to a consented caregiver; caregiver templates (standard and SMS-safe); consent checked at send | Done |
+| C13 | WS7 | `Consent` builder and `HisEventKind`; `Location` participant on `AppointmentBuilder` | Open |
+| C13 | WS8 | `Email` in `InboxChannel`; recognise caregiver messages | Open |
+| C13 | WS10 | Consent `action` in the schema; consented and withdrawn scenarios | Open |
+| C13 | Shared | `AGENTS.md` events table row for `AppointmentScheduled` | Done |
+| C15 Escalation acknowledgement | WS1, WS2 | `AcknowledgeEscalation`, persistence, `Escalation.Id`, `EscalationRaised` acknowledgement fields | Done |
+| C15 | WS4 | Staff template placeholder for the previous level's acknowledgement | Done |
+| C15 | WS5 | Sweep keeps escalating after acknowledgement, through `Case.Escalate` | Open (with the WS5 stubs) |
+| C15 | WS6 | `POST /cases/{id}/escalations/{escalationId}/acknowledgement`, timeline entry, escalations on `CaseDetailResponse` | Open |
+| C19 Patient's other cases | WS6 | `patientReference` filter for clinician roles, audited in `CaseReads` | Open |
+| C20 Patient identifiers | WS1, WS2, WS3 | Case fields, payload, `DiagnosticReportMapper` | Done |
+| C20 | WS6 | Name and MRN on staff reads, null for `coordinator` | Open |
+| C20 | WS7 | `DiagnosticReport` with a synthetic `Patient` | Open |
+| C21 Evidence kinds | WS1, WS2, WS3 | Pathway vocabulary, intake rejection, mapper | Done |
+| C21 | WS5 | `start-treatment` handled like any other deadline | Open (with the WS5 stubs) |
+| C21 | WS7 | Outcome resources carry a declared kind | Open |
+| Decision 19 Display labels | WS1 | `CaseDisplayLabels.From` | Done |
+| Decision 19 | WS6 | `DisplayLabel` on case reads and in metrics | Open |
+| Decision 19 | WS10 | Journey tests assert the label at each happy-path step | Open |
+| Summary approver roles | WS1, WS9 | `summaryApproverRoles` in the pathway (open contract point) | Open (decision needed) |
+

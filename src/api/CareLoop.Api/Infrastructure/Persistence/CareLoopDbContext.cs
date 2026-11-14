@@ -1,3 +1,4 @@
+using CareLoop.Api.Infrastructure.Persistence.Audit;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Api.Infrastructure.Persistence.Summaries;
 using CareLoop.Domain.Cases;
@@ -7,11 +8,11 @@ using Microsoft.EntityFrameworkCore;
 namespace CareLoop.Api.Infrastructure.Persistence;
 
 /// <summary>
-/// The CareLoop database: case projections, the append-only source and audit events, the outbox and handoff summaries.
+/// The CareLoop database: case projections, the append-only source and audit events, the read audit, the outbox and handoff summaries.
 /// </summary>
 /// <remarks>
 /// Writes to case state happen only in <see cref="EfCaseRepository"/>. Read slices query this
-/// context directly with no-tracking projections. The mapping is provider-neutral: nothing here
+/// context directly with no-tracking projections, and append a <see cref="CaseReadRecord"/> for each read. The mapping is provider-neutral: nothing here
 /// may depend on PostgreSQL-specific features, so Azure SQL remains an option.
 /// </remarks>
 public sealed class CareLoopDbContext : DbContext
@@ -39,6 +40,9 @@ public sealed class CareLoopDbContext : DbContext
 
     /// <summary>Per-subscriber delivery state of each outbox message.</summary>
     public DbSet<OutboxDelivery> OutboxDeliveries => Set<OutboxDelivery>();
+
+    /// <summary>Every staff read of case data (C4, C19). Append-only; the only table read slices write to.</summary>
+    public DbSet<CaseReadRecord> CaseReads => Set<CaseReadRecord>();
 
     /// <summary>AI-drafted and human-approved handoff summaries.</summary>
     public DbSet<HandoffSummaryRecord> HandoffSummaries => Set<HandoffSummaryRecord>();

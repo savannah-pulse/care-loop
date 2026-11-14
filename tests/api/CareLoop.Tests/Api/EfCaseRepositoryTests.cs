@@ -1,4 +1,5 @@
 using CareLoop.Api.Infrastructure.Persistence;
+using CareLoop.Api.Infrastructure.Persistence.Audit;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
@@ -33,6 +34,49 @@ public sealed class EfCaseRepositoryTests : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+
+    [Fact]
+    public async Task A_case_read_is_stored_in_the_read_audit()
+    {
+        var caseId = Guid.NewGuid();
+        await using (var db = NewContext())
+        {
+            db.CaseReads.Add(new CaseReadRecord
+            {
+                Id = Guid.NewGuid(),
+                CaseId = caseId,
+                ActorReference = "SYN-CLIN-0001",
+                ActorRole = "clinician",
+                ActorFacilityId = "SYN-FAC-B",
+                View = "case",
+                OutsideTeam = true,
+                Reason = "SYN covering for a colleague",
+                ReadAt = _clock.UtcNow,
+            });
+            db.CaseReads.Add(new CaseReadRecord
+            {
+                Id = Guid.NewGuid(),
+                CaseId = null,
+                ActorReference = "SYN-CLIN-0001",
+                ActorRole = "clinician",
+                ActorFacilityId = "SYN-FAC-B",
+                View = "case-list",
+                Query = "patientReference=SYN-PT-0001",
+                ReadAt = _clock.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await using var verify = NewContext();
+        var reads = await verify.CaseReads.AsNoTracking().OrderBy(r => r.View).ToListAsync();
+        Assert.Equal(2, reads.Count);
+        Assert.Equal(caseId, reads[0].CaseId);
+        Assert.True(reads[0].OutsideTeam);
+        Assert.Equal("SYN covering for a colleague", reads[0].Reason);
+        Assert.Null(reads[1].CaseId);
+        Assert.Equal("patientReference=SYN-PT-0001", reads[1].Query);
+        Assert.Empty(await verify.AuditEvents.ToListAsync());
+    }
 
     [Fact]
     public async Task Save_persists_event_case_audit_and_outbox_together()
@@ -182,6 +226,81 @@ public sealed class EfCaseRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Escalation_acknowledged_in_a_later_save_is_stored()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.Escalate(new Escalation { Level = 1, EscalatedTo = TestData.FacilityLeadQueue(), RaisedAt = _clock.UtcNow, Reason = "overdue" });
+        await SaveAsync(@case, "SYN-EVT-1");
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await ChangeAsync(@case.Id, "SYN-EVT-2", loaded => loaded.AcknowledgeEscalation(
+            new Actor { Reference = "SYN-LEAD-0001", Role = "facility-lead", FacilityId = "SYN-FAC-A" }, _clock.UtcNow));
+
+        var stored = Assert.Single((await LoadAsync(@case.Id)).Escalations);
+        Assert.Equal(@case.Escalations[0].Id, stored.Id);
+        Assert.Equal("SYN-QUEUE-FAC-A", stored.EscalatedTo.Reference);
+        Assert.Equal("SYN-LEAD-0001", stored.AcknowledgedBy!.Reference);
+        Assert.Equal(_clock.UtcNow, stored.AcknowledgedAt);
+        Assert.True(stored.IsOpen);
+    }
+
+    [Fact]
+    public async Task Escalations_resolved_in_a_later_save_are_stored_in_order()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        var coordinator = new CaseOwner { Reference = "SYN-COORD", Role = "coordinator", FacilityId = "SYN-FAC-A", IsQueue = true };
+        @case.Escalate(new Escalation { Level = 1, EscalatedTo = TestData.FacilityLeadQueue(), RaisedAt = _clock.UtcNow, Reason = "overdue" });
+        @case.AcknowledgeEscalation(new Actor { Reference = "SYN-LEAD-0001", Role = "facility-lead", FacilityId = "SYN-FAC-A" }, _clock.UtcNow);
+        await SaveAsync(@case, "SYN-EVT-1");
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await ChangeAsync(@case.Id, "SYN-EVT-2", loaded => loaded.Escalate(new Escalation { Level = 2, EscalatedTo = coordinator, RaisedAt = _clock.UtcNow, Reason = "still overdue" }));
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await ChangeAsync(@case.Id, "SYN-EVT-3", loaded => loaded.ResolveEscalations(_clock.UtcNow));
+
+        var loaded = await LoadAsync(@case.Id);
+        Assert.False(loaded.IsEscalated);
+        Assert.Equal([1, 2], loaded.Escalations.Select(e => e.Level));
+        Assert.All(loaded.Escalations, e => Assert.Equal(_clock.UtcNow, e.ResolvedAt));
+        Assert.Equal(["SYN-QUEUE-FAC-A", "SYN-COORD"], loaded.Escalations.Select(e => e.EscalatedTo.Reference));
+        Assert.Equal("SYN-LEAD-0001", loaded.Escalations[0].AcknowledgedBy!.Reference);
+        Assert.Null(loaded.Escalations[1].AcknowledgedBy);
+    }
+
+    [Fact]
+    public async Task Consent_withdrawn_in_a_later_save_is_stored()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.RecordConsent(new ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-CAREGIVER-INBOX-0001" }, "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        await using (var db = NewContext())
+        {
+            await NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(@case, "SYN-EVT-1", _clock.UtcNow, CaseEventType.ConsentRecorded), CancellationToken.None);
+        }
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await using (var db = NewContext())
+        {
+            var repository = NewRepository(db);
+            var loaded = (await repository.GetAsync(@case.Id, CancellationToken.None))!;
+            loaded.WithdrawConsent("Consent/SYN-CONSENT-0001/_history/2", _clock.UtcNow);
+
+            await repository.SaveAsync(loaded, TestData.AppliedEvent(loaded, "SYN-EVT-2", _clock.UtcNow, CaseEventType.ConsentRecorded), CancellationToken.None);
+
+            Assert.Equal("SYN-CAREGIVER-INBOX-0001", loaded.CaregiverConsent!.CaregiverContactPoint.Address);
+        }
+
+        await using var verify = NewContext();
+        var stored = (await NewRepository(verify).GetAsync(@case.Id, CancellationToken.None))!.CaregiverConsent!;
+        Assert.False(stored.IsActive);
+        Assert.Equal(_clock.UtcNow, stored.WithdrawnAt);
+        Assert.Equal("Consent/SYN-CONSENT-0001/_history/2", stored.WithdrawalEvidenceReference);
+        Assert.Equal("Consent/SYN-CONSENT-0001", stored.EvidenceReference);
+        Assert.Equal(NotificationChannel.Simulator, stored.CaregiverContactPoint.Channel);
+        Assert.Equal(2, await verify.AuditEvents.CountAsync());
+    }
+
+    [Fact]
     public async Task Case_round_trips_with_tracks_escalations_and_closure()
     {
         var @case = DomainTestData.InFollowUp(_clock);
@@ -247,6 +366,8 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(2, loaded.Escalations.Count);
         Assert.All(loaded.Escalations, e => Assert.NotNull(e.ResolvedAt));
         Assert.Equal("SYN-COORD", loaded.Escalations[1].EscalatedTo.Reference);
+        Assert.Equal(@case.Escalations.Select(e => e.Id), loaded.Escalations.Select(e => e.Id));
+        Assert.All(loaded.Escalations, e => Assert.NotEqual(Guid.Empty, e.Id));
         Assert.Null(loaded.Escalations[0].AcknowledgedBy);
         Assert.Equal("SYN-COORD-0001", loaded.Escalations[1].AcknowledgedBy!.Reference);
         Assert.Equal(_clock.UtcNow, loaded.Escalations[1].AcknowledgedAt);
@@ -373,6 +494,27 @@ public sealed class EfCaseRepositoryTests : IDisposable
             NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(other, "SYN-EVT-1", _clock.UtcNow), CancellationToken.None));
 
         Assert.Equal(0, await db.Cases.CountAsync());
+    }
+
+    private async Task SaveAsync(Case @case, string eventId)
+    {
+        await using var db = NewContext();
+        await NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(@case, eventId, _clock.UtcNow), CancellationToken.None);
+    }
+
+    private async Task ChangeAsync(Guid caseId, string eventId, Action<Case> change)
+    {
+        await using var db = NewContext();
+        var repository = NewRepository(db);
+        var loaded = (await repository.GetAsync(caseId, CancellationToken.None))!;
+        change(loaded);
+        await repository.SaveAsync(loaded, TestData.AppliedEvent(loaded, eventId, _clock.UtcNow), CancellationToken.None);
+    }
+
+    private async Task<Case> LoadAsync(Guid caseId)
+    {
+        await using var db = NewContext();
+        return (await NewRepository(db).GetAsync(caseId, CancellationToken.None))!;
     }
 
     private CareLoopDbContext NewContext() =>

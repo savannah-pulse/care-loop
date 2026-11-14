@@ -17,6 +17,9 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// outcome must also be recorded. A missed appointment gives the current owner a new next action
 /// (rebooking) and deadline, and a rebooked appointment gives them the follow-up action
 /// (<see cref="HandlerSupport.ArrangeFollowUpAction"/>) so the case is never without a deadline.
+/// A booking or rebooking with a time goes through <see cref="Case.ScheduleAppointment"/> with the payload's
+/// place, which raises <see cref="Domain.Events.DomainEvents.AppointmentScheduled"/> when the time is new. A booking
+/// without a time is tracked (dated at the booking) but raises nothing, so no caregiver is told a time the source never gave.
 /// </remarks>
 public sealed class AppointmentUpdateHandler : IEventHandler
 {
@@ -56,23 +59,29 @@ public sealed class AppointmentUpdateHandler : IEventHandler
         switch (payload.Status)
         {
             case AppointmentStatus.Scheduled:
-                if (@case.Appointment is { } booked)
+                var wasMissed = @case.Appointment?.Status == AppointmentStatus.Missed;
+                if (wasMissed && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var missing))
                 {
-                    var wasMissed = booked.Status == AppointmentStatus.Missed;
-                    if (wasMissed && !HandlerSupport.HasDeadline(@case, HandlerSupport.ArrangeFollowUpAction, pathway, out var missing))
-                    {
-                        return HandlerSupport.Refused(@case, missing!);
-                    }
+                    return HandlerSupport.Refused(@case, missing!);
+                }
 
+                if (payload.ScheduledFor is { } knownTime)
+                {
+                    @case.ScheduleAppointment(payload.AppointmentReference, knownTime, envelope.OccurredAt, payload.Location);
+                }
+                else if (@case.Appointment is { } booked)
+                {
+                    // No time from the source: track the booking, but tell nobody a time it did not give.
                     booked.Rebook(scheduledFor, envelope.OccurredAt, payload.AppointmentReference);
-                    if (wasMissed)
-                    {
-                        HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
-                    }
                 }
                 else
                 {
                     @case.BeginAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt);
+                }
+
+                if (wasMissed)
+                {
+                    HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
                 }
 
                 break;

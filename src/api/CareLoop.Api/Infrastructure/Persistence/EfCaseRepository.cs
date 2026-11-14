@@ -133,9 +133,6 @@ public sealed class EfCaseRepository : ICaseRepository
             {
                 await transaction.CommitAsync(ct);
             }
-
-            @case.ClearDomainEvents();
-            _priorProjections[@case.Id] = CaseProjection.ToJson(@case);
         }
         catch (DbUpdateException ex) when (ex is not DbUpdateConcurrencyException && ex.Entries.Any(e => e.Entity is SourceEvent))
         {
@@ -150,6 +147,11 @@ public sealed class EfCaseRepository : ICaseRepository
             Detach(appliedEvent, @case);
             throw;
         }
+
+        // After the commit, so a failure here can never trigger a rollback of what is already stored
+        // (which would fail in turn and hide the original error).
+        @case.ClearDomainEvents();
+        _priorProjections[@case.Id] = CaseProjection.ToJson(@case);
     }
 
     private void Remember(Case? @case)

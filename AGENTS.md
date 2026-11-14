@@ -25,7 +25,7 @@ If a task appears to conflict with any of these, stop and ask.
 These are deferred, not forbidden. Build the seams for them now and leave the implementations for later.
 
 - **Real SMS and email delivery.** For now the simulator notification provider is the only one enabled. SMS and email providers come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
-- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. An unsupported language tag fails rather than falling back to English.
+- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS, Malaffi or patient-channel integration.** The simulators stand in for these.
 - **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-spec.md`](docs/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
 
@@ -243,6 +243,7 @@ A contact point with `ContactPoint.system` `other` is reached through the simula
 | `CallRequested` | `Task` | Current owner |
 | `DeadlineApproaching` | None | Current owner |
 | `EscalationRaised` | `Task` | Facility lead, then coordinator |
+| `AppointmentScheduled` | None | Caregiver, only while the patient's consent is active |
 | `CaseClosed` | `Task` completed | None |
 
 Two subscribers exist: `FhirPublisher` and `NotificationRouter`.

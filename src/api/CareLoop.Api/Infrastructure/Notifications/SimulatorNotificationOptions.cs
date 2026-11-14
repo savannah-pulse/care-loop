@@ -19,4 +19,15 @@ public sealed class SimulatorNotificationOptions
 
     /// <summary>Base URL of the HIS simulator, whose staff inbox receives staff messages.</summary>
     public string? StaffInboxBaseUrl { get; set; }
+
+    /// <summary>
+    /// The secret shared with the patient-channel simulator, with which it signs what it posts to
+    /// <c>POST /notifications/inbound/simulator</c>.
+    /// </summary>
+    /// <remarks>
+    /// A secret, so it comes from the environment (<c>Notifications__Simulator__InboundSecret</c>) or a secret store and
+    /// is never committed. While it is not set, every inbound message is refused: an unsigned reply could mark a
+    /// patient as notified or acknowledged without the patient having seen anything.
+    /// </remarks>
+    public string? InboundSecret { get; set; }
 }
