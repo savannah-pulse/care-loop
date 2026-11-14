@@ -1,26 +1,102 @@
+# Dependabot version updates.
+#
+# Minor and patch updates are grouped per ecosystem, so each week brings one pull request
+# per group. Major updates still come one per package, so each can be reviewed on its own.
+#
+# Some majors are ignored because they need a matching toolchain change first. Each ignore
+# rule says what has to change before it can be removed.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # CareLoop dashboard. Builds on Node 24 (src/web/Dockerfile, CI).
   - package-ecosystem: npm
     directory: /src/web
     schedule:
       interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      web-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Node type definitions must match the runtime. Remove when the web image and CI move
+      # past Node 24.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # Simulator UIs. Both build on Node 22 (each simulator's Dockerfile, CI) and lint with
+  # ESLint and typescript-eslint, so they share the same rules.
   - package-ecosystem: npm
-    directory: /src/simulators/his/HisSimulator/ClientApp
+    directories:
+      - /src/simulators/his/HisSimulator/ClientApp
+      - /src/simulators/patient-channel/PatientChannelSimulator/ClientApp
     schedule:
       interval: weekly
-  - package-ecosystem: npm
-    directory: /src/simulators/patient-channel/PatientChannelSimulator/ClientApp
-    schedule:
-      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      simulator-ui-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint supports TypeScript below 6.1 only. Remove once a typescript-eslint
+      # release supports TypeScript 7.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Node type definitions must match the runtime. Remove when the simulator images and CI
+      # move past Node 22.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  # API, Domain, simulators, test projects and .config/dotnet-tools.json.
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      dotnet-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # These follow the .NET release they belong to. global.json pins the .NET 10 SDK and
+      # dotnet-ef has rollForward false, so a major here needs .NET 11. Remove when the SDK,
+      # the target framework and the Docker images move to .NET 11.
+      - dependency-name: "Microsoft.AspNetCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.EntityFrameworkCore.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Npgsql.EntityFrameworkCore.PostgreSQL"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "dotnet-ef"
+        update-types: ["version-update:semver-major"]
+
+  # Python AI workflow service.
   - package-ecosystem: pip
     directory: /src/ai_workflow
     schedule:
       interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      ai-workflow-minor-and-patch:
+        update-types: [minor, patch]
