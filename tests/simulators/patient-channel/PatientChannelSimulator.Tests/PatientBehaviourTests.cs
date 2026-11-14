@@ -1,3 +1,5 @@
+using PatientChannelSimulator.State;
+
 namespace PatientChannelSimulator.Tests;
 
 /// <summary>
@@ -5,11 +7,28 @@ namespace PatientChannelSimulator.Tests;
 /// </summary>
 public class PatientBehaviourTests
 {
-    [Fact(Skip = "WS8: not implemented")]
-    public void Default_behaviour_is_deliver_and_do_not_respond() { }
+    [Fact]
+    public void Default_behaviour_is_deliver_and_do_not_respond()
+    {
+        var behaviour = new SimulatorStore().GetDefaultBehaviour();
 
-    [Fact(Skip = "WS8: not implemented")]
-    public void Patient_without_a_behaviour_gets_the_default() { }
+        Assert.Equal(DeliveryBehaviour.Deliver, behaviour.Delivery);
+        Assert.Equal(PatientResponseBehaviour.None, behaviour.Response);
+        Assert.Null(behaviour.Confidence);
+        Assert.True(behaviour.Simulated);
+    }
+
+    [Fact]
+    public void Patient_without_a_behaviour_gets_the_default()
+    {
+        var store = new SimulatorStore();
+        var silent = new PatientBehaviour(DeliveryBehaviour.StaySilent, PatientResponseBehaviour.None);
+        store.SetDefaultBehaviour(silent);
+        store.SetBehaviour(new PatientBehaviourAssignment("SYN-PT-0002", new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge), null));
+
+        Assert.Same(silent, store.GetBehaviour(TestData.PatientId));
+        Assert.Equal(PatientResponseBehaviour.Acknowledge, store.GetBehaviour("SYN-PT-0002").Response);
+    }
 
     [Fact(Skip = "WS8: not implemented")]
     public void Deliver_sends_a_completed_communication_and_marks_the_message_delivered() { }
@@ -26,8 +45,19 @@ public class PatientBehaviourTests
     [Fact(Skip = "WS8: not implemented")]
     public void Changing_a_behaviour_does_not_affect_messages_already_in_the_inbox() { }
 
-    [Fact(Skip = "WS8: not implemented")]
-    public void Removing_a_behaviour_restores_the_default() { }
+    [Fact]
+    public void Removing_a_behaviour_restores_the_default()
+    {
+        var store = new SimulatorStore();
+        store.SetBehaviour(new PatientBehaviourAssignment(TestData.PatientId, new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: unreachable"), "silent-patient"));
+
+        Assert.Equal(TestData.PatientId, Assert.Single(store.GetBehaviours()).PatientSyntheticId);
+        Assert.True(store.RemoveBehaviour(TestData.PatientId));
+        Assert.False(store.RemoveBehaviour(TestData.PatientId));
+
+        Assert.Empty(store.GetBehaviours());
+        Assert.Equal(store.GetDefaultBehaviour(), store.GetBehaviour(TestData.PatientId));
+    }
 
     [Fact(Skip = "WS8: not implemented")]
     public void Fail_without_a_reason_is_rejected() { }

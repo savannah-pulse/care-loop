@@ -25,10 +25,16 @@ namespace PatientChannelSimulator.State;
 /// notifications get the delivery behaviour and no response.
 /// </param>
 /// <param name="Simulated">Visible simulated-data marker; always <see langword="true"/>.</param>
+/// <param name="Confidence">
+/// The 1 to 5 confidence rating the patient gives (C10). Required when <paramref name="Response"/>
+/// is <see cref="PatientResponseBehaviour.RateConfidence"/>; with any other response the patient
+/// rates straight after responding; must be <see langword="null"/> when the patient does not respond.
+/// </param>
 public sealed record PatientBehaviour(
     DeliveryBehaviour Delivery,
     PatientResponseBehaviour Response,
     string? FailureReason = null,
     TimeSpan RespondAfter = default,
     int RespondToNotification = 1,
-    bool Simulated = true);
+    bool Simulated = true,
+    int? Confidence = null);

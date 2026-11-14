@@ -25,4 +25,7 @@ public enum PatientReactionKind
 
     /// <summary>The patient's behaviour is to stay silent, so no response was sent.</summary>
     NoResponse,
+
+    /// <summary>The patient's 1 to 5 confidence rating was sent to CareLoop (C10). A rating is not an acknowledgement.</summary>
+    ConfidenceRated,
 }

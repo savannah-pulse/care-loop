@@ -2,15 +2,32 @@ namespace PatientChannelSimulator.State;
 
 /// <summary>
 /// In-memory state of the patient-channel simulator: the simulated patient inbox, the FHIR
-/// message log, scenario runs, patient behaviours and the reactions to notifications.
+/// message log, scenario runs, patient behaviours, the reactions to notifications and the
+/// responses that are waiting for their due time.
 /// </summary>
 /// <remarks>
-/// Registered as a singleton and therefore shared by concurrent requests and the scenario
-/// runner; the implementation must be thread-safe. Everything here is synthetic and is lost on
-/// restart by design: the simulator is not a system of record.
+/// Registered as a singleton and therefore shared by concurrent requests, the scenario runner and
+/// the response dispatcher. One lock guards plain collections, because several operations must be
+/// atomic across more than one of them (for example "store unless this request was already
+/// received"). Every read returns a snapshot. Everything here is synthetic and is lost on restart
+/// by design: the simulator is not a system of record.
 /// </remarks>
 public sealed class SimulatorStore
 {
+    /// <summary>The most log entries kept; the oldest are dropped beyond this.</summary>
+    public const int LogCapacity = 500;
+
+    private readonly Lock _gate = new();
+    private readonly Dictionary<string, InboxMessage> _messages = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _messageIdByRequest = new(StringComparer.Ordinal);
+    private readonly List<string> _messageOrder = [];
+    private readonly Queue<FhirMessageLogEntry> _log = new();
+    private readonly Dictionary<string, PatientBehaviourAssignment> _behaviours = new(StringComparer.Ordinal);
+    private readonly List<PatientReactionRecord> _reactions = [];
+    private readonly Dictionary<string, ScenarioRunState> _runs = new(StringComparer.Ordinal);
+    private readonly List<PendingResponse> _pending = [];
+    private PatientBehaviour _defaultBehaviour = new(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None);
+
     /// <summary>
     /// Adds a newly received message to the simulated patient inbox.
     /// </summary>
@@ -18,8 +35,49 @@ public sealed class SimulatorStore
     /// <exception cref="InvalidOperationException">A message with the same identifier is already stored.</exception>
     public void AddInboxMessage(InboxMessage message)
     {
-        // TODO(WS-8): store the message keyed by MessageId in a thread-safe collection and reject duplicates.
-        throw new NotImplementedException("WS8: SimulatorStore.AddInboxMessage");
+        ArgumentNullException.ThrowIfNull(message);
+        lock (_gate)
+        {
+            if (_messages.ContainsKey(message.MessageId))
+            {
+                throw new InvalidOperationException($"Inbox message '{message.MessageId}' is already stored.");
+            }
+
+            Store(message);
+        }
+    }
+
+    /// <summary>
+    /// Adds a newly received message unless its <c>CommunicationRequest</c> was already received.
+    /// </summary>
+    /// <remarks>
+    /// The check and the insert are one atomic step, so two concurrent deliveries of the same
+    /// request can never both create a message.
+    /// </remarks>
+    /// <param name="message">The message to store.</param>
+    /// <param name="stored">The message now in the inbox: <paramref name="message"/> when it was added, otherwise the one stored earlier.</param>
+    /// <returns><see langword="true"/> when the message was added; <see langword="false"/> when the request, or the message identifier, was seen before.</returns>
+    public bool TryAddInboxMessage(InboxMessage message, out InboxMessage stored)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        lock (_gate)
+        {
+            if (_messageIdByRequest.TryGetValue(message.CommunicationRequestId, out var existingId))
+            {
+                stored = _messages[existingId];
+                return false;
+            }
+
+            if (_messages.TryGetValue(message.MessageId, out var existing))
+            {
+                stored = existing;
+                return false;
+            }
+
+            Store(message);
+            stored = message;
+            return true;
+        }
     }
 
     /// <summary>
@@ -28,8 +86,12 @@ public sealed class SimulatorStore
     /// <returns>A snapshot of all inbox messages, newest first.</returns>
     public IReadOnlyList<InboxMessage> GetInboxMessages()
     {
-        // TODO(WS-8): return a snapshot ordered by ReceivedAt descending.
-        throw new NotImplementedException("WS8: SimulatorStore.GetInboxMessages");
+        lock (_gate)
+        {
+            // Stable sort over arrival order reversed, so messages received at the same instant
+            // still list the later arrival first.
+            return [.. Enumerable.Reverse(_messageOrder).Select(id => _messages[id]).OrderByDescending(m => m.ReceivedAt)];
+        }
     }
 
     /// <summary>
@@ -39,8 +101,10 @@ public sealed class SimulatorStore
     /// <returns>The message, or <see langword="null"/> when no message has that identifier.</returns>
     public InboxMessage? FindInboxMessage(string messageId)
     {
-        // TODO(WS-8): look the message up by MessageId.
-        throw new NotImplementedException("WS8: SimulatorStore.FindInboxMessage");
+        lock (_gate)
+        {
+            return _messages.GetValueOrDefault(messageId);
+        }
     }
 
     /// <summary>
@@ -54,30 +118,82 @@ public sealed class SimulatorStore
     /// <returns>The existing message, or <see langword="null"/> when the request has not been seen.</returns>
     public InboxMessage? FindInboxMessageByRequest(string communicationRequestId)
     {
-        // TODO(WS-8): look the message up by CommunicationRequestId.
-        throw new NotImplementedException("WS8: SimulatorStore.FindInboxMessageByRequest");
+        lock (_gate)
+        {
+            return _messageIdByRequest.TryGetValue(communicationRequestId, out var id) ? _messages[id] : null;
+        }
     }
 
     /// <summary>
     /// Replaces a stored inbox message with an updated copy (for example after a delivery report
     /// or a patient response).
     /// </summary>
+    /// <remarks>
+    /// Prefer <see cref="UpdateInboxMessage(string, Func{InboxMessage, InboxMessage})"/> when the
+    /// new value depends on the stored one: this overload overwrites whatever is there.
+    /// </remarks>
     /// <param name="message">The updated message; matched to the stored one by <see cref="InboxMessage.MessageId"/>.</param>
     /// <exception cref="KeyNotFoundException">No stored message has that identifier.</exception>
     public void UpdateInboxMessage(InboxMessage message)
     {
-        // TODO(WS-8): atomically replace the stored message with the same MessageId.
-        throw new NotImplementedException("WS8: SimulatorStore.UpdateInboxMessage");
+        ArgumentNullException.ThrowIfNull(message);
+        lock (_gate)
+        {
+            if (!_messages.ContainsKey(message.MessageId))
+            {
+                throw new KeyNotFoundException($"No inbox message has the identifier '{message.MessageId}'.");
+            }
+
+            _messages[message.MessageId] = message;
+        }
+    }
+
+    /// <summary>
+    /// Changes a stored inbox message in one atomic step, so a delivery report and a patient
+    /// response arriving together cannot overwrite each other.
+    /// </summary>
+    /// <param name="messageId">Simulator-local identifier of the message.</param>
+    /// <param name="change">Produces the new message from the stored one. Runs under the store's lock, so it must be quick and must not call back into the store.</param>
+    /// <returns>The message as stored after the change.</returns>
+    /// <exception cref="KeyNotFoundException">No stored message has that identifier.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="change"/> returned a message with a different identifier.</exception>
+    public InboxMessage UpdateInboxMessage(string messageId, Func<InboxMessage, InboxMessage> change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        lock (_gate)
+        {
+            if (!_messages.TryGetValue(messageId, out var current))
+            {
+                throw new KeyNotFoundException($"No inbox message has the identifier '{messageId}'.");
+            }
+
+            var updated = change(current);
+            if (!string.Equals(updated.MessageId, messageId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("An update must not change the message identifier.");
+            }
+
+            _messages[messageId] = updated;
+            return updated;
+        }
     }
 
     /// <summary>
     /// Appends one exchange to the FHIR message log.
     /// </summary>
+    /// <remarks>The log keeps the newest <see cref="LogCapacity"/> entries.</remarks>
     /// <param name="entry">The exchange to record.</param>
     public void AppendLogEntry(FhirMessageLogEntry entry)
     {
-        // TODO(WS-8): append to a bounded, thread-safe log (drop the oldest entries beyond a fixed cap).
-        throw new NotImplementedException("WS8: SimulatorStore.AppendLogEntry");
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_gate)
+        {
+            _log.Enqueue(entry);
+            while (_log.Count > LogCapacity)
+            {
+                _log.Dequeue();
+            }
+        }
     }
 
     /// <summary>
@@ -86,8 +202,10 @@ public sealed class SimulatorStore
     /// <returns>A snapshot of the logged exchanges, newest first.</returns>
     public IReadOnlyList<FhirMessageLogEntry> GetLogEntries()
     {
-        // TODO(WS-8): return a snapshot ordered by At descending.
-        throw new NotImplementedException("WS8: SimulatorStore.GetLogEntries");
+        lock (_gate)
+        {
+            return [.. _log.Reverse().OrderByDescending(e => e.At)];
+        }
     }
 
     /// <summary>
@@ -97,8 +215,10 @@ public sealed class SimulatorStore
     /// <returns>The patient's own behaviour, or the default behaviour when none was set for them.</returns>
     public PatientBehaviour GetBehaviour(string patientSyntheticId)
     {
-        // TODO(WS-8): return the behaviour set for the patient, falling back to GetDefaultBehaviour().
-        throw new NotImplementedException("WS8: SimulatorStore.GetBehaviour");
+        lock (_gate)
+        {
+            return _behaviours.TryGetValue(patientSyntheticId, out var assignment) ? assignment.Behaviour : _defaultBehaviour;
+        }
     }
 
     /// <summary>
@@ -107,8 +227,10 @@ public sealed class SimulatorStore
     /// <returns>One assignment per patient, ordered by patient identifier. The default behaviour is not included.</returns>
     public IReadOnlyList<PatientBehaviourAssignment> GetBehaviours()
     {
-        // TODO(WS-8): return a snapshot ordered by PatientSyntheticId.
-        throw new NotImplementedException("WS8: SimulatorStore.GetBehaviours");
+        lock (_gate)
+        {
+            return [.. _behaviours.Values.OrderBy(a => a.PatientSyntheticId, StringComparer.Ordinal)];
+        }
     }
 
     /// <summary>
@@ -118,8 +240,11 @@ public sealed class SimulatorStore
     /// <remarks>Notifications already in the inbox keep the reactions they already had.</remarks>
     public void SetBehaviour(PatientBehaviourAssignment assignment)
     {
-        // TODO(WS-8): insert or replace atomically, keyed by PatientSyntheticId.
-        throw new NotImplementedException("WS8: SimulatorStore.SetBehaviour");
+        ArgumentNullException.ThrowIfNull(assignment);
+        lock (_gate)
+        {
+            _behaviours[assignment.PatientSyntheticId] = assignment;
+        }
     }
 
     /// <summary>
@@ -129,8 +254,10 @@ public sealed class SimulatorStore
     /// <returns><see langword="true"/> when the patient had a behaviour of their own.</returns>
     public bool RemoveBehaviour(string patientSyntheticId)
     {
-        // TODO(WS-8): remove the assignment and report whether one existed.
-        throw new NotImplementedException("WS8: SimulatorStore.RemoveBehaviour");
+        lock (_gate)
+        {
+            return _behaviours.Remove(patientSyntheticId);
+        }
     }
 
     /// <summary>
@@ -139,8 +266,10 @@ public sealed class SimulatorStore
     /// <returns>The default behaviour. Until changed it is deliver and do not respond, so nothing is acknowledged unless a behaviour says so.</returns>
     public PatientBehaviour GetDefaultBehaviour()
     {
-        // TODO(WS-8): return the current default, initially Deliver with PatientResponseBehaviour.None.
-        throw new NotImplementedException("WS8: SimulatorStore.GetDefaultBehaviour");
+        lock (_gate)
+        {
+            return _defaultBehaviour;
+        }
     }
 
     /// <summary>
@@ -149,19 +278,31 @@ public sealed class SimulatorStore
     /// <param name="behaviour">The new default.</param>
     public void SetDefaultBehaviour(PatientBehaviour behaviour)
     {
-        // TODO(WS-8): replace the default atomically.
-        throw new NotImplementedException("WS8: SimulatorStore.SetDefaultBehaviour");
+        ArgumentNullException.ThrowIfNull(behaviour);
+        lock (_gate)
+        {
+            _defaultBehaviour = behaviour;
+        }
     }
 
     /// <summary>
     /// Counts the notifications a patient has received so far.
     /// </summary>
+    /// <remarks>
+    /// Only messages addressed to the patient count. A caregiver's copy is not a notification the
+    /// patient received, so it never moves the patient towards
+    /// <see cref="PatientBehaviour.RespondToNotification"/>.
+    /// </remarks>
     /// <param name="patientSyntheticId">Synthetic identifier of the patient.</param>
-    /// <returns>The number of inbox messages for that patient, which is what <see cref="PatientBehaviour.RespondToNotification"/> is compared with.</returns>
+    /// <returns>The number of patient inbox messages for that patient, which is what <see cref="PatientBehaviour.RespondToNotification"/> is compared with.</returns>
     public int CountNotifications(string patientSyntheticId)
     {
-        // TODO(WS-8): count the inbox messages whose PatientSyntheticId matches.
-        throw new NotImplementedException("WS8: SimulatorStore.CountNotifications");
+        lock (_gate)
+        {
+            return _messages.Values.Count(m =>
+                m.RecipientKind == RecipientKind.Patient
+                && string.Equals(m.PatientSyntheticId, patientSyntheticId, StringComparison.Ordinal));
+        }
     }
 
     /// <summary>
@@ -170,8 +311,11 @@ public sealed class SimulatorStore
     /// <param name="reaction">The reaction to record.</param>
     public void AppendReaction(PatientReactionRecord reaction)
     {
-        // TODO(WS-8): append to a thread-safe list.
-        throw new NotImplementedException("WS8: SimulatorStore.AppendReaction");
+        ArgumentNullException.ThrowIfNull(reaction);
+        lock (_gate)
+        {
+            _reactions.Add(reaction);
+        }
     }
 
     /// <summary>
@@ -181,8 +325,13 @@ public sealed class SimulatorStore
     /// <returns>Their reactions, oldest first.</returns>
     public IReadOnlyList<PatientReactionRecord> GetReactions(IReadOnlyCollection<string> patientSyntheticIds)
     {
-        // TODO(WS-8): return a snapshot filtered by patient and ordered by At.
-        throw new NotImplementedException("WS8: SimulatorStore.GetReactions");
+        ArgumentNullException.ThrowIfNull(patientSyntheticIds);
+        var wanted = patientSyntheticIds.ToHashSet(StringComparer.Ordinal);
+        lock (_gate)
+        {
+            // Stable sort, so reactions stamped with the same instant keep the order they happened in.
+            return [.. _reactions.Where(r => wanted.Contains(r.PatientSyntheticId)).OrderBy(r => r.At)];
+        }
     }
 
     /// <summary>
@@ -191,8 +340,11 @@ public sealed class SimulatorStore
     /// <param name="run">The run state to store.</param>
     public void SaveRun(ScenarioRunState run)
     {
-        // TODO(WS-8): insert or replace the run keyed by RunId.
-        throw new NotImplementedException("WS8: SimulatorStore.SaveRun");
+        ArgumentNullException.ThrowIfNull(run);
+        lock (_gate)
+        {
+            _runs[run.RunId] = run;
+        }
     }
 
     /// <summary>
@@ -202,7 +354,60 @@ public sealed class SimulatorStore
     /// <returns>The run state, or <see langword="null"/> when no run has that identifier.</returns>
     public ScenarioRunState? FindRun(string runId)
     {
-        // TODO(WS-8): look the run up by RunId.
-        throw new NotImplementedException("WS8: SimulatorStore.FindRun");
+        lock (_gate)
+        {
+            return _runs.GetValueOrDefault(runId);
+        }
+    }
+
+    /// <summary>
+    /// Queues a patient response that is due later.
+    /// </summary>
+    /// <param name="response">The response and the time it is due.</param>
+    public void SchedulePendingResponse(PendingResponse response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        lock (_gate)
+        {
+            _pending.Add(response);
+        }
+    }
+
+    /// <summary>
+    /// Takes the queued responses that are due, removing them from the queue.
+    /// </summary>
+    /// <remarks>
+    /// Taking and removing are one atomic step, so a response is handed out exactly once even if
+    /// two dispatchers ask at the same moment.
+    /// </remarks>
+    /// <param name="now">The current time on the simulator clock.</param>
+    /// <returns>The responses whose due time is at or before <paramref name="now"/>, earliest first.</returns>
+    public IReadOnlyList<PendingResponse> ClaimDueResponses(DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            var due = _pending.Where(p => p.DueAt <= now).OrderBy(p => p.DueAt).ToList();
+            _pending.RemoveAll(p => p.DueAt <= now);
+            return due;
+        }
+    }
+
+    /// <summary>
+    /// Counts the responses still waiting for their due time.
+    /// </summary>
+    /// <returns>The number of queued responses.</returns>
+    public int CountPendingResponses()
+    {
+        lock (_gate)
+        {
+            return _pending.Count;
+        }
+    }
+
+    private void Store(InboxMessage message)
+    {
+        _messages[message.MessageId] = message;
+        _messageIdByRequest[message.CommunicationRequestId] = message.MessageId;
+        _messageOrder.Add(message.MessageId);
     }
 }

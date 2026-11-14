@@ -11,8 +11,9 @@ namespace PatientChannelSimulator.Outbound;
 /// This is the event that completes CareLoop's notification track; it must only ever be built
 /// from an explicit patient action (or a scripted scenario step), never as a side effect of delivery.
 /// Every built resource is tagged as simulated (<see cref="CommunicationCodes.SimulatedTagCode"/>),
-/// points back to the originating request through <c>basedOn</c>, and carries a deterministic
-/// <c>identifier</c> so CareLoop deduplicates a resend of the same event.
+/// points back to the originating request through <c>basedOn</c> and to the case <c>Task</c> through
+/// <c>about</c>, and has a deterministic id and <c>meta.versionId</c> so CareLoop deduplicates a
+/// resend of the same event.
 /// </remarks>
 public sealed class AcknowledgementCommunicationBuilder
 {
@@ -24,7 +25,7 @@ public sealed class AcknowledgementCommunicationBuilder
     /// <returns>A FHIR R4 <c>Communication</c> ready to send to CareLoop.</returns>
     public Communication Build(InboxMessage message, DateTimeOffset occurredAt)
     {
-        // TODO(WS-8): build a Communication from the patient with status completed, category Acknowledgement, basedOn the CommunicationRequest, the simulated tag and a deterministic identifier.
-        throw new NotImplementedException("WS8: AcknowledgementCommunicationBuilder.Build");
+        return CommunicationFactory.PatientResponse(
+            message, occurredAt, CommunicationCodes.Acknowledgement, CommunicationFactory.AcknowledgementSuffix, version: 1);
     }
 }

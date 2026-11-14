@@ -48,6 +48,7 @@ public static class ServiceRegistration
         services.AddSingleton<AcknowledgementCommunicationBuilder>();
         services.AddSingleton<TeachBackCommunicationBuilder>();
         services.AddSingleton<CallMeCommunicationBuilder>();
+        services.AddSingleton<ConfidenceRatingCommunicationBuilder>();
         services.AddTransient<PatientResponseSender>();
         services.AddTransient<CaseStatusReader>();
 

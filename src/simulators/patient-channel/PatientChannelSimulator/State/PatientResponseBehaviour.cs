@@ -21,4 +21,10 @@ public enum PatientResponseBehaviour
 
     /// <summary>The patient asks to be called.</summary>
     CallMe,
+
+    /// <summary>
+    /// The patient only rates their confidence (C10). A rating is not an acknowledgement, so the
+    /// notification stays unacknowledged.
+    /// </summary>
+    RateConfidence,
 }
