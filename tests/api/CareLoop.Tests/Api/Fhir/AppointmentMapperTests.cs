@@ -26,6 +26,42 @@ public sealed class AppointmentMapperTests
         Assert.Equal(AppointmentStatus.Scheduled, payload.Status);
         Assert.Equal("Appointment/SYN-APPT-0001", payload.AppointmentReference);
         Assert.Equal(new DateTimeOffset(2026, 1, 3, 8, 0, 0, TimeSpan.Zero), payload.ScheduledFor);
+        Assert.Equal("SYN Breast Imaging Clinic", payload.Location);
+    }
+
+    [Fact]
+    public void A_contained_location_without_a_display_gives_its_name()
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Contained.Add(new Location { Id = "loc", Name = "SYN Contained Clinic" });
+        appointment.Participant[1].Actor = new ResourceReference("#loc");
+
+        var payload = (AppointmentUpdatePayload)Assert.Single(Map(Mapper, appointment)).Payload;
+
+        Assert.Equal("SYN Contained Clinic", payload.Location);
+    }
+
+    [Fact]
+    public void Without_a_location_participant_the_payload_carries_no_place()
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Participant.RemoveAt(1);
+
+        var payload = (AppointmentUpdatePayload)Assert.Single(Map(Mapper, appointment)).Payload;
+
+        Assert.Null(payload.Location);
+    }
+
+    [Fact]
+    public void A_display_on_a_non_location_participant_is_not_taken_as_the_place()
+    {
+        var appointment = Sample<Appointment>("Appointment");
+        appointment.Participant.RemoveAt(1);
+        appointment.Participant[0].Actor!.Display = "SYN Patient Name";
+
+        var payload = (AppointmentUpdatePayload)Assert.Single(Map(Mapper, appointment)).Payload;
+
+        Assert.Null(payload.Location);
     }
 
     [Fact]

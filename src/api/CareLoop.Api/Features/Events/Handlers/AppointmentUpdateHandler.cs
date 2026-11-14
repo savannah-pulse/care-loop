@@ -17,6 +17,8 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// outcome must also be recorded. A missed appointment gives the current owner a new next action
 /// (rebooking) and deadline, and a rebooked appointment gives them the follow-up action
 /// (<see cref="HandlerSupport.ArrangeFollowUpAction"/>) so the case is never without a deadline.
+/// A booking or rebooking goes through <see cref="Case.ScheduleAppointment"/> with the payload's
+/// place, which raises <see cref="Domain.Events.DomainEvents.AppointmentScheduled"/> when the time is new.
 /// </remarks>
 public sealed class AppointmentUpdateHandler : IEventHandler
 {
@@ -64,7 +66,7 @@ public sealed class AppointmentUpdateHandler : IEventHandler
                         return HandlerSupport.Refused(@case, missing!);
                     }
 
-                    booked.Rebook(scheduledFor, envelope.OccurredAt, payload.AppointmentReference);
+                    @case.ScheduleAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt, payload.Location);
                     if (wasMissed)
                     {
                         HandlerSupport.SetNextAction(@case, HandlerSupport.ArrangeFollowUpAction, pathway, _clock);
@@ -72,7 +74,7 @@ public sealed class AppointmentUpdateHandler : IEventHandler
                 }
                 else
                 {
-                    @case.BeginAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt);
+                    @case.ScheduleAppointment(payload.AppointmentReference, scheduledFor, envelope.OccurredAt, payload.Location);
                 }
 
                 break;

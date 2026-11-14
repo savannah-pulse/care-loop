@@ -36,6 +36,26 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CaseReads",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    CaseId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ActorReference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    ActorRole = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    ActorFacilityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    View = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
+                    Query = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    OutsideTeam = table.Column<bool>(type: "boolean", nullable: false),
+                    Reason = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    ReadAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CaseReads", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Cases",
                 columns: table => new
                 {
@@ -190,8 +210,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 name: "CaseEscalations",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "integer", nullable: false)
+                    Sequence = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Level = table.Column<int>(type: "integer", nullable: false),
                     EscalatedTo_Reference = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     EscalatedTo_Role = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
@@ -208,7 +229,7 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_CaseEscalations", x => x.Id);
+                    table.PrimaryKey("PK_CaseEscalations", x => x.Sequence);
                     table.ForeignKey(
                         name: "FK_CaseEscalations_Cases_CaseId",
                         column: x => x.CaseId,
@@ -282,6 +303,22 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                 column: "CaseId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_CaseEscalations_Id",
+                table: "CaseEscalations",
+                column: "Id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CaseReads_ActorReference_ReadAt",
+                table: "CaseReads",
+                columns: new[] { "ActorReference", "ReadAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CaseReads_CaseId_ReadAt",
+                table: "CaseReads",
+                columns: new[] { "CaseId", "ReadAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Cases_DueAt",
                 table: "Cases",
                 column: "DueAt");
@@ -348,6 +385,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "CaseEscalations");
+
+            migrationBuilder.DropTable(
+                name: "CaseReads");
 
             migrationBuilder.DropTable(
                 name: "HandoffSummaries");

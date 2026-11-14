@@ -92,6 +92,16 @@ public sealed class FhirPublisherTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task AppointmentScheduled_publishes_nothing()
+    {
+        var @case = await StoredCaseAsync();
+
+        await PublishAsync(new AppointmentScheduled { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, ScheduledFor = _store.Clock.UtcNow.AddDays(3), Location = "SYN Breast Imaging Clinic" });
+
+        Assert.Empty(_http.Requests);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task CaseClosed_sends_the_case_task_completed()
     {
         var @case = await StoredCaseAsync();

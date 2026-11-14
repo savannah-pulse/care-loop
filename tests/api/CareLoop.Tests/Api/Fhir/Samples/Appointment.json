@@ -7,5 +7,8 @@
   "start": "2026-01-03T08:00:00Z",
   "end": "2026-01-03T08:30:00Z",
   "created": "2026-01-02T10:00:00Z",
-  "participant": [ { "actor": { "reference": "Patient/SYN-PT-0001" }, "status": "accepted" } ]
+  "participant": [
+    { "actor": { "reference": "Patient/SYN-PT-0001" }, "status": "accepted" },
+    { "actor": { "reference": "Location/SYN-LOC-0001", "display": "SYN Breast Imaging Clinic" }, "status": "accepted" }
+  ]
 }

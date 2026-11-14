@@ -14,9 +14,10 @@ namespace CareLoop.Api.Features.Fhir.Outbound;
 /// <c>DocumentReference</c> carrying exactly the summary that approval names; <see cref="HandoffRejected"/> as the case <c>Task</c> with status
 /// <c>rejected</c> and the reason given (unless a newer handoff is already pending); <see cref="ReferralRejected"/> as a
 /// case <c>Task</c> update; <see cref="CallRequested"/> and <see cref="EscalationRaised"/> as a notice <c>Task</c>;
-/// <see cref="CaseClosed"/> as the case <c>Task</c> completed. <see cref="NotificationRequested"/> and
-/// <see cref="DeadlineApproaching"/> publish nothing: reaching the patient is the notification providers' job, not the
-/// FHIR boundary's. Resources use deterministic identifiers (the case identifier for the case task, the event or
+/// <see cref="CaseClosed"/> as the case <c>Task</c> completed. <see cref="NotificationRequested"/>,
+/// <see cref="DeadlineApproaching"/> and <see cref="AppointmentScheduled"/> publish nothing: reaching the patient or a
+/// caregiver is the notification providers' job, not the FHIR boundary's, and a booking came from the hospital system,
+/// which already knows. Resources use deterministic identifiers (the case identifier for the case task, the event or
 /// summary identifier otherwise) so a retried delivery is idempotent.
 /// <para>
 /// The case <c>Task</c> is state, not an event: it is built from the case as it stands when the message is delivered,
@@ -67,7 +68,7 @@ public sealed class FhirPublisher : IDomainEventSubscriber
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
 
-        if (domainEvent is NotificationRequested or DeadlineApproaching)
+        if (domainEvent is NotificationRequested or DeadlineApproaching or AppointmentScheduled)
         {
             return;
         }

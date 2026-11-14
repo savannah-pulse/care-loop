@@ -66,6 +66,8 @@ Additive changes. None alters the Domain's transition rules or contradicts `AGEN
 
 C14 and C16 to C18 were numbers in a superseded version of the design pull request and are withdrawn; C16 was the rejection endpoint, built by pull request 27.
 
+The status of each item, split by workstream, is kept in the design gap tracker at the end of [workstreams.md](workstreams.md#design-gap-tracker). As of 14 November 2026 the Domain, intake and FHIR-mapper parts (WS1 to WS3) of every item are built, including the C13 appointment event and place, the C15 escalation identifier and acknowledgement fields, and the read-audit table for C4 and C19; the remaining parts belong to WS4 to WS10.
+
 C10, C11 and C13 each cross several workstreams. Agree the Domain and contract changes (WS1, WS2) first; the simulators and read endpoints follow. The same holds for C15, C20 and C21, whose WS1 and WS2 parts, with the decision 18 deadline values and the decision 19 label function, were built on 13 November 2026 (see the WS1 and WS2 sections of workstreams.md).
 
 ## Section 4: What the product manager should update

@@ -1,4 +1,5 @@
 using CareLoop.Api.Infrastructure.Persistence;
+using CareLoop.Api.Infrastructure.Persistence.Audit;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
@@ -33,6 +34,49 @@ public sealed class EfCaseRepositoryTests : IDisposable
     }
 
     public void Dispose() => _connection.Dispose();
+
+    [Fact]
+    public async Task A_case_read_is_stored_in_the_read_audit()
+    {
+        var caseId = Guid.NewGuid();
+        await using (var db = NewContext())
+        {
+            db.CaseReads.Add(new CaseReadRecord
+            {
+                Id = Guid.NewGuid(),
+                CaseId = caseId,
+                ActorReference = "SYN-CLIN-0001",
+                ActorRole = "clinician",
+                ActorFacilityId = "SYN-FAC-B",
+                View = "case",
+                OutsideTeam = true,
+                Reason = "SYN covering for a colleague",
+                ReadAt = _clock.UtcNow,
+            });
+            db.CaseReads.Add(new CaseReadRecord
+            {
+                Id = Guid.NewGuid(),
+                CaseId = null,
+                ActorReference = "SYN-CLIN-0001",
+                ActorRole = "clinician",
+                ActorFacilityId = "SYN-FAC-B",
+                View = "case-list",
+                Query = "patientReference=SYN-PT-0001",
+                ReadAt = _clock.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await using var verify = NewContext();
+        var reads = await verify.CaseReads.AsNoTracking().OrderBy(r => r.View).ToListAsync();
+        Assert.Equal(2, reads.Count);
+        Assert.Equal(caseId, reads[0].CaseId);
+        Assert.True(reads[0].OutsideTeam);
+        Assert.Equal("SYN covering for a colleague", reads[0].Reason);
+        Assert.Null(reads[1].CaseId);
+        Assert.Equal("patientReference=SYN-PT-0001", reads[1].Query);
+        Assert.Empty(await verify.AuditEvents.ToListAsync());
+    }
 
     [Fact]
     public async Task Save_persists_event_case_audit_and_outbox_together()
@@ -247,6 +291,8 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(2, loaded.Escalations.Count);
         Assert.All(loaded.Escalations, e => Assert.NotNull(e.ResolvedAt));
         Assert.Equal("SYN-COORD", loaded.Escalations[1].EscalatedTo.Reference);
+        Assert.Equal(@case.Escalations.Select(e => e.Id), loaded.Escalations.Select(e => e.Id));
+        Assert.All(loaded.Escalations, e => Assert.NotEqual(Guid.Empty, e.Id));
         Assert.Null(loaded.Escalations[0].AcknowledgedBy);
         Assert.Equal("SYN-COORD-0001", loaded.Escalations[1].AcknowledgedBy!.Reference);
         Assert.Equal(_clock.UtcNow, loaded.Escalations[1].AcknowledgedAt);

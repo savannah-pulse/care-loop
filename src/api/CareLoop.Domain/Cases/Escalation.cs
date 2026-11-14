@@ -14,6 +14,16 @@ namespace CareLoop.Domain.Cases;
 /// </remarks>
 public sealed record Escalation
 {
+    /// <summary>
+    /// Identifies this escalation on its case, so a person acknowledging it names exactly the escalation they saw.
+    /// </summary>
+    /// <remarks>
+    /// Assigned by <see cref="Case.Escalate"/> when the caller leaves it empty. Without it an acknowledgement could
+    /// land on a newer escalation raised after the screen was opened, and the record would say someone saw what they
+    /// never saw.
+    /// </remarks>
+    public Guid Id { get; init; }
+
     /// <summary>The step on the pathway's escalation ladder (1 is the first step).</summary>
     public required int Level { get; init; }
 

@@ -152,7 +152,7 @@ public static class Envelopes
         };
 
     /// <summary>An appointment status change.</summary>
-    public static EventEnvelope Appointment(DateTimeOffset at, AppointmentStatus status, DateTimeOffset? scheduledFor = null, string resultId = ResultId) =>
+    public static EventEnvelope Appointment(DateTimeOffset at, AppointmentStatus status, DateTimeOffset? scheduledFor = null, string resultId = ResultId, string? location = null) =>
         new()
         {
             SourceSystem = TestData.SourceSystem,
@@ -166,6 +166,7 @@ public static class Envelopes
                 Status = status,
                 AppointmentReference = "Appointment/SYN-APPT-0001",
                 ScheduledFor = scheduledFor,
+                Location = location,
             },
         };
 

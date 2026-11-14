@@ -296,6 +296,40 @@ public sealed class EventHandlerTests
     }
 
     [Fact]
+    public async Task Booking_and_rebooking_raise_AppointmentScheduled_with_the_place()
+    {
+        await _harness.ReviewedCaseAsync();
+        var bookedFor = _harness.Clock.UtcNow.AddDays(3);
+        await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: bookedFor, location: "SYN Breast Imaging Clinic"));
+
+        var booked = Assert.Single(_harness.Repository.PublishedDomainEvents.OfType<AppointmentScheduled>());
+        Assert.Equal(bookedFor, booked.ScheduledFor);
+        Assert.Equal("SYN Breast Imaging Clinic", booked.Location);
+
+        _harness.Clock.Advance(TimeSpan.FromDays(3));
+        await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Missed));
+        Assert.Single(_harness.Repository.PublishedDomainEvents.OfType<AppointmentScheduled>());
+
+        var rebookedFor = _harness.Clock.UtcNow.AddDays(2);
+        await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: rebookedFor, location: "SYN Satellite Clinic"));
+
+        var all = _harness.Repository.PublishedDomainEvents.OfType<AppointmentScheduled>().ToList();
+        Assert.Equal(2, all.Count);
+        Assert.Equal(rebookedFor, all[1].ScheduledFor);
+        Assert.Equal("SYN Satellite Clinic", all[1].Location);
+    }
+
+    [Fact]
+    public async Task An_appointment_first_reported_as_attended_raises_no_AppointmentScheduled()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Attended, scheduledFor: _harness.Clock.UtcNow));
+
+        Assert.Empty(_harness.Repository.PublishedDomainEvents.OfType<AppointmentScheduled>());
+    }
+
+    [Fact]
     public async Task Outcome_moves_the_case_to_closure_review()
     {
         await _harness.ReviewedCaseAsync();
