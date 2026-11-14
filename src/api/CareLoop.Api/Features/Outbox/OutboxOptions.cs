@@ -8,7 +8,7 @@ public sealed class OutboxOptions
     /// <summary>Name of the configuration section.</summary>
     public const string SectionName = "Outbox";
 
-    /// <summary>Whether the dispatcher background service runs. Off until WS4 implements it.</summary>
+    /// <summary>Whether the dispatcher background service runs. On in <c>appsettings.json</c>; a test host turns it off.</summary>
     public bool Enabled { get; set; }
 
     /// <summary>How often the dispatcher looks for undelivered messages.</summary>

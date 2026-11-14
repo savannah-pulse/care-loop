@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Time;
 using CareLoop.Domain.Tracks;
@@ -42,6 +44,22 @@ public sealed class NotificationSender
     }
 
     /// <summary>
+    /// The attempt identifier for one notification to one recipient on one channel.
+    /// </summary>
+    /// <param name="notificationId">Identifies the notification, normally the domain event identifier.</param>
+    /// <param name="recipientReference">The recipient's reference.</param>
+    /// <param name="channel">The channel.</param>
+    /// <returns>The same identifier every time for the same inputs, so a repeated send reuses it and the receiving side can deduplicate.</returns>
+    public static Guid AttemptIdFor(Guid notificationId, string recipientReference, NotificationChannel channel)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"{notificationId:N}|{recipientReference}|{channel}"));
+        var bytes = hash.AsSpan(0, 16).ToArray();
+        bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50); // version 5 style: name-based
+        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80); // RFC 4122 variant
+        return new Guid(bytes);
+    }
+
+    /// <summary>
     /// Sends a notification to one recipient.
     /// </summary>
     /// <param name="caseId">The case the notification is about.</param>
@@ -50,17 +68,128 @@ public sealed class NotificationSender
     /// <param name="domainEventName">Name of the domain event that caused the notification; selects a per-event provider override.</param>
     /// <param name="values">Placeholder values for the template. Staff templates receive no patient detail.</param>
     /// <param name="ct">Cancels the operation.</param>
+    /// <param name="notificationId">
+    /// Identifies the notification, normally the domain event identifier. When given, attempt identifiers are derived from it
+    /// (<see cref="AttemptIdFor"/>), so sending the same notification again carries the same identifiers; otherwise they are random.
+    /// </param>
     /// <returns>One attempt per enabled provider that could reach the recipient; empty when none could.</returns>
-    /// <remarks>A provider that throws is recorded as a failed attempt and does not prevent the other providers from sending.</remarks>
-    public Task<IReadOnlyList<NotificationAttempt>> SendAsync(
+    /// <remarks>
+    /// Every template variant is rendered before anything is sent, so a missing template or value fails the whole
+    /// notification rather than leaving it half sent. A provider that throws is recorded as a failed attempt and does
+    /// not prevent the other providers from sending.
+    /// </remarks>
+    /// <exception cref="FileNotFoundException">The template does not exist.</exception>
+    /// <exception cref="KeyNotFoundException">A placeholder value is missing.</exception>
+    public async Task<IReadOnlyList<NotificationAttempt>> SendAsync(
         Guid caseId,
         Recipient recipient,
         string templateKey,
         string domainEventName,
         IReadOnlyDictionary<string, string> values,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid? notificationId = null)
     {
-        // TODO(WS-4): select enabled providers with CanReach, render per channel (SMS-safe where required), send, collect attempts.
-        throw new NotImplementedException("WS4: NotificationSender.SendAsync");
+        ArgumentNullException.ThrowIfNull(recipient);
+        ArgumentNullException.ThrowIfNull(values);
+
+        var targets = new List<(INotificationProvider Provider, ContactPoint? ContactPoint, string? CannotReach)>();
+        foreach (var provider in EnabledProviders(domainEventName))
+        {
+            try
+            {
+                if (provider.CanReach(recipient))
+                {
+                    targets.Add((provider, recipient.ContactPoints.FirstOrDefault(c => c.Channel == provider.Channel), null));
+                }
+            }
+            catch (Exception ex)
+            {
+                targets.Add((provider, null, $"{provider.Channel} provider could not check the recipient: {ex.Message}"));
+            }
+        }
+
+        var rendered = new Dictionary<bool, RenderedTemplate>();
+        foreach (var smsSafe in targets.Where(t => t.CannotReach is null).Select(t => !t.Provider.AllowsSensitiveContent).Distinct())
+        {
+            rendered[smsSafe] = _templates.Render(templateKey, recipient.Language, smsSafe, values);
+        }
+
+        var attempts = new List<NotificationAttempt>(targets.Count);
+        foreach (var (provider, contactPoint, cannotReach) in targets)
+        {
+            var attemptId = notificationId is { } id ? AttemptIdFor(id, recipient.Reference, provider.Channel) : Guid.NewGuid();
+            var smsSafe = !provider.AllowsSensitiveContent;
+            if (cannotReach is not null || contactPoint is null)
+            {
+                attempts.Add(Failed(attemptId, provider.Channel, smsSafe, cannotReach ?? $"The recipient has no {provider.Channel} contact point."));
+                continue;
+            }
+
+            var template = rendered[smsSafe];
+            var message = new NotificationMessage
+            {
+                AttemptId = attemptId,
+                CaseId = caseId,
+                Recipient = recipient,
+                ContactPoint = contactPoint,
+                TemplateKey = templateKey,
+                Subject = template.Subject,
+                Body = template.Body,
+                IsSmsSafe = template.IsSmsSafe,
+            };
+
+            SendResult result;
+            try
+            {
+                result = await provider.SendAsync(message, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                result = new SendResult { Accepted = false, FailureReason = $"{provider.Channel} provider failed: {ex.Message}" };
+            }
+
+            attempts.Add(new NotificationAttempt
+            {
+                Id = attemptId,
+                Channel = provider.Channel,
+                AttemptedAt = _clock.UtcNow,
+                Status = result.Accepted ? NotificationAttemptStatus.Sent : NotificationAttemptStatus.Failed,
+                UsedSmsSafeTemplate = template.IsSmsSafe,
+                ProviderMessageId = result.ProviderMessageId,
+                FailureReason = result.Accepted ? null : result.FailureReason ?? "The provider did not accept the message.",
+            });
+        }
+
+        return attempts;
+    }
+
+    private NotificationAttempt Failed(Guid id, NotificationChannel channel, bool smsSafe, string reason) => new()
+    {
+        Id = id,
+        Channel = channel,
+        AttemptedAt = _clock.UtcNow,
+        Status = NotificationAttemptStatus.Failed,
+        UsedSmsSafeTemplate = smsSafe,
+        FailureReason = reason,
+    };
+
+    private IEnumerable<INotificationProvider> EnabledProviders(string domainEventName)
+    {
+        var options = _options.Value;
+        var names = options.PerEventOverrides.TryGetValue(domainEventName, out var overridden)
+            ? overridden
+            : options.EnabledProviders;
+        var enabled = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+
+        // One provider per channel, in channel order, so the outcome never depends on registration order.
+        return _providers
+            .Where(p => enabled.Contains(p.Channel.ToString()))
+            .GroupBy(p => p.Channel)
+            .OrderBy(g => g.Key)
+            .Select(g => g.First());
     }
 }

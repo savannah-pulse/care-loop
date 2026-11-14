@@ -106,7 +106,7 @@ public static class DependencyInjection
     /// <remarks>
     /// All three notification providers are registered so the seam exists, but only those named in
     /// <see cref="NotificationOptions.EnabledProviders"/> are used. The dispatcher only runs as a
-    /// hosted service when <c>Outbox:Enabled</c> is <see langword="true"/>, because its stub would otherwise stop the host.
+    /// hosted service when <c>Outbox:Enabled</c> is <see langword="true"/>, so a test host or a tool can run without it.
     /// </remarks>
     public static IServiceCollection AddOutboxAndNotifications(this IServiceCollection services, IConfiguration configuration)
     {
@@ -120,6 +120,7 @@ public static class DependencyInjection
         services.AddScoped<RecipientResolver>();
         services.AddScoped<NotificationSender>();
         services.AddSingleton<TemplateRenderer>();
+        services.AddSingleton<NotificationSendLog>();
 
         services.AddHttpClient<SimulatorNotificationProvider>();
         services.AddTransient<INotificationProvider>(sp => sp.GetRequiredService<SimulatorNotificationProvider>());
@@ -127,12 +128,12 @@ public static class DependencyInjection
         services.AddTransient<INotificationProvider, EmailNotificationProvider>();
 
         // The inbound half of a provider. SMS and email get theirs when those providers are built.
-        services.AddSingleton<IInboundNotificationHandler, SimulatorInboundNotificationHandler>();
+        // Scoped: the simulator handler reads the case a reply is about.
+        services.AddScoped<IInboundNotificationHandler, SimulatorInboundNotificationHandler>();
 
         services.AddSingleton<OutboxDispatcher>();
         if (configuration.GetValue<bool>($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.Enabled)}"))
         {
-            // TODO(WS-4): set Outbox:Enabled to true in appsettings.json once OutboxDispatcher is implemented.
             services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
         }
 
