@@ -30,4 +30,7 @@ public static class ScenarioVocabulary
 
     /// <summary>Value of <c>behaviour.response</c>: the patient asks for a call.</summary>
     public const string ResponseCallMe = "call-me";
+
+    /// <summary>Value of <c>behaviour.response</c>: the patient only rates their confidence (C10); not an acknowledgement.</summary>
+    public const string ResponseRateConfidence = "rate-confidence";
 }

@@ -16,40 +16,68 @@ public static class ScenarioEndpoints
     {
         var group = routes.MapGroup("/scenarios").WithTags("Scenarios");
 
-        group.MapGet("/", () =>
+        group.MapGet("/", async (ScenarioLoader loader, CancellationToken ct) =>
             {
-                // TODO(WS-8): return ScenarioLoader.ListAsync mapped to ScenarioSummary.
-                return NotImplementedResponse.For("GET /scenarios");
+                try
+                {
+                    var scenarios = await loader.ListAsync(ct);
+                    return Results.Ok(scenarios.Select(s => new ScenarioSummary(
+                        s.Name,
+                        s.Description,
+                        s.PathwayId,
+                        IsCohort: s.Cohort is not null,
+                        PatientCount: s.Cohort is null ? s.Patients?.Count ?? 0 : 0)).ToList());
+                }
+                catch (Exception ex) when (ex is DirectoryNotFoundException or InvalidDataException)
+                {
+                    return Unreadable(ex);
+                }
             })
             .WithName("ListScenarios")
             .WithSummary("Lists the scenarios available in the configured directory (SIMULATED).")
             .Produces<IReadOnlyList<ScenarioSummary>>()
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
-        group.MapPost("/{name}/run", (string name, RunScenarioRequest? request) =>
+        group.MapPost("/{name}/run", async (string name, RunScenarioRequest? request, ScenarioRunner runner, CancellationToken ct) =>
             {
-                // TODO(WS-8): call ScenarioRunner.StartAsync; 202 with the run state, 404 for an unknown
-                // scenario, 400 for a cohort scenario.
-                return NotImplementedResponse.For("POST /scenarios/{name}/run");
+                try
+                {
+                    var run = await runner.StartAsync(name, request ?? new RunScenarioRequest(), ct);
+                    return run is null
+                        ? Results.NotFound()
+                        : Results.Accepted($"/scenarios/runs/{run.RunId}", run);
+                }
+                catch (ArgumentException ex)
+                {
+                    // Covers a name that is not a scenario key and a pacing that is out of range.
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "The run request is not valid.");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "This scenario cannot be run by the patient channel.");
+                }
+                catch (Exception ex) when (ex is DirectoryNotFoundException or InvalidDataException)
+                {
+                    return Unreadable(ex);
+                }
             })
             .WithName("RunScenario")
             .WithSummary("Puts the patient behaviours of a scenario in force, so those patients react to CareLoop's notifications (SIMULATED).")
             .Produces<ScenarioRunState>(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/runs/{runId}", (string runId) =>
-            {
-                // TODO(WS-8): return ScenarioRunner.GetRun(runId) or 404.
-                return NotImplementedResponse.For("GET /scenarios/runs/{runId}");
-            })
+        group.MapGet("/runs/{runId}", (string runId, ScenarioRunner runner) =>
+                runner.GetRun(runId) is { } run ? Results.Ok(run) : Results.NotFound())
             .WithName("GetScenarioRun")
             .WithSummary("Reads a scenario run: its patients and how they have reacted so far (SIMULATED).")
             .Produces<ScenarioRunState>()
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .Produces(StatusCodes.Status404NotFound);
 
         return routes;
     }
+
+    private static IResult Unreadable(Exception ex) =>
+        Results.Problem(ex.Message, statusCode: StatusCodes.Status500InternalServerError, title: "The scenario files could not be read.");
 }

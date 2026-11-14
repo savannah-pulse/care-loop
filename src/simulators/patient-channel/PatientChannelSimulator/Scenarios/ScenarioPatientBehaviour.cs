@@ -24,4 +24,11 @@ public sealed record ScenarioPatientBehaviour
 
     /// <summary>Which received notification the patient responds to, counting from 1; absent means the first.</summary>
     public int? RespondToNotification { get; init; }
+
+    /// <summary>
+    /// The 1 to 5 confidence rating the patient gives (C10). Required when <see cref="Response"/> is
+    /// <see cref="ScenarioVocabulary.ResponseRateConfidence"/>; with another response the patient
+    /// rates straight after it; absent means the patient gives no rating.
+    /// </summary>
+    public int? Confidence { get; init; }
 }

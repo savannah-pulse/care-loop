@@ -90,6 +90,22 @@ public class SimulatorStoreTests
     }
 
     [Fact]
+    public void Setting_a_behaviour_starts_the_notification_count_again()
+    {
+        var store = new SimulatorStore();
+        store.AddInboxMessage(TestData.Message(requestId: "earlier"));
+
+        store.SetBehaviour(new PatientBehaviourAssignment(TestData.PatientId, new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge), "happy-path"));
+        Assert.Equal(0, store.CountNotifications(TestData.PatientId));
+
+        store.AddInboxMessage(TestData.Message(requestId: "under-the-behaviour"));
+        Assert.Equal(1, store.CountNotifications(TestData.PatientId));
+
+        store.RemoveBehaviour(TestData.PatientId);
+        Assert.Equal(2, store.CountNotifications(TestData.PatientId));
+    }
+
+    [Fact]
     public void Reactions_are_listed_oldest_first_for_the_requested_patients_only()
     {
         var store = new SimulatorStore();

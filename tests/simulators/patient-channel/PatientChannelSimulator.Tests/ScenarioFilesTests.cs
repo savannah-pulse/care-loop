@@ -47,6 +47,7 @@ public class ScenarioFilesTests
             ScenarioVocabulary.ResponseAcknowledge,
             ScenarioVocabulary.ResponseUnderstand,
             ScenarioVocabulary.ResponseCallMe,
+            ScenarioVocabulary.ResponseRateConfidence,
         ];
 
         foreach (var patient in Read(name).Patients ?? [])
@@ -70,6 +71,17 @@ public class ScenarioFilesTests
             }
 
             Assert.True((patient.Behaviour.RespondToNotification ?? 1) >= 1);
+
+            if (patient.Behaviour.Response == ScenarioVocabulary.ResponseRateConfidence)
+            {
+                Assert.NotNull(patient.Behaviour.Confidence);
+            }
+
+            if (patient.Behaviour.Confidence is { } confidence)
+            {
+                Assert.InRange(confidence, 1, 5);
+                Assert.NotEqual(ScenarioVocabulary.ResponseNone, patient.Behaviour.Response);
+            }
         }
     }
 

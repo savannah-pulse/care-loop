@@ -105,10 +105,12 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
     };
 
     private readonly string _secret;
+    private readonly string _scenariosDirectory;
 
-    public SimulatorFactory(string secret = Secret)
+    public SimulatorFactory(string secret = Secret, string? scenariosDirectory = null)
     {
         _secret = secret;
+        _scenariosDirectory = scenariosDirectory ?? ScenariosDirectory();
     }
 
     public FakeClock Clock { get; } = new();
@@ -124,7 +126,7 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
         builder.UseSetting("CareLoop:NotificationCallbackUrl", CallbackUrl);
         builder.UseSetting("CareLoop:InboundSecret", _secret);
         builder.UseSetting("CareLoop:RetryDelayMilliseconds", "0");
-        builder.UseSetting("Scenarios:Directory", ScenariosDirectory());
+        builder.UseSetting("Scenarios:Directory", _scenariosDirectory);
 
         builder.ConfigureTestServices(services =>
         {
