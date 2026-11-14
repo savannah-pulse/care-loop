@@ -695,7 +695,12 @@ public sealed class Case
                 $"Role '{acknowledgedBy.Role}' may not acknowledge the level {escalation.Level} escalation; it was escalated to role '{escalation.EscalatedTo.Role}'.");
         }
 
-        _escalations[index] = escalation with { AcknowledgedBy = acknowledgedBy, AcknowledgedAt = at };
+        _escalations[index] = escalation with
+        {
+            EscalatedTo = escalation.EscalatedTo with { },
+            AcknowledgedBy = acknowledgedBy with { },
+            AcknowledgedAt = at,
+        };
         Touch(at);
     }
 
@@ -703,13 +708,24 @@ public sealed class Case
     /// Marks every open escalation as resolved once the overdue action has been completed.
     /// </summary>
     /// <param name="at">When the overdue action was completed.</param>
+    /// <remarks>
+    /// Each resolved escalation is a new record with its own copies of the nested owner and acknowledger, as in
+    /// <see cref="AcknowledgeEscalation(Actor, DateTimeOffset)"/> and <see cref="WithdrawConsent"/>: a persistence
+    /// layer that tracks nested values by reference cannot store a replacement that shares them with the record it replaces.
+    /// </remarks>
     public void ResolveEscalations(DateTimeOffset at)
     {
         for (var i = 0; i < _escalations.Count; i++)
         {
             if (_escalations[i].ResolvedAt is null)
             {
-                _escalations[i] = _escalations[i] with { ResolvedAt = at };
+                var open = _escalations[i];
+                _escalations[i] = open with
+                {
+                    EscalatedTo = open.EscalatedTo with { },
+                    AcknowledgedBy = open.AcknowledgedBy is { } acknowledgedBy ? acknowledgedBy with { } : null,
+                    ResolvedAt = at,
+                };
             }
         }
 
