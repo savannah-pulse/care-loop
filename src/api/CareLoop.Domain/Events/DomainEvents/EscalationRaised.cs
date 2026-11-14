@@ -20,6 +20,12 @@ public sealed record EscalationRaised : IDomainEvent
     /// <inheritdoc/>
     public required DateTimeOffset OccurredAt { get; init; }
 
+    /// <summary>
+    /// The <see cref="Escalation.Id"/> of the escalation this event announces; the identifier a person names when
+    /// acknowledging it. <see cref="Guid.Empty"/> only on events built outside <see cref="Case.Escalate"/>.
+    /// </summary>
+    public Guid EscalationId { get; init; }
+
     /// <summary>The step on the escalation ladder that was reached (1 is the first step).</summary>
     public required int Level { get; init; }
 

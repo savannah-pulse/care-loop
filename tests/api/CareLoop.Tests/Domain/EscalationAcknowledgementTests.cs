@@ -215,6 +215,65 @@ public sealed class EscalationAcknowledgementTests
         Assert.Null(raised.AcknowledgedAt);
     }
 
+    [Fact]
+    public void Escalate_gives_each_escalation_an_id_and_the_event_names_it()
+    {
+        var @case = EscalatedCase();
+        _clock.Advance(TimeSpan.FromHours(4));
+
+        @case.Escalate(Level2());
+
+        Assert.All(@case.Escalations, e => Assert.NotEqual(Guid.Empty, e.Id));
+        Assert.NotEqual(@case.Escalations[0].Id, @case.Escalations[1].Id);
+        Assert.Equal(@case.Escalations[1].Id, Assert.Single(@case.DomainEvents.OfType<EscalationRaised>()).EscalationId);
+    }
+
+    [Fact]
+    public void A_given_id_is_kept_and_a_duplicate_is_refused()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        var id = Guid.NewGuid();
+        var escalation = new Escalation { Id = id, Level = 1, EscalatedTo = TestData.FacilityLeadQueue(), RaisedAt = _clock.UtcNow, Reason = "acknowledge-notification overdue" };
+
+        @case.Escalate(escalation);
+
+        Assert.Equal(id, Assert.Single(@case.Escalations).Id);
+        Assert.Throws<InvalidOperationException>(() => @case.Escalate(escalation));
+    }
+
+    [Fact]
+    public void Acknowledging_by_id_records_the_named_escalation()
+    {
+        var @case = EscalatedCase();
+        var id = Assert.Single(@case.Escalations).Id;
+
+        @case.AcknowledgeEscalation(id, FacilityLead(), _clock.UtcNow);
+
+        Assert.True(Assert.Single(@case.Escalations).IsAcknowledged);
+    }
+
+    [Fact]
+    public void Acknowledging_a_superseded_or_unknown_escalation_is_refused()
+    {
+        var @case = EscalatedCase();
+        var levelOne = Assert.Single(@case.Escalations).Id;
+        @case.Escalate(Level2());
+
+        Assert.Throws<InvalidOperationException>(() => @case.AcknowledgeEscalation(levelOne, Coordinator(), _clock.UtcNow));
+        Assert.Throws<InvalidOperationException>(() => @case.AcknowledgeEscalation(Guid.NewGuid(), Coordinator(), _clock.UtcNow));
+        Assert.All(@case.Escalations, e => Assert.False(e.IsAcknowledged));
+    }
+
+    [Fact]
+    public void Acknowledging_a_resolved_escalation_by_id_is_refused()
+    {
+        var @case = EscalatedCase();
+        var id = Assert.Single(@case.Escalations).Id;
+        @case.ResolveEscalations(_clock.UtcNow);
+
+        Assert.Throws<InvalidOperationException>(() => @case.AcknowledgeEscalation(id, FacilityLead(), _clock.UtcNow));
+    }
+
     private Escalation Level2() => new()
     {
         Level = 2,

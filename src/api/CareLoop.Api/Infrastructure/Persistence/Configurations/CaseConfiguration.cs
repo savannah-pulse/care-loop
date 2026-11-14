@@ -77,8 +77,11 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         {
             escalation.ToTable("CaseEscalations");
             escalation.WithOwner().HasForeignKey("CaseId");
-            escalation.Property<int>("Id");
-            escalation.HasKey("Id");
+            // The int "Sequence" key keeps the stored order of escalations; the Domain's Guid Id is what callers name.
+            escalation.Property<int>("Sequence");
+            escalation.HasKey("Sequence");
+            escalation.Property(e => e.Id).ValueGeneratedNever();
+            escalation.HasIndex(e => e.Id).IsUnique();
             escalation.Property(e => e.Reason).HasMaxLength(500);
             escalation.Ignore(e => e.IsOpen);
             escalation.Ignore(e => e.IsAcknowledged);

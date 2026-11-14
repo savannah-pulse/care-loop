@@ -176,7 +176,7 @@ Authentication is Entra ID throughout: `DefaultAzureCredential` locally with the
 |---|---|
 | `IAiProvider`, `NoOpAiProvider` | Working. The default, so everything runs with AI off |
 | Fact, request, draft and response contracts | Written |
-| `HandoffSummaryRecord` and its EF configuration | Written. Needs a migration (`HandoffSummaryProvenance`, WS2) |
+| `HandoffSummaryRecord` and its EF configuration | Written. In the `InitialCreate` migration |
 | `HandoffFactCollector`, `HandoffSummaryDrafter`, `AutoDraftOnHandoff` | Stubs, `TODO(WS-9)` |
 | `DraftHandoffSummary`, `ApproveSummary`, `RejectSummary` | Stubs, answering 501 |
 | `AiWorkflowProvider`, `FoundryDirectProvider` | Stubs |

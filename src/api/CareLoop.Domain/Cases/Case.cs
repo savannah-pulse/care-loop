@@ -579,7 +579,7 @@ public sealed class Case
     /// </para>
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="escalation"/> is <see langword="null"/>.</exception>
-    /// <exception cref="InvalidOperationException">The case is closed.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed, or an escalation with the same <see cref="Escalation.Id"/> is already on the case.</exception>
     public void Escalate(Escalation escalation)
     {
         ArgumentNullException.ThrowIfNull(escalation);
@@ -590,7 +590,17 @@ public sealed class Case
             : null;
         var acknowledged = previous is { IsAcknowledged: true } ? previous : null;
 
-        _escalations.Add(escalation with { ResolvedAt = null });
+        var stored = escalation with
+        {
+            Id = escalation.Id == Guid.Empty ? Guid.NewGuid() : escalation.Id,
+            ResolvedAt = null,
+        };
+        if (_escalations.Any(e => e.Id == stored.Id))
+        {
+            throw new InvalidOperationException($"Escalation {stored.Id} is already on case {Id}.");
+        }
+
+        _escalations.Add(stored);
         IsEscalated = true;
         Touch(escalation.RaisedAt);
 
@@ -599,6 +609,7 @@ public sealed class Case
             EventId = Guid.NewGuid(),
             CaseId = Id,
             OccurredAt = escalation.RaisedAt,
+            EscalationId = stored.Id,
             Level = escalation.Level,
             EscalatedTo = escalation.EscalatedTo,
             CurrentOwner = Owner,
@@ -629,7 +640,32 @@ public sealed class Case
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="acknowledgedBy"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">The case is closed, no escalation is open, the open escalation was already acknowledged, or the actor's role is not the role it was escalated to.</exception>
-    public void AcknowledgeEscalation(Actor acknowledgedBy, DateTimeOffset at)
+    public void AcknowledgeEscalation(Actor acknowledgedBy, DateTimeOffset at) =>
+        AcknowledgeCore(null, acknowledgedBy, at);
+
+    /// <summary>
+    /// Records that the role an escalation was addressed to has seen that specific escalation.
+    /// </summary>
+    /// <param name="escalationId">The <see cref="Escalation.Id"/> the person saw, for example from the case screen.</param>
+    /// <param name="acknowledgedBy">The person acknowledging; must act in the role the escalation was escalated to.</param>
+    /// <param name="at">When the acknowledgement was made.</param>
+    /// <remarks>
+    /// Behaves like <see cref="AcknowledgeEscalation(Actor, DateTimeOffset)"/>, and also refuses when the named
+    /// escalation is not the current one: unknown, already resolved, or superseded by a newer escalation. A person can
+    /// then only ever be recorded as having seen the escalation they were shown.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="acknowledgedBy"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed, the named escalation is not the current open one, it was already acknowledged, or the actor's role is not the role it was escalated to.</exception>
+    public void AcknowledgeEscalation(Guid escalationId, Actor acknowledgedBy, DateTimeOffset at) =>
+        AcknowledgeCore(escalationId, acknowledgedBy, at);
+
+    /// <summary>
+    /// Shared body of the two <c>AcknowledgeEscalation</c> overloads.
+    /// </summary>
+    /// <param name="escalationId">The escalation the person saw, or <see langword="null"/> for the current one.</param>
+    /// <param name="acknowledgedBy">The person acknowledging.</param>
+    /// <param name="at">When the acknowledgement was made.</param>
+    private void AcknowledgeCore(Guid? escalationId, Actor acknowledgedBy, DateTimeOffset at)
     {
         ArgumentNullException.ThrowIfNull(acknowledgedBy);
         ThrowIfClosed();
@@ -638,6 +674,12 @@ public sealed class Case
         if (index < 0)
         {
             throw new InvalidOperationException($"Case {Id} has no open escalation to acknowledge.");
+        }
+
+        if (escalationId is { } named && _escalations[index].Id != named)
+        {
+            throw new InvalidOperationException(
+                $"Escalation {named} is not the current open escalation on case {Id}; it is unknown, resolved or superseded.");
         }
 
         var escalation = _escalations[index];
