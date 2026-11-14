@@ -1,3 +1,5 @@
+using Hl7.Fhir.Model;
+using PatientChannelSimulator.Outbound;
 using PatientChannelSimulator.Scenarios;
 using PatientChannelSimulator.State;
 
@@ -11,10 +13,14 @@ namespace PatientChannelSimulator.Inbound;
 /// simulated patient inbox, hands it to <see cref="DeliverySimulator"/> and then, if it was
 /// delivered, to <see cref="AutomaticResponder"/> so the patient can react. Handling is
 /// idempotent on the request id because CareLoop's outbox retries deliveries: a resend must not
-/// create a second inbox message or a second delivery report.
+/// create a second inbox message, a second delivery report or a second response. The one thing a
+/// resend does is finish a delivery that could not be reported the first time.
 /// </remarks>
 public sealed class CommunicationRequestReceiver
 {
+    /// <summary>The route CareLoop posts notification requests to; used as the URL of the log entry.</summary>
+    public const string Route = "/fhir/CommunicationRequest";
+
     private readonly CommunicationRequestMapper _mapper;
     private readonly DeliverySimulator _delivery;
     private readonly AutomaticResponder _responder;
@@ -48,17 +54,50 @@ public sealed class CommunicationRequestReceiver
     /// </summary>
     /// <param name="fhirJson">The raw request body: a FHIR R4 <c>CommunicationRequest</c> as JSON.</param>
     /// <param name="ct">Cancels the call.</param>
-    /// <returns>The inbox message created for the request, or the existing one when the request was already received.</returns>
+    /// <returns>The inbox message for the request, and whether this call created it.</returns>
     /// <exception cref="FormatException">The body is not a valid FHIR <c>CommunicationRequest</c> or cannot be mapped.</exception>
-    public Task<InboxMessage> ReceiveAsync(string fhirJson, CancellationToken ct)
+    /// <exception cref="HttpRequestException">The delivery outcome could not be reported to CareLoop. The message is in the inbox, still pending; a resend of the request tries again.</exception>
+    /// <exception cref="CareLoopNotConfiguredException">No signing secret is configured, so the delivery outcome could not be reported. The message is in the inbox, still pending.</exception>
+    public async Task<ReceivedCommunicationRequest> ReceiveAsync(string fhirJson, CancellationToken ct)
     {
-        // TODO(WS-8): parse with the Firely JSON parser, append an Inbound FhirMessageLogEntry, return the
-        // existing message if the request id was seen before, otherwise map, store, apply delivery and, when delivered, call AutomaticResponder.ScheduleAsync.
-        _ = _mapper;
-        _ = _delivery;
-        _ = _responder;
-        _ = _store;
-        _ = _clock;
-        throw new NotImplementedException("WS8: CommunicationRequestReceiver.ReceiveAsync");
+        var now = _clock.UtcNow;
+        InboxMessage mapped;
+        try
+        {
+            mapped = _mapper.Map(FhirJson.Parse<CommunicationRequest>(fhirJson), now);
+        }
+        catch (FormatException)
+        {
+            Log(now, null, StatusCodes.Status400BadRequest, fhirJson);
+            throw;
+        }
+
+        var created = _store.TryAddInboxMessage(mapped, out var message);
+        Log(now, message.CommunicationRequestId, created ? StatusCodes.Status201Created : StatusCodes.Status200OK, fhirJson);
+
+        // A resend changes nothing, unless the first attempt never managed to report a delivery outcome.
+        if (created || message.Delivery == DeliveryState.Pending)
+        {
+            message = await _delivery.ApplyAsync(message, ct);
+            if (message.Delivery == DeliveryState.Delivered)
+            {
+                await _responder.ScheduleAsync(message, ct);
+                message = _store.FindInboxMessage(message.MessageId) ?? message;
+            }
+        }
+
+        return new ReceivedCommunicationRequest(message, created);
     }
+
+    private void Log(DateTimeOffset at, string? resourceId, int statusCode, string body) =>
+        _store.AppendLogEntry(new FhirMessageLogEntry(
+            Guid.NewGuid().ToString("N"),
+            at,
+            FhirMessageDirection.Inbound,
+            "POST",
+            Route,
+            "CommunicationRequest",
+            resourceId,
+            statusCode,
+            body));
 }

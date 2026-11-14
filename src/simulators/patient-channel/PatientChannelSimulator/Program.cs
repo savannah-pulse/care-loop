@@ -42,3 +42,9 @@ app.MapScenarioEndpoints();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+
+/// <summary>
+/// The simulator's entry point. Declared public so the test project can host the real
+/// application in memory.
+/// </summary>
+public partial class Program;

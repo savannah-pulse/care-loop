@@ -24,4 +24,25 @@ public sealed class CareLoopOptions
     /// reports and patient responses are posted here, not to the FHIR endpoints.
     /// </summary>
     public string NotificationCallbackUrl { get; set; } = "http://localhost:5080/notifications/inbound/simulator";
+
+    /// <summary>
+    /// Shared secret every callback is signed with. It must equal CareLoop's
+    /// <c>Notifications:Simulator:InboundSecret</c>.
+    /// </summary>
+    /// <remarks>
+    /// CareLoop refuses an unsigned callback, so that nobody who merely knows a case identifier
+    /// can acknowledge for a patient. There is no default: with no secret the simulator refuses
+    /// to send, instead of sending something CareLoop is certain to reject. It is a local
+    /// development secret for synthetic data, never a production credential.
+    /// </remarks>
+    public string InboundSecret { get; set; } = string.Empty;
+
+    /// <summary>
+    /// How many times a callback is sent in total when CareLoop answers with a server error or
+    /// does not answer in time. A resend is safe because CareLoop deduplicates on the resource id and version.
+    /// </summary>
+    public int SendAttempts { get; set; } = 3;
+
+    /// <summary>Pause before each further attempt, in milliseconds, multiplied by the number of attempts already made.</summary>
+    public int RetryDelayMilliseconds { get; set; } = 200;
 }

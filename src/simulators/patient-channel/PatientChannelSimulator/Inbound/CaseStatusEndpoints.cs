@@ -14,19 +14,27 @@ public static class CaseStatusEndpoints
     /// <returns>The same route builder, for chaining.</returns>
     public static IEndpointRouteBuilder MapCaseStatusEndpoints(this IEndpointRouteBuilder routes)
     {
-        routes.MapGet("/api/case-status/{taskId}", (string taskId) =>
+        routes.MapGet("/api/case-status/{taskId}", async (string taskId, CaseStatusReader reader, CancellationToken ct) =>
             {
-                // TODO(WS-8): call CaseStatusReader.ReadAsync(taskId); 200 with the status, 404 when CareLoop
-                // has no such Task, 502 when CareLoop cannot be reached.
-                return NotImplementedResponse.For("GET /api/case-status/{taskId}");
+                try
+                {
+                    return await reader.ReadAsync(taskId, ct) is { } status ? Results.Ok(status) : Results.NotFound();
+                }
+                catch (HttpRequestException ex)
+                {
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "CareLoop could not be reached.");
+                }
+                catch (FormatException ex)
+                {
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status502BadGateway, title: "CareLoop's answer was not a FHIR Task.");
+                }
             })
             .WithName("GetCaseStatus")
             .WithSummary("Reads the patient-facing status of a case from CareLoop's case Task (SIMULATED).")
             .WithTags("Case status")
             .Produces<PatientCaseStatus>()
             .Produces(StatusCodes.Status404NotFound)
-            .Produces(StatusCodes.Status502BadGateway)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status502BadGateway);
 
         return routes;
     }

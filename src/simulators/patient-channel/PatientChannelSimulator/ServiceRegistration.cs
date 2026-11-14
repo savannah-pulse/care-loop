@@ -21,12 +21,13 @@ public static class ServiceRegistration
     /// service resolves without starting a web server.
     /// </remarks>
     /// <param name="services">The service collection to add to.</param>
-    /// <param name="configuration">Application configuration supplying the <c>CareLoop</c> and <c>Scenarios</c> sections.</param>
+    /// <param name="configuration">Application configuration supplying the <c>CareLoop</c>, <c>PatientChannel</c> and <c>Scenarios</c> sections.</param>
     /// <returns>The same service collection, for chaining.</returns>
     public static IServiceCollection AddPatientChannelSimulator(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<CareLoopOptions>(configuration.GetSection(CareLoopOptions.SectionName));
         services.Configure<ScenarioOptions>(configuration.GetSection(ScenarioOptions.SectionName));
+        services.Configure<PatientChannelOptions>(configuration.GetSection(PatientChannelOptions.SectionName));
 
         // Enums travel as their names so the ClientApp and the log stay readable.
         services.ConfigureHttpJsonOptions(options =>
@@ -57,6 +58,7 @@ public static class ServiceRegistration
         services.AddTransient<DeliverySimulator>();
         services.AddTransient<AutomaticResponder>();
         services.AddTransient<CommunicationRequestReceiver>();
+        services.AddHostedService<ResponseDispatcher>();
 
         // Scenarios.
         services.AddSingleton<ScenarioLoader>();
