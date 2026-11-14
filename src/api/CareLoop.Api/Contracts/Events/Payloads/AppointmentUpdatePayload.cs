@@ -18,4 +18,11 @@ public sealed record AppointmentUpdatePayload : EventPayload
 
     /// <summary>When the appointment is or was scheduled for.</summary>
     public DateTimeOffset? ScheduledFor { get; init; }
+
+    /// <summary>
+    /// Where the appointment takes place, as the source system names it (for example a clinic name);
+    /// <see langword="null"/> when the source did not say.
+    /// </summary>
+    /// <remarks>Passed to the domain on a booking or rebooking so a consented caregiver can be told the place; it is not stored on the case.</remarks>
+    public string? Location { get; init; }
 }

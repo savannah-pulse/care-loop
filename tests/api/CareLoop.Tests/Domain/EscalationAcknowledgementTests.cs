@@ -1,5 +1,6 @@
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
+using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Domain.Rules;
 using CareLoop.Tests.Fakes;
 
@@ -150,4 +151,75 @@ public sealed class EscalationAcknowledgementTests
         Assert.Null(result.NextAction);
         Assert.False(TransitionRules.Evaluate(DomainTestData.Closed(_clock), CaseEventType.EscalationAcknowledged, FacilityLead(), DomainTestData.Pathway).Verdict.Allowed);
     }
+    [Fact]
+    public void Next_level_says_who_acknowledged_the_previous_level_and_when()
+    {
+        var @case = EscalatedCase();
+        _clock.Advance(TimeSpan.FromMinutes(30));
+        var acknowledgedAt = _clock.UtcNow;
+        @case.AcknowledgeEscalation(FacilityLead(), acknowledgedAt);
+        _clock.Advance(TimeSpan.FromHours(4));
+
+        @case.Escalate(Level2());
+
+        var raised = Assert.Single(@case.DomainEvents.OfType<EscalationRaised>());
+        Assert.Equal(2, raised.Level);
+        Assert.Equal("facility-lead", raised.AcknowledgedByRole);
+        Assert.Equal(acknowledgedAt, raised.AcknowledgedAt);
+    }
+
+    [Fact]
+    public void Next_level_carries_no_acknowledgement_when_nobody_acknowledged_the_previous_level()
+    {
+        var @case = EscalatedCase();
+        _clock.Advance(TimeSpan.FromHours(4));
+
+        @case.Escalate(Level2());
+
+        var raised = Assert.Single(@case.DomainEvents.OfType<EscalationRaised>());
+        Assert.Null(raised.AcknowledgedByRole);
+        Assert.Null(raised.AcknowledgedAt);
+    }
+
+    [Fact]
+    public void First_level_carries_no_acknowledgement()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.ClearDomainEvents();
+
+        @case.Escalate(new Escalation
+        {
+            Level = 1,
+            EscalatedTo = TestData.FacilityLeadQueue(),
+            RaisedAt = _clock.UtcNow,
+            Reason = "acknowledge-notification overdue",
+        });
+
+        var raised = Assert.Single(@case.DomainEvents.OfType<EscalationRaised>());
+        Assert.Null(raised.AcknowledgedByRole);
+        Assert.Null(raised.AcknowledgedAt);
+    }
+
+    [Fact]
+    public void An_acknowledgement_on_a_resolved_earlier_escalation_is_not_carried_forward()
+    {
+        var @case = EscalatedCase();
+        @case.AcknowledgeEscalation(FacilityLead(), _clock.UtcNow);
+        @case.ResolveEscalations(_clock.UtcNow);
+        _clock.Advance(TimeSpan.FromDays(1));
+
+        @case.Escalate(Level2());
+
+        var raised = Assert.Single(@case.DomainEvents.OfType<EscalationRaised>());
+        Assert.Null(raised.AcknowledgedByRole);
+        Assert.Null(raised.AcknowledgedAt);
+    }
+
+    private Escalation Level2() => new()
+    {
+        Level = 2,
+        EscalatedTo = new CaseOwner { Reference = "SYN-QUEUE-COORD", Role = "coordinator", FacilityId = "SYN-FAC-A", IsQueue = true },
+        RaisedAt = _clock.UtcNow,
+        Reason = "acknowledge-notification overdue",
+    };
 }

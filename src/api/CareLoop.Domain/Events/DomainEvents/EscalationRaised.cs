@@ -31,4 +31,22 @@ public sealed record EscalationRaised : IDomainEvent
 
     /// <summary>Why the escalation was raised, for example which deadline passed.</summary>
     public required string Reason { get; init; }
+
+    /// <summary>
+    /// The role of the person who acknowledged the previous escalation level, for example <c>facility-lead</c>;
+    /// <see langword="null"/> at level 1, or when nobody acknowledged the previous level.
+    /// </summary>
+    /// <remarks>
+    /// Carried so the next role up the ladder can see whether the level below has already looked
+    /// (C15). Acknowledging never stops the clock, so an acknowledged escalation can still be
+    /// followed by the next level. Only the role is carried, never a person's name or any patient detail,
+    /// because the event feeds staff notices.
+    /// </remarks>
+    public string? AcknowledgedByRole { get; init; }
+
+    /// <summary>
+    /// When the previous escalation level was acknowledged; <see langword="null"/> whenever
+    /// <see cref="AcknowledgedByRole"/> is.
+    /// </summary>
+    public DateTimeOffset? AcknowledgedAt { get; init; }
 }

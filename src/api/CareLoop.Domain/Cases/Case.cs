@@ -483,6 +483,63 @@ public sealed class Case
     }
 
     /// <summary>
+    /// Records that the follow-up appointment was booked, rebooked or moved, and tells the outbox.
+    /// </summary>
+    /// <param name="sourceReference">Reference to the <c>Appointment</c>.</param>
+    /// <param name="scheduledFor">When the appointment is scheduled for.</param>
+    /// <param name="at">When the booking happened according to the source.</param>
+    /// <param name="location">Where the appointment takes place, as the source names it; <see langword="null"/> when it did not say.</param>
+    /// <returns>The appointment track, in status <see cref="AppointmentStatus.Scheduled"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// Starts the track when there is none, otherwise books it again (<see cref="AppointmentTrack.Rebook"/>).
+    /// Raises <see cref="AppointmentScheduled"/> on a first booking, on a rebooking after a missed appointment,
+    /// and when the appointment moves to another time, so a consented caregiver can be told the date, time and
+    /// place. A resend of the same booking at the same time raises nothing, so nobody is told twice.
+    /// </para>
+    /// <para>
+    /// The place is passed through on the event only; the track does not store it. A change of place alone,
+    /// with the time unchanged, therefore raises nothing.
+    /// </para>
+    /// <para>
+    /// Use <see cref="BeginAppointment"/> instead when the source first reports an appointment already attended
+    /// or missed: that appointment is in the past and nobody should be told to attend it.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The case is closed, or the appointment was already attended.</exception>
+    public AppointmentTrack ScheduleAppointment(string sourceReference, DateTimeOffset scheduledFor, DateTimeOffset at, string? location = null)
+    {
+        ThrowIfClosed();
+
+        bool changed;
+        if (Appointment is { } track)
+        {
+            changed = track.Status != AppointmentStatus.Scheduled || track.ScheduledFor != scheduledFor;
+            track.Rebook(scheduledFor, at, sourceReference);
+            Touch(at);
+        }
+        else
+        {
+            BeginAppointment(sourceReference, scheduledFor, at);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            Raise(new AppointmentScheduled
+            {
+                EventId = Guid.NewGuid(),
+                CaseId = Id,
+                OccurredAt = at,
+                ScheduledFor = scheduledFor,
+                Location = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
+            });
+        }
+
+        return Appointment!;
+    }
+
+    /// <summary>
     /// Flags an unresolved exception so the case appears in the exception queue.
     /// </summary>
     /// <param name="exception">The exception flag or flags to set.</param>
@@ -512,13 +569,26 @@ public sealed class Case
     /// Raises an escalation on the case.
     /// </summary>
     /// <param name="escalation">The escalation step reached, from the pathway's escalation ladder.</param>
-    /// <remarks>Escalation adds oversight only: it changes neither the stage nor the owner, who remains accountable for the overdue action.</remarks>
+    /// <remarks>
+    /// <para>Escalation adds oversight only: it changes neither the stage nor the owner, who remains accountable for the overdue action.</para>
+    /// <para>
+    /// Above level 1, the raised <see cref="EscalationRaised"/> says who acknowledged the previous level and when
+    /// (<see cref="EscalationRaised.AcknowledgedByRole"/>, <see cref="EscalationRaised.AcknowledgedAt"/>), taken from the
+    /// most recent open escalation at the level below, if it was acknowledged. The next role up the ladder then knows
+    /// whether the level below has already looked; acknowledgement never stops the clock, so it does not prevent this step.
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="escalation"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">The case is closed.</exception>
     public void Escalate(Escalation escalation)
     {
         ArgumentNullException.ThrowIfNull(escalation);
         ThrowIfClosed();
+
+        var previous = escalation.Level > 1
+            ? _escalations.LastOrDefault(e => e.IsOpen && e.Level == escalation.Level - 1)
+            : null;
+        var acknowledged = previous is { IsAcknowledged: true } ? previous : null;
 
         _escalations.Add(escalation with { ResolvedAt = null });
         IsEscalated = true;
@@ -533,6 +603,8 @@ public sealed class Case
             EscalatedTo = escalation.EscalatedTo,
             CurrentOwner = Owner,
             Reason = escalation.Reason,
+            AcknowledgedByRole = acknowledged?.AcknowledgedBy?.Role,
+            AcknowledgedAt = acknowledged?.AcknowledgedAt,
         });
     }
 
