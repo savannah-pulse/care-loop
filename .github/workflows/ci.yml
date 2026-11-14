@@ -5,19 +5,93 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# A new push to a pull request cancels that pull request's run still in progress.
+# Runs on main are never cancelled, so every commit on main gets a full result.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
+  # Works out which parts of the repository a pull request touches, so jobs for the
+  # untouched parts are skipped. Pushes to main and manual runs build everything.
+  changes:
+    name: Detect changed areas
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      dotnet: ${{ steps.filter.outputs.dotnet }}
+      web: ${{ steps.filter.outputs.web }}
+      simulator-ui: ${{ steps.filter.outputs.simulator-ui }}
+      ai-workflow: ${{ steps.filter.outputs.ai-workflow }}
+    steps:
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          areas="dotnet web simulator-ui ai-workflow"
+
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            for area in $areas; do echo "$area=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+
+          # Both sides of a rename count, so moving a file out of an area still tests that area.
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)')
+          echo "Changed files:"; echo "$files"
+
+          # A change to this workflow runs everything.
+          if echo "$files" | grep -qx '.github/workflows/ci.yml'; then
+            for area in $areas; do echo "$area=true" >> "$GITHUB_OUTPUT"; done
+            exit 0
+          fi
+
+          match() { echo "$files" | grep -Eq "$1" && echo true || echo false; }
+
+          # MSBuild excludes each simulator's ClientApp, so UI-only changes skip the .NET job.
+          dotnet_files=$(echo "$files" | grep -v '/ClientApp/' || true)
+          dotnet=$(echo "$dotnet_files" | grep -Eq '^(src/api/|src/simulators/|tests/|contracts/|\.config/|CareLoop\.sln$|Directory\.Build\.(props|targets)$|global\.json$)' && echo true || echo false)
+
+          {
+            echo "dotnet=$dotnet"
+            echo "web=$(match '^src/web/')"
+            echo "simulator-ui=$(match '^src/simulators/[^/]+/[^/]+/ClientApp/')"
+            echo "ai-workflow=$(match '^src/ai_workflow/')"
+          } | tee -a "$GITHUB_OUTPUT"
+
   dotnet:
     name: API and simulators build and tests
+    needs: changes
+    if: needs.changes.outputs.dotnet == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props', 'global.json', '.config/dotnet-tools.json') }}
+          restore-keys: nuget-${{ runner.os }}-
       - run: dotnet restore CareLoop.sln
       - name: Build (warnings are errors, XML docs enforced)
         run: dotnet build CareLoop.sln --configuration Release --no-restore
@@ -27,7 +101,13 @@ jobs:
 
   web:
     name: Web lint and build
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: src/web
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -36,15 +116,15 @@ jobs:
           cache: npm
           cache-dependency-path: src/web/package-lock.json
       - run: npm ci
-        working-directory: src/web
       - run: npm run lint
-        working-directory: src/web
       - run: npm run build
-        working-directory: src/web
 
   simulator-client-apps:
     name: Simulator ClientApp lint, tests and build
+    needs: changes
+    if: needs.changes.outputs.simulator-ui == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +139,12 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Cache Yarn packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles(format('{0}/yarn.lock', matrix.client-app)) }}
+          restore-keys: yarn-${{ runner.os }}-
       - run: corepack yarn install --immutable
       - run: corepack yarn lint
       - run: corepack yarn typecheck
@@ -67,7 +153,10 @@ jobs:
 
   ai-workflow:
     name: Python workflow lint and tests
+    needs: changes
+    if: needs.changes.outputs.ai-workflow == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: src/ai_workflow

@@ -11,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <!-- SQLite in-memory stands in for PostgreSQL in the repository tests: it enforces unique indexes, transactions and concurrency tokens. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
     <PackageReference Include="xunit" Version="2.9.3" />
