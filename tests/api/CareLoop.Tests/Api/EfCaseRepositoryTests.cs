@@ -226,6 +226,38 @@ public sealed class EfCaseRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task Consent_withdrawn_in_a_later_save_is_stored()
+    {
+        var @case = DomainTestData.InFollowUp(_clock);
+        @case.RecordConsent(new ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-CAREGIVER-INBOX-0001" }, "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        await using (var db = NewContext())
+        {
+            await NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(@case, "SYN-EVT-1", _clock.UtcNow, CaseEventType.ConsentRecorded), CancellationToken.None);
+        }
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await using (var db = NewContext())
+        {
+            var repository = NewRepository(db);
+            var loaded = (await repository.GetAsync(@case.Id, CancellationToken.None))!;
+            loaded.WithdrawConsent("Consent/SYN-CONSENT-0001/_history/2", _clock.UtcNow);
+
+            await repository.SaveAsync(loaded, TestData.AppliedEvent(loaded, "SYN-EVT-2", _clock.UtcNow, CaseEventType.ConsentRecorded), CancellationToken.None);
+
+            Assert.Equal("SYN-CAREGIVER-INBOX-0001", loaded.CaregiverConsent!.CaregiverContactPoint.Address);
+        }
+
+        await using var verify = NewContext();
+        var stored = (await NewRepository(verify).GetAsync(@case.Id, CancellationToken.None))!.CaregiverConsent!;
+        Assert.False(stored.IsActive);
+        Assert.Equal(_clock.UtcNow, stored.WithdrawnAt);
+        Assert.Equal("Consent/SYN-CONSENT-0001/_history/2", stored.WithdrawalEvidenceReference);
+        Assert.Equal("Consent/SYN-CONSENT-0001", stored.EvidenceReference);
+        Assert.Equal(NotificationChannel.Simulator, stored.CaregiverContactPoint.Channel);
+        Assert.Equal(2, await verify.AuditEvents.CountAsync());
+    }
+
+    [Fact]
     public async Task Case_round_trips_with_tracks_escalations_and_closure()
     {
         var @case = DomainTestData.InFollowUp(_clock);

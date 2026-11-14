@@ -5,7 +5,6 @@ using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Tracks;
 using CareLoop.Tests.Fakes;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using static CareLoop.Tests.Api.Notifications.NotificationTestSupport;
 
@@ -214,12 +213,9 @@ public sealed class NotificationRouterTests : IDisposable
     {
         var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic");
 
-        // Stands in for a withdrawal saved after the event was raised. Written directly because saving a
-        // withdrawal through the repository on a case whose grant was saved earlier currently fails (WS1/WS2).
-        await using (var db = _store.NewContext())
-        {
-            await db.Database.ExecuteSqlRawAsync("UPDATE \"Cases\" SET \"CaregiverConsent_WithdrawnAt\" = {0}", _store.Clock.UtcNow);
-        }
+        Assert.Equal(
+            CareLoop.Api.Features.Events.IngestOutcome.Applied,
+            (await _store.IngestAsync(Envelopes.Consent(_store.Clock.UtcNow, ConsentUpdateKind.Withdrawn, consentReference: "Consent/SYN-CONSENT-0001/_history/2"))).Outcome);
 
         Assert.False((await _store.TheCaseAsync()).CaregiverConsent!.IsActive);
         await RouteAsync(scheduled);

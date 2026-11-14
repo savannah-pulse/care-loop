@@ -828,7 +828,14 @@ public sealed class Case
             throw new InvalidOperationException("No caregiver consent is active on this case, so there is nothing to withdraw.");
         }
 
-        CaregiverConsent = consent with { WithdrawnAt = at, WithdrawalEvidenceReference = evidenceReference };
+        // A fresh contact point, not the same instance: the withdrawn consent replaces the granted one, and a
+        // persistence layer that tracks the nested value by reference would otherwise drop it with the old record.
+        CaregiverConsent = consent with
+        {
+            CaregiverContactPoint = consent.CaregiverContactPoint with { },
+            WithdrawnAt = at,
+            WithdrawalEvidenceReference = evidenceReference,
+        };
         Touch(at);
     }
 
