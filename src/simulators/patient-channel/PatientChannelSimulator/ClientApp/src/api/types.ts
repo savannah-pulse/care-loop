@@ -6,7 +6,15 @@
  */
 
 /** The simulated channel a message was presented on. */
-export type InboxChannel = 'App' | 'Sms' | 'Portal';
+export type InboxChannel = 'App' | 'Sms' | 'Portal' | 'Email';
+
+/**
+ * Who an inbox message was sent to.
+ *
+ * @remarks
+ * A caregiver's copy is read-only: nothing a caregiver does may count as the patient's response.
+ */
+export type RecipientKind = 'Patient' | 'Caregiver';
 
 /**
  * What the simulator reported to CareLoop about delivery.
@@ -27,7 +35,7 @@ export interface InboxMessage {
   communicationRequestId: string;
   /** Logical id of the CareLoop case `Task`, when the request referenced one. */
   caseTaskId: string | null;
-  /** Synthetic patient identifier (prefixed `SYN-`). */
+  /** Synthetic identifier of whoever the message is for (prefixed `SYN-`): the patient, or a caregiver's inbox address. */
   patientSyntheticId: string;
   /** Visibly synthetic display name (starts with "Synthetic"). */
   patientDisplayName: string;
@@ -49,16 +57,33 @@ export interface InboxMessage {
   respondedAt: string | null;
   /** Simulated-data marker; always `true`. */
   simulated: boolean;
+  /** Whether the message is for the patient or is a caregiver's copy. */
+  recipientKind: RecipientKind;
+  /** The patient's latest 1 to 5 confidence rating, otherwise `null`. A rating is not an acknowledgement. */
+  confidence: number | null;
+  /** ISO 8601 time of the latest rating, otherwise `null`. */
+  confidenceRatedAt: string | null;
+  /** How many call-me requests CareLoop has accepted for this message. */
+  callRequestCount: number;
+  /** How many confidence ratings CareLoop has accepted for this message. */
+  confidenceRatingCount: number;
 }
 
-/** The action a patient can take on an inbox message. */
+/**
+ * A one-click action a patient can take on an inbox message.
+ *
+ * @remarks
+ * `acknowledge` is "I will come": it sends an acknowledgement and nothing else. The confidence
+ * rating and the SMS reply carry a value, so they have their own client functions.
+ */
 export type InboxAction = 'acknowledge' | 'understand' | 'call-me';
 
 /** What the channel reports when a notification for a patient arrives. */
 export type DeliveryBehaviour = 'Deliver' | 'Fail' | 'StaySilent';
 
 /** What a patient does, on their own, after a notification has been delivered to them. */
-export type PatientResponseBehaviour = 'None' | 'Acknowledge' | 'Understand' | 'CallMe';
+export type PatientResponseBehaviour =
+  'None' | 'Acknowledge' | 'Understand' | 'CallMe' | 'RateConfidence';
 
 /**
  * How one simulated patient reacts when CareLoop notifies them.
@@ -79,6 +104,11 @@ export interface PatientBehaviour {
   respondToNotification: number;
   /** Simulated-data marker; always `true`. */
   simulated: boolean;
+  /**
+   * The 1 to 5 confidence rating the patient gives, or `null` for none. Required when `response`
+   * is `RateConfidence`; with another response the patient rates straight after it.
+   */
+  confidence: number | null;
 }
 
 /** The behaviour in force for one patient (`GET /api/patient-behaviours`). */
@@ -167,7 +197,8 @@ export type PatientReactionKind =
   | 'Acknowledged'
   | 'Understood'
   | 'CallRequested'
-  | 'NoResponse';
+  | 'NoResponse'
+  | 'ConfidenceRated';
 
 /** A record of one reaction to one notification. */
 export interface PatientReactionRecord {

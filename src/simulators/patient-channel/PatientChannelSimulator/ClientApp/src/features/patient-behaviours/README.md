@@ -1,6 +1,5 @@
-# patient-behaviours
+# Patient behaviours
 
-Patient behaviours: shows and edits how each simulated patient reacts when CareLoop notifies them. A behaviour says what the channel reports (delivered, failed, or nothing) and what the patient then does (nothing, acknowledge, confirm understanding, or ask for a call), with an optional delay and the option to react only to a reminder.
+Shows and edits how each simulated patient reacts when CareLoop notifies them, and the default used for every other patient. The form applies the same rules as the host: a failed delivery needs a reason, and only a delivered notification can be answered or rated.
 
-Status: placeholder (`TODO(WS-8)`). All text comes from `src/locales/en.json` under `patientBehaviours.*`.
-All data shown is simulated.
+All text comes from `src/locales/en.json` under `patientBehaviours.*`. All data shown is simulated.

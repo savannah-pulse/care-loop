@@ -1,6 +1,5 @@
-# lookup
+# Case status
 
-Patient case-status view: shows what the patient can see about their follow-up, read from the CareLoop case Task through the simulator.
+Looks up a case by its Task identifier and shows what the patient can see about their follow-up: stage, status, deadline and last update. It never shows clinical detail or who owns the case.
 
-Status: placeholder (`TODO(WS-8)`). All text comes from `src/locales/en.json` under `caseStatus.*`.
-All data shown is simulated.
+All text comes from `src/locales/en.json` under `caseStatus.*`. All data shown is simulated.
