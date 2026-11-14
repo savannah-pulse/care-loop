@@ -7,7 +7,9 @@ using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Recipients;
 using CareLoop.Tests.Fakes;
+using CareLoop.Api.Infrastructure.Persistence;
 using Hl7.Fhir.Model;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Tests.Api.Notifications;
 
@@ -16,6 +18,8 @@ namespace CareLoop.Tests.Api.Notifications;
 /// </summary>
 public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
 {
+    private const string Secret = "SYN-TEST-SECRET";
+
     private readonly NotificationStore _store = new();
     private readonly Guid _attemptId = Guid.NewGuid();
 
@@ -105,6 +109,35 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Reports_about_a_caregiver_message_are_not_the_patients()
+    {
+        var @case = await _store.OpenCaseAsync();
+        var delivered = Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.Completed);
+        delivered.BasedOn = [new ResourceReference($"CommunicationRequest/{SimulatorNotificationProvider.CaregiverIdPrefix}{_attemptId:D}")];
+        var acknowledged = Report(@case, StatusMap.AcknowledgementCategory, id: "SYN-COMM-2");
+        acknowledged.BasedOn = delivered.BasedOn;
+
+        Assert.Empty(await TranslateAsync(delivered));
+        Assert.Empty(await TranslateAsync(acknowledged));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task Unsigned_wrongly_signed_or_unconfigured_messages_are_refused()
+    {
+        var @case = await _store.OpenCaseAsync();
+        var body = FhirJsonCodec.Serialize(Report(@case, StatusMap.AcknowledgementCategory));
+        await using var db = _store.NewContext();
+
+        var unsigned = new InboundNotificationMessage { ContentType = FhirEndpoints.FhirJson, Body = body, Headers = new Dictionary<string, string>() };
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Handler(db).TranslateAsync(unsigned, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Handler(db).TranslateAsync(Signed(body, SimulatorInboundNotificationHandler.SignatureFor(body, "SYN-OTHER-SECRET")), CancellationToken.None));
+        var tampered = Signed(body) with { Body = body.Replace("SYN-COMM-1", "SYN-COMM-9", StringComparison.Ordinal) };
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Handler(db).TranslateAsync(tampered, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => Handler(db, secret: null).TranslateAsync(Signed(body), CancellationToken.None));
+        Assert.Single(await Handler(db).TranslateAsync(Signed(body), CancellationToken.None));
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Same_communication_version_gives_the_same_source_event_id()
     {
         var @case = await _store.OpenCaseAsync();
@@ -175,10 +208,18 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     private async System.Threading.Tasks.Task<IReadOnlyList<EventEnvelope>> TranslateAsync(string body)
     {
         await using var db = _store.NewContext();
-        return await new SimulatorInboundNotificationHandler(db).TranslateAsync(
-            new InboundNotificationMessage { ContentType = FhirEndpoints.FhirJson, Body = body, Headers = new Dictionary<string, string>() },
-            CancellationToken.None);
+        return await Handler(db).TranslateAsync(Signed(body), CancellationToken.None);
     }
+
+    private static SimulatorInboundNotificationHandler Handler(CareLoopDbContext db, string? secret = Secret) =>
+        new(db, Options.Create(new SimulatorNotificationOptions { InboundSecret = secret }));
+
+    private static InboundNotificationMessage Signed(string body, string? signature = null) => new()
+    {
+        ContentType = FhirEndpoints.FhirJson,
+        Body = body,
+        Headers = new Dictionary<string, string> { [SimulatorInboundNotificationHandler.SignatureHeader] = signature ?? SimulatorInboundNotificationHandler.SignatureFor(body, Secret) },
+    };
 
     private static NotificationUpdatePayload Payload(EventEnvelope envelope) => Assert.IsType<NotificationUpdatePayload>(envelope.Payload);
 }

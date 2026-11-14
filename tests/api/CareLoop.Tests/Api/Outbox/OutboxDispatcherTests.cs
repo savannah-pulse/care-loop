@@ -6,6 +6,7 @@ using CareLoop.Domain.Time;
 using CareLoop.Tests.Fakes;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -30,7 +31,7 @@ public sealed class OutboxDispatcherTests : IDisposable
     {
         _connection.Open();
         var services = new ServiceCollection();
-        services.AddDbContext<CareLoopDbContext>(o => o.UseSqlite(_connection));
+        services.AddDbContext<CareLoopDbContext>(o => o.UseSqlite(_connection).ReplaceService<IModelCustomizer, SqliteDateTimeOffsetCustomizer>());
         services.AddSingleton<IDomainEventSubscriber>(_first);
         services.AddSingleton<IDomainEventSubscriber>(_second);
         _services = services.BuildServiceProvider();
@@ -159,9 +160,29 @@ public sealed class OutboxDispatcherTests : IDisposable
         Assert.Equal(2, _first.Calls);
     }
 
-    private async Task<CallRequested> StoreEventAsync()
+    [Fact]
+    public async Task Due_deliveries_go_out_oldest_first_and_waiting_ones_are_left()
     {
-        var @case = TestData.NewCase(_clock.UtcNow);
+        _first.FailuresLeft = 1;
+        var older = await StoreEventAsync();
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        var newer = await StoreEventAsync("SYN-RESULT-0002");
+
+        // The older event's retry to First is still backing off; only the newer event is due for it.
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+        Assert.Equal([newer.EventId], _first.Received.Select(e => e.EventId));
+
+        _clock.Advance(OutboxDispatcher.MaxBackOff);
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+        Assert.Equal([newer.EventId, older.EventId], _first.Received.Select(e => e.EventId));
+        Assert.Equal([older.EventId, newer.EventId], _second.Received.Select(e => e.EventId));
+    }
+
+    private async Task<CallRequested> StoreEventAsync(string sourceResultId = "SYN-RESULT-0001")
+    {
+        var @case = TestData.NewCase(_clock.UtcNow, sourceResultId);
         var raised = new CallRequested
         {
             EventId = Guid.NewGuid(),

@@ -115,30 +115,23 @@ public sealed class OutboxDispatcher : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<CareLoopDbContext>();
         var now = _clock.UtcNow;
 
-        // Due-time filtering and ordering happen in memory: SQLite cannot compare DateTimeOffset values.
-        var pending = await db.OutboxDeliveries
-            .Where(d => d.Status == OutboxDeliveryStatus.Pending)
+        // Only due deliveries, oldest message first, one batch: the filtering, ordering and limit run in the database,
+        // so deliveries still backing off are never read. The query stays tracked (no AsNoTracking on either side),
+        // because the deliveries it returns are updated and saved below.
+        var batch = await (
+                from d in db.OutboxDeliveries
+                join m in db.OutboxMessages on d.OutboxMessageId equals m.Id
+                where d.Status == OutboxDeliveryStatus.Pending && (d.NextAttemptAt == null || d.NextAttemptAt <= now)
+                orderby m.CreatedAt, m.Id
+                select new { Delivery = d, Message = m })
+            .Take(BatchSize)
             .ToListAsync(ct);
-        var due = pending.Where(d => d.NextAttemptAt is null || d.NextAttemptAt <= now).ToList();
-        if (due.Count == 0)
-        {
-            return 0;
-        }
-
-        var messageIds = due.Select(d => d.OutboxMessageId).Distinct().ToList();
-        var messages = await db.OutboxMessages.AsNoTracking()
-            .Where(m => messageIds.Contains(m.Id))
-            .ToDictionaryAsync(m => m.Id, ct);
 
         var delivered = 0;
-        foreach (var delivery in due
-            .Where(d => messages.ContainsKey(d.OutboxMessageId))
-            .OrderBy(d => messages[d.OutboxMessageId].CreatedAt)
-            .ThenBy(d => messages[d.OutboxMessageId].Id)
-            .Take(BatchSize))
+        foreach (var item in batch)
         {
             ct.ThrowIfCancellationRequested();
-            if (await DeliverAsync(delivery, messages[delivery.OutboxMessageId], ct))
+            if (await DeliverAsync(item.Delivery, item.Message, ct))
             {
                 delivered++;
             }

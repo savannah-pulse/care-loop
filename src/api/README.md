@@ -72,6 +72,7 @@ at both simulators; Docker Compose sets the same through environment variables. 
 | `ExternalSystems:Systems:{systemId}:BaseUrl` | none | Address of one system of record (HIS, EMR, lab system). Any number may be configured. The key must equal the source system identifier that system sends; messages about a case go back to the system the case came from. |
 | `Notifications:Simulator:PatientChannelBaseUrl` | none | Where the simulator provider sends patient messages (the patient-channel simulator). |
 | `Notifications:Simulator:StaffInboxBaseUrl` | none | Where the simulator provider sends staff messages (the HIS simulator's staff inbox). |
+| `Notifications:Simulator:InboundSecret` | none | Secret shared with the patient-channel simulator. Every message to `POST /notifications/inbound/simulator` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
 | `Notifications:EnabledProviders` | `[ "Simulator" ]` | Enabled notification providers. SMS and email are stubs and must stay off. |
 | `Notifications:PerEventOverrides` | `{ }` | Optional provider list per domain event name. |
 | `Outbox:Enabled` | `false` | Run the outbox dispatcher. Off until WS4 implements it. |

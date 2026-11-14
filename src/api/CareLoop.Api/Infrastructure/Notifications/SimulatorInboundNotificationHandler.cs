@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using CareLoop.Api.Features.Fhir;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Persistence;
@@ -7,6 +9,7 @@ using CareLoop.Domain.Events;
 using CareLoop.Domain.Recipients;
 using Hl7.Fhir.Model;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Infrastructure.Notifications;
 
@@ -34,18 +37,51 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// <c>Communication</c> id and <c>meta.versionId</c> form the source event identifier, so a redelivery is
 /// deduplicated. The time is <c>sent</c>, else <c>meta.lastUpdated</c>.
 /// </para>
+/// <para>
+/// Every message must be signed: header <see cref="SignatureHeader"/> carries <c>sha256=</c> followed by the lower-case
+/// hexadecimal HMAC-SHA256 of the raw body (UTF-8), keyed with <see cref="SimulatorNotificationOptions.InboundSecret"/>.
+/// A missing or wrong signature, or no secret configured, is refused before the body is read, so nobody who merely
+/// knows a case identifier can acknowledge for a patient.
+/// </para>
+/// <para>
+/// A <c>Communication</c> based on a caregiver message (its <c>CommunicationRequest</c> id starts with
+/// <see cref="SimulatorNotificationProvider.CaregiverIdPrefix"/>) translates to nothing: the case's notification
+/// track is the patient's, and a caregiver's delivery or acknowledgement must never count as the patient's.
+/// </para>
 /// </remarks>
 public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHandler
 {
+    /// <summary>The header that carries the message signature.</summary>
+    public const string SignatureHeader = "X-CareLoop-Signature";
+
+    private const string SignaturePrefix = "sha256=";
+
     private readonly CareLoopDbContext _db;
+    private readonly IOptions<SimulatorNotificationOptions> _options;
 
     /// <summary>
     /// Creates the handler.
     /// </summary>
     /// <param name="db">Read access to cases, to find the source identity of the case a reply is about.</param>
-    public SimulatorInboundNotificationHandler(CareLoopDbContext db)
+    /// <param name="options">Supplies the secret that inbound messages are signed with.</param>
+    public SimulatorInboundNotificationHandler(CareLoopDbContext db, IOptions<SimulatorNotificationOptions> options)
     {
         _db = db;
+        _options = options;
+    }
+
+    /// <summary>
+    /// Computes the signature header value for a body, as the patient-channel simulator must send it.
+    /// </summary>
+    /// <param name="body">The raw request body.</param>
+    /// <param name="secret">The shared secret.</param>
+    /// <returns><c>sha256=</c> followed by the lower-case hexadecimal HMAC-SHA256 of the body.</returns>
+    public static string SignatureFor(string body, string secret)
+    {
+        ArgumentNullException.ThrowIfNull(body);
+        ArgumentException.ThrowIfNullOrEmpty(secret);
+        var hash = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(body));
+        return SignaturePrefix + Convert.ToHexStringLower(hash);
     }
 
     /// <inheritdoc/>
@@ -55,7 +91,13 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
     public async Task<IReadOnlyList<EventEnvelope>> TranslateAsync(InboundNotificationMessage message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
+        Verify(message);
         var communication = Parse(message.Body);
+
+        if (IsAboutCaregiverMessage(communication))
+        {
+            return [];
+        }
 
         var kind = StatusMap.ToNotificationUpdateKind(communication);
         if (kind is null)
@@ -120,6 +162,28 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
         return resource as Communication
             ?? throw new FormatException($"Expected a FHIR Communication, not {resource.TypeName}.");
     }
+
+    /// <exception cref="UnauthorizedAccessException">No secret is configured, or the signature is missing or wrong.</exception>
+    private void Verify(InboundNotificationMessage message)
+    {
+        var secret = _options.Value.InboundSecret;
+        if (string.IsNullOrEmpty(secret))
+        {
+            throw new UnauthorizedAccessException($"{SimulatorNotificationOptions.SectionName}:InboundSecret is not configured, so no inbound message can be trusted.");
+        }
+
+        var given = message.Headers.FirstOrDefault(h => string.Equals(h.Key, SignatureHeader, StringComparison.OrdinalIgnoreCase)).Value;
+        var expected = SignatureFor(message.Body, secret);
+        if (string.IsNullOrEmpty(given)
+            || !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(given.Trim().ToLowerInvariant()), Encoding.ASCII.GetBytes(expected)))
+        {
+            throw new UnauthorizedAccessException("The message signature is missing or does not match.");
+        }
+    }
+
+    private static bool IsAboutCaregiverMessage(Communication communication) =>
+        communication.BasedOn.Any(r => r.Reference is { } value
+            && value.StartsWith("CommunicationRequest/" + SimulatorNotificationProvider.CaregiverIdPrefix, StringComparison.Ordinal));
 
     private static Guid? ReferencedId(IEnumerable<ResourceReference> references, string type)
     {

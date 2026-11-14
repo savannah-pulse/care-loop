@@ -19,8 +19,9 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// <list type="bullet">
 /// <item><description>
 /// A patient or caregiver message is a FHIR <c>CommunicationRequest</c> posted to
-/// <c>{PatientChannelBaseUrl}/fhir/CommunicationRequest</c>. Its logical id and its
-/// <see cref="AttemptIdentifierSystem"/> identifier are the notification attempt identifier; its category in
+/// <c>{PatientChannelBaseUrl}/fhir/CommunicationRequest</c>. Its <see cref="AttemptIdentifierSystem"/> identifier
+/// is the notification attempt identifier, and so is its logical id, prefixed with <see cref="CaregiverIdPrefix"/>
+/// for a caregiver message so that what comes back about it is never taken for the patient's; its category in
 /// <see cref="RecipientKindSystem"/> is <c>patient</c> or <c>caregiver</c> (a caregiver message belongs in the
 /// simulator's Email inbox); <c>subject</c> is the patient; <c>recipient</c> names the simulator inbox in
 /// <see cref="SimulatorInboxSystem"/>; <c>about</c> is the case <c>Task</c>; <c>payload</c> is the rendered text;
@@ -52,6 +53,16 @@ public sealed class SimulatorNotificationProvider : INotificationProvider
 
     /// <summary>Code system of the recipient kind carried as the <c>CommunicationRequest</c> category.</summary>
     public const string RecipientKindSystem = Base + "/CodeSystem/recipient-kind";
+
+    /// <summary>
+    /// Prefix of the logical id of a caregiver message's <c>CommunicationRequest</c>.
+    /// </summary>
+    /// <remarks>
+    /// The case's notification track follows the patient only. A <c>Communication</c> based on a request with this
+    /// prefix (a caregiver's delivery report or reply) is therefore ignored by
+    /// <see cref="SimulatorInboundNotificationHandler"/> rather than recorded as the patient's.
+    /// </remarks>
+    public const string CaregiverIdPrefix = "caregiver-";
 
     /// <summary>Task code, in <see cref="StatusMap.TaskCodeSystem"/>, of a direct staff notice.</summary>
     public const string StaffNoticeTaskCode = "staff-notice";
@@ -130,7 +141,9 @@ public sealed class SimulatorNotificationProvider : INotificationProvider
         var kind = message.Recipient.Kind == RecipientKind.Caregiver ? "caregiver" : "patient";
         return new CommunicationRequest
         {
-            Id = message.AttemptId.ToString("D"),
+            Id = message.Recipient.Kind == RecipientKind.Caregiver
+                ? CaregiverIdPrefix + message.AttemptId.ToString("D")
+                : message.AttemptId.ToString("D"),
             Identifier = [new Identifier(AttemptIdentifierSystem, message.AttemptId.ToString("D"))],
             Status = RequestStatus.Active,
             Category = [new CodeableConcept(RecipientKindSystem, kind)],

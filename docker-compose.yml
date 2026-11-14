@@ -37,6 +37,7 @@ services:
       ExternalSystems__Systems__his-simulator__BaseUrl: http://his-simulator:8080
       Notifications__Simulator__PatientChannelBaseUrl: http://patient-channel-simulator:8080
       Notifications__Simulator__StaffInboxBaseUrl: http://his-simulator:8080
+      Notifications__Simulator__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
       Ai__Provider: ${AI_PROVIDER:-NoOp}
       Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
       Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}

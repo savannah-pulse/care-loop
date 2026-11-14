@@ -70,6 +70,19 @@ public sealed class SimulatorNotificationProviderTests
     }
 
     [Fact]
+    public void Caregiver_message_id_is_marked_as_a_caregiver_message()
+    {
+        var caregiver = Message(RecipientKind.Caregiver);
+
+        var request = SimulatorNotificationProvider.CommunicationRequestFor(caregiver);
+
+        Assert.Equal(SimulatorNotificationProvider.CaregiverIdPrefix + caregiver.AttemptId.ToString("D"), request.Id);
+        Assert.Equal(caregiver.AttemptId.ToString("D"), Assert.Single(request.Identifier).Value);
+        Assert.Equal("caregiver", StatusMap.CodeIn(Assert.Single(request.Category), SimulatorNotificationProvider.RecipientKindSystem));
+        Assert.Null(request.Subject);
+    }
+
+    [Fact]
     public void Cannot_reach_a_recipient_without_a_simulator_contact_point()
     {
         var provider = Provider();
@@ -112,7 +125,7 @@ public sealed class SimulatorNotificationProviderTests
         {
             AttemptId = Guid.NewGuid(),
             CaseId = CaseId,
-            Recipient = new Recipient { Reference = kind == RecipientKind.Staff ? address : "SYN-PT-0001", Kind = kind, Language = "en", ContactPoints = [contactPoint] },
+            Recipient = new Recipient { Reference = kind == RecipientKind.Patient ? "SYN-PT-0001" : address, Kind = kind, Language = "en", ContactPoints = [contactPoint] },
             ContactPoint = contactPoint,
             TemplateKey = "patient-follow-up",
             Body = body,

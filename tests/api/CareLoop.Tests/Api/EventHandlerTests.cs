@@ -320,6 +320,19 @@ public sealed class EventHandlerTests
     }
 
     [Fact]
+    public async Task A_booking_without_a_time_is_tracked_but_raises_no_AppointmentScheduled()
+    {
+        await _harness.ReviewedCaseAsync();
+
+        var @case = await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Scheduled, location: "SYN Breast Imaging Clinic"));
+        _harness.Clock.Advance(TimeSpan.FromHours(1));
+        await _harness.ApplyAsync(Envelopes.Appointment(_harness.Clock.UtcNow, AppointmentStatus.Scheduled));
+
+        Assert.Equal(AppointmentStatus.Scheduled, @case.Appointment!.Status);
+        Assert.Empty(_harness.Repository.PublishedDomainEvents.OfType<AppointmentScheduled>());
+    }
+
+    [Fact]
     public async Task An_appointment_first_reported_as_attended_raises_no_AppointmentScheduled()
     {
         await _harness.ReviewedCaseAsync();

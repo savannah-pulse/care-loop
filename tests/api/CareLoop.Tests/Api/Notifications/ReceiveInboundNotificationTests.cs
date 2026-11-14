@@ -16,6 +16,8 @@ namespace CareLoop.Tests.Api.Notifications;
 /// </summary>
 public sealed class ReceiveInboundNotificationTests : IDisposable
 {
+    private const string Secret = "SYN-TEST-SECRET";
+
     private readonly NotificationStore _store = new();
     private readonly Guid _attemptId = Guid.NewGuid();
 
@@ -85,6 +87,19 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Unsigned_simulator_message_returns_401_and_changes_nothing()
+    {
+        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var before = await _store.TheCaseAsync();
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, await PostAsync("simulator", Report(caseId, StatusMap.AcknowledgementCategory), signed: false));
+
+        var after = await _store.TheCaseAsync();
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(before.Notification!.Status, after.Notification!.Status);
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Message_in_the_wrong_format_returns_400()
     {
         await _store.ReviewedCaseAsync();
@@ -115,13 +130,13 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
         SentElement = new FhirDateTime(_store.Clock.UtcNow),
     });
 
-    private async System.Threading.Tasks.Task<int> PostAsync(string provider, string body, string[]? enabled = null)
+    private async System.Threading.Tasks.Task<int> PostAsync(string provider, string body, string[]? enabled = null, bool signed = true)
     {
         await using var db = _store.NewContext();
         var result = await ReceiveInboundNotification.Handle(
             provider,
-            Request(body),
-            [new SimulatorInboundNotificationHandler(db)],
+            Request(body, signed ? SimulatorInboundNotificationHandler.SignatureFor(body, Secret) : null),
+            [new SimulatorInboundNotificationHandler(db, Options.Create(new SimulatorNotificationOptions { InboundSecret = Secret }))],
             Options.Create(new NotificationOptions { EnabledProviders = [.. enabled ?? ["Simulator"]] }),
             _store.Ingestor(db),
             CancellationToken.None);
@@ -131,10 +146,15 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     private static int StatusOf(IResult result) =>
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result).StatusCode ?? StatusCodes.Status200OK;
 
-    private static HttpRequest Request(string body)
+    private static HttpRequest Request(string body, string? signature = null)
     {
         var context = new DefaultHttpContext();
         context.Request.ContentType = FhirEndpoints.FhirJson;
+        if (signature is not null)
+        {
+            context.Request.Headers[SimulatorInboundNotificationHandler.SignatureHeader] = signature;
+        }
+
         context.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
         return context.Request;
     }
