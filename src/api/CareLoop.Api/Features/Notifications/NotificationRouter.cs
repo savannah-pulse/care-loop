@@ -1,3 +1,4 @@
+using System.Globalization;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Features.Outbox;
 using CareLoop.Api.Infrastructure.Persistence;
@@ -18,7 +19,14 @@ namespace CareLoop.Api.Features.Notifications;
 /// <para>
 /// Resolves the recipients with <see cref="RecipientResolver"/>, chooses the template for the event and
 /// recipient kind, and sends with <see cref="NotificationSender"/>. Staff notifications carry no patient
-/// detail: "a case needs your action" plus a link into the HIS (<see cref="HisLinkFor"/>).
+/// detail: "a case needs your action" plus a link into the HIS (<see cref="HisLinkFor"/>); an escalation
+/// notice also says who acknowledged the previous level, if anyone (<see cref="PreviousAcknowledgementFor"/>).
+/// </para>
+/// <para>
+/// <see cref="AppointmentScheduled"/> goes to a consented caregiver only, with the appointment's date, time and
+/// place and nothing else (<see cref="CaregiverTemplateKey"/>, or <see cref="CaregiverPlaceToBeConfirmedTemplateKey"/>
+/// when the source named no place). Its attempts are not fed into the case's notification track, which follows the
+/// patient's notification: a caregiver message is never the patient's acknowledgement or delivery.
 /// </para>
 /// <para>
 /// For <see cref="NotificationRequested"/>, a send the provider refused is fed back to the case through
@@ -37,6 +45,12 @@ public sealed class NotificationRouter : IDomainEventSubscriber
 {
     /// <summary>The template every staff notification uses.</summary>
     public const string StaffTemplateKey = "staff-action-needed";
+
+    /// <summary>The template of the caregiver's appointment message.</summary>
+    public const string CaregiverTemplateKey = "caregiver-appointment";
+
+    /// <summary>The caregiver's appointment message when the source named no place; it says the place will be confirmed.</summary>
+    public const string CaregiverPlaceToBeConfirmedTemplateKey = "caregiver-appointment-place-tbc";
 
     /// <summary>Reason recorded when no enabled channel can reach the patient.</summary>
     public const string NoChannelReason = "No enabled notification channel can reach the patient.";
@@ -90,6 +104,28 @@ public sealed class NotificationRouter : IDomainEventSubscriber
     /// <returns>The first eight hexadecimal digits of the case identifier, upper case.</returns>
     public static string CaseReferenceFor(Guid caseId) => caseId.ToString("N")[..8].ToUpperInvariant();
 
+    /// <summary>
+    /// The line an escalation notice carries about the previous level's acknowledgement.
+    /// </summary>
+    /// <param name="escalation">The escalation being announced.</param>
+    /// <returns>
+    /// For example <c>Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.</c>, or an empty string
+    /// when nobody acknowledged the previous level (always at level 1). Only the role is named, never a person.
+    /// </returns>
+    public static string PreviousAcknowledgementFor(EscalationRaised escalation)
+    {
+        ArgumentNullException.ThrowIfNull(escalation);
+        if (string.IsNullOrWhiteSpace(escalation.AcknowledgedByRole) || escalation.AcknowledgedAt is not { } at)
+        {
+            return string.Empty;
+        }
+
+        var utc = at.ToUniversalTime();
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"Level {escalation.Level - 1} was acknowledged by {escalation.AcknowledgedByRole} at {utc:HH:mm} UTC on {utc:yyyy-MM-dd}.");
+    }
+
     /// <inheritdoc/>
     public async Task HandleAsync(IDomainEvent domainEvent, CancellationToken ct)
     {
@@ -121,12 +157,46 @@ public sealed class NotificationRouter : IDomainEventSubscriber
         {
             await FeedBackFailuresAsync(requested, recipients[0], attempts, ct);
         }
+        else if (domainEvent is AppointmentScheduled)
+        {
+            foreach (var failed in attempts.Where(a => a.Status == NotificationAttemptStatus.Failed))
+            {
+                _logger.LogWarning(
+                    "Caregiver appointment message {AttemptId} on case {CaseId} failed on {Channel}: {Reason}",
+                    failed.Id, domainEvent.CaseId, failed.Channel, failed.FailureReason);
+            }
+        }
     }
 
     private static (string TemplateKey, IReadOnlyDictionary<string, string> Values) TemplateFor(IDomainEvent domainEvent) =>
-        domainEvent is NotificationRequested requested
-            ? (requested.TemplateKey, new Dictionary<string, string> { ["caseReference"] = CaseReferenceFor(requested.CaseId) })
-            : (StaffTemplateKey, new Dictionary<string, string> { ["hisLink"] = HisLinkFor(domainEvent.CaseId) });
+        domainEvent switch
+        {
+            NotificationRequested requested =>
+                (requested.TemplateKey, new Dictionary<string, string> { ["caseReference"] = CaseReferenceFor(requested.CaseId) }),
+            AppointmentScheduled scheduled => CaregiverTemplateFor(scheduled),
+            _ => (StaffTemplateKey, new Dictionary<string, string>
+            {
+                ["hisLink"] = HisLinkFor(domainEvent.CaseId),
+                ["previousAcknowledgement"] = domainEvent is EscalationRaised escalation ? PreviousAcknowledgementFor(escalation) : string.Empty,
+            }),
+        };
+
+    private static (string TemplateKey, IReadOnlyDictionary<string, string> Values) CaregiverTemplateFor(AppointmentScheduled scheduled)
+    {
+        // The time as the hospital system gave it, in a language-neutral form; never anything about the result.
+        var values = new Dictionary<string, string>
+        {
+            ["appointmentDate"] = scheduled.ScheduledFor.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            ["appointmentTime"] = scheduled.ScheduledFor.ToString("HH:mm", CultureInfo.InvariantCulture),
+        };
+        if (string.IsNullOrWhiteSpace(scheduled.Location))
+        {
+            return (CaregiverPlaceToBeConfirmedTemplateKey, values);
+        }
+
+        values["place"] = scheduled.Location.Trim();
+        return (CaregiverTemplateKey, values);
+    }
 
     private async Task FeedBackFailuresAsync(NotificationRequested requested, Recipient patient, IReadOnlyList<NotificationAttempt> attempts, CancellationToken ct)
     {

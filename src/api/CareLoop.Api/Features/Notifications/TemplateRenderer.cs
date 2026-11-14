@@ -68,8 +68,9 @@ public sealed partial class TemplateRenderer
         var (subject, body) = Split(File.ReadAllText(path, Encoding.UTF8));
         return new RenderedTemplate
         {
-            Subject = subject is null ? null : Substitute(subject, values, templateKey),
-            Body = Substitute(body, values, templateKey),
+            Subject = subject is null ? null : Substitute(subject, values, templateKey).Trim(),
+            // Trimmed after substitution, so an empty optional line at the end leaves nothing behind.
+            Body = Substitute(body, values, templateKey).Trim(),
             IsSmsSafe = smsSafe,
         };
     }

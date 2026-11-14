@@ -2,3 +2,5 @@
 Subject: A case needs your action
 
 A case needs your action. Open it in the HIS: {{hisLink}}
+
+{{previousAcknowledgement}}

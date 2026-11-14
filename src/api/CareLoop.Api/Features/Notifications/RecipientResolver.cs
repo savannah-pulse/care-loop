@@ -18,9 +18,12 @@ namespace CareLoop.Api.Features.Notifications;
 /// <see cref="HandoffProposed"/> to the proposed owner; <see cref="HandoffRejected"/>,
 /// <see cref="ReferralRejected"/>, <see cref="CallRequested"/> and <see cref="DeadlineApproaching"/> to the
 /// current owner; <see cref="EscalationRaised"/> to the step of the escalation ladder it reached (the facility
-/// lead, then the coordinator); <see cref="CaseClosed"/> and <see cref="HandoffSummaryApproved"/> to nobody.
+/// lead, then the coordinator); <see cref="AppointmentScheduled"/> to the caregiver while the case's caregiver
+/// consent is active, and to nobody else; <see cref="CaseClosed"/> and <see cref="HandoffSummaryApproved"/> to nobody.
 /// The Domain holds no contact data, so patient contact points are read from the stored screening-result
-/// event and staff are addressed through their simulator inbox.
+/// event, the caregiver's from the case's <see cref="Consent"/>, and staff are addressed through their simulator inbox.
+/// Consent is read when the message is about to be sent, not when the event was raised, because the outbox
+/// may deliver after a withdrawal.
 /// </remarks>
 public sealed class RecipientResolver
 {
@@ -53,6 +56,7 @@ public sealed class RecipientResolver
         return domainEvent switch
         {
             NotificationRequested requested => [await PatientAsync(requested, ct)],
+            AppointmentScheduled scheduled => await CaregiverAsync(scheduled, ct),
             HandoffProposed proposed => [ForOwner(proposed.ProposedOwner)],
             HandoffRejected rejected => [ForOwner(rejected.CurrentOwner)],
             ReferralRejected rejected => [ForOwner(rejected.CurrentOwner)],
@@ -82,18 +86,8 @@ public sealed class RecipientResolver
 
     private async Task<Recipient> PatientAsync(NotificationRequested requested, CancellationToken ct)
     {
-        // The latest applied screening result is the current source of the patient's language and contact points.
-        var stored = await _db.SourceEvents.AsNoTracking()
-            .Where(e => e.CaseId == requested.CaseId
-                && e.Type == CaseEventType.ScreeningResultReceived
-                && e.Disposition == SourceEventDisposition.Applied)
-            .Select(e => new { e.PayloadJson, e.ReceivedAt })
-            .ToListAsync(ct);
-        var latest = stored.OrderByDescending(e => e.ReceivedAt).FirstOrDefault()
+        var payload = await ScreeningResultAsync(requested.CaseId, ct)
             ?? throw new InvalidOperationException($"Case {requested.CaseId} has no stored screening result, so the patient cannot be reached.");
-
-        var payload = JsonSerializer.Deserialize<ScreeningResultPayload>(latest.PayloadJson, PayloadSerializerOptions)
-            ?? throw new InvalidOperationException($"The screening result of case {requested.CaseId} has an empty payload.");
 
         return new Recipient
         {
@@ -102,6 +96,48 @@ public sealed class RecipientResolver
             Language = payload.PatientLanguage,
             ContactPoints = payload.PatientContactPoints,
         };
+    }
+
+    private async Task<IReadOnlyList<Recipient>> CaregiverAsync(AppointmentScheduled scheduled, CancellationToken ct)
+    {
+        var @case = await _db.Cases.AsNoTracking().SingleOrDefaultAsync(c => c.Id == scheduled.CaseId, ct);
+        if (@case?.CaregiverConsent is not { IsActive: true } consent)
+        {
+            return [];
+        }
+
+        // The caregiver's own language is not recorded; the patient's is the best available guess, and the
+        // renderer falls back to English when no template exists in it.
+        var language = (await ScreeningResultAsync(scheduled.CaseId, ct))?.PatientLanguage;
+        return
+        [
+            new Recipient
+            {
+                Reference = consent.EvidenceReference,
+                Kind = RecipientKind.Caregiver,
+                Language = string.IsNullOrWhiteSpace(language) ? TemplateRenderer.FallbackLanguage : language,
+                ContactPoints = [consent.CaregiverContactPoint],
+            },
+        ];
+    }
+
+    /// <summary>The latest applied screening result, the current source of the patient's language and contact points.</summary>
+    private async Task<ScreeningResultPayload?> ScreeningResultAsync(Guid caseId, CancellationToken ct)
+    {
+        var stored = await _db.SourceEvents.AsNoTracking()
+            .Where(e => e.CaseId == caseId
+                && e.Type == CaseEventType.ScreeningResultReceived
+                && e.Disposition == SourceEventDisposition.Applied)
+            .Select(e => new { e.PayloadJson, e.ReceivedAt })
+            .ToListAsync(ct);
+        var latest = stored.OrderByDescending(e => e.ReceivedAt).FirstOrDefault();
+        if (latest is null)
+        {
+            return null;
+        }
+
+        return JsonSerializer.Deserialize<ScreeningResultPayload>(latest.PayloadJson, PayloadSerializerOptions)
+            ?? throw new InvalidOperationException($"The screening result of case {caseId} has an empty payload.");
     }
 
     /// <summary>Must match the options <c>EventIngestor</c> stores payloads with: web defaults, enums as names.</summary>

@@ -1,9 +1,11 @@
 using CareLoop.Api.Features.Notifications;
+using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Tracks;
 using CareLoop.Tests.Fakes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using static CareLoop.Tests.Api.Notifications.NotificationTestSupport;
 
@@ -161,6 +163,117 @@ public sealed class NotificationRouterTests : IDisposable
         var @case = await _store.TheCaseAsync();
         Assert.Equal(NotificationRouter.NoChannelReason, Assert.Single(@case.Notification!.Attempts).FailureReason);
         Assert.True(@case.Exceptions.HasFlag(CaseExceptions.Unreachable));
+    }
+
+    [Fact]
+    public async Task AppointmentScheduled_goes_to_a_consented_caregiver_with_date_time_and_place_only()
+    {
+        var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic");
+
+        await RouteAsync(scheduled);
+
+        var message = Assert.Single(_simulator.Sent);
+        Assert.Equal(RecipientKind.Caregiver, message.Recipient.Kind);
+        Assert.Equal(CaregiverInbox, message.ContactPoint.Address);
+        Assert.Equal(NotificationRouter.CaregiverTemplateKey, message.TemplateKey);
+        Assert.Contains(scheduled.ScheduledFor.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), message.Body);
+        Assert.Contains(scheduled.ScheduledFor.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), message.Body);
+        Assert.Contains("SYN Breast Imaging Clinic", message.Body);
+        var text = $"{message.Subject} {message.Body}";
+        foreach (var patientDetail in new[] { "SYN-PT-0001", "SYN-INBOX-0001", Envelopes.ResultId, NotificationRouter.CaseReferenceFor(scheduled.CaseId), "PLACEHOLDER-URGENCY-A" })
+        {
+            Assert.DoesNotContain(patientDetail, text);
+        }
+    }
+
+    [Fact]
+    public async Task AppointmentScheduled_without_a_place_says_it_will_be_confirmed()
+    {
+        var scheduled = await BookedWithConsentAsync(location: null);
+
+        await RouteAsync(scheduled);
+
+        var message = Assert.Single(_simulator.Sent);
+        Assert.Equal(NotificationRouter.CaregiverPlaceToBeConfirmedTemplateKey, message.TemplateKey);
+        Assert.Contains("to be confirmed", message.Body);
+    }
+
+    [Fact]
+    public async Task AppointmentScheduled_without_consent_notifies_nobody()
+    {
+        await _store.ReviewedCaseAsync();
+        await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: _store.Clock.UtcNow.AddDays(3), location: "SYN Breast Imaging Clinic"));
+
+        await RouteAsync(Assert.Single(await _store.RaisedAsync<AppointmentScheduled>()));
+
+        Assert.Empty(_simulator.Sent);
+    }
+
+    [Fact]
+    public async Task Consent_withdrawn_after_the_booking_stops_the_caregiver_message()
+    {
+        var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic");
+
+        // Stands in for a withdrawal saved after the event was raised. Written directly because saving a
+        // withdrawal through the repository on a case whose grant was saved earlier currently fails (WS1/WS2).
+        await using (var db = _store.NewContext())
+        {
+            await db.Database.ExecuteSqlRawAsync("UPDATE \"Cases\" SET \"CaregiverConsent_WithdrawnAt\" = {0}", _store.Clock.UtcNow);
+        }
+
+        Assert.False((await _store.TheCaseAsync()).CaregiverConsent!.IsActive);
+        await RouteAsync(scheduled);
+
+        Assert.Empty(_simulator.Sent);
+    }
+
+    [Fact]
+    public async Task Caregiver_sms_leaves_out_the_place_and_each_send_is_its_own_attempt()
+    {
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false);
+        var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic", NotificationChannel.Sms);
+
+        await using var db = _store.NewContext();
+        var recipient = Assert.Single(await new RecipientResolver(db).ResolveAsync(scheduled, CancellationToken.None));
+        var both = recipient with { ContactPoints = [.. recipient.ContactPoints, new ContactPoint { Channel = NotificationChannel.Simulator, Address = CaregiverInbox }] };
+        var attempts = await Sender(_store.Clock, Enabled("Simulator", "Sms"), _simulator, sms).SendAsync(
+            scheduled.CaseId, both, NotificationRouter.CaregiverTemplateKey, nameof(AppointmentScheduled),
+            new Dictionary<string, string> { ["appointmentDate"] = "2026-11-17", ["appointmentTime"] = "09:30", ["place"] = "SYN Breast Imaging Clinic" },
+            CancellationToken.None, scheduled.EventId);
+
+        Assert.Equal(2, attempts.Select(a => a.Id).Distinct().Count());
+        var text = Assert.Single(sms.Sent);
+        Assert.True(text.IsSmsSafe);
+        Assert.Contains("2026-11-17", text.Body);
+        Assert.DoesNotContain("SYN Breast Imaging Clinic", text.Body);
+        Assert.Contains("SYN Breast Imaging Clinic", Assert.Single(_simulator.Sent).Body);
+    }
+
+    [Fact]
+    public async Task Escalation_notice_says_who_acknowledged_the_previous_level()
+    {
+        var @case = await _store.OpenCaseAsync();
+        var coordinator = new CaseOwner { Reference = "SYN-QUEUE-COORD", Role = "coordinator", FacilityId = "SYN-FAC-A", IsQueue = true };
+        var acknowledgedAt = new DateTimeOffset(2026, 11, 14, 9, 40, 0, TimeSpan.Zero);
+
+        await RouteAsync(Escalation(@case, 1, TestData.FacilityLeadQueue()));
+        await RouteAsync(Escalation(@case, 2, coordinator) with { AcknowledgedByRole = "facility-lead", AcknowledgedAt = acknowledgedAt });
+
+        Assert.Equal(2, _simulator.Sent.Count);
+        Assert.DoesNotContain("acknowledged", _simulator.Sent[0].Body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.", _simulator.Sent[1].Body);
+    }
+
+    private const string CaregiverInbox = "SYN-CAREGIVER-INBOX-0001";
+
+    private async Task<AppointmentScheduled> BookedWithConsentAsync(string? location, NotificationChannel channel = NotificationChannel.Simulator)
+    {
+        await _store.ReviewedCaseAsync();
+        await _store.IngestAsync(Envelopes.Consent(_store.Clock.UtcNow, ConsentUpdateKind.Granted, new ContactPoint { Channel = channel, Address = CaregiverInbox }));
+        _store.Clock.Advance(TimeSpan.FromMinutes(5));
+        await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: _store.Clock.UtcNow.AddDays(3), location: location));
+        _store.Clock.Advance(TimeSpan.FromMinutes(5));
+        return Assert.Single(await _store.RaisedAsync<AppointmentScheduled>());
     }
 
     private EscalationRaised Escalation(Case @case, int level, CaseOwner to) =>

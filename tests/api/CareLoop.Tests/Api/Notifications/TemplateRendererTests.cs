@@ -65,4 +65,20 @@ public sealed class TemplateRendererTests
         Assert.Throws<ArgumentException>(() => renderer.Render("../en/patient-follow-up", "en", smsSafe: false, Values));
         Assert.Throws<ArgumentException>(() => renderer.Render("patient-follow-up", "../en", smsSafe: false, Values));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Staff_notice_shows_the_previous_acknowledgement_only_when_there_was_one(bool smsSafe)
+    {
+        var renderer = ShippedTemplates();
+        const string Acknowledgement = "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.";
+
+        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = Acknowledgement });
+        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = string.Empty });
+
+        Assert.Contains(Acknowledgement, acknowledged.Body);
+        Assert.DoesNotContain("acknowledged", none.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.EndsWith("Task/SYN", none.Body);
+    }
 }
