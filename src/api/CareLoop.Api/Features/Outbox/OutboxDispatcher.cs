@@ -19,6 +19,13 @@ namespace CareLoop.Api.Features.Outbox;
 /// <see cref="IDomainEventSubscriber"/> separately and records success or failure per subscriber.
 /// A failing subscriber is retried with back-off and never blocks the others; after
 /// <see cref="OutboxOptions.MaxAttempts"/> failures its delivery is parked for a person to look at.
+/// <para>
+/// Several API instances may run a dispatcher against one database. Each delivery is claimed with a single
+/// conditional update before its subscriber runs (<see cref="OutboxDelivery.LeaseOwner"/>,
+/// <see cref="OutboxDelivery.LeasedUntil"/>), so only one instance delivers it at a time, and only the claim owner
+/// records the outcome. A claim left by an instance that stopped lapses after <see cref="OutboxOptions.LeaseDuration"/>
+/// and the delivery is picked up again, so delivery is at least once and subscribers stay idempotent.
+/// </para>
 /// </remarks>
 public sealed class OutboxDispatcher : BackgroundService
 {
@@ -34,6 +41,7 @@ public sealed class OutboxDispatcher : BackgroundService
         .Where(t => t is { IsClass: true, IsAbstract: false } && typeof(IDomainEvent).IsAssignableFrom(t))
         .ToDictionary(t => t.Name, StringComparer.Ordinal);
 
+    private readonly string _instance = $"{Environment.MachineName}/{Guid.NewGuid():N}";
     private readonly IServiceScopeFactory _scopes;
     private readonly IOptions<OutboxOptions> _options;
     private readonly IClock _clock;
@@ -115,13 +123,14 @@ public sealed class OutboxDispatcher : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<CareLoopDbContext>();
         var now = _clock.UtcNow;
 
-        // Only due deliveries, oldest message first, one batch: the filtering, ordering and limit run in the database,
-        // so deliveries still backing off are never read. The query stays tracked (no AsNoTracking on either side),
-        // because the deliveries it returns are updated and saved below.
+        // Due, unclaimed deliveries, oldest message first, one batch. Filtering, ordering and the limit run in the
+        // database, so deliveries still backing off or claimed by another instance are never read.
         var batch = await (
-                from d in db.OutboxDeliveries
-                join m in db.OutboxMessages on d.OutboxMessageId equals m.Id
-                where d.Status == OutboxDeliveryStatus.Pending && (d.NextAttemptAt == null || d.NextAttemptAt <= now)
+                from d in db.OutboxDeliveries.AsNoTracking()
+                join m in db.OutboxMessages.AsNoTracking() on d.OutboxMessageId equals m.Id
+                where d.Status == OutboxDeliveryStatus.Pending
+                    && (d.NextAttemptAt == null || d.NextAttemptAt <= now)
+                    && (d.LeasedUntil == null || d.LeasedUntil <= now)
                 orderby m.CreatedAt, m.Id
                 select new { Delivery = d, Message = m })
             .Take(BatchSize)
@@ -131,15 +140,66 @@ public sealed class OutboxDispatcher : BackgroundService
         foreach (var item in batch)
         {
             ct.ThrowIfCancellationRequested();
+            if (!await ClaimAsync(db, item.Delivery, ct))
+            {
+                // Another instance claimed it between the read and now.
+                continue;
+            }
+
             if (await DeliverAsync(item.Delivery, item.Message, ct))
             {
                 delivered++;
             }
 
-            await db.SaveChangesAsync(ct);
+            await RecordAsync(db, item.Delivery, ct);
         }
 
         return delivered;
+    }
+
+    /// <summary>
+    /// Claims a delivery for this instance with one conditional update, which only one instance can win.
+    /// </summary>
+    private async Task<bool> ClaimAsync(CareLoopDbContext db, OutboxDelivery delivery, CancellationToken ct)
+    {
+        var now = _clock.UtcNow;
+        var until = now + _options.Value.LeaseDuration;
+        var claimed = await db.OutboxDeliveries
+            .Where(d => d.Id == delivery.Id
+                && d.Status == OutboxDeliveryStatus.Pending
+                && (d.LeasedUntil == null || d.LeasedUntil <= now))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.LeaseOwner, _instance)
+                .SetProperty(d => d.LeasedUntil, until), ct);
+        return claimed == 1;
+    }
+
+    /// <summary>
+    /// Records the outcome and releases the claim, only while this instance still holds it.
+    /// </summary>
+    /// <remarks>
+    /// When the claim lapsed and another instance took the delivery over, that instance records the outcome instead,
+    /// so two instances never overwrite each other's bookkeeping.
+    /// </remarks>
+    private async Task RecordAsync(CareLoopDbContext db, OutboxDelivery delivery, CancellationToken ct)
+    {
+        var recorded = await db.OutboxDeliveries
+            .Where(d => d.Id == delivery.Id && d.LeaseOwner == _instance)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.Status, delivery.Status)
+                .SetProperty(d => d.Attempts, delivery.Attempts)
+                .SetProperty(d => d.LastAttemptAt, delivery.LastAttemptAt)
+                .SetProperty(d => d.NextAttemptAt, delivery.NextAttemptAt)
+                .SetProperty(d => d.DeliveredAt, delivery.DeliveredAt)
+                .SetProperty(d => d.LastError, delivery.LastError)
+                .SetProperty(d => d.LeaseOwner, (string?)null)
+                .SetProperty(d => d.LeasedUntil, (DateTimeOffset?)null), ct);
+        if (recorded == 0)
+        {
+            _logger.LogWarning(
+                "Outbox delivery {DeliveryId} to {Subscriber} was taken over by another instance; its outcome there stands",
+                delivery.Id, delivery.Subscriber);
+        }
     }
 
     private async Task<bool> DeliverAsync(OutboxDelivery delivery, OutboxMessage message, CancellationToken ct)
@@ -168,8 +228,7 @@ public sealed class OutboxDispatcher : BackgroundService
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            // Shutting down is not the subscriber's fault: give the attempt back.
-            delivery.Attempts--;
+            // Shutting down is not the subscriber's fault. The claim is left to lapse, and the attempt is not counted.
             throw;
         }
         catch (Exception ex)

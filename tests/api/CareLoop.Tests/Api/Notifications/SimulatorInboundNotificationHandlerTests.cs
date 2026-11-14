@@ -21,14 +21,14 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     private const string Secret = "SYN-TEST-SECRET";
 
     private readonly NotificationStore _store = new();
-    private readonly Guid _attemptId = Guid.NewGuid();
+    private Guid _attemptId = Guid.NewGuid();
 
     public void Dispose() => _store.Dispose();
 
     [Fact]
     public async System.Threading.Tasks.Task Completed_translates_to_delivered()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         var envelope = await TranslateOneAsync(Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.Completed));
 
@@ -47,7 +47,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Not_done_translates_to_failed_with_reason()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var report = Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.NotDone);
         report.StatusReason = new CodeableConcept { Text = "PLACEHOLDER: handset switched off" };
 
@@ -60,7 +60,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Patient_acknowledgement_category_translates_to_acknowledged()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         Assert.Equal(NotificationUpdateKind.Acknowledged, Payload(await TranslateOneAsync(Report(@case, StatusMap.AcknowledgementCategory))).Kind);
     }
@@ -68,7 +68,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Teach_back_category_translates_to_understood()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         Assert.Equal(NotificationUpdateKind.Understood, Payload(await TranslateOneAsync(Report(@case, StatusMap.TeachBackCategory))).Kind);
     }
@@ -76,7 +76,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Call_me_category_translates_to_call_requested()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         Assert.Equal(NotificationUpdateKind.CallRequested, Payload(await TranslateOneAsync(Report(@case, StatusMap.CallMeCategory))).Kind);
     }
@@ -84,7 +84,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Confidence_rating_category_translates_to_a_rating_with_its_value()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var report = Report(@case, StatusMap.ConfidenceRatingCategory);
         report.Payload = [new Communication.PayloadComponent { Content = new FhirString("4") }];
 
@@ -97,7 +97,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Delivery_report_is_never_translated_to_an_acknowledgement()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         var completed = Payload(await TranslateOneAsync(Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.Completed)));
         var inProgress = await TranslateAsync(Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.InProgress));
@@ -111,7 +111,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Reports_about_a_caregiver_message_are_not_the_patients()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var delivered = Report(@case, StatusMap.DeliveryStatusCategory, EventStatus.Completed);
         delivered.BasedOn = [new ResourceReference($"CommunicationRequest/{SimulatorNotificationProvider.CaregiverIdPrefix}{_attemptId:D}")];
         var acknowledged = Report(@case, StatusMap.AcknowledgementCategory, id: "SYN-COMM-2");
@@ -124,7 +124,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Unsigned_wrongly_signed_or_unconfigured_messages_are_refused()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var body = FhirJsonCodec.Serialize(Report(@case, StatusMap.AcknowledgementCategory));
         await using var db = _store.NewContext();
 
@@ -138,9 +138,26 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Report_must_name_a_patient_attempt_of_the_case_it_is_about()
+    {
+        var @case = await PatientNotifiedAsync();
+        var noBasis = Report(@case, StatusMap.AcknowledgementCategory);
+        noBasis.BasedOn = [];
+        var unknownAttempt = Report(@case, StatusMap.AcknowledgementCategory);
+        unknownAttempt.BasedOn = [new ResourceReference($"CommunicationRequest/{Guid.NewGuid():D}")];
+        var staffAttempt = Report(@case, StatusMap.AcknowledgementCategory);
+        staffAttempt.BasedOn = [new ResourceReference($"CommunicationRequest/{NotificationSender.AttemptIdFor(Guid.NewGuid(), @case.Owner.Reference, NotificationChannel.Simulator):D}")];
+
+        await Assert.ThrowsAsync<FormatException>(() => TranslateAsync(noBasis));
+        await Assert.ThrowsAsync<FormatException>(() => TranslateAsync(unknownAttempt));
+        await Assert.ThrowsAsync<FormatException>(() => TranslateAsync(staffAttempt));
+        Assert.Single(await TranslateAsync(Report(@case, StatusMap.AcknowledgementCategory)));
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task Same_communication_version_gives_the_same_source_event_id()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var report = Report(@case, StatusMap.AcknowledgementCategory);
 
         var first = await TranslateOneAsync(report);
@@ -156,7 +173,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Body_that_is_not_a_Communication_is_a_format_error()
     {
-        var @case = await _store.OpenCaseAsync();
+        var @case = await PatientNotifiedAsync();
         var noCase = Report(@case, StatusMap.AcknowledgementCategory);
         noCase.About = [];
         var unknownCase = Report(@case, StatusMap.AcknowledgementCategory);
@@ -171,8 +188,7 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Translated_replies_apply_to_the_case()
     {
-        await _store.ReviewedCaseAsync();
-        var @case = await _store.TheCaseAsync();
+        var @case = await PatientNotifiedAsync();
 
         foreach (var report in new[]
         {
@@ -186,6 +202,14 @@ public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
         var after = await _store.TheCaseAsync();
         Assert.Equal(_attemptId, Assert.Single(after.Notification!.Attempts).Id);
         Assert.Equal(CareLoop.Domain.Tracks.NotificationStatus.Acknowledged, after.Notification.Status);
+    }
+
+    /// <summary>A reviewed case whose patient notification went out on the simulator; <see cref="_attemptId"/> is that attempt.</summary>
+    private async System.Threading.Tasks.Task<Case> PatientNotifiedAsync()
+    {
+        var requested = await _store.ReviewedCaseAsync();
+        _attemptId = NotificationSender.AttemptIdFor(requested.EventId, requested.PatientReference, NotificationChannel.Simulator);
+        return await _store.TheCaseAsync();
     }
 
     private Communication Report(Case @case, string category, EventStatus status = EventStatus.Completed, string id = "SYN-COMM-1") => new()

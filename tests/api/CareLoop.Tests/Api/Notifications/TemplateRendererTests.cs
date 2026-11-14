@@ -48,6 +48,18 @@ public sealed class TemplateRendererTests
         Assert.Equal("Bonjour", renderer.Render("greeting", "fr-CA", smsSafe: false, Values).Body);
     }
 
+    [Theory]
+    [InlineData("EN")]
+    [InlineData("EN-GB")]
+    [InlineData("Ar-AE")]
+    public void Upper_case_tags_still_reach_the_lower_case_folders(string language)
+    {
+        // The shipped folders are lower case; on a case-sensitive file system (Linux, Docker) "EN" is not "en".
+        var rendered = ShippedTemplates().Render("patient-follow-up", language, smsSafe: false, Values);
+
+        Assert.Contains("Reference: AB12CD34", rendered.Body);
+    }
+
     [Fact]
     public void Missing_placeholder_value_throws()
     {

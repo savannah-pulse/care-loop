@@ -19,14 +19,14 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     private const string Secret = "SYN-TEST-SECRET";
 
     private readonly NotificationStore _store = new();
-    private readonly Guid _attemptId = Guid.NewGuid();
+    private Guid _attemptId = Guid.NewGuid();
 
     public void Dispose() => _store.Dispose();
 
     [Fact]
     public async System.Threading.Tasks.Task Message_for_an_enabled_provider_is_translated_and_ingested()
     {
-        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var caseId = await PatientNotifiedAsync();
 
         var status = await PostAsync("simulator", Report(caseId, StatusMap.DeliveryStatusCategory));
 
@@ -39,7 +39,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Redelivered_message_is_deduplicated()
     {
-        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var caseId = await PatientNotifiedAsync();
         var body = Report(caseId, StatusMap.AcknowledgementCategory);
 
         Assert.Equal(StatusCodes.Status200OK, await PostAsync("Simulator", body));
@@ -54,7 +54,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Unknown_provider_returns_404()
     {
-        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var caseId = await PatientNotifiedAsync();
         var body = Report(caseId, StatusMap.AcknowledgementCategory);
 
         Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("pigeon", body));
@@ -64,7 +64,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Provider_that_is_not_enabled_returns_404()
     {
-        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var caseId = await PatientNotifiedAsync();
         var body = Report(caseId, StatusMap.AcknowledgementCategory);
 
         Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("simulator", body, enabled: ["Sms"]));
@@ -89,7 +89,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Unsigned_simulator_message_returns_401_and_changes_nothing()
     {
-        var caseId = (await _store.ReviewedCaseAsync()).CaseId;
+        var caseId = await PatientNotifiedAsync();
         var before = await _store.TheCaseAsync();
 
         Assert.Equal(StatusCodes.Status401Unauthorized, await PostAsync("simulator", Report(caseId, StatusMap.AcknowledgementCategory), signed: false));
@@ -111,16 +111,25 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     [Fact]
     public async System.Threading.Tasks.Task Event_refused_by_a_rule_returns_422()
     {
-        // No notification has been requested on an unreviewed case, so there is nothing to report on.
-        var @case = await _store.OpenCaseAsync();
+        // A confidence rating outside 1 to 5 is refused by the notification rule.
+        var caseId = await PatientNotifiedAsync();
 
-        var status = await PostAsync("simulator", Report(@case.Id, StatusMap.DeliveryStatusCategory));
+        var status = await PostAsync("simulator", Report(caseId, StatusMap.ConfidenceRatingCategory, payload: "9"));
 
         Assert.Equal(StatusCodes.Status422UnprocessableEntity, status);
     }
 
-    private string Report(Guid caseId, string category) => FhirJsonCodec.Serialize(new Communication
+    /// <summary>Reviews a case so its patient notification goes out, and points <see cref="_attemptId"/> at that attempt.</summary>
+    private async System.Threading.Tasks.Task<Guid> PatientNotifiedAsync()
     {
+        var requested = await _store.ReviewedCaseAsync();
+        _attemptId = NotificationSender.AttemptIdFor(requested.EventId, requested.PatientReference, NotificationChannel.Simulator);
+        return requested.CaseId;
+    }
+
+    private string Report(Guid caseId, string category, string? payload = null) => FhirJsonCodec.Serialize(new Communication
+    {
+        Payload = payload is null ? [] : [new Communication.PayloadComponent { Content = new FhirString(payload) }],
         Id = $"SYN-COMM-{category}",
         Meta = new Meta { VersionId = "1" },
         Status = EventStatus.Completed,

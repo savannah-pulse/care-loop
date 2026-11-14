@@ -85,9 +85,11 @@ public sealed partial class TemplateRenderer
 
     private static IEnumerable<string> Candidates(string language)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Ordinal, not case-insensitive: on a case-sensitive file system "EN" and "en" are different folders, so
+        // the lower-case forms (the folders' convention) must stay candidates after the tag as given.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         var primary = language.Split('-')[0];
-        foreach (var candidate in new[] { language, primary, FallbackLanguage })
+        foreach (var candidate in new[] { language, language.ToLowerInvariant(), primary, primary.ToLowerInvariant(), FallbackLanguage })
         {
             if (seen.Add(candidate))
             {

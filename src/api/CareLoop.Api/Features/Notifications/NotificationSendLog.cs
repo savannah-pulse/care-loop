@@ -3,13 +3,13 @@ using System.Collections.Concurrent;
 namespace CareLoop.Api.Features.Notifications;
 
 /// <summary>
-/// Remembers which domain events this process has already sent notifications for.
+/// Remembers which notification attempts this process has already had accepted by a provider.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The outbox retries a delivery only when the router failed, and the router does its sending last,
-/// so a repeat is rare. This log stops one anyway: a domain event whose notifications were sent is
-/// never sent again by the same process.
+/// The router makes the outbox retry an event when a staff or caregiver send failed. Keyed by attempt
+/// identifier (one recipient on one channel), this log makes that retry resend only the channels that
+/// failed: an attempt a provider accepted is never sent again by the same process.
 /// </para>
 /// <para>
 /// It lives in memory, so it does not survive a restart. A crash between sending and the outbox
@@ -21,31 +21,31 @@ namespace CareLoop.Api.Features.Notifications;
 /// </remarks>
 public sealed class NotificationSendLog
 {
-    /// <summary>How many event identifiers are remembered before the oldest are forgotten.</summary>
+    /// <summary>How many attempt identifiers are remembered before the oldest are forgotten.</summary>
     public const int Capacity = 100_000;
 
     private readonly ConcurrentDictionary<Guid, byte> _sent = new();
     private readonly ConcurrentQueue<Guid> _order = new();
 
     /// <summary>
-    /// Tells whether notifications for an event were already sent.
+    /// Tells whether an attempt was already accepted by its provider.
     /// </summary>
-    /// <param name="eventId">The domain event identifier.</param>
+    /// <param name="attemptId">The attempt identifier (<see cref="NotificationSender.AttemptIdFor"/>).</param>
     /// <returns><see langword="true"/> when <see cref="MarkSent"/> was called for it.</returns>
-    public bool WasSent(Guid eventId) => _sent.ContainsKey(eventId);
+    public bool WasSent(Guid attemptId) => _sent.ContainsKey(attemptId);
 
     /// <summary>
-    /// Records that notifications for an event were sent.
+    /// Records that a provider accepted an attempt.
     /// </summary>
-    /// <param name="eventId">The domain event identifier.</param>
-    public void MarkSent(Guid eventId)
+    /// <param name="attemptId">The attempt identifier.</param>
+    public void MarkSent(Guid attemptId)
     {
-        if (!_sent.TryAdd(eventId, 0))
+        if (!_sent.TryAdd(attemptId, 0))
         {
             return;
         }
 
-        _order.Enqueue(eventId);
+        _order.Enqueue(attemptId);
         while (_order.Count > Capacity && _order.TryDequeue(out var oldest))
         {
             _sent.TryRemove(oldest, out _);

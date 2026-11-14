@@ -260,6 +260,49 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Contains("Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.", _simulator.Sent[1].Body);
     }
 
+    [Fact]
+    public async Task Refused_staff_notice_is_retried_until_sent_and_then_not_sent_again()
+    {
+        var @case = await _store.OpenCaseAsync();
+        var approaching = new DeadlineApproaching { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, CurrentOwner = @case.Owner, NextAction = "review-result", DueAt = _store.Clock.UtcNow.AddHours(1) };
+        _simulator.Answer = _ => new SendResult { Accepted = false, FailureReason = "The simulator answered 503 Service Unavailable." };
+
+        var refused = await Assert.ThrowsAsync<NotificationNotSentException>(() => RouteAsync(approaching));
+        Assert.Contains("503", refused.Message);
+        Assert.DoesNotContain("SYN-PT-0001", refused.Message);
+
+        _simulator.Answer = m => new SendResult { Accepted = true, ProviderMessageId = $"fake-{m.AttemptId:N}" };
+        await RouteAsync(approaching);
+        await RouteAsync(approaching);
+
+        Assert.Equal(2, _simulator.Sent.Count);
+        Assert.Equal(_simulator.Sent[0].AttemptId, _simulator.Sent[1].AttemptId);
+    }
+
+    [Fact]
+    public async Task Refused_caregiver_message_is_retried()
+    {
+        var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic");
+        _simulator.Answer = _ => new SendResult { Accepted = false, FailureReason = "PLACEHOLDER: inbox unavailable" };
+
+        await Assert.ThrowsAsync<NotificationNotSentException>(() => RouteAsync(scheduled));
+    }
+
+    [Fact]
+    public async Task Patient_refusal_on_one_channel_is_not_recorded_while_another_channel_accepted()
+    {
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false) { Reach = _ => true };
+        var requested = await _store.ReviewedCaseAsync();
+
+        await RouteAsync(requested, sms);
+
+        Assert.Single(_simulator.Sent);
+        var @case = await _store.TheCaseAsync();
+        Assert.Empty(@case.Notification!.Attempts);
+        Assert.Equal(NotificationStatus.Sent, @case.Notification.Status);
+        Assert.False(@case.Exceptions.HasFlag(CaseExceptions.Unreachable));
+    }
+
     private const string CaregiverInbox = "SYN-CAREGIVER-INBOX-0001";
 
     private async Task<AppointmentScheduled> BookedWithConsentAsync(string? location, NotificationChannel channel = NotificationChannel.Simulator)
@@ -283,12 +326,12 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(NotificationRouter.StaffTemplateKey, message.TemplateKey);
     }
 
-    private async Task RouteAsync(IDomainEvent domainEvent)
+    private async Task RouteAsync(IDomainEvent domainEvent, FakeProvider? sms = null)
     {
         await using var db = _store.NewContext();
         var router = new NotificationRouter(
             new RecipientResolver(db),
-            Sender(_store.Clock, Enabled("Simulator"), _simulator),
+            sms is null ? Sender(_store.Clock, Enabled("Simulator"), _simulator) : Sender(_store.Clock, Enabled("Simulator", "Sms"), _simulator, sms),
             _log,
             _store.Ingestor(db),
             db,

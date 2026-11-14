@@ -29,16 +29,20 @@ namespace CareLoop.Api.Features.Notifications;
 /// patient's notification: a caregiver message is never the patient's acknowledgement or delivery.
 /// </para>
 /// <para>
-/// For <see cref="NotificationRequested"/>, a send the provider refused is fed back to the case through
-/// the event ingestor as a failed delivery, so the notification track records it and the case is flagged
-/// unreachable when every channel failed. When no enabled channel can reach the patient at all, that is
-/// fed back as a failure too, so a patient is never left silently unnotified. An accepted send is not
-/// fed back: the track already counts as sent, and the provider reports delivery later.
+/// For <see cref="NotificationRequested"/>, when no channel accepted the message (every provider refused,
+/// or no enabled channel can reach the patient), each failure is fed back to the case through the event
+/// ingestor, so the notification track records it and the case is flagged unreachable: a patient is never
+/// left silently unnotified. When any channel accepted, nothing is fed back: the track already counts as sent,
+/// the provider reports delivery later, and recording another channel's refusal on its own would mark the
+/// patient unreachable while a message is still on its way. If recording the feedback fails, the exception
+/// propagates so the outbox retries it.
 /// </para>
 /// <para>
-/// Because deliveries are retried, a notification already sent for an event identifier is not sent again
-/// (<see cref="NotificationSendLog"/>), and everything that can fail is done before anything is sent.
-/// Nothing here changes an owner, a deadline or an acknowledgement.
+/// For staff and caregiver messages there is no case track to record a failure on, so a refused send, or a
+/// recipient no enabled channel can reach, makes <see cref="HandleAsync"/> throw and the outbox retry (and in the
+/// end park) the delivery. Every attempt a provider accepted is remembered (<see cref="NotificationSendLog"/>), so a
+/// retry resends only the channels that failed. Everything that can fail before sending is done before anything is
+/// sent. Nothing here changes an owner, a deadline or an acknowledgement.
 /// </para>
 /// </remarks>
 public sealed class NotificationRouter : IDomainEventSubscriber
@@ -127,44 +131,48 @@ public sealed class NotificationRouter : IDomainEventSubscriber
     }
 
     /// <inheritdoc/>
+    /// <exception cref="NotificationNotSentException">A staff or caregiver message was refused on a channel, or no enabled channel can reach its recipient; the outbox retries.</exception>
     public async Task HandleAsync(IDomainEvent domainEvent, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(domainEvent);
-        if (_sent.WasSent(domainEvent.EventId))
-        {
-            return;
-        }
 
         var recipients = await _recipients.ResolveAsync(domainEvent, ct);
         if (recipients.Count == 0)
         {
-            _sent.MarkSent(domainEvent.EventId);
             return;
         }
 
         var (templateKey, values) = TemplateFor(domainEvent);
         var eventName = domainEvent.GetType().Name;
-        var attempts = new List<NotificationAttempt>();
+        var attemptsByRecipient = new List<(Recipient Recipient, IReadOnlyList<NotificationAttempt> Attempts)>();
         foreach (var recipient in recipients)
         {
-            attempts.AddRange(await _sender.SendAsync(domainEvent.CaseId, recipient, templateKey, eventName, values, ct, domainEvent.EventId));
-        }
+            var attempts = await _sender.SendAsync(domainEvent.CaseId, recipient, templateKey, eventName, values, ct, domainEvent.EventId, _sent.WasSent);
+            foreach (var accepted in attempts.Where(a => a.Status == NotificationAttemptStatus.Sent))
+            {
+                _sent.MarkSent(accepted.Id);
+            }
 
-        // From here on something may have been sent, so nothing below may make the outbox retry.
-        _sent.MarkSent(domainEvent.EventId);
+            attemptsByRecipient.Add((recipient, attempts));
+        }
 
         if (domainEvent is NotificationRequested requested)
         {
-            await FeedBackFailuresAsync(requested, recipients[0], attempts, ct);
+            var (patient, attempts) = attemptsByRecipient[0];
+            await FeedBackFailuresAsync(requested, patient, attempts, ct);
+            return;
         }
-        else if (domainEvent is AppointmentScheduled)
+
+        var notSent = attemptsByRecipient
+            .Where(r => r.Attempts.Count == 0 || r.Attempts.Any(a => a.Status == NotificationAttemptStatus.Failed))
+            .ToList();
+        if (notSent.Count > 0)
         {
-            foreach (var failed in attempts.Where(a => a.Status == NotificationAttemptStatus.Failed))
-            {
-                _logger.LogWarning(
-                    "Caregiver appointment message {AttemptId} on case {CaseId} failed on {Channel}: {Reason}",
-                    failed.Id, domainEvent.CaseId, failed.Channel, failed.FailureReason);
-            }
+            // Only the recipient kind, channel and provider reason: never a patient detail in an exception the outbox stores.
+            var reasons = notSent.SelectMany(r => r.Attempts.Count == 0
+                ? [$"{r.Recipient.Kind}: no enabled channel can reach the recipient"]
+                : r.Attempts.Where(a => a.Status == NotificationAttemptStatus.Failed).Select(a => $"{r.Recipient.Kind} on {a.Channel}: {a.FailureReason}"));
+            throw new NotificationNotSentException($"{eventName} {domainEvent.EventId} was not sent to every recipient: {string.Join("; ", reasons)}");
         }
     }
 
@@ -200,6 +208,12 @@ public sealed class NotificationRouter : IDomainEventSubscriber
 
     private async Task FeedBackFailuresAsync(NotificationRequested requested, Recipient patient, IReadOnlyList<NotificationAttempt> attempts, CancellationToken ct)
     {
+        if (attempts.Any(a => a.Status == NotificationAttemptStatus.Sent))
+        {
+            // A channel accepted it: the patient may still get it, so no refusal is recorded on its own.
+            return;
+        }
+
         var failures = attempts.Where(a => a.Status == NotificationAttemptStatus.Failed).ToList();
         if (attempts.Count == 0)
         {
@@ -220,50 +234,60 @@ public sealed class NotificationRouter : IDomainEventSubscriber
             return;
         }
 
-        try
+        var source = await _db.Cases.AsNoTracking()
+            .Where(c => c.Id == requested.CaseId)
+            .Select(c => new { c.SourceSystem, c.SourceResultId })
+            .SingleOrDefaultAsync(ct);
+        if (source is null)
         {
-            var source = await _db.Cases.AsNoTracking()
-                .Where(c => c.Id == requested.CaseId)
-                .Select(c => new { c.SourceSystem, c.SourceResultId })
-                .SingleOrDefaultAsync(ct);
-            if (source is null)
-            {
-                _logger.LogWarning("Case {CaseId} for {EventId} no longer exists; failed sends were not recorded", requested.CaseId, requested.EventId);
-                return;
-            }
+            _logger.LogWarning("Case {CaseId} for {EventId} no longer exists; failed sends were not recorded", requested.CaseId, requested.EventId);
+            return;
+        }
 
-            foreach (var failure in failures)
+        foreach (var failure in failures)
+        {
+            var result = await _ingestor.IngestAsync(new EventEnvelope
             {
-                var result = await _ingestor.IngestAsync(new EventEnvelope
+                SourceSystem = source.SourceSystem,
+                SourceEventId = $"notification-attempt/{failure.Id:N}/failed",
+                Type = CaseEventType.NotificationUpdated,
+                SourceResultId = source.SourceResultId,
+                OccurredAt = failure.AttemptedAt,
+                Actor = null,
+                Payload = new NotificationUpdatePayload
                 {
-                    SourceSystem = source.SourceSystem,
-                    SourceEventId = $"notification-attempt/{failure.Id:N}/failed",
-                    Type = CaseEventType.NotificationUpdated,
-                    SourceResultId = source.SourceResultId,
-                    OccurredAt = failure.AttemptedAt,
-                    Actor = null,
-                    Payload = new NotificationUpdatePayload
-                    {
-                        Kind = NotificationUpdateKind.Failed,
-                        Channel = failure.Channel,
-                        CommunicationReference = $"notification-attempt/{failure.Id:D}",
-                        AttemptId = failure.Id,
-                        FailureReason = failure.FailureReason,
-                    },
-                }, ct);
+                    Kind = NotificationUpdateKind.Failed,
+                    Channel = failure.Channel,
+                    CommunicationReference = $"notification-attempt/{failure.Id:D}",
+                    AttemptId = failure.Id,
+                    FailureReason = failure.FailureReason,
+                },
+            }, ct);
 
-                if (result.Outcome is IngestOutcome.Invalid or IngestOutcome.Rejected)
-                {
-                    _logger.LogWarning(
-                        "Failed send {AttemptId} on case {CaseId} was not recorded ({Outcome}): {Reason}",
-                        failure.Id, requested.CaseId, result.Outcome, result.Reason);
-                }
+            // A rule refusing it will refuse it again, so that is logged; anything thrown (the database, a
+            // concurrency conflict) propagates and the outbox retries. Accepted attempts are not resent on retry.
+            if (result.Outcome is IngestOutcome.Invalid or IngestOutcome.Rejected)
+            {
+                _logger.LogWarning(
+                    "Failed send {AttemptId} on case {CaseId} was not recorded ({Outcome}): {Reason}",
+                    failure.Id, requested.CaseId, result.Outcome, result.Reason);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // Retrying would send again, so a failure to record is logged rather than thrown.
-            _logger.LogError(ex, "Failed sends for {EventId} on case {CaseId} could not be recorded", requested.EventId, requested.CaseId);
-        }
+    }
+}
+
+/// <summary>
+/// A staff or caregiver notification was not sent on every channel, so the outbox must retry it.
+/// </summary>
+/// <remarks>Its message names recipient kinds, channels and provider reasons only, never a patient detail, because the outbox stores it.</remarks>
+public sealed class NotificationNotSentException : Exception
+{
+    /// <summary>
+    /// Creates the exception.
+    /// </summary>
+    /// <param name="message">What was not sent and why.</param>
+    public NotificationNotSentException(string message)
+        : base(message)
+    {
     }
 }

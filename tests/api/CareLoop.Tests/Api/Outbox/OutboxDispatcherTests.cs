@@ -180,6 +180,53 @@ public sealed class OutboxDispatcherTests : IDisposable
         Assert.Equal([older.EventId, newer.EventId], _second.Received.Select(e => e.EventId));
     }
 
+    [Fact]
+    public async Task Delivery_claimed_by_another_instance_waits_until_its_claim_lapses()
+    {
+        await StoreEventAsync();
+        await SetLeaseAsync("First", "other-instance", _clock.UtcNow + TimeSpan.FromMinutes(5));
+
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+        Assert.Equal(0, _first.Calls);
+        Assert.Single(_second.Received);
+
+        // The other instance stopped: once its claim lapses, this one takes the delivery over.
+        _clock.Advance(TimeSpan.FromMinutes(5));
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+        Assert.Single(_first.Received);
+        var first = (await DeliveriesAsync()).Single(d => d.Subscriber == "First");
+        Assert.Equal(OutboxDeliveryStatus.Delivered, first.Status);
+        Assert.Null(first.LeaseOwner);
+        Assert.Null(first.LeasedUntil);
+    }
+
+    [Fact]
+    public async Task Outcome_is_not_recorded_by_an_instance_whose_claim_was_taken_over()
+    {
+        await StoreEventAsync();
+
+        // While this instance is delivering, its claim lapses and another instance takes the delivery over.
+        _first.During = () => SetLeaseAsync("First", "other-instance", _clock.UtcNow + TimeSpan.FromMinutes(5)).GetAwaiter().GetResult();
+        await _dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+        var first = (await DeliveriesAsync()).Single(d => d.Subscriber == "First");
+        Assert.Equal(OutboxDeliveryStatus.Pending, first.Status);
+        Assert.Equal("other-instance", first.LeaseOwner);
+        Assert.Equal(0, first.Attempts);
+        Assert.Equal(OutboxDeliveryStatus.Delivered, (await DeliveriesAsync()).Single(d => d.Subscriber == "Second").Status);
+    }
+
+    private async Task SetLeaseAsync(string subscriber, string owner, DateTimeOffset until)
+    {
+        using var scope = _services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CareLoopDbContext>();
+        var delivery = await db.OutboxDeliveries.SingleAsync(d => d.Subscriber == subscriber);
+        delivery.LeaseOwner = owner;
+        delivery.LeasedUntil = until;
+        await db.SaveChangesAsync();
+    }
+
     private async Task<CallRequested> StoreEventAsync(string sourceResultId = "SYN-RESULT-0001")
     {
         var @case = TestData.NewCase(_clock.UtcNow, sourceResultId);
@@ -216,9 +263,13 @@ public sealed class OutboxDispatcherTests : IDisposable
 
         public List<IDomainEvent> Received { get; } = [];
 
+        /// <summary>Runs inside each call, before the outcome; lets a test act as another instance mid-delivery.</summary>
+        public Action? During { get; set; }
+
         public Task HandleAsync(IDomainEvent domainEvent, CancellationToken ct)
         {
             Calls++;
+            During?.Invoke();
             if (FailuresLeft > 0)
             {
                 FailuresLeft--;

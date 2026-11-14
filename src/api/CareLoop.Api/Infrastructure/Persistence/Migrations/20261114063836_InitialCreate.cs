@@ -274,7 +274,9 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     LastAttemptAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     NextAttemptAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     DeliveredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LastError = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true)
+                    LastError = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    LeaseOwner = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    LeasedUntil = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {

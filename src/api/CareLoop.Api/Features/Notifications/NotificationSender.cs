@@ -72,6 +72,11 @@ public sealed class NotificationSender
     /// Identifies the notification, normally the domain event identifier. When given, attempt identifiers are derived from it
     /// (<see cref="AttemptIdFor"/>), so sending the same notification again carries the same identifiers; otherwise they are random.
     /// </param>
+    /// <param name="alreadySent">
+    /// Tells whether an attempt identifier was already accepted by its provider. Such an attempt is not sent again and is
+    /// returned with status <see cref="NotificationAttemptStatus.Sent"/>, so retrying a notification resends only the
+    /// channels that failed. Applies only when <paramref name="notificationId"/> is given.
+    /// </param>
     /// <returns>One attempt per enabled provider that could reach the recipient; empty when none could.</returns>
     /// <remarks>
     /// Every template variant is rendered before anything is sent, so a missing template or value fails the whole
@@ -87,7 +92,8 @@ public sealed class NotificationSender
         string domainEventName,
         IReadOnlyDictionary<string, string> values,
         CancellationToken ct,
-        Guid? notificationId = null)
+        Guid? notificationId = null,
+        Func<Guid, bool>? alreadySent = null)
     {
         ArgumentNullException.ThrowIfNull(recipient);
         ArgumentNullException.ThrowIfNull(values);
@@ -126,6 +132,19 @@ public sealed class NotificationSender
             }
 
             var template = rendered[smsSafe];
+            if (notificationId is not null && alreadySent?.Invoke(attemptId) == true)
+            {
+                attempts.Add(new NotificationAttempt
+                {
+                    Id = attemptId,
+                    Channel = provider.Channel,
+                    AttemptedAt = _clock.UtcNow,
+                    Status = NotificationAttemptStatus.Sent,
+                    UsedSmsSafeTemplate = template.IsSmsSafe,
+                });
+                continue;
+            }
+
             var message = new NotificationMessage
             {
                 AttemptId = attemptId,

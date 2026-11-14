@@ -44,6 +44,10 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// knows a case identifier can acknowledge for a patient.
 /// </para>
 /// <para>
+/// <c>basedOn</c> must name an attempt CareLoop made for a patient notification of the case named in <c>about</c>;
+/// anything else is a format error, so a report can never change a case it was not sent for.
+/// </para>
+/// <para>
 /// A <c>Communication</c> based on a caregiver message (its <c>CommunicationRequest</c> id starts with
 /// <see cref="SimulatorNotificationProvider.CaregiverIdPrefix"/>) translates to nothing: the case's notification
 /// track is the patient's, and a caregiver's delivery or acknowledgement must never count as the patient's.
@@ -117,11 +121,19 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
             ?? communication.Meta?.LastUpdated
             ?? throw new FormatException("The Communication has neither sent nor meta.lastUpdated.");
 
+        var attemptId = ReferencedId(communication.BasedOn, "CommunicationRequest")
+            ?? throw new FormatException("The Communication's basedOn does not name the CommunicationRequest it reports on.");
+
         var source = await _db.Cases.AsNoTracking()
             .Where(c => c.Id == caseId)
-            .Select(c => new { c.SourceSystem, c.SourceResultId })
+            .Select(c => new { c.SourceSystem, c.SourceResultId, c.PatientReference })
             .SingleOrDefaultAsync(ct)
             ?? throw new FormatException($"The Communication is about Task/{caseId:D}, which is not a known case.");
+
+        if (!await IsPatientAttemptOfCaseAsync(caseId, source.PatientReference, attemptId, ct))
+        {
+            throw new FormatException($"CommunicationRequest/{attemptId:D} is not a patient notification of Task/{caseId:D}.");
+        }
 
         var version = string.IsNullOrWhiteSpace(communication.Meta?.VersionId) ? "1" : communication.Meta.VersionId;
         return
@@ -139,7 +151,7 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
                     Kind = kind.Value,
                     Channel = NotificationChannel.Simulator,
                     CommunicationReference = $"Communication/{communication.Id}",
-                    AttemptId = ReferencedId(communication.BasedOn, "CommunicationRequest"),
+                    AttemptId = attemptId,
                     FailureReason = kind == NotificationUpdateKind.Failed ? FailureReason(communication) : null,
                     Confidence = kind == NotificationUpdateKind.ConfidenceRated ? StatusMap.ToConfidence(communication) : null,
                 },
@@ -179,6 +191,24 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
         {
             throw new UnauthorizedAccessException("The message signature is missing or does not match.");
         }
+    }
+
+    /// <summary>
+    /// Tells whether an attempt identifier is one CareLoop gave a patient notification of this case on this channel.
+    /// </summary>
+    /// <remarks>
+    /// Attempt identifiers are derived from the <see cref="Domain.Events.DomainEvents.NotificationRequested"/> event, the
+    /// patient and the channel (<see cref="NotificationSender.AttemptIdFor"/>), and every such event is in the case's
+    /// outbox. Recomputing them means a report whose <c>about</c> and <c>basedOn</c> disagree can never change the
+    /// wrong case, without storing sent attempts.
+    /// </remarks>
+    private async Task<bool> IsPatientAttemptOfCaseAsync(Guid caseId, string patientReference, Guid attemptId, CancellationToken ct)
+    {
+        var notificationIds = await _db.OutboxMessages.AsNoTracking()
+            .Where(m => m.CaseId == caseId && m.EventType == nameof(Domain.Events.DomainEvents.NotificationRequested))
+            .Select(m => m.Id)
+            .ToListAsync(ct);
+        return notificationIds.Any(id => NotificationSender.AttemptIdFor(id, patientReference, Channel) == attemptId);
     }
 
     private static bool IsAboutCaregiverMessage(Communication communication) =>
