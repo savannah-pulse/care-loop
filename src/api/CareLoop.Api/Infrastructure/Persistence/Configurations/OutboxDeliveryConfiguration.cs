@@ -19,6 +19,7 @@ public sealed class OutboxDeliveryConfiguration : IEntityTypeConfiguration<Outbo
         builder.Property(d => d.Subscriber).HasMaxLength(100).IsRequired();
         builder.Property(d => d.Status).HasConversion<string>().HasMaxLength(40);
         builder.Property(d => d.LastError).HasMaxLength(2000);
+        builder.Property(d => d.LeaseOwner).HasMaxLength(200);
 
         builder.HasIndex(d => new { d.OutboxMessageId, d.Subscriber }).IsUnique();
         builder.HasIndex(d => new { d.Status, d.NextAttemptAt });

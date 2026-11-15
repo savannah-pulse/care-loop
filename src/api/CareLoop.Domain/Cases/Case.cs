@@ -13,11 +13,13 @@ namespace CareLoop.Domain.Cases;
 /// <b>Definition.</b> One actionable result equals one case. A case is a coordination record, not a
 /// clinical record: it answers "what stage is this result at, who is accountable, what must happen
 /// next and by when, and how did it end?". The hospital systems remain the systems of record, so a
-/// case holds identifiers and references into them and never clinical content.
+/// case holds identifiers and references into them, plus the patient's name and record number for
+/// staff screens, and never clinical content.
 /// </para>
 /// <para><b>What a case holds.</b></para>
 /// <list type="bullet">
 /// <item><description><b>Source identity</b>: <see cref="SourceSystem"/>, <see cref="SourceResultId"/>, <see cref="PatientReference"/> and <see cref="FacilityId"/>. One source result can open only one case.</description></item>
+/// <item><description><b>Patient demographics</b>: <see cref="PatientDisplayName"/> and <see cref="PatientSecondaryIdentifier"/>, when the source supplied them, so staff can recognise the patient. They are demographic, not clinical, and are shown to staff roles only.</description></item>
 /// <item><description><b>Pathway</b>: <see cref="PathwayId"/> names the <see cref="CareLoop.Domain.Pathways.PathwayDefinition"/> that supplies this case's stage rules, deadlines, escalation ladder and closure rules.</description></item>
 /// <item><description><b>Urgency</b>: <see cref="Urgency"/> is the clinician-reviewed urgency code received from the hospital system. CareLoop never sets or changes it.</description></item>
 /// <item><description><b>Stage</b>: <see cref="Stage"/> is where the case is in the pathway (see <see cref="CaseStage"/>).</description></item>
@@ -56,6 +58,8 @@ public sealed class Case
     /// <param name="facilityId">The facility that produced the result.</param>
     /// <param name="initialOwner">The first accountable owner, or the facility lead queue when nobody is named. Required because a case may never be unowned.</param>
     /// <param name="receivedAt">When CareLoop received the result.</param>
+    /// <param name="patientDisplayName">The patient's display name as supplied by the source, or <see langword="null"/>. Demographic, for staff screens only.</param>
+    /// <param name="patientSecondaryIdentifier">A second patient identifier such as the facility's medical record number, or <see langword="null"/>. Demographic, for staff screens only.</param>
     /// <exception cref="ArgumentException">A required identifier is empty.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="initialOwner"/> is <see langword="null"/>.</exception>
     public Case(
@@ -66,7 +70,9 @@ public sealed class Case
         string pathwayId,
         string facilityId,
         CaseOwner initialOwner,
-        DateTimeOffset receivedAt)
+        DateTimeOffset receivedAt,
+        string? patientDisplayName = null,
+        string? patientSecondaryIdentifier = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceSystem);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceResultId);
@@ -79,6 +85,8 @@ public sealed class Case
         SourceSystem = sourceSystem;
         SourceResultId = sourceResultId;
         PatientReference = patientReference;
+        PatientDisplayName = string.IsNullOrWhiteSpace(patientDisplayName) ? null : patientDisplayName.Trim();
+        PatientSecondaryIdentifier = string.IsNullOrWhiteSpace(patientSecondaryIdentifier) ? null : patientSecondaryIdentifier.Trim();
         PathwayId = pathwayId;
         FacilityId = facilityId;
         Owner = initialOwner;
@@ -110,8 +118,23 @@ public sealed class Case
     /// <summary>The source system's identifier of the actionable result. Unique together with <see cref="SourceSystem"/>.</summary>
     public string SourceResultId { get; private set; }
 
-    /// <summary>Source-system reference of the patient. Never a name or other clinical or demographic detail.</summary>
+    /// <summary>Source-system reference of the patient. The identifier every system-to-system message and the audit trail use; never a name.</summary>
     public string PatientReference { get; private set; }
+
+    /// <summary>
+    /// The patient's display name as the source system supplied it, or <see langword="null"/> when it
+    /// did not. Demographic, not clinical: it is kept so staff can recognise who a case is about
+    /// (decision 15, C20), is returned to staff roles only, and never appears in the audit snapshot,
+    /// in a domain event, in an outbound FHIR message or in anything sent to a patient channel.
+    /// </summary>
+    public string? PatientDisplayName { get; private set; }
+
+    /// <summary>
+    /// A second identifier of the patient, typically the facility's medical record number, or
+    /// <see langword="null"/>. Demographic, not clinical, and handled exactly like
+    /// <see cref="PatientDisplayName"/>: staff roles only, never in the audit snapshot or any message.
+    /// </summary>
+    public string? PatientSecondaryIdentifier { get; private set; }
 
     /// <summary>Identifier of the pathway definition that supplies this case's stages, deadlines and evidence rules.</summary>
     public string PathwayId { get; private set; }
@@ -158,8 +181,15 @@ public sealed class Case
     /// <summary>The appointment track, or <see langword="null"/> until an appointment is scheduled.</summary>
     public AppointmentTrack? Appointment { get; private set; }
 
-    /// <summary>Reference to the recorded outcome evidence, or <see langword="null"/> until an outcome event arrives.</summary>
+    /// <summary>Reference to the most recently recorded outcome evidence, or <see langword="null"/> until an outcome event arrives.</summary>
     public string? OutcomeEvidenceReference { get; private set; }
+
+    /// <summary>
+    /// The kind of the most recently recorded outcome evidence (a code from the pathway's evidence
+    /// kinds, for example <c>treatment-plan</c>), or <see langword="null"/> until an outcome event
+    /// arrives. Earlier outcomes stay in the audit trail and the stored source events.
+    /// </summary>
+    public string? OutcomeEvidenceKind { get; private set; }
 
     /// <summary>The accepted closure decision, or <see langword="null"/> while the case is open.</summary>
     public ClosureDecision? Closure { get; private set; }
@@ -453,6 +483,63 @@ public sealed class Case
     }
 
     /// <summary>
+    /// Records that the follow-up appointment was booked, rebooked or moved, and tells the outbox.
+    /// </summary>
+    /// <param name="sourceReference">Reference to the <c>Appointment</c>.</param>
+    /// <param name="scheduledFor">When the appointment is scheduled for.</param>
+    /// <param name="at">When the booking happened according to the source.</param>
+    /// <param name="location">Where the appointment takes place, as the source names it; <see langword="null"/> when it did not say.</param>
+    /// <returns>The appointment track, in status <see cref="AppointmentStatus.Scheduled"/>.</returns>
+    /// <remarks>
+    /// <para>
+    /// Starts the track when there is none, otherwise books it again (<see cref="AppointmentTrack.Rebook"/>).
+    /// Raises <see cref="AppointmentScheduled"/> on a first booking, on a rebooking after a missed appointment,
+    /// and when the appointment moves to another time, so a consented caregiver can be told the date, time and
+    /// place. A resend of the same booking at the same time raises nothing, so nobody is told twice.
+    /// </para>
+    /// <para>
+    /// The place is passed through on the event only; the track does not store it. A change of place alone,
+    /// with the time unchanged, therefore raises nothing.
+    /// </para>
+    /// <para>
+    /// Use <see cref="BeginAppointment"/> instead when the source first reports an appointment already attended
+    /// or missed: that appointment is in the past and nobody should be told to attend it.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">The case is closed, or the appointment was already attended.</exception>
+    public AppointmentTrack ScheduleAppointment(string sourceReference, DateTimeOffset scheduledFor, DateTimeOffset at, string? location = null)
+    {
+        ThrowIfClosed();
+
+        bool changed;
+        if (Appointment is { } track)
+        {
+            changed = track.Status != AppointmentStatus.Scheduled || track.ScheduledFor != scheduledFor;
+            track.Rebook(scheduledFor, at, sourceReference);
+            Touch(at);
+        }
+        else
+        {
+            BeginAppointment(sourceReference, scheduledFor, at);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            Raise(new AppointmentScheduled
+            {
+                EventId = Guid.NewGuid(),
+                CaseId = Id,
+                OccurredAt = at,
+                ScheduledFor = scheduledFor,
+                Location = string.IsNullOrWhiteSpace(location) ? null : location.Trim(),
+            });
+        }
+
+        return Appointment!;
+    }
+
+    /// <summary>
     /// Flags an unresolved exception so the case appears in the exception queue.
     /// </summary>
     /// <param name="exception">The exception flag or flags to set.</param>
@@ -482,15 +569,38 @@ public sealed class Case
     /// Raises an escalation on the case.
     /// </summary>
     /// <param name="escalation">The escalation step reached, from the pathway's escalation ladder.</param>
-    /// <remarks>Escalation adds oversight only: it changes neither the stage nor the owner, who remains accountable for the overdue action.</remarks>
+    /// <remarks>
+    /// <para>Escalation adds oversight only: it changes neither the stage nor the owner, who remains accountable for the overdue action.</para>
+    /// <para>
+    /// Above level 1, the raised <see cref="EscalationRaised"/> says who acknowledged the previous level and when
+    /// (<see cref="EscalationRaised.AcknowledgedByRole"/>, <see cref="EscalationRaised.AcknowledgedAt"/>), taken from the
+    /// most recent open escalation at the level below, if it was acknowledged. The next role up the ladder then knows
+    /// whether the level below has already looked; acknowledgement never stops the clock, so it does not prevent this step.
+    /// </para>
+    /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="escalation"/> is <see langword="null"/>.</exception>
-    /// <exception cref="InvalidOperationException">The case is closed.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed, or an escalation with the same <see cref="Escalation.Id"/> is already on the case.</exception>
     public void Escalate(Escalation escalation)
     {
         ArgumentNullException.ThrowIfNull(escalation);
         ThrowIfClosed();
 
-        _escalations.Add(escalation with { ResolvedAt = null });
+        var previous = escalation.Level > 1
+            ? _escalations.LastOrDefault(e => e.IsOpen && e.Level == escalation.Level - 1)
+            : null;
+        var acknowledged = previous is { IsAcknowledged: true } ? previous : null;
+
+        var stored = escalation with
+        {
+            Id = escalation.Id == Guid.Empty ? Guid.NewGuid() : escalation.Id,
+            ResolvedAt = null,
+        };
+        if (_escalations.Any(e => e.Id == stored.Id))
+        {
+            throw new InvalidOperationException($"Escalation {stored.Id} is already on case {Id}.");
+        }
+
+        _escalations.Add(stored);
         IsEscalated = true;
         Touch(escalation.RaisedAt);
 
@@ -499,24 +609,123 @@ public sealed class Case
             EventId = Guid.NewGuid(),
             CaseId = Id,
             OccurredAt = escalation.RaisedAt,
+            EscalationId = stored.Id,
             Level = escalation.Level,
             EscalatedTo = escalation.EscalatedTo,
             CurrentOwner = Owner,
             Reason = escalation.Reason,
+            AcknowledgedByRole = acknowledged?.AcknowledgedBy?.Role,
+            AcknowledgedAt = acknowledged?.AcknowledgedAt,
         });
+    }
+
+    /// <summary>
+    /// Records that the role an escalation was addressed to has seen it.
+    /// </summary>
+    /// <param name="acknowledgedBy">The person acknowledging; must act in the role the current escalation was escalated to.</param>
+    /// <param name="at">When the acknowledgement was made.</param>
+    /// <remarks>
+    /// <para>
+    /// The current escalation is the most recent one still open. Acknowledging it records who in
+    /// the oversight role has seen it and when, so a facility lead or coordinator can be held to
+    /// having looked. It changes nothing else: the owner stays accountable, every exception flag
+    /// stays set, and <see cref="NextAction"/> and <see cref="DueAt"/> are untouched, because
+    /// seeing a problem is not solving it. Only completing the overdue action resolves an
+    /// escalation (<see cref="ResolveEscalations"/>).
+    /// </para>
+    /// <para>
+    /// The change is audited by the repository when it is saved under
+    /// <see cref="CaseEventType.EscalationAcknowledged"/>; a refused attempt is audited the same way.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="acknowledgedBy"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed, no escalation is open, the open escalation was already acknowledged, or the actor's role is not the role it was escalated to.</exception>
+    public void AcknowledgeEscalation(Actor acknowledgedBy, DateTimeOffset at) =>
+        AcknowledgeCore(null, acknowledgedBy, at);
+
+    /// <summary>
+    /// Records that the role an escalation was addressed to has seen that specific escalation.
+    /// </summary>
+    /// <param name="escalationId">The <see cref="Escalation.Id"/> the person saw, for example from the case screen.</param>
+    /// <param name="acknowledgedBy">The person acknowledging; must act in the role the escalation was escalated to.</param>
+    /// <param name="at">When the acknowledgement was made.</param>
+    /// <remarks>
+    /// Behaves like <see cref="AcknowledgeEscalation(Actor, DateTimeOffset)"/>, and also refuses when the named
+    /// escalation is not the current one: unknown, already resolved, or superseded by a newer escalation. A person can
+    /// then only ever be recorded as having seen the escalation they were shown.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="acknowledgedBy"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The case is closed, the named escalation is not the current open one, it was already acknowledged, or the actor's role is not the role it was escalated to.</exception>
+    public void AcknowledgeEscalation(Guid escalationId, Actor acknowledgedBy, DateTimeOffset at) =>
+        AcknowledgeCore(escalationId, acknowledgedBy, at);
+
+    /// <summary>
+    /// Shared body of the two <c>AcknowledgeEscalation</c> overloads.
+    /// </summary>
+    /// <param name="escalationId">The escalation the person saw, or <see langword="null"/> for the current one.</param>
+    /// <param name="acknowledgedBy">The person acknowledging.</param>
+    /// <param name="at">When the acknowledgement was made.</param>
+    private void AcknowledgeCore(Guid? escalationId, Actor acknowledgedBy, DateTimeOffset at)
+    {
+        ArgumentNullException.ThrowIfNull(acknowledgedBy);
+        ThrowIfClosed();
+
+        var index = _escalations.FindLastIndex(e => e.IsOpen);
+        if (index < 0)
+        {
+            throw new InvalidOperationException($"Case {Id} has no open escalation to acknowledge.");
+        }
+
+        if (escalationId is { } named && _escalations[index].Id != named)
+        {
+            throw new InvalidOperationException(
+                $"Escalation {named} is not the current open escalation on case {Id}; it is unknown, resolved or superseded.");
+        }
+
+        var escalation = _escalations[index];
+        if (escalation.IsAcknowledged)
+        {
+            throw new InvalidOperationException(
+                $"The level {escalation.Level} escalation was already acknowledged by '{escalation.AcknowledgedBy!.Reference}' at {escalation.AcknowledgedAt:O}.");
+        }
+
+        if (!string.Equals(escalation.EscalatedTo.Role, acknowledgedBy.Role, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Role '{acknowledgedBy.Role}' may not acknowledge the level {escalation.Level} escalation; it was escalated to role '{escalation.EscalatedTo.Role}'.");
+        }
+
+        _escalations[index] = escalation with
+        {
+            EscalatedTo = escalation.EscalatedTo with { },
+            AcknowledgedBy = acknowledgedBy with { },
+            AcknowledgedAt = at,
+        };
+        Touch(at);
     }
 
     /// <summary>
     /// Marks every open escalation as resolved once the overdue action has been completed.
     /// </summary>
     /// <param name="at">When the overdue action was completed.</param>
+    /// <remarks>
+    /// Each resolved escalation is a new record with its own copies of the nested owner and acknowledger, as in
+    /// <see cref="AcknowledgeEscalation(Actor, DateTimeOffset)"/> and <see cref="WithdrawConsent"/>: a persistence
+    /// layer that tracks nested values by reference cannot store a replacement that shares them with the record it replaces.
+    /// </remarks>
     public void ResolveEscalations(DateTimeOffset at)
     {
         for (var i = 0; i < _escalations.Count; i++)
         {
             if (_escalations[i].ResolvedAt is null)
             {
-                _escalations[i] = _escalations[i] with { ResolvedAt = at };
+                var open = _escalations[i];
+                _escalations[i] = open with
+                {
+                    EscalatedTo = open.EscalatedTo with { },
+                    AcknowledgedBy = open.AcknowledgedBy is { } acknowledgedBy ? acknowledgedBy with { } : null,
+                    ResolvedAt = at,
+                };
             }
         }
 
@@ -529,15 +738,23 @@ public sealed class Case
     /// </summary>
     /// <param name="evidenceReference">Reference to the <c>Procedure</c> or follow-up <c>DiagnosticReport</c>.</param>
     /// <param name="at">When the outcome was recorded.</param>
-    /// <remarks>Recording an outcome does not close the case; it only makes an authorized closure decision possible. The evidence is also linked to the appointment track, which completes only when the patient attended and an outcome is documented.</remarks>
+    /// <param name="evidenceKind">The kind of evidence, as a code the pathway declares (for example <c>diagnosis</c>, <c>treatment-plan</c>, <c>treatment-started</c>), or <see langword="null"/> when the caller has none. Checking the code against the pathway is the caller's job, because the Domain has no pathway here.</param>
+    /// <remarks>
+    /// Recording an outcome does not close the case; it only makes an authorized closure decision
+    /// possible. The evidence is also linked to the appointment track, which completes only when the
+    /// patient attended and an outcome is documented. A case may record several outcomes in turn
+    /// (diagnosis, then treatment plan, then treatment started); each replaces the reference and kind
+    /// held here and every one stays in the audit trail.
+    /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="evidenceReference"/> is empty.</exception>
     /// <exception cref="InvalidOperationException">The case is closed.</exception>
-    public void RecordOutcomeEvidence(string evidenceReference, DateTimeOffset at)
+    public void RecordOutcomeEvidence(string evidenceReference, DateTimeOffset at, string? evidenceKind = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(evidenceReference);
         ThrowIfClosed();
 
         OutcomeEvidenceReference = evidenceReference;
+        OutcomeEvidenceKind = string.IsNullOrWhiteSpace(evidenceKind) ? null : evidenceKind.Trim();
         Appointment?.RecordOutcome(evidenceReference, at);
         Touch(at);
     }
@@ -627,7 +844,14 @@ public sealed class Case
             throw new InvalidOperationException("No caregiver consent is active on this case, so there is nothing to withdraw.");
         }
 
-        CaregiverConsent = consent with { WithdrawnAt = at, WithdrawalEvidenceReference = evidenceReference };
+        // A fresh contact point, not the same instance: the withdrawn consent replaces the granted one, and a
+        // persistence layer that tracks the nested value by reference would otherwise drop it with the old record.
+        CaregiverConsent = consent with
+        {
+            CaregiverContactPoint = consent.CaregiverContactPoint with { },
+            WithdrawnAt = at,
+            WithdrawalEvidenceReference = evidenceReference,
+        };
         Touch(at);
     }
 

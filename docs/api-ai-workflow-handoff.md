@@ -2,7 +2,7 @@
 
 How the .NET API and the Python AI workflow service work together to draft a clinician handoff summary, what the API can and cannot do with AI, and what is built today.
 
-This is FR-11. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](ui-design-gap-analysis.md) section 5) and the AI design proposal reviewed in November 2026.
+This is FR-11, and this document is the contract. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](ui-design-gap-analysis.md) section 5). [`ai-spec.md`](ai-spec.md) is the design proposal behind it and is superseded here where the two differ.
 
 ## The boundary
 
@@ -176,7 +176,7 @@ Authentication is Entra ID throughout: `DefaultAzureCredential` locally with the
 |---|---|
 | `IAiProvider`, `NoOpAiProvider` | Working. The default, so everything runs with AI off |
 | Fact, request, draft and response contracts | Written |
-| `HandoffSummaryRecord` and its EF configuration | Written. Needs a migration (`HandoffSummaryProvenance`, WS2) |
+| `HandoffSummaryRecord` and its EF configuration | Written. In the `InitialCreate` migration |
 | `HandoffFactCollector`, `HandoffSummaryDrafter`, `AutoDraftOnHandoff` | Stubs, `TODO(WS-9)` |
 | `DraftHandoffSummary`, `ApproveSummary`, `RejectSummary` | Stubs, answering 501 |
 | `AiWorkflowProvider`, `FoundryDirectProvider` | Stubs |

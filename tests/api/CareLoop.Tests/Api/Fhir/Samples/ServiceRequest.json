@@ -1,10 +1,12 @@
 {
   "resourceType": "ServiceRequest",
   "id": "SYN-SR-0001",
-  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
   "status": "active",
   "intent": "order",
-  "category": [ { "text": "PLACEHOLDER - synthetic, not a clinical code" } ],
+  "category": [ { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/service-request-category", "code": "consultation" } ] } ],
   "subject": { "reference": "Patient/SYN-PT-0001" },
-  "authoredOn": "2026-01-02T08:00:00Z"
+  "authoredOn": "2026-01-02T08:00:00Z",
+  "requester": { "reference": "Practitioner/SYN-STAFF-0001", "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-role", "valueCode": "clinician" }, { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-facility", "valueString": "SYN-FAC-A" } ] },
+  "reasonReference": [ { "reference": "DiagnosticReport/SYN-RESULT-0001" } ]
 }

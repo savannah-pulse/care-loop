@@ -20,6 +20,24 @@ public sealed record CaseDetailResponse
     /// <summary>Source-system reference of the patient. Never a name.</summary>
     public required string PatientReference { get; init; }
 
+    /// <summary>Patient display name for staff; absent for a coordinator.</summary>
+    public string? PatientDisplayName { get; init; }
+
+    /// <summary>Patient's second identifier for staff; absent for a coordinator.</summary>
+    public string? PatientSecondaryIdentifier { get; init; }
+
+    /// <summary>The display step derived from stage and tracks by the Domain.</summary>
+    public required CaseDisplayLabel DisplayLabel { get; init; }
+
+    /// <summary>The escalation history, including acknowledgements and resolutions.</summary>
+    public required IReadOnlyList<EscalationResponse> Escalations { get; init; }
+
+    /// <summary>The latest outcome's evidence kind.</summary>
+    public string? OutcomeEvidenceKind { get; init; }
+
+    /// <summary>The patient's confidence rating, 1 to 5, when supplied.</summary>
+    public int? Confidence { get; init; }
+
     /// <summary>Identifier of the pathway the case follows.</summary>
     public required string PathwayId { get; init; }
 

@@ -78,12 +78,15 @@ public static class DependencyInjection
     {
         services.Configure<ExternalSystemsOptions>(configuration.GetSection(ExternalSystemsOptions.SectionName));
 
-        services.AddSingleton<IFhirInboundMapper, DiagnosticReportMapper>();
-        services.AddSingleton<IFhirInboundMapper, TaskMapper>();
-        services.AddSingleton<IFhirInboundMapper, ServiceRequestMapper>();
-        services.AddSingleton<IFhirInboundMapper, AppointmentMapper>();
-        services.AddSingleton<IFhirInboundMapper, ProcedureMapper>();
-        services.AddSingleton<IFhirInboundMapper, ProvenanceMapper>();
+        // Scoped: DiagnosticReportMapper reads the referenced Patient through the typed FhirHttpClient,
+        // which must not be captured by a singleton.
+        services.AddScoped<IFhirInboundMapper, DiagnosticReportMapper>();
+        services.AddScoped<IFhirInboundMapper, TaskMapper>();
+        services.AddScoped<IFhirInboundMapper, ServiceRequestMapper>();
+        services.AddScoped<IFhirInboundMapper, AppointmentMapper>();
+        services.AddScoped<IFhirInboundMapper, ProcedureMapper>();
+        services.AddScoped<IFhirInboundMapper, ProvenanceMapper>();
+        services.AddScoped<IFhirInboundMapper, ConsentMapper>();
 
         services.AddSingleton<EscalationTaskMapper>();
         services.AddSingleton<HandoffDocumentReferenceMapper>();
@@ -103,7 +106,7 @@ public static class DependencyInjection
     /// <remarks>
     /// All three notification providers are registered so the seam exists, but only those named in
     /// <see cref="NotificationOptions.EnabledProviders"/> are used. The dispatcher only runs as a
-    /// hosted service when <c>Outbox:Enabled</c> is <see langword="true"/>, because its stub would otherwise stop the host.
+    /// hosted service when <c>Outbox:Enabled</c> is <see langword="true"/>, so a test host or a tool can run without it.
     /// </remarks>
     public static IServiceCollection AddOutboxAndNotifications(this IServiceCollection services, IConfiguration configuration)
     {
@@ -117,6 +120,7 @@ public static class DependencyInjection
         services.AddScoped<RecipientResolver>();
         services.AddScoped<NotificationSender>();
         services.AddSingleton<TemplateRenderer>();
+        services.AddSingleton<NotificationSendLog>();
 
         services.AddHttpClient<SimulatorNotificationProvider>();
         services.AddTransient<INotificationProvider>(sp => sp.GetRequiredService<SimulatorNotificationProvider>());
@@ -124,12 +128,12 @@ public static class DependencyInjection
         services.AddTransient<INotificationProvider, EmailNotificationProvider>();
 
         // The inbound half of a provider. SMS and email get theirs when those providers are built.
-        services.AddSingleton<IInboundNotificationHandler, SimulatorInboundNotificationHandler>();
+        // Scoped: the simulator handler reads the case a reply is about.
+        services.AddScoped<IInboundNotificationHandler, SimulatorInboundNotificationHandler>();
 
         services.AddSingleton<OutboxDispatcher>();
         if (configuration.GetValue<bool>($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.Enabled)}"))
         {
-            // TODO(WS-4): set Outbox:Enabled to true in appsettings.json once OutboxDispatcher is implemented.
             services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
         }
 
@@ -142,15 +146,18 @@ public static class DependencyInjection
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration; supplies the <c>DeadlineWorker</c> section.</param>
     /// <returns>The same service collection, for chaining.</returns>
-    /// <remarks>The worker only runs as a hosted service when <c>DeadlineWorker:Enabled</c> is <see langword="true"/>, because its stub would otherwise stop the host.</remarks>
+    /// <remarks>The worker only runs as a hosted service when <c>DeadlineWorker:Enabled</c> is <see langword="true"/>. Explicit sweeps remain available to tests.</remarks>
     public static IServiceCollection AddDeadlines(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<DeadlineWorkerOptions>(configuration.GetSection(DeadlineWorkerOptions.SectionName));
+        services.AddOptions<DeadlineWorkerOptions>()
+            .Bind(configuration.GetSection(DeadlineWorkerOptions.SectionName))
+            .Validate(o => o.Interval > TimeSpan.Zero && o.Interval.TotalMilliseconds <= uint.MaxValue - 1,
+                "DeadlineWorker:Interval must be positive and supported by Task.Delay.")
+            .ValidateOnStart();
 
         services.AddSingleton<DeadlineWorker>();
         if (configuration.GetValue<bool>($"{DeadlineWorkerOptions.SectionName}:{nameof(DeadlineWorkerOptions.Enabled)}"))
         {
-            // TODO(WS-5): set DeadlineWorker:Enabled to true in appsettings.json once DeadlineWorker is implemented.
             services.AddHostedService(sp => sp.GetRequiredService<DeadlineWorker>());
         }
 

@@ -25,8 +25,9 @@ If a task appears to conflict with any of these, stop and ask.
 These are deferred, not forbidden. Build the seams for them now and leave the implementations for later.
 
 - **Real SMS and email delivery.** For now the simulator notification provider is the only one enabled. SMS and email providers come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
-- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed.
+- **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS, Malaffi or patient-channel integration.** The simulators stand in for these.
+- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-spec.md`](docs/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
 
 ## Before real patient data
 
@@ -35,7 +36,7 @@ The prototype is not yet fit for real patient data. These are prerequisites for 
 - **Authentication and authorization.** `DemoRoles` (identity stated in request headers) is replaced by real sign-in for dashboard users and authenticated system-to-system access on `/fhir`.
 - **Clinical approval.** The pathway definition and every message template are approved by a clinical adviser; no placeholder remains.
 - **Live integrations.** HIS, patient channel, SMS and email are implemented behind the existing seams and switched on through configuration.
-- **Security and data protection.** Encryption in transit and at rest, managed secrets, access logging, retention rules and a review against the health-data regulation that applies to the deployment.
+- **Security and data protection.** Encryption in transit and at rest, managed secrets, access logging, retention rules and a review against the health-data regulation that applies to the deployment. The case store holds patient names and identifiers, so it is personal health data from the first real record.
 
 ## Repository layout
 
@@ -56,6 +57,7 @@ care-loop/
 │   ├── workstreams.md                  who owns which files (WS1 to WS10)
 │   ├── architecture.md, development.md, releasing.md, component-register.md
 │   ├── api-ai-workflow-handoff.md      what AI may do, and how the API and the Python service share the work
+│   ├── ai-spec.md                      the AI design proposal; the handoff doc above is the contract
 │   └── ui-design/                      screen designs
 │
 ├── src/
@@ -67,7 +69,8 @@ care-loop/
 │   │   │   ├── Recipients/             Recipient, ContactPoint, NotificationChannel
 │   │   │   ├── Events/                 SourceEvent, CaseEventType, AuditEvent
 │   │   │   │   └── DomainEvents/       IDomainEvent, NotificationRequested, HandoffProposed, HandoffRejected,
-│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed
+│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed,
+│   │   │   │                           HandoffSummaryApproved
 │   │   │   ├── Rules/                  TransitionRules, OwnershipRules, ClosureGate, DeadlinePolicy
 │   │   │   ├── Pathways/               PathwayDefinition, IPathwayProvider
 │   │   │   └── Time/                   IClock
@@ -111,7 +114,8 @@ care-loop/
 │   │
 │   ├── web/                            CareLoop dashboard only (React, TypeScript, Vite); a starter today
 │   │
-│   ├── ai_workflow/                    Python AI workflow service (see its README); proposes, never decides
+│   ├── ai_workflow/                    Python AI workflow service (see its README); proposes, never decides.
+│   │                                   Owned by WS9; it owns the handoff summary prompt and the Foundry call
 │   │
 │   ├── worker/                         README only: the deadline worker lives in CareLoop.Api/Worker
 │   │
@@ -155,7 +159,7 @@ File names inside folders are a starting point. Folder boundaries and dependency
 
 ## Domain model
 
-**Case.** One actionable result equals one case. It holds source identifiers and references (not clinical data), pathway, clinician-reviewed urgency, stage, current owner and due time.
+**Case.** One actionable result equals one case. It holds source identifiers and references (not clinical data), the patient's display name and a second identifier such as the MRN (demographic, for staff screens; never shown to the coordinator role), pathway, clinician-reviewed urgency, stage, current owner and due time.
 
 **Stages.**
 
@@ -199,20 +203,21 @@ Inbound:
 
 | Event | FHIR resource | Interpretation |
 |---|---|---|
-| Screening result | `DiagnosticReport` with `Observation`s | A new report opens a case |
+| Screening result | `DiagnosticReport` with `Observation`s | A new report opens a case; the patient's display name, MRN, language and contact points come from its `Patient` (contained, or read from the source) |
 | Clinical review | `Task` (review) | Completed, with priority as the reviewed urgency |
 | Consultation | `ServiceRequest` plus `Task` | Task status: requested, accepted, rejected, completed |
 | Referral | `ServiceRequest` plus `Task` | Same pattern |
 | Appointment | `Appointment` | booked, fulfilled, noshow |
 | Outcome | `Procedure` or follow-up `DiagnosticReport` | Becomes the evidence reference |
-| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer |
+| Closure | Case `Task` set to completed, plus `Provenance` | Provenance names the authorizer; it counts only when it targets that case `Task` |
+| Caregiver consent | `Consent` | `active` grants, `inactive`, `rejected` or a `deny` provision withdraws; the caregiver is a contained `RelatedPerson` |
 
 Outbound:
 
 | From CareLoop | FHIR resource |
 |---|---|
 | Escalation notice | `Task` |
-| Handoff summary | `DocumentReference` |
+| Handoff summary | `DocumentReference`, sent when a person approves it |
 | Case status (also feeds the patient view) | `Task` via `GET /fhir/Task/{id}` |
 
 Case to `Task` field mapping: handoff status to `Task.status`; pathway stage to `Task.businessStatus`; owner to `Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`; patient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to `Task.statusReason`. Keep all code mappings in `StatusMap`.
@@ -221,18 +226,24 @@ FHIR carries state; the engine wants events. Each inbound mapper must work out w
 
 Delivery reports and patient replies are not part of the FHIR boundary. They come back through the notification provider that sent the message (see "Events and notifications").
 
-Endpoints: `POST` and `PUT /fhir/{resourceType}`, `GET /fhir/Task/{id}`, `GET /fhir/metadata`.
+Endpoints: `POST /fhir/{resourceType}`, `PUT /fhir/{resourceType}/{id}` (the URL id must equal the body id), `GET /fhir/Task/{id}`, `GET /fhir/metadata`.
+
+The sending system names itself in `meta.source`, using its key under `ExternalSystems:Systems`. A resource without it is refused with 400, and one from a system that is not configured there with 403. Replies go back to the system a case came from.
+
+A contact point with `ContactPoint.system` `other` is reached through the simulator channel, for the patient and for a consented caregiver alike; `sms` and `email` are reserved for the real providers.
 
 ## Events and notifications
 
 | Domain event | FHIR message out | Direct notification to |
 |---|---|---|
 | `NotificationRequested` | None | Patient |
-| `HandoffProposed` | `Task` plus `DocumentReference` | Proposed owner |
+| `HandoffProposed` | `Task` | Proposed owner |
+| `HandoffSummaryApproved` | `DocumentReference` (exactly the approved text) | None |
 | `HandoffRejected`, `ReferralRejected` | `Task` update | Current owner |
 | `CallRequested` | `Task` | Current owner |
 | `DeadlineApproaching` | None | Current owner |
 | `EscalationRaised` | `Task` | Facility lead, then coordinator |
+| `AppointmentScheduled` | None | Caregiver, only while the patient's consent is active |
 | `CaseClosed` | `Task` completed | None |
 
 Two subscribers exist: `FhirPublisher` and `NotificationRouter`.
@@ -452,3 +463,4 @@ Work in this order. Finish and test each step before starting the next.
 - Do not invent clinical content: result categories, urgency levels, timeframes or closure criteria must come from the pathway definition file, with values marked as placeholders.
 - Keep secrets out of the repository. Use environment variables and provide a `.env.example`.
 - Report honestly what was built, what was tested and what was not.
+- Keep [`docs/workstreams.md`](docs/workstreams.md) current. When a change removes a workstream's last `TODO(WS-n)` tag and un-skips its last test, set that workstream's **Status** to `Done` in the summary table in the same change. When you finish a design-gap item, mark it `Done` in its workstream's section. Never mark something `Done` that still has a stub, a skipped test or a failing test; if later work reopens a workstream, set it back to `Open`.

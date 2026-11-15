@@ -1,8 +1,22 @@
 {
   "resourceType": "Provenance",
   "id": "SYN-PROV-0001",
-  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
-  "target": [ { "reference": "Task/SYN-TASK-0001" } ],
+  "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
+  "contained": [
+    {
+      "resourceType": "Task",
+      "id": "SYN-CASE-TASK-0001",
+      "status": "completed",
+      "statusReason": { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/status-reason", "code": "treated" } ] },
+      "intent": "order",
+      "code": { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/task-code", "code": "case" } ] },
+      "basedOn": [ { "reference": "DiagnosticReport/SYN-RESULT-0001" } ],
+      "for": { "reference": "Patient/SYN-PT-0001" },
+      "lastModified": "2026-01-03T10:00:00Z",
+      "output": [ { "type": { "coding": [ { "system": "https://careloop.invalid/fhir/CodeSystem/closure-output", "code": "evidence" } ] }, "valueReference": { "reference": "Procedure/SYN-PROC-0001" } } ]
+    }
+  ],
+  "target": [ { "reference": "#SYN-CASE-TASK-0001" } ],
   "recorded": "2026-01-03T10:00:00Z",
-  "agent": [ { "who": { "reference": "Practitioner/SYN-STAFF-0002" } } ]
+  "agent": [ { "who": { "reference": "Practitioner/SYN-STAFF-0002", "extension": [ { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-role", "valueCode": "clinician" }, { "url": "https://careloop.invalid/fhir/StructureDefinition/actor-facility", "valueString": "SYN-FAC-A" } ] } } ]
 }

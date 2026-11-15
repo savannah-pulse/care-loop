@@ -44,4 +44,31 @@ public sealed record MetricsResponse
 
     /// <summary>Median time from result received to closure; <see langword="null"/> when no case is closed.</summary>
     public TimeSpan? MedianTimeToClosure { get; init; }
+
+    /// <summary>Rates keyed by measure: acknowledgement, closure, understanding, nextStepOnTime, referralAcceptedAndAttended, appointmentsAttended, treatmentStartedOnTime and signedEvidence.</summary>
+    public required IReadOnlyDictionary<string, RateMeasureResponse> Measures { get; init; }
+
+    /// <summary>Elapsed clock-time medians keyed by acknowledgement, consultation, appointment, careStarted and closure.</summary>
+    public required IReadOnlyDictionary<string, DurationMeasureResponse> TimeToStep { get; init; }
+
+    /// <summary>Closed cases per authorized typed closure reason.</summary>
+    public required IReadOnlyDictionary<string, int> ClosuresByReason { get; init; }
+
+    /// <summary>Cases that actually reached each display label in an applied audit projection; no skipped labels are inferred.</summary>
+    public required IReadOnlyDictionary<string, RateMeasureResponse> CasesReachingDisplayLabel { get; init; }
+
+    /// <summary>Current cases per Domain display label.</summary>
+    public required IReadOnlyDictionary<string, int> CasesByDisplayLabel { get; init; }
+
+    /// <summary>Share of notified cases that supplied a confidence rating; null when none were notified.</summary>
+    public double? ConfidenceRate { get; init; }
+
+    /// <summary>Number of notified cases eligible to supply a confidence rating.</summary>
+    public required int ConfidenceDenominator { get; init; }
+
+    /// <summary>Number of cases supplying a rating.</summary>
+    public required int ConfidenceResponses { get; init; }
+
+    /// <summary>Mean latest rating, 1 to 5; null when no rating was supplied.</summary>
+    public double? AverageConfidence { get; init; }
 }

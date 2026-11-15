@@ -116,14 +116,18 @@ function listCases(state: MockState, query: URLSearchParams): Schemas['CaseSumma
     .map((detail) => ({
       caseId: detail.caseId,
       patientReference: detail.patientReference,
+      facilityId: detail.facilityId,
       pathwayId: detail.pathwayId,
       stage: detail.stage,
+      displayLabel: detail.displayLabel,
       urgency: detail.urgency,
       owner: detail.owner,
       nextAction: detail.nextAction,
       dueAt: detail.dueAt,
       isEscalated: detail.isEscalated,
       exceptions: [...detail.exceptions],
+      closureReason: detail.closureReason,
+      createdAt: detail.createdAt,
       updatedAt: detail.updatedAt,
     }))
 }
@@ -142,6 +146,9 @@ function listExceptions(state: MockState, query: URLSearchParams): Schemas['Exce
       return {
         caseId: detail.caseId,
         patientReference: detail.patientReference,
+        facilityId: detail.facilityId,
+        pathwayId: detail.pathwayId,
+        displayLabel: detail.displayLabel,
         exceptions: [...detail.exceptions],
         stage: detail.stage,
         urgency: detail.urgency,
@@ -205,6 +212,7 @@ function approve(state: MockState, fixture: CaseFixture, summary: HandoffSummary
   const detail = fixture.detail
   fixture.timeline.push({
     auditEventId: randomUUID(),
+    sourceSystem: 'careloop',
     eventType: 'HandoffSummaryApproved',
     disposition: 'Applied',
     actorReference: approver,

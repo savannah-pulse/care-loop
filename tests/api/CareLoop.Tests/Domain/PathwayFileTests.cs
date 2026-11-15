@@ -67,6 +67,43 @@ public sealed class PathwayFileTests
     }
 
     [Fact]
+    public void Reply_deadline_placeholders_follow_the_design_as_clock_time()
+    {
+        var root = Load();
+        var deadlines = root.GetProperty("deadlines").EnumerateArray()
+            .Where(d => d.GetProperty("urgencyCode").ValueKind == JsonValueKind.Null)
+            .ToDictionary(d => d.GetProperty("nextAction").GetString()!, d => d);
+
+        Assert.Equal(TimeSpan.FromHours(4), TimeSpan.Parse(deadlines["respond-to-referral"].GetProperty("duration").GetString()!));
+        Assert.Equal(TimeSpan.FromDays(1), TimeSpan.Parse(deadlines["answer-consultation"].GetProperty("duration").GetString()!));
+        Assert.Equal(TimeSpan.FromHours(2), TimeSpan.Parse(deadlines["call-patient"].GetProperty("duration").GetString()!));
+
+        foreach (var action in new[] { "respond-to-referral", "answer-consultation", "call-patient" })
+        {
+            var deadline = deadlines[action];
+            Assert.False(deadline.GetProperty("clinicallyApproved").GetBoolean());
+            Assert.Contains("clock time", deadline.GetProperty("citation").GetString());
+            Assert.Contains("working hours", deadline.GetProperty("citation").GetString());
+            Assert.True(TimeSpan.Parse(deadline.GetProperty("warnBefore").GetString()!) < TimeSpan.Parse(deadline.GetProperty("duration").GetString()!), $"{action} warns before it is due");
+        }
+    }
+
+    [Fact]
+    public void Evidence_kinds_are_declared_as_placeholders_and_a_treatment_plan_leads_to_start_treatment()
+    {
+        var root = Load();
+        var kinds = root.GetProperty("evidenceKinds").EnumerateArray().ToDictionary(k => k.GetProperty("kind").GetString()!, k => k);
+
+        Assert.Equal(new HashSet<string> { "diagnosis", "treatment-plan", "treatment-started", "surveillance-started" }, kinds.Keys.ToHashSet());
+        Assert.All(kinds.Values, k => Assert.False(k.GetProperty("clinicallyApproved").GetBoolean()));
+        Assert.Equal("start-treatment", kinds["treatment-plan"].GetProperty("nextAction").GetString());
+
+        var startTreatment = root.GetProperty("deadlines").EnumerateArray().Single(d => d.GetProperty("nextAction").GetString() == "start-treatment");
+        Assert.Equal("receiving-clinician", startTreatment.GetProperty("ownerRole").GetString());
+        Assert.False(startTreatment.GetProperty("clinicallyApproved").GetBoolean());
+    }
+
+    [Fact]
     public void Every_deadline_names_an_owner_role_and_a_placeholder_citation()
     {
         var root = Load();

@@ -11,6 +11,9 @@ public sealed record TimelineEntryResponse
     /// <summary>Identifier of the audit entry.</summary>
     public required Guid AuditEventId { get; init; }
 
+    /// <summary>The source system joined from the stored event; internal events use careloop.</summary>
+    public required string SourceSystem { get; init; }
+
     /// <summary>The kind of event.</summary>
     public required CaseEventType EventType { get; init; }
 

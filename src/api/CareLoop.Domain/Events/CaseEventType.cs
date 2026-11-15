@@ -43,4 +43,7 @@ public enum CaseEventType
 
     /// <summary>Internal: a person approved an AI-drafted handoff summary in the dashboard.</summary>
     HandoffSummaryApproved = 101,
+
+    /// <summary>Internal: the role an escalation was addressed to acknowledged it in the dashboard. Oversight only: it changes no owner, exception or deadline.</summary>
+    EscalationAcknowledged = 102,
 }

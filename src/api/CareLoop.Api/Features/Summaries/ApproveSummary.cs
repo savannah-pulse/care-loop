@@ -16,7 +16,8 @@ namespace CareLoop.Api.Features.Summaries;
 /// which may differ from the draft, because the approver owns the words they sign.
 /// <para>
 /// Approval changes nothing else: it cannot set urgency, alter source data, close the case or send
-/// a message. It is what lets the FHIR publisher send the <c>DocumentReference</c>.
+/// a message. It raises the <see cref="CareLoop.Domain.Events.DomainEvents.HandoffSummaryApproved"/> domain event,
+/// which is what lets the FHIR publisher send the <c>DocumentReference</c> for this summary and no other.
 /// </para>
 /// </remarks>
 public static class ApproveSummary
@@ -52,7 +53,9 @@ public static class ApproveSummary
     public static IResult Handle(Guid caseId, Guid summaryId, ApproveSummaryRequest request, [FromHeader(Name = DemoRoles.UserHeader)] string? userReference, [FromHeader(Name = DemoRoles.RoleHeader)] string? role, CancellationToken ct)
     {
         // TODO(WS-9): check the role against the pathway's summary approver roles, mark the record
-        // Approved with the approved text, and save a HandoffSummaryApproved event via ICaseRepository.SaveAsync.
+        // Approved with the approved text, raise the HandoffSummaryApproved domain event (naming this summary
+        // and the approver) on the case, and save a HandoffSummaryApproved source event via ICaseRepository.SaveAsync,
+        // so the FHIR publisher sends the DocumentReference.
         return NotImplementedResults.For("WS9", "ApproveSummary");
     }
 }

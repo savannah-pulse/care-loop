@@ -16,8 +16,10 @@ namespace CareLoop.Api.Infrastructure.Pathways;
 /// <c>d.hh:mm:ss</c>) and caches it for the lifetime of the provider. Fails loudly on a malformed
 /// file, on a duplicate pathway identifier, or on a definition missing a rule for any stage or
 /// closure reason or a deadline for any next action it names (including the consultation answer and
-/// referral response actions the handlers set), because a silently incomplete pathway would let
-/// cases stall without a deadline. A change log entry with no version, approver or summary also
+/// referral response actions the handlers set, and the next action an evidence kind names), because
+/// a silently incomplete pathway would let cases stall without a deadline. A definition with no
+/// evidence kinds, or a duplicate one, also fails, because every outcome must carry a kind the
+/// pathway knows. A change log entry with no version, approver or summary also
 /// fails, because an unattributed rule cannot be traced. A failed load is not cached, so a corrected file is
 /// picked up on the next call.
 /// </remarks>
@@ -194,6 +196,7 @@ public sealed class JsonPathwayProvider : IPathwayProvider
         var namedActions = definition.Stages
             .Select(s => s.NextActionOnEntry)
             .Concat(definition.Tracks.Select(t => t.NextActionOnException))
+            .Concat(definition.EvidenceKinds.Select(k => k.NextAction))
             .Append(ConsultationTrack.AnswerAction)
             .Append(ReferralTrack.RespondAction)
             .Where(a => !string.IsNullOrWhiteSpace(a))
@@ -226,6 +229,21 @@ public sealed class JsonPathwayProvider : IPathwayProvider
             {
                 problems.Add($"has a change log entry (index {index}) without a version, approver or summary");
             }
+        }
+
+        if (definition.EvidenceKinds.Count == 0)
+        {
+            problems.Add("declares no evidence kinds, so no outcome could ever be recorded");
+        }
+
+        foreach (var kind in definition.EvidenceKinds.Where(k => string.IsNullOrWhiteSpace(k.Kind)))
+        {
+            problems.Add("has an evidence kind with no code");
+        }
+
+        foreach (var duplicate in definition.EvidenceKinds.GroupBy(k => k.Kind, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+        {
+            problems.Add($"declares evidence kind '{duplicate.Key}' more than once");
         }
 
         if (definition.EscalationLadder.Count == 0)

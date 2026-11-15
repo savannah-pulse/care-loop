@@ -27,6 +27,8 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.SourceSystem).HasMaxLength(100).IsRequired();
         builder.Property(c => c.SourceResultId).HasMaxLength(200).IsRequired();
         builder.Property(c => c.PatientReference).HasMaxLength(200).IsRequired();
+        builder.Property(c => c.PatientDisplayName).HasMaxLength(200);
+        builder.Property(c => c.PatientSecondaryIdentifier).HasMaxLength(200);
         builder.Property(c => c.PathwayId).HasMaxLength(100).IsRequired();
         builder.Property(c => c.FacilityId).HasMaxLength(100).IsRequired();
         builder.Property(c => c.Urgency).HasMaxLength(100);
@@ -34,6 +36,7 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         builder.Property(c => c.NextAction).HasMaxLength(100);
         builder.Property(c => c.Exceptions).HasConversion<int>();
         builder.Property(c => c.OutcomeEvidenceReference).HasMaxLength(200);
+        builder.Property(c => c.OutcomeEvidenceKind).HasMaxLength(100);
         builder.Property(c => c.Version).IsConcurrencyToken();
 
         // One actionable result equals one case.
@@ -74,14 +77,25 @@ public sealed class CaseConfiguration : IEntityTypeConfiguration<Case>
         {
             escalation.ToTable("CaseEscalations");
             escalation.WithOwner().HasForeignKey("CaseId");
-            escalation.Property<int>("Id");
-            escalation.HasKey("Id");
+            // The int "Sequence" key keeps the stored order of escalations; the Domain's Guid Id is what callers name.
+            escalation.Property<int>("Sequence");
+            escalation.HasKey("Sequence");
+            escalation.Property(e => e.Id).ValueGeneratedNever();
+            escalation.HasIndex(e => e.Id).IsUnique();
             escalation.Property(e => e.Reason).HasMaxLength(500);
+            escalation.Ignore(e => e.IsOpen);
+            escalation.Ignore(e => e.IsAcknowledged);
             escalation.OwnsOne(e => e.EscalatedTo, owner =>
             {
                 owner.Property(o => o.Reference).HasMaxLength(200);
                 owner.Property(o => o.Role).HasMaxLength(100);
                 owner.Property(o => o.FacilityId).HasMaxLength(100);
+            });
+            escalation.OwnsOne(e => e.AcknowledgedBy, actor =>
+            {
+                actor.Property(a => a.Reference).HasMaxLength(200);
+                actor.Property(a => a.Role).HasMaxLength(100);
+                actor.Property(a => a.FacilityId).HasMaxLength(100);
             });
         });
         builder.Navigation(c => c.Escalations).UsePropertyAccessMode(PropertyAccessMode.Field);

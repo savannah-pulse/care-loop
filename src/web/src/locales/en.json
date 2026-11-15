@@ -343,7 +343,8 @@
       "ClosureDecided": "Case closed",
       "ConsentRecorded": "Consent recorded",
       "DeadlineElapsed": "Deadline reached",
-      "HandoffSummaryApproved": "Handoff summary approved"
+      "HandoffSummaryApproved": "Handoff summary approved",
+      "EscalationAcknowledged": "Escalation acknowledged"
     },
     "kinds": {
       "ScreeningResultReceived": "Result",
@@ -356,7 +357,8 @@
       "ClosureDecided": "Closure",
       "ConsentRecorded": "Consent",
       "DeadlineElapsed": "Deadline",
-      "HandoffSummaryApproved": "Summary"
+      "HandoffSummaryApproved": "Summary",
+      "EscalationAcknowledged": "Escalation"
     },
     "fromHospital": "{actor} · from the hospital system",
     "inCareLoop": "{actor} · in CareLoop",

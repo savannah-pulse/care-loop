@@ -89,16 +89,6 @@
                 }
               }
             }
-          },
-          "501": {
-            "description": "Not Implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
-                }
-              }
-            }
           }
         }
       }
@@ -108,13 +98,13 @@
         "tags": [
           "Cases"
         ],
-        "summary": "Lists cases, optionally filtered.",
+        "summary": "Lists matching cases, updated newest first, with bounded paging.",
         "operationId": "ListCases",
         "parameters": [
           {
             "name": "stage",
             "in": "query",
-            "description": "Only cases in this stage; all stages when omitted.",
+            "description": "Optional stage.",
             "schema": {
               "$ref": "#/components/schemas/CaseStage"
             }
@@ -122,7 +112,7 @@
           {
             "name": "ownerReference",
             "in": "query",
-            "description": "Only cases owned by this person or queue; all owners when omitted.",
+            "description": "Optional accountable owner.",
             "schema": {
               "type": "string"
             }
@@ -130,7 +120,7 @@
           {
             "name": "escalated",
             "in": "query",
-            "description": "Only cases with (or without) an open escalation; both when omitted.",
+            "description": "Optional open-escalation filter.",
             "schema": {
               "type": "boolean"
             }
@@ -138,7 +128,7 @@
           {
             "name": "skip",
             "in": "query",
-            "description": "Number of cases to skip, for paging; zero when omitted.",
+            "description": "Nonnegative offset; default zero.",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -151,7 +141,7 @@
           {
             "name": "take",
             "in": "query",
-            "description": "Maximum number of cases to return; a server default when omitted.",
+            "description": "Page size from 1 to 200; default 50.",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -159,6 +149,30 @@
                 "string"
               ],
               "format": "int32"
+            }
+          },
+          {
+            "name": "facilityId",
+            "in": "query",
+            "description": "Facility filter; defaults to the staff reader's facility.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "patientReference",
+            "in": "query",
+            "description": "Patient search, restricted to clinician and receiving-clinician.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason required for a cross-facility read.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -176,12 +190,32 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "400": {
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -194,17 +228,25 @@
         "tags": [
           "Cases"
         ],
-        "summary": "Returns one case.",
+        "summary": "Returns case state only after recording an authorized staff read.",
         "operationId": "GetCase",
         "parameters": [
           {
             "name": "caseId",
             "in": "path",
-            "description": "CareLoop's identifier of the case.",
+            "description": "The case identifier.",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason required outside the caller's facility.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -222,12 +264,32 @@
           "404": {
             "description": "Not Found"
           },
-          "501": {
-            "description": "Not Implemented",
+          "400": {
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -240,17 +302,25 @@
         "tags": [
           "Cases"
         ],
-        "summary": "Returns the audit timeline of one case.",
+        "summary": "Returns audit entries oldest received first; source timestamps are shown separately.",
         "operationId": "GetCaseTimeline",
         "parameters": [
           {
             "name": "caseId",
             "in": "path",
-            "description": "CareLoop's identifier of the case.",
+            "description": "The case identifier.",
             "required": true,
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason required outside the caller's facility.",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -271,12 +341,32 @@
           "404": {
             "description": "Not Found"
           },
-          "501": {
-            "description": "Not Implemented",
+          "400": {
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -289,13 +379,13 @@
         "tags": [
           "Exceptions"
         ],
-        "summary": "Lists the cases that currently need attention.",
+        "summary": "Returns unresolved exceptions, earliest due first, within an audited facility scope.",
         "operationId": "GetExceptions",
         "parameters": [
           {
             "name": "facilityId",
             "in": "query",
-            "description": "Only cases of this facility; all facilities when omitted.",
+            "description": "Facility filter; defaults to the staff reader's facility.",
             "schema": {
               "type": "string"
             }
@@ -303,7 +393,15 @@
           {
             "name": "ownerReference",
             "in": "query",
-            "description": "Only cases owned by this person or queue; all owners when omitted.",
+            "description": "Optional accountable owner.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason required outside the reader's facility.",
             "schema": {
               "type": "string"
             }
@@ -323,12 +421,32 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "400": {
+            "description": "Bad Request",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -341,8 +459,26 @@
         "tags": [
           "Metrics"
         ],
-        "summary": "Returns the current loop-closure metrics.",
+        "summary": "Computes current counts and actual applied-event history within an audited scope.",
         "operationId": "GetMetrics",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "query",
+            "description": "Optional facility; coordinators otherwise receive global aggregates.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason for staff reading aggregates outside their facility.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -354,12 +490,245 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/programmes": {
+      "get": {
+        "tags": [
+          "Programmes"
+        ],
+        "summary": "Lists the configured programmes for an identified staff reader.",
+        "operationId": "ListProgrammes",
+        "responses": {
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProgrammeResponse"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/programmes/{pathwayId}": {
+      "get": {
+        "tags": [
+          "Programmes"
+        ],
+        "summary": "Returns a programme without assuming an unknown key exists.",
+        "operationId": "GetProgramme",
+        "parameters": [
+          {
+            "name": "pathwayId",
+            "in": "path",
+            "description": "The programme key.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgrammeResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/escalations/{escalationId}/acknowledgement": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Saves the acknowledgement through the transactional case write path.",
+        "operationId": "AcknowledgeEscalation",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "escalationId",
+            "in": "path",
+            "description": "The exact escalation the person saw.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Access reason required outside the reader's facility.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -679,25 +1048,15 @@
           "FHIR"
         ],
         "summary": "Describes what the CareLoop FHIR boundary supports.",
-        "description": "Will list one entry per registered IFhirInboundMapper (create and update) plus read on\n`Task`.",
+        "description": "Lists one entry per registered IFhirInboundMapper (create and update) plus read on\r\n`Task`, so the statement can never drift from what the endpoints accept.",
         "operationId": "GetFhirCapabilityStatement",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "200 with a FHIR R4 `CapabilityStatement` listing the supported resource types and interactions.",
             "content": {
               "application/fhir+json": {
                 "schema": {
                   "$ref": "#/components/schemas/JsonElement"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Not Implemented",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
                 }
               }
             }
@@ -711,7 +1070,7 @@
           "FHIR"
         ],
         "summary": "Returns the current status of a case as a FHIR `Task`; also feeds the patient view.",
-        "description": "Field mapping: handoff status to `Task.status`; stage to `Task.businessStatus`; owner to\n`Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`;\npatient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to\n`Task.statusReason`.",
+        "description": "Field mapping: handoff status to `Task.status`; stage to `Task.businessStatus`; owner to\r\n`Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`;\r\npatient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to\r\n`Task.statusReason`.",
         "operationId": "GetFhirTask",
         "parameters": [
           {
@@ -736,14 +1095,11 @@
             }
           },
           "404": {
-            "description": "Not Found"
-          },
-          "501": {
-            "description": "Not Implemented",
+            "description": "Not Found",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }
@@ -816,6 +1172,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -826,12 +1192,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "503": {
+            "description": "Service Unavailable",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }
@@ -904,6 +1270,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/fhir+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonElement"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Unprocessable Entity",
             "content": {
@@ -914,12 +1290,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "503": {
+            "description": "Service Unavailable",
             "content": {
-              "application/json": {
+              "application/fhir+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/JsonElement"
                 }
               }
             }
@@ -949,6 +1325,8 @@
           "sourceSystem",
           "sourceResultId",
           "patientReference",
+          "displayLabel",
+          "escalations",
           "pathwayId",
           "facilityId",
           "stage",
@@ -977,6 +1355,48 @@
           "patientReference": {
             "type": "string",
             "description": "Source-system reference of the patient. Never a name."
+          },
+          "patientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient display name for staff; absent for a coordinator."
+          },
+          "patientSecondaryIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient's second identifier for staff; absent for a coordinator."
+          },
+          "displayLabel": {
+            "description": "The display step derived from stage and tracks by the Domain.",
+            "$ref": "#/components/schemas/CaseDisplayLabel"
+          },
+          "escalations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EscalationResponse"
+            },
+            "description": "The escalation history, including acknowledgements and resolutions."
+          },
+          "outcomeEvidenceKind": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The latest outcome's evidence kind."
+          },
+          "confidence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "The patient's confidence rating, 1 to 5, when supplied.",
+            "format": "int32"
           },
           "pathwayId": {
             "type": "string",
@@ -1076,6 +1496,21 @@
         },
         "description": "The full coordination state of one case, returned by `GET /cases/{caseId}`."
       },
+      "CaseDisplayLabel": {
+        "enum": [
+          "ResultReceived",
+          "CaseOpened",
+          "OwnerAssigned",
+          "PatientNotified",
+          "PatientAcknowledged",
+          "Consultation",
+          "FollowUp",
+          "OutcomeRecorded",
+          "ClosureReview",
+          "Closed"
+        ],
+        "description": "The ten labels the screen designs show for where a case is, computed from the five\r\nCaseStage values plus the track statuses (decisions 1 and 19)."
+      },
       "CaseEventType": {
         "enum": [
           "ScreeningResultReceived",
@@ -1088,7 +1523,8 @@
           "ClosureDecided",
           "ConsentRecorded",
           "DeadlineElapsed",
-          "HandoffSummaryApproved"
+          "HandoffSummaryApproved",
+          "EscalationAcknowledged"
         ],
         "description": "The kinds of event that can change a case."
       },
@@ -1106,6 +1542,9 @@
         "required": [
           "caseId",
           "patientReference",
+          "facilityId",
+          "displayLabel",
+          "createdAt",
           "pathwayId",
           "stage",
           "owner",
@@ -1123,6 +1562,44 @@
           "patientReference": {
             "type": "string",
             "description": "Source-system reference of the patient. Never a name."
+          },
+          "patientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient display name for staff; absent for a coordinator."
+          },
+          "patientSecondaryIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient's second identifier for staff; absent for a coordinator."
+          },
+          "facilityId": {
+            "type": "string",
+            "description": "The case's facility, for audited team-scoped reads."
+          },
+          "displayLabel": {
+            "description": "The display step derived by the Domain, never recomputed by the dashboard.",
+            "$ref": "#/components/schemas/CaseDisplayLabel"
+          },
+          "closureReason": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The closure reason, when closed.",
+                "$ref": "#/components/schemas/ClosureReason"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When the result opened this case.",
+            "format": "date-time"
           },
           "pathwayId": {
             "type": "string",
@@ -1177,6 +1654,64 @@
         },
         "description": "One row in the case list returned by `GET /cases`."
       },
+      "ClosureEvidenceRule": {
+        "required": [
+          "reason",
+          "authorizedRoles",
+          "isException",
+          "requiresEvidenceReference",
+          "requiresExceptionNote",
+          "requiresNextSurveillanceDate",
+          "minimumDocumentedAttempts"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "description": "The closure reason the rule applies to.",
+            "$ref": "#/components/schemas/ClosureReason"
+          },
+          "authorizedRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The role keys allowed to authorize closure for this reason."
+          },
+          "isException": {
+            "type": "boolean",
+            "description": "`true` when the reason is a documented exception rather than completed care."
+          },
+          "requiresEvidenceReference": {
+            "type": "boolean",
+            "description": "`true` when an outcome evidence reference must be present."
+          },
+          "requiresExceptionNote": {
+            "type": "boolean",
+            "description": "`true` when a written exception note must be present."
+          },
+          "requiresNextSurveillanceDate": {
+            "type": "boolean",
+            "description": "`true` when a next surveillance date must be present."
+          },
+          "minimumDocumentedAttempts": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The minimum number of documented contact attempts required; zero when none are needed.",
+            "format": "int32"
+          },
+          "citation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The clinical or policy source the evidence requirement is taken from, or `null` while it is a placeholder with no source."
+          }
+        },
+        "description": "What a pathway requires before a case may be closed for a given reason."
+      },
       "ClosureReason": {
         "enum": [
           "Treated",
@@ -1188,10 +1723,226 @@
           null
         ]
       },
+      "DeadlineDefinition": {
+        "required": [
+          "nextAction",
+          "duration",
+          "warnBefore",
+          "clinicallyApproved"
+        ],
+        "type": "object",
+        "properties": {
+          "nextAction": {
+            "type": "string",
+            "description": "Key of the next action the deadline applies to, for example `acknowledge-notification`."
+          },
+          "urgencyCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The urgency code the deadline applies to, or `null` when it applies to every urgency."
+          },
+          "duration": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "The time allowed from when the next action is set."
+          },
+          "warnBefore": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long before the deadline the owner is warned."
+          },
+          "clinicallyApproved": {
+            "type": "boolean",
+            "description": "`true` once a clinical adviser has approved the value; `false` marks a placeholder."
+          },
+          "ownerRole": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Role key of the person expected to own the case while this next action is open, for example\r\n`nurse-navigator` for acknowledging a notification, or `null` when the\r\npathway does not say."
+          },
+          "citation": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The clinical or policy source the deadline is taken from, or `null` while it is a placeholder with no source."
+          }
+        },
+        "description": "How long one kind of next action may take, and who is expected to hold the case while it is open."
+      },
+      "DurationMeasureResponse": {
+        "required": [
+          "denominator"
+        ],
+        "type": "object",
+        "properties": {
+          "denominator": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of eligible cases that reached the measured step.",
+            "format": "int32"
+          },
+          "median": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Median duration, or null when the step has not been reached."
+          }
+        },
+        "description": "Median elapsed clock time and the number of cases that reached that step."
+      },
+      "EscalationResponse": {
+        "required": [
+          "escalationId",
+          "level",
+          "escalatedTo",
+          "raisedAt",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "escalationId": {
+            "type": "string",
+            "description": "The specific escalation a person may acknowledge.",
+            "format": "uuid"
+          },
+          "level": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The pathway ladder step.",
+            "format": "int32"
+          },
+          "escalatedTo": {
+            "description": "The oversight role and facility queue addressed.",
+            "$ref": "#/components/schemas/OwnerResponse"
+          },
+          "raisedAt": {
+            "type": "string",
+            "description": "When oversight was requested.",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The overdue action that prompted oversight."
+          },
+          "acknowledgedBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who acknowledged it, when anyone has."
+          },
+          "acknowledgedByRole": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The role the acknowledger acted in."
+          },
+          "acknowledgedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the oversight role saw it.",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the overdue work was resolved, independently of acknowledgement.",
+            "format": "date-time"
+          }
+        },
+        "description": "An oversight escalation; acknowledgement records seeing it, not resolving it."
+      },
+      "EscalationStep": {
+        "required": [
+          "level",
+          "escalateToRole",
+          "afterOverdue",
+          "clinicallyApproved"
+        ],
+        "type": "object",
+        "properties": {
+          "level": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Position on the ladder; 1 is the first step.",
+            "format": "int32"
+          },
+          "escalateToRole": {
+            "type": "string",
+            "description": "Role key of who is told at this step, for example the facility lead and then the coordinator."
+          },
+          "afterOverdue": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": "string",
+            "description": "How long after the deadline passed this step is reached."
+          },
+          "clinicallyApproved": {
+            "type": "boolean",
+            "description": "`true` once a clinical adviser has approved the value; `false` marks a placeholder."
+          }
+        },
+        "description": "One step on a pathway's escalation ladder."
+      },
+      "EvidenceKindDefinition": {
+        "required": [
+          "kind",
+          "clinicallyApproved"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The code the outcome event carries, for example `treatment-plan`. Compared ignoring case."
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the kind means, for the programme screen."
+          },
+          "clinicallyApproved": {
+            "type": "boolean",
+            "description": "`true` once a clinical adviser has approved the kind; `false` marks a placeholder."
+          },
+          "nextAction": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the next action to set when an outcome of this kind is recorded, or `null`\r\nto keep whatever next action the stage rules give the case."
+          }
+        },
+        "description": "One kind of outcome evidence the pathway recognises, and what recording it means for the case."
+      },
       "ExceptionItemResponse": {
         "required": [
           "caseId",
           "patientReference",
+          "facilityId",
+          "pathwayId",
+          "displayLabel",
           "exceptions",
           "stage",
           "nextAction",
@@ -1210,6 +1961,32 @@
           "patientReference": {
             "type": "string",
             "description": "Source-system reference of the patient. Never a name."
+          },
+          "patientDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient display name for staff; absent for a coordinator."
+          },
+          "patientSecondaryIdentifier": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Patient's second identifier for staff; absent for a coordinator."
+          },
+          "facilityId": {
+            "type": "string",
+            "description": "The case's facility."
+          },
+          "pathwayId": {
+            "type": "string",
+            "description": "The pathway the case follows."
+          },
+          "displayLabel": {
+            "description": "The display step derived by the Domain.",
+            "$ref": "#/components/schemas/CaseDisplayLabel"
           },
           "exceptions": {
             "type": "array",
@@ -1422,7 +2199,14 @@
           "casesByException",
           "overdueCases",
           "escalatedCases",
-          "unassignedCases"
+          "unassignedCases",
+          "measures",
+          "timeToStep",
+          "closuresByReason",
+          "casesReachingDisplayLabel",
+          "casesByDisplayLabel",
+          "confidenceDenominator",
+          "confidenceResponses"
         ],
         "type": "object",
         "properties": {
@@ -1536,6 +2320,89 @@
               "string"
             ],
             "description": "Median time from result received to closure; `null` when no case is closed."
+          },
+          "measures": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RateMeasureResponse"
+            },
+            "description": "Rates keyed by measure: acknowledgement, closure, understanding, nextStepOnTime, referralAcceptedAndAttended, appointmentsAttended, treatmentStartedOnTime and signedEvidence."
+          },
+          "timeToStep": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DurationMeasureResponse"
+            },
+            "description": "Elapsed clock-time medians keyed by acknowledgement, consultation, appointment, careStarted and closure."
+          },
+          "closuresByReason": {
+            "type": "object",
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Closed cases per authorized typed closure reason."
+          },
+          "casesReachingDisplayLabel": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RateMeasureResponse"
+            },
+            "description": "Cases that actually reached each display label in an applied audit projection; no skipped labels are inferred."
+          },
+          "casesByDisplayLabel": {
+            "type": "object",
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            },
+            "description": "Current cases per Domain display label."
+          },
+          "confidenceRate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Share of notified cases that supplied a confidence rating; null when none were notified.",
+            "format": "double"
+          },
+          "confidenceDenominator": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of notified cases eligible to supply a confidence rating.",
+            "format": "int32"
+          },
+          "confidenceResponses": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of cases supplying a rating.",
+            "format": "int32"
+          },
+          "averageConfidence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Mean latest rating, 1 to 5; null when no rating was supplied.",
+            "format": "double"
           }
         },
         "description": "Loop-closure metrics returned by `GET /metrics`."
@@ -1591,6 +2458,35 @@
         },
         "description": "The person or queue accountable for a case, as shown in the dashboard."
       },
+      "PathwayChangeLogEntry": {
+        "required": [
+          "version",
+          "date",
+          "approver",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The definition version the entry describes; matches string PathwayDefinition.Version for the current entry."
+          },
+          "date": {
+            "type": "string",
+            "description": "The date the version was approved or, for a placeholder, drafted.",
+            "format": "date"
+          },
+          "approver": {
+            "type": "string",
+            "description": "Who approved the version. A placeholder entry names no clinical adviser and says it is unapproved."
+          },
+          "summary": {
+            "type": "string",
+            "description": "What changed in this version, in one or two sentences."
+          }
+        },
+        "description": "One entry in a pathway definition's change history: who approved which version, when, and what changed."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -1628,6 +2524,141 @@
             ]
           }
         }
+      },
+      "ProgrammeResponse": {
+        "required": [
+          "pathwayId",
+          "version",
+          "displayName",
+          "isPlaceholder",
+          "urgencyCodes",
+          "unassignedQueueRole",
+          "stages",
+          "tracks",
+          "deadlines",
+          "escalationLadder",
+          "closureRules",
+          "evidenceKinds",
+          "changeLog"
+        ],
+        "type": "object",
+        "properties": {
+          "pathwayId": {
+            "type": "string",
+            "description": "The pathway key."
+          },
+          "version": {
+            "type": "string",
+            "description": "The current definition's version, not a historical case-version claim."
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The configured programme name."
+          },
+          "isPlaceholder": {
+            "type": "boolean",
+            "description": "Whether the definition still contains clinically unapproved placeholders."
+          },
+          "urgencyCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The reviewed urgency codes the pathway accepts."
+          },
+          "unassignedQueueRole": {
+            "type": "string",
+            "description": "The role accountable while a case has no named owner."
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StageDefinition"
+            },
+            "description": "Configured stages and permitted roles."
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackDefinition"
+            },
+            "description": "Tracks required for closure and their exception next actions."
+          },
+          "deadlines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeadlineDefinition"
+            },
+            "description": "Deadlines with owners, citations and clinical approval status."
+          },
+          "escalationLadder": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EscalationStep"
+            },
+            "description": "Oversight steps and elapsed overdue thresholds."
+          },
+          "closureRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClosureEvidenceRule"
+            },
+            "description": "Authorized closure reasons and evidence requirements."
+          },
+          "evidenceKinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvidenceKindDefinition"
+            },
+            "description": "Recognized outcome kinds and their next actions."
+          },
+          "changeLog": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PathwayChangeLogEntry"
+            },
+            "description": "The configuration's documented change history."
+          }
+        },
+        "description": "The read-only, versioned pathway configuration; approvals happen outside CareLoop."
+      },
+      "RateMeasureResponse": {
+        "required": [
+          "numerator",
+          "denominator"
+        ],
+        "type": "object",
+        "properties": {
+          "numerator": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Cases satisfying the measure.",
+            "format": "int32"
+          },
+          "denominator": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Cases eligible for the measure.",
+            "format": "int32"
+          },
+          "rate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "description": "Numerator divided by denominator, or null when no cases are eligible.",
+            "format": "double"
+          }
+        },
+        "description": "A coordination rate with its explicit population, not a clinical effectiveness claim."
       },
       "RejectSummaryRequest": {
         "required": [
@@ -1766,6 +2797,53 @@
         ],
         "description": "What CareLoop did with a source event."
       },
+      "StageDefinition": {
+        "required": [
+          "stage",
+          "leavesOn",
+          "allowedRoles"
+        ],
+        "type": "object",
+        "properties": {
+          "stage": {
+            "description": "The stage being defined.",
+            "$ref": "#/components/schemas/CaseStage"
+          },
+          "leavesOn": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CaseEventType"
+            },
+            "description": "The event types that move a case out of this stage."
+          },
+          "next": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The stage entered when one of IReadOnlyList&lt;CaseEventType&gt; StageDefinition.LeavesOn is applied; `null` for the final stage.",
+                "$ref": "#/components/schemas/CaseStage"
+              }
+            ]
+          },
+          "allowedRoles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The role keys allowed to perform the event that leaves this stage."
+          },
+          "nextActionOnEntry": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the next action set when the stage is entered; matches a string DeadlineDefinition.NextAction."
+          }
+        },
+        "description": "Entry and exit rules for one pathway stage."
+      },
       "SummarySectionResponse": {
         "required": [
           "heading",
@@ -1795,6 +2873,7 @@
       "TimelineEntryResponse": {
         "required": [
           "auditEventId",
+          "sourceSystem",
           "eventType",
           "disposition",
           "actorReference",
@@ -1810,6 +2889,10 @@
             "type": "string",
             "description": "Identifier of the audit entry.",
             "format": "uuid"
+          },
+          "sourceSystem": {
+            "type": "string",
+            "description": "The source system joined from the stored event; internal events use careloop."
           },
           "eventType": {
             "description": "The kind of event.",
@@ -1865,6 +2948,29 @@
           }
         },
         "description": "One audit entry in a case timeline, returned by `GET /cases/{caseId}/timeline`."
+      },
+      "TrackDefinition": {
+        "required": [
+          "kind",
+          "requiredForClosure",
+          "nextActionOnException"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "description": "The track being configured.",
+            "$ref": "#/components/schemas/TrackKind"
+          },
+          "requiredForClosure": {
+            "type": "boolean",
+            "description": "`true` when the track must be complete before closure on a non-exception reason."
+          },
+          "nextActionOnException": {
+            "type": "string",
+            "description": "Key of the next action created when the track hits an exception (failed, rejected, missed)."
+          }
+        },
+        "description": "How a pathway uses one of the parallel tracks."
       },
       "TrackKind": {
         "enum": [
@@ -1925,6 +3031,9 @@
     },
     {
       "name": "Metrics"
+    },
+    {
+      "name": "Programmes"
     },
     {
       "name": "Summaries"
