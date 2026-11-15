@@ -43,6 +43,7 @@ public static class ServiceRegistration
             var options = provider.GetRequiredService<IOptions<CareLoopOptions>>().Value;
             // A trailing slash makes relative paths such as "Task/{id}" resolve under /fhir/.
             client.BaseAddress = new Uri(options.FhirBaseUrl.TrimEnd('/') + "/", UriKind.Absolute);
+            client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.TimeoutSeconds));
         });
         services.AddSingleton<DeliveredCommunicationBuilder>();
         services.AddSingleton<DeliveryFailedCommunicationBuilder>();

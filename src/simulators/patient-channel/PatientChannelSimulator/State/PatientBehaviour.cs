@@ -66,9 +66,10 @@ public sealed record PatientBehaviour
     public TimeSpan RespondAfter { get; init; }
 
     /// <summary>
-    /// Which notification the patient responds to, counting the notifications this patient has
-    /// received: 1 is the first, 2 describes a patient who only reacts to a reminder. Earlier
-    /// notifications get the delivery behaviour and no response.
+    /// Which notification the patient responds to, counting the notifications about one case
+    /// that the patient received since this behaviour was set: 1 is the first, 2 describes a
+    /// patient who only reacts to a reminder. Other notifications about that case get the
+    /// delivery behaviour and no response.
     /// </summary>
     public int RespondToNotification { get; init; } = 1;
 

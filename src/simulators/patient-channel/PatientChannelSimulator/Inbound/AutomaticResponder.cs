@@ -61,9 +61,9 @@ public sealed class AutomaticResponder
         }
 
         var behaviour = _store.GetBehaviour(message.PatientSyntheticId);
-        var received = _store.CountNotifications(message.PatientSyntheticId);
+        var number = _store.GetNotificationNumber(message.MessageId);
         var kind = KindOf(behaviour.Response);
-        if (kind is null || received != behaviour.RespondToNotification)
+        if (kind is null || number != behaviour.RespondToNotification)
         {
             _store.AppendReaction(new PatientReactionRecord(
                 message.MessageId, message.PatientSyntheticId, PatientReactionKind.NoResponse, true, null, _clock.UtcNow, null, true, null));
@@ -91,7 +91,18 @@ public sealed class AutomaticResponder
         var due = _store.ClaimDueResponses(_clock.UtcNow);
         foreach (var response in due)
         {
-            await SendAsync(response, ct);
+            try
+            {
+                await SendAsync(response, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // The responses were already taken off the queue, so one that fails unexpectedly
+                // must not take the rest of the batch with it. It stays visible as a failed reaction.
+                var message = _store.FindInboxMessage(response.MessageId);
+                _store.AppendReaction(new PatientReactionRecord(
+                    response.MessageId, message?.PatientSyntheticId ?? string.Empty, ReactionOf(response.Kind), true, null, _clock.UtcNow, null, false, ex.Message));
+            }
         }
 
         return due.Count;
@@ -104,6 +115,14 @@ public sealed class AutomaticResponder
         PatientResponseBehaviour.CallMe => PatientResponseKind.CallMe,
         PatientResponseBehaviour.RateConfidence => PatientResponseKind.ConfidenceRating,
         _ => null,
+    };
+
+    private static PatientReactionKind ReactionOf(PatientResponseKind kind) => kind switch
+    {
+        PatientResponseKind.Acknowledgement => PatientReactionKind.Acknowledged,
+        PatientResponseKind.TeachBack => PatientReactionKind.Understood,
+        PatientResponseKind.CallMe => PatientReactionKind.CallRequested,
+        _ => PatientReactionKind.ConfidenceRated,
     };
 
     private async Task SendAsync(PendingResponse response, CancellationToken ct)

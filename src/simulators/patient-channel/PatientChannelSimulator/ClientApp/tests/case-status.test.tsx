@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { CaseStatusPage } from '../src/features/case-status';
@@ -29,6 +29,16 @@ describe('Patient case status', () => {
 
     expect((await screen.findByTestId('case-taskId')).textContent).toBe('case-1');
     expect(api.callsTo('GET /api/case-status/case-1')).toHaveLength(1);
+  });
+
+  it('reads the status again when the same case is looked up again', async () => {
+    const api = mockApi({ 'GET /api/case-status/case-1': STATUS });
+    renderAt(<CaseStatusPage taskId="case-1" />);
+    await screen.findByTestId('case-taskId');
+
+    fireEvent.click(screen.getByRole('button', { name: en.caseStatus.lookUp }));
+
+    await waitFor(() => expect(api.callsTo('GET /api/case-status/case-1')).toHaveLength(2));
   });
 
   it('opens the case named in the link from the inbox', async () => {

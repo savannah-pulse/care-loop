@@ -86,7 +86,9 @@ public class SimulatorStoreTests
         store.AddInboxMessage(TestData.Message(requestId: "caregiver-" + TestData.RequestId, recipientKind: RecipientKind.Caregiver));
         store.AddInboxMessage(TestData.Message(requestId: "other", patientId: "SYN-PT-0002"));
 
-        Assert.Equal(1, store.CountNotifications(TestData.PatientId));
+        Assert.Equal(1, store.GetNotificationNumber(TestData.RequestId));
+        Assert.Equal(0, store.GetNotificationNumber("caregiver-" + TestData.RequestId));
+        Assert.Equal(0, store.GetNotificationNumber("unknown"));
     }
 
     [Fact]
@@ -96,13 +98,39 @@ public class SimulatorStoreTests
         store.AddInboxMessage(TestData.Message(requestId: "earlier"));
 
         store.SetBehaviour(new PatientBehaviourAssignment(TestData.PatientId, new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge), "happy-path"));
-        Assert.Equal(0, store.CountNotifications(TestData.PatientId));
+        Assert.Equal(0, store.GetNotificationNumber("earlier"));
 
         store.AddInboxMessage(TestData.Message(requestId: "under-the-behaviour"));
-        Assert.Equal(1, store.CountNotifications(TestData.PatientId));
+        Assert.Equal(1, store.GetNotificationNumber("under-the-behaviour"));
 
         store.RemoveBehaviour(TestData.PatientId);
-        Assert.Equal(2, store.CountNotifications(TestData.PatientId));
+        Assert.Equal(2, store.GetNotificationNumber("under-the-behaviour"));
+    }
+
+    [Fact]
+    public void Notifications_are_numbered_for_each_case_separately()
+    {
+        var store = new SimulatorStore();
+        store.AddInboxMessage(TestData.Message(requestId: "first"));
+        store.AddInboxMessage(TestData.Message(requestId: "other-case") with { CaseTaskId = "another-case" });
+        store.AddInboxMessage(TestData.Message(requestId: "reminder"));
+
+        Assert.Equal(1, store.GetNotificationNumber("first"));
+        Assert.Equal(1, store.GetNotificationNumber("other-case"));
+        Assert.Equal(2, store.GetNotificationNumber("reminder"));
+    }
+
+    [Fact]
+    public void Setting_the_default_behaviour_starts_the_numbers_again_for_patients_without_their_own()
+    {
+        var store = new SimulatorStore();
+        store.AddInboxMessage(TestData.Message(requestId: "earlier"));
+
+        store.SetDefaultBehaviour(new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge));
+        store.AddInboxMessage(TestData.Message(requestId: "under-the-default"));
+
+        Assert.Equal(0, store.GetNotificationNumber("earlier"));
+        Assert.Equal(1, store.GetNotificationNumber("under-the-default"));
     }
 
     [Fact]

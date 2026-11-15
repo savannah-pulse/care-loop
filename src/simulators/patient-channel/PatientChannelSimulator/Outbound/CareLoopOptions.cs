@@ -45,4 +45,15 @@ public sealed class CareLoopOptions
 
     /// <summary>Pause before each further attempt, in milliseconds, multiplied by the number of attempts already made.</summary>
     public int RetryDelayMilliseconds { get; set; } = 200;
+
+    /// <summary>
+    /// How long one call to CareLoop may take, in seconds, before it counts as not answered.
+    /// </summary>
+    /// <remarks>
+    /// A delivery report is sent while CareLoop is still waiting for the answer to the
+    /// <c>CommunicationRequest</c> it posted. All attempts together must therefore finish well
+    /// inside CareLoop's own HTTP timeout, or CareLoop gives up on a request the simulator is
+    /// still handling.
+    /// </remarks>
+    public int TimeoutSeconds { get; set; } = 10;
 }

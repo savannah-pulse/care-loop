@@ -68,6 +68,8 @@ export function SmartphoneView({ message, onChanged }: SmartphoneViewProps) {
       if (answer) {
         latest = await actOnInboxMessage(id, answer === 'understand' ? 'understand' : 'call-me');
         onChanged(latest);
+        // The answer is with CareLoop now. If the rating fails, a retry must not send it again.
+        setAnswer(null);
       }
 
       return rating === null ? latest : rateConfidence(id, rating);

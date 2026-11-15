@@ -206,6 +206,36 @@ describe('Patient inbox', () => {
     ]);
   });
 
+  it('a retry after a failed rating does not ask for a second call', async () => {
+    let ratingAttempts = 0;
+    const api = mockApi({
+      'GET /api/inbox': [inboxMessage({ response: 'Acknowledged' })],
+      'POST /api/inbox/message-1/call-me': inboxMessage({ response: 'CallRequested' }),
+      'POST /api/inbox/message-1/rate-confidence': () => {
+        ratingAttempts += 1;
+        return ratingAttempts === 1
+          ? problem(502, 'CareLoop could not be reached.', 'SIMULATED outage.')
+          : inboxMessage({ response: 'CallRequested', confidence: 3 });
+      },
+    });
+    renderAt(<InboxPage />);
+
+    fireEvent.click(await screen.findByRole('radio', { name: app.answer.wait }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rate 3 out of 5' }));
+    fireEvent.click(screen.getByRole('button', { name: app.send }));
+    await screen.findByRole('alert');
+
+    fireEvent.click(screen.getByRole('button', { name: app.send }));
+    await waitFor(() =>
+      expect(screen.getByTestId('confidence-state').textContent).toBe('Confidence 3 out of 5'),
+    );
+    expect(api.calls.filter((call) => call.method === 'POST').map((call) => call.path)).toEqual([
+      '/api/inbox/message-1/call-me',
+      '/api/inbox/message-1/rate-confidence',
+      '/api/inbox/message-1/rate-confidence',
+    ]);
+  });
+
   it('a delivered message is shown as not yet acknowledged', async () => {
     mockApi({ 'GET /api/inbox': [inboxMessage({ delivery: 'Delivered', response: 'None' })] });
 

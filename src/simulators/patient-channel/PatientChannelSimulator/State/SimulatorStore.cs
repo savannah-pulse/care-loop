@@ -23,11 +23,12 @@ public sealed class SimulatorStore
     private readonly List<string> _messageOrder = [];
     private readonly Queue<FhirMessageLogEntry> _log = new();
     private readonly Dictionary<string, PatientBehaviourAssignment> _behaviours = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, int> _notificationsBeforeBehaviour = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _behaviourInForceFrom = new(StringComparer.Ordinal);
     private readonly List<PatientReactionRecord> _reactions = [];
     private readonly Dictionary<string, ScenarioRunState> _runs = new(StringComparer.Ordinal);
     private readonly List<PendingResponse> _pending = [];
     private PatientBehaviour _defaultBehaviour = new(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None);
+    private int _defaultInForceFrom;
 
     /// <summary>
     /// Adds a newly received message to the simulated patient inbox.
@@ -240,7 +241,7 @@ public sealed class SimulatorStore
     /// <param name="assignment">The patient, their behaviour and the scenario that set it, if any.</param>
     /// <remarks>
     /// Notifications already in the inbox keep the reactions they already had, and the patient's
-    /// notification count starts again: <see cref="PatientBehaviour.RespondToNotification"/> counts
+    /// notification numbers start again: <see cref="PatientBehaviour.RespondToNotification"/> counts
     /// the notifications received under this behaviour. Otherwise a scenario run a second time
     /// would find its patient already past the notification they respond to.
     /// </remarks>
@@ -250,7 +251,7 @@ public sealed class SimulatorStore
         lock (_gate)
         {
             _behaviours[assignment.PatientSyntheticId] = assignment;
-            _notificationsBeforeBehaviour[assignment.PatientSyntheticId] = CountPatientMessages(assignment.PatientSyntheticId);
+            _behaviourInForceFrom[assignment.PatientSyntheticId] = _messageOrder.Count;
         }
     }
 
@@ -263,7 +264,7 @@ public sealed class SimulatorStore
     {
         lock (_gate)
         {
-            _notificationsBeforeBehaviour.Remove(patientSyntheticId);
+            _behaviourInForceFrom.Remove(patientSyntheticId);
             return _behaviours.Remove(patientSyntheticId);
         }
     }
@@ -283,6 +284,10 @@ public sealed class SimulatorStore
     /// <summary>
     /// Replaces the behaviour used for patients that have none of their own.
     /// </summary>
+    /// <remarks>
+    /// As with <see cref="SetBehaviour"/>, notification numbers start again for the patients the
+    /// default applies to.
+    /// </remarks>
     /// <param name="behaviour">The new default.</param>
     public void SetDefaultBehaviour(PatientBehaviour behaviour)
     {
@@ -290,25 +295,56 @@ public sealed class SimulatorStore
         lock (_gate)
         {
             _defaultBehaviour = behaviour;
+            _defaultInForceFrom = _messageOrder.Count;
         }
     }
 
     /// <summary>
-    /// Counts the notifications a patient has received since their behaviour was last set, or
-    /// in all when they have no behaviour of their own.
+    /// Finds which notification an inbox message is for its patient: the first, the second and so on.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// This is what <see cref="PatientBehaviour.RespondToNotification"/> is compared with. The
+    /// number counts the notifications about the same case that the patient received since the
+    /// behaviour in force for them was set, up to and including this one. Counting per case
+    /// matters: a reminder is the second notification about a case, but the first notification
+    /// about the patient's next case is a first notification again.
+    /// </para>
+    /// <para>
     /// Only messages addressed to the patient count. A caregiver's copy is not a notification the
-    /// patient received, so it never moves the patient towards
-    /// <see cref="PatientBehaviour.RespondToNotification"/>.
+    /// patient received, so it never moves the patient towards the notification they respond to.
+    /// </para>
     /// </remarks>
-    /// <param name="patientSyntheticId">Synthetic identifier of the patient.</param>
-    /// <returns>The number of patient inbox messages for that patient, which is what <see cref="PatientBehaviour.RespondToNotification"/> is compared with.</returns>
-    public int CountNotifications(string patientSyntheticId)
+    /// <param name="messageId">Simulator-local identifier of the inbox message.</param>
+    /// <returns>The number, counting from 1; 0 when the message is unknown, is a caregiver's copy, or arrived before the behaviour in force was set.</returns>
+    public int GetNotificationNumber(string messageId)
     {
         lock (_gate)
         {
-            return CountPatientMessages(patientSyntheticId) - _notificationsBeforeBehaviour.GetValueOrDefault(patientSyntheticId);
+            if (!_messages.TryGetValue(messageId, out var message) || message.RecipientKind != RecipientKind.Patient)
+            {
+                return 0;
+            }
+
+            var from = _behaviourInForceFrom.TryGetValue(message.PatientSyntheticId, out var own) ? own : _defaultInForceFrom;
+            var number = 0;
+            for (var i = from; i < _messageOrder.Count; i++)
+            {
+                var other = _messages[_messageOrder[i]];
+                if (other.RecipientKind == RecipientKind.Patient
+                    && string.Equals(other.PatientSyntheticId, message.PatientSyntheticId, StringComparison.Ordinal)
+                    && string.Equals(other.CaseTaskId, message.CaseTaskId, StringComparison.Ordinal))
+                {
+                    number++;
+                }
+
+                if (ReferenceEquals(other, message))
+                {
+                    return number;
+                }
+            }
+
+            return 0;
         }
     }
 
@@ -410,11 +446,6 @@ public sealed class SimulatorStore
             return _pending.Count;
         }
     }
-
-    private int CountPatientMessages(string patientSyntheticId) =>
-        _messages.Values.Count(m =>
-            m.RecipientKind == RecipientKind.Patient
-            && string.Equals(m.PatientSyntheticId, patientSyntheticId, StringComparison.Ordinal));
 
     private void Store(InboxMessage message)
     {

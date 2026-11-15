@@ -27,7 +27,9 @@ export function CaseStatusPage({ taskId }: CaseStatusPageProps) {
   const [params] = useSearchParams();
   const initial = taskId ?? params.get('taskId') ?? '';
   const [input, setInput] = useState(initial);
-  const [wanted, setWanted] = useState(initial);
+  // An object, so looking up the same identifier again is a new lookup and reads the status again.
+  const [lookup, setLookup] = useState({ taskId: initial });
+  const wanted = lookup.taskId;
   const [status, setStatus] = useState<PatientCaseStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -65,11 +67,11 @@ export function CaseStatusPage({ taskId }: CaseStatusPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [wanted, t]);
+  }, [lookup, wanted, t]);
 
   const lookUp = (event: FormEvent) => {
     event.preventDefault();
-    setWanted(input.trim());
+    setLookup({ taskId: input.trim() });
   };
 
   const fields: readonly (readonly [string, string | null])[] = status
