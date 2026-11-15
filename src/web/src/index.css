@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #172554;
-  background: #f8fafc;
+  color: #14263b;
+  background: #f5f7fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -17,3 +17,5 @@ body {
   min-height: 100vh;
   margin: 0;
 }
+
+a { color: #145b9f; }

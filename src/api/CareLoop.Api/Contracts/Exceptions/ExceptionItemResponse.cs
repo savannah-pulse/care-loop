@@ -18,6 +18,17 @@ public sealed record ExceptionItemResponse
     /// <summary>Source-system reference of the patient. Never a name.</summary>
     public required string PatientReference { get; init; }
 
+    /// <summary>Patient display name for staff; absent for a coordinator.</summary>
+    public string? PatientDisplayName { get; init; }
+    /// <summary>Patient's second identifier for staff; absent for a coordinator.</summary>
+    public string? PatientSecondaryIdentifier { get; init; }
+    /// <summary>The case's facility.</summary>
+    public required string FacilityId { get; init; }
+    /// <summary>The pathway the case follows.</summary>
+    public required string PathwayId { get; init; }
+    /// <summary>The display step derived by the Domain.</summary>
+    public required CaseDisplayLabel DisplayLabel { get; init; }
+
     /// <summary>Names of the unresolved exceptions on the case.</summary>
     public required IReadOnlyList<string> Exceptions { get; init; }
 

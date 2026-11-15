@@ -14,6 +14,24 @@ public sealed record CaseSummaryResponse
     /// <summary>Source-system reference of the patient. Never a name.</summary>
     public required string PatientReference { get; init; }
 
+    /// <summary>Patient display name for staff; absent for a coordinator.</summary>
+    public string? PatientDisplayName { get; init; }
+
+    /// <summary>Patient's second identifier for staff; absent for a coordinator.</summary>
+    public string? PatientSecondaryIdentifier { get; init; }
+
+    /// <summary>The case's facility, for audited team-scoped reads.</summary>
+    public required string FacilityId { get; init; }
+
+    /// <summary>The display step derived by the Domain, never recomputed by the dashboard.</summary>
+    public required CaseDisplayLabel DisplayLabel { get; init; }
+
+    /// <summary>The closure reason, when closed.</summary>
+    public ClosureReason? ClosureReason { get; init; }
+
+    /// <summary>When the result opened this case.</summary>
+    public required DateTimeOffset CreatedAt { get; init; }
+
     /// <summary>Identifier of the pathway the case follows.</summary>
     public required string PathwayId { get; init; }
 

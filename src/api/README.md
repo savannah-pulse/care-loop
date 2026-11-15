@@ -3,9 +3,9 @@
 The coordination engine: ASP.NET Core minimal APIs on .NET 10, EF Core on PostgreSQL, FHIR R4 through the Firely SDK.
 It is not a clinical system. It is built as for production and is currently connected to the two simulators. Read the root `AGENTS.md` before changing anything. Paths below are relative to the repository root.
 
-This is a scaffold. Contracts, signatures and documentation are complete; behaviour is stubbed.
-Every stub is tagged `// TODO(WS-n): ...` and throws `NotImplementedException("WSn: Class.Method")`, and every endpoint
-except `/health` answers **501** with the owning workstream. See `docs/workstreams.md` for who owns what.
+Domain, persistence/intake, FHIR, outbox/notifications, deadlines and the WS6 read APIs are implemented.
+Remaining workstream stubs return **501**, including WS9 summary actions and WS10 simulation.
+See `docs/workstreams.md` for ownership and status.
 
 ## Projects
 
@@ -24,7 +24,7 @@ dotnet run --project src/api/CareLoop.Api
 The API listens on `http://localhost:5080`. `GET /health` returns 200. The OpenAPI document is served at
 `/openapi/v1.json` and written to `contracts/openapi/careloop.json` on every build.
 
-A database is only needed once persistence is implemented. Start one with `docker compose up db` from the repository root.
+Persistence and read endpoints require a database. Start one with `docker compose up db` from the repository root.
 
 ## Test
 
@@ -126,10 +126,65 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | GET | `/cases` | WS6 |
 | GET | `/cases/{caseId}` | WS6 |
 | GET | `/cases/{caseId}/timeline` | WS6 |
+| POST | `/cases/{caseId}/escalations/{escalationId}/acknowledgement` | WS6 |
 | GET | `/exceptions` | WS6 |
 | GET | `/metrics` | WS6 |
+| GET | `/programmes` | WS6 |
+| GET | `/programmes/{pathwayId}` | WS6 |
 | POST | `/metrics/simulation` | WS10 |
 | POST | `/cases/{caseId}/handoff-summary` | WS9 |
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/approval` | WS9 |
+| POST | `/cases/{caseId}/handoff-summary/{summaryId}/rejection` | WS9 |
 
 External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard.
+
+### Read access and acknowledgement (WS6)
+
+REST reads require `X-Demo-User` and a human `X-Demo-Role`; non-coordinators also require `X-Demo-Facility`.
+These caller-stated headers are prototype identity, not production authentication. Missing identity is 401,
+unsupported roles are 403 and malformed headers/filters are 400.
+
+Staff reads default to their facility (the current team boundary). An explicit different `facilityId`, or a case
+outside that facility, requires a nonblank `reason` of at most 1000 characters. Coordinators have global aggregate
+metrics, but their case reads are limited to cases with an open escalation addressed to the coordinator.
+Names and MRNs are null on coordinator case, detail and exception responses.
+Each authorized-identity read records one `CaseReadRecord`; denied facility/role reads use a denied view name.
+Read audits do not change case state and are not timeline events.
+
+`GET /cases` supports `stage`, `ownerReference`, `escalated`, `facilityId`, `patientReference`, `skip` and `take`.
+Patient searches are restricted to `clinician` and `receiving-clinician`. Paging defaults to 50, is capped at 200,
+and uses newest-updated order with a case-ID tie-break. `GET /exceptions` returns open flagged cases in deadline
+order. Timelines include applied and rejected events in received-time/projection-version order, joined to their
+source event for source attribution. Display labels come from the Domain rule, never the dashboard.
+Programmes describe current definitions; historic pathway-version retention is not implied.
+
+Acknowledgement checks the addressed role and current escalation ID, maps refusals to 403/409 and records both
+applied and Domain-refused attempts through `ICaseRepository.SaveAsync`. It changes no stage, urgency, owner,
+exception or deadline. A stale concurrent write returns 409 instead of overwriting the case.
+
+### Coordination measures (WS6)
+
+Measures use applied audit snapshots only, including source-received progress rather than inferred skipped labels:
+
+- `Measures` supplies numerator, denominator and nullable rate for acknowledgement, closure, understanding,
+  next-step timeliness, accepted referral plus attended appointment, attended appointments, timely treatment start
+  and signed closure evidence.
+- `TimeToStep` supplies sample count and nullable median elapsed time from the screening result (or case creation
+  when no result source timestamp exists) to acknowledgement, consultation, appointment, care started and closure.
+  Care started means a `treatment-started` or `surveillance-started` outcome; all time is clock time.
+- Next-step timeliness uses the most recent deadline episode whose due instant has passed. Repeated snapshots do
+  not restart an episode. Completion at the due instant is on time.
+- Treatment timeliness uses cases with `treatment-plan` as denominator and subsequent `treatment-started` at or
+  before that plan's captured `start-treatment` deadline as numerator. A referral is not completed care.
+- Current and historically reached display-label counts, closure reasons and open exception counts remain distinct.
+- `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
+  separately averages each case's latest 1-5 rating.
+
+Empty populations have null rates/medians, not zero success. The API does not add simulation labels, a working-hours
+calendar, AI narrative or the WS10 escalation-off comparison.
+
+Focused validation (98 passed, none skipped):
+
+```sh
+dotnet test tests/api/CareLoop.Tests/CareLoop.Tests.csproj --no-restore --filter "FullyQualifiedName~ReadEndpointsTests|FullyQualifiedName~CaseDisplayLabelTests|FullyQualifiedName~EscalationAcknowledgementTests|FullyQualifiedName~DeadlineWorkerTests|FullyQualifiedName~DeadlinePolicyTests" --verbosity minimal
+```

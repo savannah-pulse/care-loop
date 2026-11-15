@@ -26,12 +26,12 @@ independently against common contracts. The rules every contributor follows are 
 - Only an authorized human can close a case, with pathway evidence or a documented exception.
 - AI output is a reviewable draft. It cannot change source facts, set urgency, close cases, or send messages.
 
-## Status: scaffold
+## Implementation status
 
-The API and both simulators are scaffolded so ten workstreams can build in parallel. Contracts, signatures and
-documentation are in place; behaviour is stubbed. Every stub is tagged `TODO(WS-n)` and its planned behaviour exists
-as a named, skipped test. Search for `TODO(WS-` to find your work and read [`docs/workstreams.md`](docs/workstreams.md)
-for ownership.
+WS1 to WS6 implement Domain rules, persistence/intake, FHIR, outbox/notifications, deadlines and the staff read
+APIs/dashboard. Simulator, AI-summary and end-to-end workstreams still have assigned stubs. Remaining stubs are tagged
+`TODO(WS-n)` with named skipped tests. Search for `TODO(WS-` and read [`docs/workstreams.md`](docs/workstreams.md)
+for ownership and validation. The dashboard reports unavailable capabilities explicitly.
 
 ## Repository map
 
@@ -45,7 +45,7 @@ infra/local/                Local environment notes
 src/
   api/                      The CareLoop engine (.NET 10): CareLoop.Domain, CareLoop.Api and its Dockerfile
   ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
-  web/                      React + TypeScript + Vite dashboard starter and Dockerfile
+  web/                      React + TypeScript + Vite staff dashboard and Dockerfile
   simulators/
     scenarios/              Scripted synthetic journeys shared by both simulators (scenario.schema.json)
     his/                    Stand-in for a hospital information system: HisSimulator (.NET) with a React ClientApp
