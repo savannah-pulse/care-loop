@@ -10,8 +10,13 @@
   "nav": {
     "label": "Main",
     "worklist": "Worklist",
+    "escalations": "Escalations",
     "impact": "Impact",
-    "programmes": "Programmes"
+    "programmes": "Programmes",
+    "escalationCount": {
+      "one": "{count} open escalation",
+      "other": "{count} open escalations"
+    }
   },
   "identity": {
     "signedInAs": "Signed in as",
@@ -729,5 +734,26 @@
       "resolved": "The late step was done",
       "resolvedDetail": "The escalation is closed."
     }
+  },
+  "escalations": {
+    "title": "Escalations",
+    "needYou": {
+      "one": "{count} escalation needs you",
+      "other": "{count} escalations need you"
+    },
+    "noneNeedYou": "Nothing needs your acknowledgement",
+    "loading": "Loading escalations",
+    "notAvailable": "Escalations will show here once they are switched on.",
+    "errorTitle": "We couldn't load escalations",
+    "emptyTitle": "No open escalations",
+    "emptyBody": "When a step is late, CareLoop reminds the person responsible, then tells the facility lead, then the programme coordinator. Nothing is escalated now.",
+    "emptyBodyCoordinator": "A case shows here when an escalation reaches the programme coordinator. None has.",
+    "status": {
+      "needsYou": "Needs your acknowledgement",
+      "acknowledged": "Acknowledged by {name}, {date}",
+      "with": "With {target}",
+      "unknown": "Escalated"
+    },
+    "note": "Acknowledging records that you have seen an escalation. It never changes who is responsible or stops the clock."
   }
 }

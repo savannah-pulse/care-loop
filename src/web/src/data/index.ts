@@ -17,6 +17,17 @@ export {
   identityHeaders,
 } from './client'
 export type { CareLoopClient, CareLoopClientOptions } from './client'
+export {
+  DETAIL_READS_AT_ONCE,
+  acknowledgeEscalation,
+  escalationsChanged,
+  loadEscalatedCases,
+  mapAtMost,
+  useEscalatedCases,
+  useEscalationCount,
+  useEscalationsVersion,
+} from './escalations'
+export type { EscalatedCase } from './escalations'
 export { callApi, failureKindFor } from './outcome'
 export type { ApiFailure, ApiOutcome, FailureKind } from './outcome'
 export { useApiRead } from './read'

@@ -11,6 +11,8 @@ export type Route =
   | { readonly name: 'worklist' }
   | { readonly name: 'case'; readonly caseId: string }
   | { readonly name: 'summary'; readonly caseId: string }
+  | { readonly name: 'escalation'; readonly caseId: string }
+  | { readonly name: 'escalations' }
   | { readonly name: 'impact' }
   | { readonly name: 'programmes' }
   | { readonly name: 'notFound' }
@@ -60,6 +62,9 @@ export function parseRoute(hash: string): Route {
     if (third === 'summary') {
       return { name: 'summary', caseId: second }
     }
+    if (third === 'escalation') {
+      return { name: 'escalation', caseId: second }
+    }
     return { name: 'notFound' }
   }
   if (second !== undefined) {
@@ -70,6 +75,9 @@ export function parseRoute(hash: string): Route {
   }
   if (first === 'programmes') {
     return { name: 'programmes' }
+  }
+  if (first === 'escalations') {
+    return { name: 'escalations' }
   }
   return { name: 'notFound' }
 }
@@ -88,6 +96,10 @@ export function routeHref(route: AddressableRoute): string {
       return `#/cases/${encodeURIComponent(route.caseId)}`
     case 'summary':
       return `#/cases/${encodeURIComponent(route.caseId)}/summary`
+    case 'escalation':
+      return `#/cases/${encodeURIComponent(route.caseId)}/escalation`
+    case 'escalations':
+      return '#/escalations'
     case 'impact':
       return '#/impact'
     case 'programmes':

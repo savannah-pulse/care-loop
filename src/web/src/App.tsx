@@ -1,6 +1,7 @@
 import { useEffect, useRef, type MouseEvent } from 'react'
 import { AppHeader, ErrorBoundary } from './components'
 import { CasePage } from './features/case'
+import { EscalationPage, EscalationsPage } from './features/escalations'
 import { ImpactPage } from './features/impact'
 import { NotFoundPage } from './features/not-found'
 import { ProgrammesPage } from './features/programmes'
@@ -18,6 +19,10 @@ function Screen({ route }: { readonly route: Route }) {
       return <CasePage key={route.caseId} caseId={route.caseId} />
     case 'summary':
       return <SummaryPage key={route.caseId} caseId={route.caseId} />
+    case 'escalation':
+      return <EscalationPage key={route.caseId} caseId={route.caseId} />
+    case 'escalations':
+      return <EscalationsPage />
     case 'impact':
       return <ImpactPage />
     case 'programmes':

@@ -13,7 +13,7 @@ import {
   noticeActor,
 } from '../../domain'
 import { describeDue, formatWhen, parseInstant } from '../../format'
-import { isClinicianRole, sameReference, useSignedInStaff } from '../../identity'
+import { isClinicianRole, isEscalationRole, sameReference, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { routeHref } from '../../routing'
 
@@ -58,6 +58,12 @@ function EscalationFact({ detail, now }: EscalationFactProps) {
           : t('case.escalationNotAcknowledged')}{' '}
         {t('case.escalationSameOwner')}
       </span>
+      {isEscalationRole(me.role) ? (
+        <a className="fact-link" href={routeHref({ name: 'escalation', caseId: detail.caseId })}>
+          {t('case.openEscalation')}
+          <Icon name="right" />
+        </a>
+      ) : null}
     </>
   )
 }
@@ -70,8 +76,8 @@ function EscalationFact({ detail, now }: EscalationFactProps) {
  * The status pill uses the same rule as the worklist. The explanation comes from the unresolved
  * exceptions and any pending transfer: until a proposed owner accepts, the current owner stays
  * responsible. Escalation brings in the facility lead, then the programme coordinator, but never
- * changes who is responsible; the card says who it went to and whether they acknowledged it.
- * Clinicians get a way into the handoff
+ * changes who is responsible; the card says who it went to and whether they acknowledged it, and
+ * gives those roles a way into the escalation (screen 17). Clinicians get a way into the handoff
  * summary when the action is to send or arrange a referral; everyone else sees who needs to act.
  */
 export function NextActionCard({ detail, now, children }: NextActionCardProps) {
