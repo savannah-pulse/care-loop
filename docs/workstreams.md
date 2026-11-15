@@ -27,7 +27,7 @@ Rules of the road:
 | 2 | Persistence and intake | WS1 | Done |
 | 3 | FHIR boundary | WS2 (ingestor and envelope contracts) | Done |
 | 4 | Outbox and notifications | WS1 (domain events), WS2 (outbox tables) | Done |
-| 5 | Deadlines and escalation | WS1, WS2 | Open |
+| 5 | Deadlines and escalation | WS1, WS2 | Done |
 | 6 | Read endpoints and dashboard | WS2 (schema) | Open |
 | 7 | HIS simulator | WS3 (FHIR contract and codes) | Open |
 | 8 | Patient-channel simulator | WS3 (FHIR contract and codes), WS4 (notification delivery) | Open |
@@ -175,11 +175,24 @@ Because the contracts already exist, every workstream can start now against the 
 - `Worker/DeadlineWorker.cs`: `ExecuteAsync`, `SweepAsync`
 - Set `DeadlineWorker:Enabled` to `true` in `appsettings.json` when the worker works
 
+**Implementation**
+
+- Complete: urgency-specific deadline lookup with general fallback; clock-time due dates; warning and overdue
+  boundary classification; per-deadline escalation ladder checks. WS2's temporary lookup now delegates to the Domain policy.
+- The enabled worker persists warnings once per case/action/due time, including across restarts; flags overdue and
+  unacknowledged cases; catches up due ladder steps through `Case.Escalate`; saves every change as `DeadlineElapsed`
+  with audit and outbox deliveries in the single transaction. It never changes owner, stage, urgency or deadline.
+- Checks use isolated scopes. Errors are logged and retried on the next sweep; optimistic concurrency rolls back
+  stale checks. The polling interval is validated at startup. No schema or clinical configuration changes were needed.
+- All WS5 skipped tests are implemented. Tests cover boundary instants, configurable durations, repeat sweeps,
+  restarts, new deadlines, late sweeps, acknowledgement propagation, audit/outbox persistence, cancellation,
+  the background loop, error isolation and a concurrent case update.
+
 **Design gaps**
 
-- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue`; acknowledgement never stops the clock. Raise each step with `Case.Escalate`, which fills `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt` from the previous level and assigns `Escalation.Id`; do not build `EscalationRaised` yourself. Done when: a `DeadlineWorkerTests` case acknowledges level 1, sweeps past level 2's `afterOverdue`, and asserts level 2 is raised carrying the acknowledgement.
-- C21: `ComputeDueAt` handles the `start-treatment` deadline like any other next action; no special case.
-- C12 and decision 18: `answer-consultation` (1 day), `respond-to-referral` (4 hours) and `call-patient` (2 hours) are ordinary next-action deadlines. Durations are clock time: add no working-hours calendar, which stays future work.
+- C15: an acknowledged escalation is still overdue. The sweep keeps escalating up the ladder on the pathway's `afterOverdue`; acknowledgement never stops the clock. Raise each step with `Case.Escalate`, which fills `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt` from the previous level and assigns `Escalation.Id`; do not build `EscalationRaised` yourself. Done: a worker test acknowledges level 1 and asserts level 2 is raised at its threshold carrying that acknowledgement.
+- C21: `ComputeDueAt` handles the `start-treatment` deadline like any other next action; no special case. Done.
+- C12 and decision 18: `answer-consultation` (1 day), `respond-to-referral` (4 hours) and `call-patient` (2 hours) are ordinary next-action deadlines. Durations are clock time: add no working-hours calendar, which stays future work. Done.
 
 ## WS6 Read endpoints and dashboard
 
@@ -406,7 +419,7 @@ withdrawn.
 | C11 | WS6 (shared) | `nurse-navigator`, `receiving-clinician`, `lab` in `DemoRoles.HumanRoles` | Open |
 | C11 | WS7 | `ActingStaff` roles and clinician actions page | Open |
 | C12 Per-kind reply deadlines | WS1, WS2 | Pathway deadlines and next actions | Done |
-| C12 | WS5 | Ordinary deadlines in `ComputeDueAt`, clock time | Open (with the WS5 stubs) |
+| C12 | WS5 | Ordinary deadlines in `ComputeDueAt`, clock time | Done |
 | C13 Caregiver and consent | WS1, WS2, WS3 | `Consent`, `ConsentRecorded`, `ConsentMapper`; `AppointmentScheduled`, `Location` on payload and mapper | Done |
 | C13 | WS4 | Route `AppointmentScheduled` to a consented caregiver; caregiver templates (standard and SMS-safe); consent checked at send | Done |
 | C13 | WS7 | `Consent` builder and `HisEventKind`; `Location` participant on `AppointmentBuilder` | Open |
@@ -415,14 +428,14 @@ withdrawn.
 | C13 | Shared | `AGENTS.md` events table row for `AppointmentScheduled` | Done |
 | C15 Escalation acknowledgement | WS1, WS2 | `AcknowledgeEscalation`, persistence, `Escalation.Id`, `EscalationRaised` acknowledgement fields | Done |
 | C15 | WS4 | Staff template placeholder for the previous level's acknowledgement | Done |
-| C15 | WS5 | Sweep keeps escalating after acknowledgement, through `Case.Escalate` | Open (with the WS5 stubs) |
+| C15 | WS5 | Sweep keeps escalating after acknowledgement, through `Case.Escalate` | Done |
 | C15 | WS6 | `POST /cases/{id}/escalations/{escalationId}/acknowledgement`, timeline entry, escalations on `CaseDetailResponse` | Open |
 | C19 Patient's other cases | WS6 | `patientReference` filter for clinician roles, audited in `CaseReads` | Open |
 | C20 Patient identifiers | WS1, WS2, WS3 | Case fields, payload, `DiagnosticReportMapper` | Done |
 | C20 | WS6 | Name and MRN on staff reads, null for `coordinator` | Open |
 | C20 | WS7 | `DiagnosticReport` with a synthetic `Patient` | Open |
 | C21 Evidence kinds | WS1, WS2, WS3 | Pathway vocabulary, intake rejection, mapper | Done |
-| C21 | WS5 | `start-treatment` handled like any other deadline | Open (with the WS5 stubs) |
+| C21 | WS5 | `start-treatment` handled like any other deadline | Done |
 | C21 | WS7 | Outcome resources carry a declared kind | Open |
 | Decision 19 Display labels | WS1 | `CaseDisplayLabels.From` | Done |
 | Decision 19 | WS6 | `DisplayLabel` on case reads and in metrics | Open |

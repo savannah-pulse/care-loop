@@ -79,7 +79,8 @@ at both simulators; Docker Compose sets the same through environment variables. 
 | `Outbox:PollInterval` | `00:00:02` | How often the dispatcher looks for due deliveries. |
 | `Outbox:MaxAttempts` | `10` | Attempts per subscriber before a delivery is parked for a person to look at. |
 | `Outbox:LeaseDuration` | `00:05:00` | How long one instance's claim on a delivery lasts. Several API instances may share the database; a claim left by a stopped instance lapses after this and the delivery is picked up again. |
-| `DeadlineWorker:Enabled` | `false` | Run the deadline worker. Off until WS5 implements it. |
+| `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
+| `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. |
 | `Ai:Provider` | `NoOp` | `NoOp` (AI off) or `AzureOpenAi`. Azure settings come from environment variables only. |
 
 Clinical deadlines are **not** configuration keys here. They live in
@@ -88,6 +89,30 @@ Clinical deadlines are **not** configuration keys here. They live in
 The API always runs on real time. For a live demo it reads `Pathways/demo/breast-screening.json` instead: the same
 definition with every duration divided by 1800, so a one-day deadline passes in 48 seconds. `DemoPathwayFileTests`
 fails if the two files differ in anything but that factor. Never point a real deployment at the demo folder.
+
+### Deadlines and escalation (WS5)
+
+The worker checks open cases with a due time using `IClock`. At the start of the configured warning window,
+it writes one `DeadlineApproaching` event to the outbox per case, next action and due time. The warning's source
+event identity is persisted, so repeated sweeps and worker restarts do not repeat it. A deadline is overdue
+strictly after its due instant; a notification still awaiting acknowledgement also gets the `Unacknowledged` flag.
+
+Each due escalation step is raised through `Case.Escalate`, in ladder order, with oversight addressed to
+`{role}:{facility}`. A delayed sweep catches up every due step. Acknowledging a step does not stop escalation;
+the next notice includes the previous level's acknowledgement. Resolved escalations and those raised before
+the current due time do not block a new deadline's ladder.
+
+Warnings, new exception flags and escalations are saved as internal `DeadlineElapsed` source events through
+`ICaseRepository.SaveAsync`, atomically with audit and outbox records. The existing dispatcher publishes them;
+the worker sends nothing directly and changes neither owner, urgency, stage nor deadline. Case checks use fresh
+scopes, log failures without patient detail and retry on the next sweep. Optimistic concurrency rolls back a stale
+check rather than overwriting an intervening event.
+
+Run the focused tests:
+
+```bash
+dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicyTests|FullyQualifiedName~DeadlineWorkerTests"
+```
 
 ## Routes
 

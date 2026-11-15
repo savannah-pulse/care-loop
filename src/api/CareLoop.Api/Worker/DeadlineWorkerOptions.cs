@@ -9,7 +9,7 @@ public sealed class DeadlineWorkerOptions
     /// <summary>Name of the configuration section.</summary>
     public const string SectionName = "DeadlineWorker";
 
-    /// <summary>Whether the worker background service runs. Off until WS5 implements it.</summary>
+    /// <summary>Whether the worker background service runs. Test hosts may leave it off and sweep explicitly.</summary>
     public bool Enabled { get; set; }
 
     /// <summary>How often the worker checks open cases against their deadlines.</summary>

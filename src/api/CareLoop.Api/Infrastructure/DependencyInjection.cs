@@ -146,15 +146,18 @@ public static class DependencyInjection
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration; supplies the <c>DeadlineWorker</c> section.</param>
     /// <returns>The same service collection, for chaining.</returns>
-    /// <remarks>The worker only runs as a hosted service when <c>DeadlineWorker:Enabled</c> is <see langword="true"/>, because its stub would otherwise stop the host.</remarks>
+    /// <remarks>The worker only runs as a hosted service when <c>DeadlineWorker:Enabled</c> is <see langword="true"/>. Explicit sweeps remain available to tests.</remarks>
     public static IServiceCollection AddDeadlines(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<DeadlineWorkerOptions>(configuration.GetSection(DeadlineWorkerOptions.SectionName));
+        services.AddOptions<DeadlineWorkerOptions>()
+            .Bind(configuration.GetSection(DeadlineWorkerOptions.SectionName))
+            .Validate(o => o.Interval > TimeSpan.Zero && o.Interval.TotalMilliseconds <= uint.MaxValue - 1,
+                "DeadlineWorker:Interval must be positive and supported by Task.Delay.")
+            .ValidateOnStart();
 
         services.AddSingleton<DeadlineWorker>();
         if (configuration.GetValue<bool>($"{DeadlineWorkerOptions.SectionName}:{nameof(DeadlineWorkerOptions.Enabled)}"))
         {
-            // TODO(WS-5): set DeadlineWorker:Enabled to true in appsettings.json once DeadlineWorker is implemented.
             services.AddHostedService(sp => sp.GetRequiredService<DeadlineWorker>());
         }
 
