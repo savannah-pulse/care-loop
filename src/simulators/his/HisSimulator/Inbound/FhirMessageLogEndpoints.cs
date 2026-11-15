@@ -1,42 +1,26 @@
 using HisSimulator.State;
-using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace HisSimulator.Inbound;
 
-/// <summary>
-/// Maps the read route for the FHIR message log shown by the ClientApp.
-/// </summary>
+/// <summary>Reads exact synthetic FHIR wire exchanges, including refusals.</summary>
 public static class FhirMessageLogEndpoints
 {
-    /// <summary>
-    /// Maps <c>GET /fhir-log</c>.
-    /// </summary>
-    /// <param name="app">The route builder to add the endpoint to.</param>
-    /// <returns>The same <paramref name="app"/> instance, for chaining.</returns>
+    /// <summary>Maps the filtered message-log read.</summary>
+    /// <param name="app">The route builder.</param>
+    /// <returns>The same route builder.</returns>
     public static IEndpointRouteBuilder MapFhirMessageLogEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/fhir-log", ListLog)
-            .WithName("ListFhirMessageLog")
-            .Produces<FhirMessageLogResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status501NotImplemented);
-
+        app.MapGet("/fhir-log", IResult (string? direction, string? caseRef, SimulatorStore store, CancellationToken ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            FhirMessageDirection? filter = direction?.ToLowerInvariant() switch
+            {
+                null => null, "sent" => FhirMessageDirection.Sent, "received" => FhirMessageDirection.Received,
+                _ => throw new ArgumentException("Direction must be sent or received."),
+            };
+            return TypedResults.Ok(new FhirMessageLogResponse(store.GetLogEntries(filter, caseRef)));
+        }).WithName("ListFhirMessageLog").WithSummary("Lists synthetic FHIR request and response bodies.")
+            .Produces<FhirMessageLogResponse>().ProducesProblem(400);
         return app;
-    }
-
-    /// <summary>
-    /// Will list logged FHIR messages, newest first.
-    /// </summary>
-    /// <param name="direction">
-    /// Optional filter (query string <c>direction</c>): <c>sent</c> or <c>received</c>, matched case-insensitively
-    /// against <see cref="FhirMessageDirection"/>. Bound as text so an unknown value yields a descriptive 400.
-    /// </param>
-    /// <param name="caseRef">Optional filter (query string <c>caseRef</c>): a simulator-side case handle.</param>
-    /// <returns>501 until implemented; then 200 with a <see cref="FhirMessageLogResponse"/>, or 400 for an unknown direction.</returns>
-    private static ProblemHttpResult ListLog(string? direction, string? caseRef)
-    {
-        // TODO(WS-7): parse direction (Enum.TryParse, ignoreCase) and return SimulatorStore.GetLogEntries(direction, caseRef)
-        // wrapped in FhirMessageLogResponse; answer 400 for an unknown direction.
-        return StubResults.NotImplemented("FhirMessageLogEndpoints.ListLog");
     }
 }

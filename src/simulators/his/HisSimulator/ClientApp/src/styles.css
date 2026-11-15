@@ -70,3 +70,77 @@ body {
   border-inline-start: 4px solid #7a3e00;
   background-color: #fff4e5;
 }
+
+label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-inline-size: 0;
+  gap: 0.25rem;
+  margin-block: 0.5rem;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  max-inline-size: 100%;
+  box-sizing: border-box;
+  padding-block: 0.5rem;
+  padding-inline: 0.65rem;
+}
+
+button {
+  cursor: pointer;
+  margin-block: 0.5rem;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+}
+
+.cards {
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.cards > li,
+aside,
+fieldset {
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  margin-block: 1rem;
+  padding-block: 1rem;
+  padding-inline: 1rem;
+  background: #ffffff;
+  border: 1px solid #c9d2dc;
+  border-radius: 0.5rem;
+}
+
+.cards button {
+  display: block;
+}
+
+pre {
+  overflow: auto;
+  max-inline-size: 100%;
+  padding-block: 0.75rem;
+  padding-inline: 0.75rem;
+  background: #edf2f7;
+}
+
+[role='alert'] {
+  color: #8b1b1b;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

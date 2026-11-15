@@ -1,55 +1,54 @@
+using HisSimulator.Scenarios;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+
 namespace HisSimulator.Tests.Scenarios;
 
-/// <summary>Planned behaviour of <c>ScenarioLoader</c>.</summary>
 public sealed class ScenarioLoaderTests
 {
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAllAsync_returns_the_five_scenarios_ordered_by_name()
+    private sealed class HostEnvironment : IHostEnvironment
     {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "HisSimulator";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAllAsync_ignores_the_schema_file()
+    [Fact] public async Task Shared_scenarios_load_in_name_order_without_schema_and_relative_directory_resolves()
     {
+        await using var host = await SimulatorHost.StartAsync();
+        using var services = new ServiceCollection().AddSingleton<IHostEnvironment>(new HostEnvironment
+        { ContentRootPath = Directory.GetParent(TestPaths.ScenariosDirectory)!.FullName }).BuildServiceProvider();
+        var loader = new ScenarioLoader(Options.Create(new ScenarioOptions { Directory = "scenarios" }), services.GetRequiredService<IHostEnvironment>());
+        var all = await loader.LoadAllAsync(default);
+        Assert.Equal(5, all.Count); Assert.Equal(all.Select(s => s.Name).Order(StringComparer.Ordinal), all.Select(s => s.Name));
+        Assert.DoesNotContain(all, s => s.Name == "scenario.schema"); Assert.Equal("happy-path", (await loader.LoadAsync("happy-path", default)).Name);
+        await Assert.ThrowsAsync<ScenarioNotFoundException>(() => loader.LoadAsync("unknown", default));
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAllAsync_resolves_a_relative_directory_against_the_content_root()
+    [Theory] [InlineData("../secret")] [InlineData("C:\\secret")] [InlineData("a/b")]
+    public async Task Unsafe_names_are_refused(string name)
     {
+        var loader = new ScenarioLoader(Options.Create(new ScenarioOptions { Directory = TestPaths.ScenariosDirectory }), new HostEnvironment());
+        await Assert.ThrowsAsync<ArgumentException>(() => loader.LoadAsync(name, default));
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAsync_returns_the_named_scenario()
+    [Theory] [InlineData("flag")] [InlineData("name")] [InlineData("patient")] [InlineData("both")] [InlineData("index")]
+    [InlineData("offset")] [InlineData("actor")] [InlineData("evidence")]
+    public async Task Invalid_shape_identifiers_behaviour_offsets_and_evidence_are_refused(string error)
     {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAsync_unknown_name_throws_scenario_not_found()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void LoadAsync_rejects_a_name_that_could_escape_the_directory()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Load_rejects_a_file_whose_synthetic_flag_is_not_true()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Load_rejects_a_file_whose_name_differs_from_the_file_name()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Load_rejects_identifiers_without_the_SYN_prefix()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Load_rejects_a_file_with_both_steps_and_cohort()
-    {
+        using var folder = new ScenarioFolder();
+        switch (error)
+        {
+            case "flag": folder.Scenario["synthetic"] = false; break;
+            case "name": folder.Scenario["name"] = "different"; break;
+            case "patient": folder.Scenario["patients"]![0]!["syntheticId"] = "REAL-1"; break;
+            case "both": folder.Scenario["cohort"] = System.Text.Json.Nodes.JsonNode.Parse("{\"seed\":1,\"size\":1,\"mix\":[{\"scenario\":\"test\",\"weight\":1}]}"); break;
+            case "index": folder.Scenario["patients"]![0]!["behaviour"]!["respondToNotification"] = "not-a-number"; break;
+            case "offset": folder.Scenario["steps"]![1]!["at"] = "-PT1H"; break;
+            case "actor": folder.Scenario["steps"]![1]!["actor"] = "patient"; break;
+            case "evidence": folder.Scenario["steps"]![1]!["params"]!["evidenceFromStep"] = "s1"; break;
+        }
+        folder.Save();
+        var loader = new ScenarioLoader(Options.Create(new ScenarioOptions { Directory = folder.Path }), new HostEnvironment());
+        await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadAsync("test", default));
     }
 }

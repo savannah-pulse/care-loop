@@ -29,6 +29,8 @@ public static class HisSimulatorServiceCollectionExtensions
     /// <returns>The same <paramref name="services"/> instance, for chaining.</returns>
     public static IServiceCollection AddHisSimulator(this IServiceCollection services, IConfiguration configuration)
     {
+        services.AddProblemDetails();
+        services.AddExceptionHandler<Middleware.SimulatorExceptionHandler>();
         services.Configure<CareLoopOptions>(configuration.GetSection(CareLoopOptions.SectionName));
         services.Configure<ScenarioOptions>(configuration.GetSection(ScenarioOptions.SectionName));
 
@@ -48,6 +50,7 @@ public static class HisSimulatorServiceCollectionExtensions
         services.AddSingleton<AppointmentBuilder>();
         services.AddSingleton<OutcomeBuilder>();
         services.AddSingleton<ClosureBuilder>();
+        services.AddSingleton<ConsentBuilder>();
         services.AddHttpClient<CareLoopFhirClient>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<CareLoopOptions>>().Value;
@@ -63,6 +66,7 @@ public static class HisSimulatorServiceCollectionExtensions
         // Scenarios.
         services.AddSingleton<ScenarioLoader>();
         services.AddSingleton<ScenarioRunner>();
+        services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<ScenarioRunner>());
 
         return services;
     }

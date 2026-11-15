@@ -26,7 +26,17 @@ public sealed class ClinicalReviewTaskBuilder
     /// <exception cref="ArgumentException">The performer or the urgency is missing.</exception>
     public FhirTask Build(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the review Task; agree the urgency carrier and the review task code with WS6 (StatusMap).
-        throw new NotImplementedException("WS7: ClinicalReviewTaskBuilder.Build");
+        var task = FhirSupport.Stamp(new FhirTask
+        {
+            Status = FhirTask.TaskStatus.Completed, Intent = FhirTask.TaskIntent.Order,
+            Code = FhirSupport.Concept("task-code", "clinical-review"),
+            Focus = new Hl7.Fhir.Model.ResourceReference("DiagnosticReport/" + @case.DiagnosticReportId),
+            For = new Hl7.Fhir.Model.ResourceReference("Patient/" + @case.Patient.SyntheticId),
+            Owner = FhirSupport.Actor(FhirSupport.Staff(request.Performer)),
+            LastModifiedElement = new Hl7.Fhir.Model.FhirDateTime(request.OccurredAt),
+        }, request, FhirSupport.Id(@case.CaseRef + "/review"));
+        task.Extension.Add(new Hl7.Fhir.Model.Extension(FhirSupport.Base + "/StructureDefinition/reviewed-urgency",
+            new Hl7.Fhir.Model.Code(FhirSupport.Text(request, "urgency"))));
+        return task;
     }
 }

@@ -26,8 +26,14 @@ public sealed class ReferralBuilder
     /// <exception cref="ArgumentException">The performer is missing.</exception>
     public ServiceRequest BuildServiceRequest(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the referral ServiceRequest.
-        throw new NotImplementedException("WS7: ReferralBuilder.BuildServiceRequest");
+        var resource = FhirSupport.Service(@case, request, "referral");
+        var facility = FhirSupport.OptionalText(request, "receivingFacility");
+        if (facility is not null)
+        {
+            if (!FhirSupport.SyntheticId(facility)) throw new ArgumentException("The receiving facility must be synthetic.");
+            resource.Performer.Add(new ResourceReference("Organization/" + facility));
+        }
+        return resource;
     }
 
     /// <summary>
@@ -43,7 +49,6 @@ public sealed class ReferralBuilder
     /// <exception cref="ArgumentException">The status is missing or not one of the supported values.</exception>
     public FhirTask BuildTask(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the referral Task for the requested state.
-        throw new NotImplementedException("WS7: ReferralBuilder.BuildTask");
+        return FhirSupport.TrackTask(@case, request, "referral");
     }
 }

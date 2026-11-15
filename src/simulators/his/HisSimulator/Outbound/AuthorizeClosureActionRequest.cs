@@ -15,9 +15,13 @@ namespace HisSimulator.Outbound;
 /// <see langword="null"/> to send no evidence reference.
 /// </param>
 /// <param name="ExceptionNote">Documented exception text when closing without outcome evidence; otherwise <see langword="null"/>.</param>
+/// <param name="NextSurveillanceDate">Optional source-recorded next date, YYYY-MM-DD.</param>
+/// <param name="DocumentedAttemptReferences">Optional source evidence for documented contact attempts.</param>
 public sealed record AuthorizeClosureActionRequest(
     string CaseRef,
     ActingStaff Performer,
     string ClosureReason,
     string? EvidenceResourceKey,
-    string? ExceptionNote);
+    string? ExceptionNote,
+    string? NextSurveillanceDate = null,
+    IReadOnlyList<string>? DocumentedAttemptReferences = null);

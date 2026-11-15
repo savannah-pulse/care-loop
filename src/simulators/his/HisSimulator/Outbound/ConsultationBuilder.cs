@@ -26,8 +26,7 @@ public sealed class ConsultationBuilder
     /// <exception cref="ArgumentException">The performer is missing.</exception>
     public ServiceRequest BuildServiceRequest(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the consultation ServiceRequest.
-        throw new NotImplementedException("WS7: ConsultationBuilder.BuildServiceRequest");
+        return FhirSupport.Service(@case, request, "consultation");
     }
 
     /// <summary>
@@ -43,7 +42,6 @@ public sealed class ConsultationBuilder
     /// <exception cref="ArgumentException">The status is missing or not one of the supported values.</exception>
     public FhirTask BuildTask(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the consultation Task for the requested state.
-        throw new NotImplementedException("WS7: ConsultationBuilder.BuildTask");
+        return FhirSupport.TrackTask(@case, request, "consultation");
     }
 }

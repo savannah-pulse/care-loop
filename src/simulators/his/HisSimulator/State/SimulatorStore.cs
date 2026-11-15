@@ -10,6 +10,14 @@ namespace HisSimulator.State;
 /// </remarks>
 public sealed class SimulatorStore
 {
+    private readonly object _sync = new();
+    private readonly Dictionary<Guid, StaffInboxItem> _inbox = [];
+    private readonly List<FhirMessageLogEntry> _log = [];
+    private readonly Dictionary<string, SimulatedCase> _cases = new(StringComparer.Ordinal);
+    private readonly Dictionary<Guid, ScenarioRun> _runs = [];
+    private readonly Dictionary<string, string> _caseTasks = new(StringComparer.Ordinal);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _gates = new();
+
     /// <summary>
     /// Adds an item to the staff inbox.
     /// </summary>
@@ -17,8 +25,8 @@ public sealed class SimulatorStore
     /// <exception cref="ArgumentException">An item with the same identifier already exists.</exception>
     public void AddInboxItem(StaffInboxItem item)
     {
-        // TODO(WS-7): store the item in a thread-safe collection keyed by Id; reject duplicate ids.
-        throw new NotImplementedException("WS7: SimulatorStore.AddInboxItem");
+        lock (_sync)
+            if (!_inbox.TryAdd(item.Id, item)) throw new ArgumentException("An inbox item with this id already exists.", nameof(item));
     }
 
     /// <summary>
@@ -30,8 +38,8 @@ public sealed class SimulatorStore
     /// <returns>A snapshot of the matching items ordered by <see cref="StaffInboxItem.ReceivedAt"/> descending.</returns>
     public IReadOnlyList<StaffInboxItem> GetInboxItems(string? recipientSyntheticId = null)
     {
-        // TODO(WS-7): return an immutable snapshot, filtered by recipient when given, newest first.
-        throw new NotImplementedException("WS7: SimulatorStore.GetInboxItems");
+        lock (_sync) return _inbox.Values.Where(i => recipientSyntheticId is null || i.RecipientSyntheticId == recipientSyntheticId)
+            .OrderByDescending(i => i.ReceivedAt).ThenBy(i => i.Id).ToArray();
     }
 
     /// <summary>
@@ -41,8 +49,7 @@ public sealed class SimulatorStore
     /// <returns>The item, or <see langword="null"/> if none has that identifier.</returns>
     public StaffInboxItem? GetInboxItem(Guid id)
     {
-        // TODO(WS-7): look the item up by id.
-        throw new NotImplementedException("WS7: SimulatorStore.GetInboxItem");
+        lock (_sync) return _inbox.GetValueOrDefault(id);
     }
 
     /// <summary>
@@ -51,8 +58,7 @@ public sealed class SimulatorStore
     /// <param name="entry">The sent or received message to record.</param>
     public void AppendLogEntry(FhirMessageLogEntry entry)
     {
-        // TODO(WS-7): append in arrival order; consider a size cap so a long cohort run cannot exhaust memory.
-        throw new NotImplementedException("WS7: SimulatorStore.AppendLogEntry");
+        lock (_sync) _log.Add(entry);
     }
 
     /// <summary>
@@ -63,8 +69,8 @@ public sealed class SimulatorStore
     /// <returns>A snapshot of the matching entries ordered by <see cref="FhirMessageLogEntry.At"/> descending.</returns>
     public IReadOnlyList<FhirMessageLogEntry> GetLogEntries(FhirMessageDirection? direction = null, string? caseRef = null)
     {
-        // TODO(WS-7): return an immutable snapshot with both optional filters applied, newest first.
-        throw new NotImplementedException("WS7: SimulatorStore.GetLogEntries");
+        lock (_sync) return _log.Where(e => (direction is null || e.Direction == direction) && (caseRef is null || e.CaseRef == caseRef))
+            .OrderByDescending(e => e.At).ToArray();
     }
 
     /// <summary>
@@ -73,8 +79,17 @@ public sealed class SimulatorStore
     /// <param name="case">The case to store, keyed by <see cref="SimulatedCase.CaseRef"/>.</param>
     public void UpsertCase(SimulatedCase @case)
     {
-        // TODO(WS-7): add or replace by CaseRef.
-        throw new NotImplementedException("WS7: SimulatorStore.UpsertCase");
+        lock (_sync)
+        {
+            var prior = _cases.GetValueOrDefault(@case.CaseRef);
+            var ids = new Dictionary<string, string>(prior?.ResourceIds ?? new Dictionary<string, string>());
+            foreach (var pair in @case.ResourceIds) ids[pair.Key] = pair.Value;
+            _cases[@case.CaseRef] = @case with
+            {
+                CareLoopTaskId = @case.CareLoopTaskId ?? prior?.CareLoopTaskId ?? _caseTasks.GetValueOrDefault(@case.DiagnosticReportId),
+                ResourceIds = new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(ids),
+            };
+        }
     }
 
     /// <summary>
@@ -84,8 +99,7 @@ public sealed class SimulatorStore
     /// <returns>The case, or <see langword="null"/> if the simulator has not sent a screening result for it.</returns>
     public SimulatedCase? GetCase(string caseRef)
     {
-        // TODO(WS-7): look the case up by CaseRef.
-        throw new NotImplementedException("WS7: SimulatorStore.GetCase");
+        lock (_sync) return _cases.GetValueOrDefault(caseRef);
     }
 
     /// <summary>
@@ -94,8 +108,7 @@ public sealed class SimulatorStore
     /// <returns>A snapshot of all cases, in creation order.</returns>
     public IReadOnlyList<SimulatedCase> GetCases()
     {
-        // TODO(WS-7): return an immutable snapshot in creation order.
-        throw new NotImplementedException("WS7: SimulatorStore.GetCases");
+        lock (_sync) return _cases.Values.ToArray();
     }
 
     /// <summary>
@@ -104,8 +117,7 @@ public sealed class SimulatorStore
     /// <param name="run">The run state to store, keyed by <see cref="ScenarioRun.RunId"/>.</param>
     public void SaveRun(ScenarioRun run)
     {
-        // TODO(WS-7): add or replace by RunId so progress updates are visible to GET /scenarios/runs/{runId}.
-        throw new NotImplementedException("WS7: SimulatorStore.SaveRun");
+        lock (_sync) _runs[run.RunId] = run with { Steps = run.Steps.ToArray() };
     }
 
     /// <summary>
@@ -115,8 +127,7 @@ public sealed class SimulatorStore
     /// <returns>The latest saved state, or <see langword="null"/> if no run has that identifier.</returns>
     public ScenarioRun? GetRun(Guid runId)
     {
-        // TODO(WS-7): look the run up by RunId.
-        throw new NotImplementedException("WS7: SimulatorStore.GetRun");
+        lock (_sync) return _runs.GetValueOrDefault(runId);
     }
 
     /// <summary>
@@ -127,7 +138,28 @@ public sealed class SimulatorStore
     /// </remarks>
     public void Reset()
     {
-        // TODO(WS-7): clear all collections atomically.
-        throw new NotImplementedException("WS7: SimulatorStore.Reset");
+        lock (_sync) { _inbox.Clear(); _log.Clear(); _cases.Clear(); _runs.Clear(); _caseTasks.Clear(); }
     }
+
+    /// <summary>Replaces the current inbox state on replay of the same FHIR resource.</summary>
+    /// <param name="item">The deterministic inbox item.</param>
+    internal void UpsertInboxItem(StaffInboxItem item) { lock (_sync) _inbox[item.Id] = item; }
+
+    /// <summary>Correlates the API case Task with the source report, including delivery before the initial send finishes.</summary>
+    /// <param name="reportId">The source screening report id.</param>
+    /// <param name="taskId">The real CareLoop case Task id.</param>
+    internal void RecordCaseTask(string reportId, string taskId)
+    {
+        lock (_sync)
+        {
+            _caseTasks[reportId] = taskId;
+            foreach (var pair in _cases.Where(p => p.Value.DiagnosticReportId == reportId).ToArray())
+                _cases[pair.Key] = pair.Value with { CareLoopTaskId = taskId };
+        }
+    }
+
+    /// <summary>Serializes outbound state changes for one local case across manual actions and runs.</summary>
+    /// <param name="caseRef">The case whose FHIR state is being sent.</param>
+    /// <returns>The shared gate; callers must release it in a finally block.</returns>
+    internal SemaphoreSlim GateFor(string caseRef) => _gates.GetOrAdd(caseRef, _ => new SemaphoreSlim(1));
 }
