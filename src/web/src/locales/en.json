@@ -22,7 +22,9 @@
     "nurseNavigator": "Nurse navigator",
     "screeningPhysician": "Screening physician",
     "facilityLead": "Facility lead",
-    "programmeCoordinator": "Programme coordinator"
+    "programmeCoordinator": "Programme coordinator",
+    "breastSurgeon": "Breast surgeon",
+    "familyDoctor": "Family doctor"
   },
   "facilities": {
     "family-health-centre": "Family Health Centre",
@@ -49,7 +51,11 @@
   },
   "patient": {
     "label": "Patient {id}",
-    "detail": "Name and details are in the hospital record."
+    "mrn": "MRN {mrn}",
+    "case": "Case {number}",
+    "hidden": "Name hidden for your role",
+    "detail": "Reports, images and other details are in the hospital record.",
+    "hiddenDetail": "Names and MRNs are hidden for your role. Everything else on the case is here."
   },
   "facts": {
     "dated": "{name}, {date}",
@@ -63,22 +69,15 @@
     "heart-kidney-diabetes": "Heart, kidney and diabetes check"
   },
   "stages": {
-    "steps": {
-      "resultReceived": "Result received",
-      "caseOpened": "Case opened",
-      "ownerAssigned": "Owner assigned",
-      "patientNotified": "Patient notified",
-      "patientAcknowledged": "Patient acknowledged",
-      "consultation": "Consultation",
-      "followUp": "Follow-up",
-      "outcomeRecorded": "Outcome recorded",
-      "closureReview": "Closure review",
-      "closed": "Closed"
-    },
-    "list": {
-      "Received": "Case opened",
-      "ReviewPending": "Owner assigned",
-      "FollowUpActive": "In follow-up",
+    "labels": {
+      "ResultReceived": "Result received",
+      "CaseOpened": "Case opened",
+      "OwnerAssigned": "Owner assigned",
+      "PatientNotified": "Patient notified",
+      "PatientAcknowledged": "Patient acknowledged",
+      "Consultation": "Consultation",
+      "FollowUp": "Follow-up",
+      "OutcomeRecorded": "Outcome recorded",
       "ClosureReview": "Closure review",
       "Closed": "Closed"
     },
@@ -104,6 +103,7 @@
     "reassign-consultation": "Find another clinician for the consultation",
     "arrange-alternative-referral": "Send a new referral",
     "rebook-appointment": "Rebook the appointment",
+    "start-treatment": "Start the treatment",
     "decide-closure": "Decide whether to close the case",
     "none": "No next action",
     "unknown": "Next action: {key}"
@@ -152,6 +152,7 @@
   },
   "time": {
     "date": "{weekday} {day} {month}",
+    "dateWithYear": "{weekday} {day} {month} {year}",
     "dateTime": "{weekday} {day} {month}, {time}",
     "dateTimeWithYear": "{weekday} {day} {month} {year}, {time}",
     "today": "Today, {time}",
@@ -170,7 +171,9 @@
     "daysHours": {
       "one": "{count} day {hours} h",
       "other": "{count} days {hours} h"
-    }
+    },
+    "seconds": "{count} s",
+    "minutesSeconds": "{minutes} min {seconds} s"
   },
   "states": {
     "notAvailableTitle": "This part isn't ready yet",
@@ -178,7 +181,11 @@
     "lastTried": "Last tried at {time}.",
     "tryAgain": "Try again",
     "checkAgain": "Check again",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "forbiddenTitle": "Not open to your role",
+    "forbiddenBody": "Your role can't see this. If you need it, ask your facility lead.",
+    "screenFailed": "We couldn't show this page",
+    "screenFailedBody": "Something in it could not be shown. Try again, or go back to the worklist."
   },
   "worklist": {
     "title": "Worklist",
@@ -207,8 +214,10 @@
     },
     "programmeLabel": "Programme",
     "allProgrammes": "All programmes",
-    "searchLabel": "Search by patient number",
-    "searchPlaceholder": "Search patient number",
+    "searchLabel": "Search by name, MRN or patient number",
+    "searchPlaceholder": "Search name or MRN",
+    "searchCaseLabel": "Search by case number",
+    "searchCasePlaceholder": "Search by case number",
     "filtersLabel": "Show cases",
     "chips": {
       "all": "All open",
@@ -227,10 +236,16 @@
       "due": "Due",
       "status": "Status"
     },
-    "showing": "Showing {shown} of {total}.",
+    "showing": {
+      "one": "Showing {shown} of {count} open case.",
+      "other": "Showing {shown} of {count} open cases."
+    },
+    "limited": "Only the {limit} most recently updated cases are loaded. Search or filter to find a case.",
     "loading": "Loading your worklist",
     "notAvailable": "Cases will show here once the case list is switched on.",
     "errorTitle": "We couldn't load your worklist",
+    "forbiddenTitle": "This list is not open to your role",
+    "forbiddenBody": "Your role can only see cases sent to you. If you think you should see this list, ask your facility lead.",
     "emptyTitle": "Nothing needs you right now",
     "emptyAllOnTrack": {
       "one": "Your {count} case is on track. The next deadline is {date}.",
@@ -241,11 +256,23 @@
       "other": "All {count} of your cases are on track."
     },
     "emptyNoCases": "There are no open cases.",
+    "emptyNothingEscalated": "No case is escalated to you. A case shows here while an escalation is with the programme coordinator.",
     "showAll": "Show all cases",
     "filterEmptyTitle": "No cases match these filters",
     "filterEmptyBody": "Try another filter, or clear them to see every open case.",
     "clearFilters": "Clear filters",
-    "note": "Names and details are in the hospital record, and clinical steps are recorded there too. CareLoop shows where each case is and who acts next."
+    "team": {
+      "yours": "Cases at {facility}, your team.",
+      "choose": "View another team's cases",
+      "dialogTitle": "View another team's cases",
+      "dialogIntro": "Their cases are not yours. Say why you need them. Your reason and everything you open are recorded, and your facility lead checks them.",
+      "chooseLabel": "Team",
+      "submit": "Show their cases",
+      "showing": "Showing cases at {facility}",
+      "reasonRecorded": "Your reason is recorded with each case you open: {reason}",
+      "back": "Back to my team"
+    },
+    "note": "Read-only. Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next."
   },
   "case": {
     "titleFallback": "Case",
@@ -258,7 +285,6 @@
     "responsible": "Responsible",
     "due": "Due",
     "escalation": "Escalation",
-    "escalationOpen": "The facility lead has been told. The responsible person stays the same.",
     "escalationNone": "Not escalated",
     "proposedOwner": "Waiting for {name} to accept. {owner} stays responsible until then.",
     "noProblem": "Nothing is blocking this case.",
@@ -281,7 +307,16 @@
     "errorTitle": "We couldn't load this case",
     "notFoundTitle": "Case not found",
     "notFoundBody": "There is no case at this link. Check the link, or find the case on the worklist.",
-    "note": "Read-only. Reports, images and notes stay in the hospital system."
+    "note": "Read-only. Reports, images and notes stay in the hospital system, and every view is recorded.",
+    "escalatedTo": "Escalated to {target}, {date}.",
+    "escalatedToNoDate": "Escalated to {target}.",
+    "escalationAcknowledged": "Acknowledged by {name}, {date}.",
+    "escalationNotAcknowledged": "Not acknowledged yet.",
+    "escalationSameOwner": "The person responsible stays the same.",
+    "openEscalation": "Open the escalation",
+    "forbiddenTitle": "This case is not open to you",
+    "forbiddenBody": "Your role or team can't open this case. If you need it, ask the person responsible for it.",
+    "forbiddenCoordinator": "A case opens for the programme coordinator only while it is escalated to them."
   },
   "closureReasons": {
     "Treated": "Treated",
@@ -360,9 +395,26 @@
       "HandoffSummaryApproved": "Summary",
       "EscalationAcknowledged": "Escalation"
     },
-    "fromHospital": "{actor} · from the hospital system",
-    "inCareLoop": "{actor} · in CareLoop",
-    "refused": "Refused"
+    "refused": "Refused",
+    "sources": {
+      "careLoop": "CareLoop",
+      "hospital": "Hospital system",
+      "patientChannel": "Patient channel"
+    },
+    "refusedEvents": {
+      "ScreeningResultReceived": "Result not accepted",
+      "ClinicalReviewCompleted": "Review not accepted",
+      "NotificationUpdated": "Patient contact update not accepted",
+      "ConsultationUpdated": "Consultation update not accepted",
+      "ReferralUpdated": "Referral update not accepted",
+      "AppointmentUpdated": "Appointment update not accepted",
+      "OutcomeRecorded": "Outcome not accepted",
+      "ClosureDecided": "Closure refused",
+      "ConsentRecorded": "Consent not accepted",
+      "DeadlineElapsed": "Deadline check not applied",
+      "HandoffSummaryApproved": "Summary approval refused",
+      "EscalationAcknowledged": "Acknowledgement refused"
+    }
   },
   "summary": {
     "title": "Handoff summary",
@@ -414,10 +466,10 @@
     "rejectedNext": "Write the summary yourself in your hospital system and attach it to the referral.",
     "noDraftTitle": "No AI draft",
     "noDraft": {
-      "notAvailable": "No AI draft: drafting is not available yet.",
-      "conflict": "No AI draft: AI drafting is switched off, or this case already has an approved summary.",
-      "unavailable": "No AI draft: the AI service did not produce a draft it could check.",
-      "error": "No AI draft: the service is off or did not answer."
+      "notAvailable": "Drafting isn't ready yet.",
+      "conflict": "AI drafting is switched off, or this case already has an approved summary.",
+      "unavailable": "The AI service did not produce a draft it could check.",
+      "error": "The service is off or did not answer."
     },
     "noDraftBody": "CareLoop cannot take a summary you write yourself yet. Write it in your hospital system and attach it to the referral. Every other step still works.",
     "decisionFailed": {
@@ -434,27 +486,101 @@
   },
   "impact": {
     "title": "Impact",
-    "subtitle": "All screening programmes · Updated {date} · {count}",
+    "subtitle": "{scope} · Updated {date} · {count}",
+    "allFacilities": "All facilities",
     "cases": {
       "one": "{count} case",
       "other": "{count} cases"
     },
-    "closedLabel": "Cases closed",
-    "closedOf": "{closed} of {total} cases, with evidence or a documented exception",
-    "medianClosure": "Typical time to close: {duration}",
-    "noClosureYet": "No case closed yet",
-    "overdueLabel": "Open cases past their deadline",
-    "overdueOf": "Out of {open} open cases",
+    "notMeasured": "Not measured yet",
+    "notReached": "Not reached yet",
+    "outOf": "Out of {count}",
+    "measures": {
+      "nextStepOnTime": "Next care step done by the deadline",
+      "understanding": "Understood their next step",
+      "acknowledgement": "Patients who acknowledged the message",
+      "closure": "Cases closed",
+      "referralAcceptedAndAttended": "Referral accepted and attended",
+      "appointmentsAttended": "Appointments attended",
+      "treatmentStartedOnTime": "Treatment started by the deadline",
+      "signedEvidence": "Closed with signed evidence"
+    },
+    "measureOf": {
+      "nextStepOnTime": {
+        "one": "{numerator} of {count} case whose deadline has passed",
+        "other": "{numerator} of {count} cases whose deadline has passed"
+      },
+      "understanding": {
+        "one": "{numerator} of {count} who acknowledged said it back",
+        "other": "{numerator} of {count} who acknowledged said it back"
+      },
+      "acknowledgement": {
+        "one": "{numerator} of {count} patient told",
+        "other": "{numerator} of {count} patients told"
+      },
+      "closure": {
+        "one": "{numerator} of {count} case",
+        "other": "{numerator} of {count} cases"
+      },
+      "referralAcceptedAndAttended": {
+        "one": "{numerator} of {count} referral",
+        "other": "{numerator} of {count} referrals"
+      },
+      "appointmentsAttended": {
+        "one": "{numerator} of {count} appointment due",
+        "other": "{numerator} of {count} appointments due"
+      },
+      "treatmentStartedOnTime": {
+        "one": "{numerator} of {count} person who needed treatment",
+        "other": "{numerator} of {count} people who needed treatment"
+      },
+      "signedEvidence": {
+        "one": "{numerator} of {count} closed case",
+        "other": "{numerator} of {count} closed cases"
+      }
+    },
+    "closedDetail": "Cases closed: {rate} ({closed} of {total})",
+    "closedNone": "No case closed yet, out of {total}",
+    "overdueLabel": "Unresolved actionable results",
+    "overdueOf": {
+      "one": "Past the deadline, out of {count} open case",
+      "other": "Past the deadline, out of {count} open cases"
+    },
     "overdueDetail": "Escalated: {escalated} · Need a new owner: {unassigned}",
-    "ackLabel": "Patients who acknowledged the message",
-    "ackOf": "Share of notifications the patient acknowledged",
-    "ackDetail": "Delivery alone does not count.",
-    "noRate": "None yet",
-    "byStageTitle": "Open cases by stage",
-    "byStageOf": "Out of {open}",
+    "ackDetail": "Acknowledged the message: {rate} ({numerator} of {denominator} told)",
+    "ackNone": "No patient has been told yet.",
+    "stepsTitle": "Time to each step",
+    "stepsAside": "Median clock time from the result",
+    "steps": {
+      "acknowledgement": "Patient acknowledged",
+      "consultation": "Consultation answered",
+      "appointment": "Appointment attended",
+      "careStarted": "Care started: treatment or surveillance",
+      "closure": "Case closed"
+    },
+    "columns": {
+      "step": "Step",
+      "median": "Median",
+      "cases": "Cases",
+      "measure": "Measure",
+      "rate": "Rate"
+    },
+    "completedTitle": "Steps completed",
+    "completedAside": "Each with what it is out of",
+    "confidence": "Patient confidence, out of 5",
+    "confidenceOf": {
+      "one": "{count} answer from {told} patients told ({rate})",
+      "other": "{count} answers from {told} patients told ({rate})"
+    },
+    "reachedTitle": "Cases that reached each stage",
+    "nowTitle": "Where open cases are now",
+    "nowNone": "No case is open.",
     "byExceptionTitle": "Why cases are waiting",
     "byExceptionOf": "Open cases with each reason",
     "byExceptionNone": "No open case is waiting on anything.",
+    "closuresTitle": "Closures by reason",
+    "closuresNone": "No case has closed yet.",
+    "closuresNote": "Declined, transferred and untraceable are documented exceptions, not care received.",
     "loading": "Loading the numbers",
     "notAvailable": "The numbers will show here once they are switched on.",
     "errorTitle": "We couldn't load the numbers",
@@ -476,8 +602,10 @@
     "methodTitle": "How this is worked out",
     "methodBody": "We replay the same cases twice: once with reminders and escalation, and once without them. Everything else stays the same, so the difference shows what reminders and escalation change. It shows how CareLoop works; it is not evidence of real-world results.",
     "comparisonLoading": "Running the comparison",
-    "comparisonNotAvailable": "The comparison will show here once it is switched on.",
-    "comparisonError": "We couldn't run the comparison"
+    "comparisonNotAvailable": "The comparison with reminders and escalation switched off will show here once it is switched on.",
+    "comparisonUnavailableTitle": "The comparison isn't available right now",
+    "comparisonUnavailableBody": "The rest of the numbers on this page are up to date. Check again later.",
+    "footnote": "These numbers show how CareLoop works. They are not evidence of real-world results."
   },
   "programmesPage": {
     "title": "Programmes",
@@ -488,5 +616,118 @@
     "title": "Page not found",
     "body": "There is nothing at this link.",
     "link": "Go to the worklist"
+  },
+  "access": {
+    "legend": "Why do you need it?",
+    "other": "Another reason, which I will write",
+    "writtenLabel": "Your reason",
+    "chooseReason": "Choose a reason first.",
+    "writeReason": "Write your reason first.",
+    "cancel": "Cancel",
+    "caseTitle": "Opening a case outside your team",
+    "caseLead": "This case is cared for by another team.",
+    "caseIntro": "Say why you need it. Your reason and everything you open are recorded, and your facility lead checks them.",
+    "caseReasons": {
+      "calledForHelp": "The patient called me and needs help now",
+      "covering": "I am covering for the patient's nurse today"
+    },
+    "openCase": "Open the case",
+    "teamReasons": {
+      "covering": "I am covering for a colleague there today",
+      "patientNeedsHelp": "A patient of theirs needs help now"
+    }
+  },
+  "otherCases": {
+    "title": "This patient's other screening",
+    "titleNamed": "{name}'s other screening",
+    "item": "{programme}, opened {date}",
+    "closedAs": "Closed: {reason}",
+    "none": "No other screening in CareLoop for this patient.",
+    "note": "From their other cases in CareLoop. Only clinicians see this. The full history is in the hospital record.",
+    "loading": "Loading other screening",
+    "notAvailable": "Other screening will show here once it is switched on.",
+    "error": "We couldn't load other screening",
+    "forbiddenTitle": "Not open to your role",
+    "forbiddenBody": "Only clinicians see a patient's other screening."
+  },
+  "escalation": {
+    "title": "Escalation",
+    "toYouTitle": "Escalated to you",
+    "documentTitle": "Escalation: {name}",
+    "back": "Escalations",
+    "label": "Escalation",
+    "levelBadge": "Level {level}",
+    "loading": "Loading the escalation",
+    "errorTitle": "We couldn't load this escalation",
+    "wasDue": "Was due",
+    "escalatedTo": "Escalated to",
+    "since": "Since {date}",
+    "noneOpen": "No open escalation",
+    "ladderLabel": "When a step is late",
+    "rungStates": {
+      "done": "done",
+      "current": "where it is now",
+      "upcoming": "not reached"
+    },
+    "rungs": {
+      "reminder": "Reminder to {name}",
+      "reminderYou": "Reminder to you",
+      "reminderSent": "Sent {date}",
+      "reminderSentNoDate": "Sent before the deadline",
+      "reminderDue": "Before the deadline, {date}",
+      "reminderBefore": "Before the deadline",
+      "you": "You, the {role}",
+      "raised": "Escalated {date}.",
+      "raisedNoDate": "Escalated.",
+      "acknowledged": "Acknowledged by {name}, {date}.",
+      "pleaseAcknowledge": "Please acknowledge.",
+      "notAcknowledged": "Not acknowledged yet.",
+      "upcoming": "{date}, if still open",
+      "upcomingNoDate": "If the step is still late"
+    },
+    "target": {
+      "name": "{role}, {facility}",
+      "inSentence": "the {role}",
+      "inSentenceAt": "the {role} at {facility}"
+    },
+    "you": "you",
+    "someone": "a {role}",
+    "ackTitle": "What acknowledging means",
+    "ackMeaning": "{owner} stays responsible. Acknowledging records that you have seen this escalation: it does not change who is responsible or stop the clock, and the case keeps escalating if the step stays late.",
+    "acknowledge": "Acknowledge",
+    "acknowledging": "Acknowledging…",
+    "ackDone": "Acknowledged by {name}, {date}",
+    "ackDoneNext": "The case stays with the person responsible until the late step is done.",
+    "ackOnlyRole": "Only {role} can acknowledge this escalation.",
+    "ackClosed": "This escalation can no longer be acknowledged here.",
+    "ackNote": "To act on the case itself, use your hospital system. Reports, images and notes stay there.",
+    "openCase": "Open the case",
+    "confirmTitle": "Acknowledge this escalation?",
+    "confirmBody": "This records that you have seen it. It does not change who is responsible or stop the clock: {owner} stays responsible, and the deadline stays the same.",
+    "cancel": "Cancel",
+    "close": "Close",
+    "acknowledgedToast": "Escalation acknowledged.",
+    "ackFailed": {
+      "conflict": "This escalation was already acknowledged, or a newer one replaced it. Close this message to see the latest.",
+      "forbidden": "Only the {role} can acknowledge this escalation.",
+      "notAvailable": "Acknowledging is not available yet.",
+      "notFound": "This case or escalation no longer exists.",
+      "error": "Your acknowledgement could not be saved. Try again."
+    },
+    "historyTitle": "What happened",
+    "historyEmpty": "No escalation notices yet.",
+    "notices": {
+      "reminder": "Deadline reminder",
+      "raised": "Escalated to {target}",
+      "nextLevel": "the next level",
+      "level": "Level {level}",
+      "acknowledged": "Acknowledged by {name}",
+      "acknowledgedDetail": "Seen. The person responsible and the deadline stayed the same.",
+      "someone": "someone",
+      "refused": "Acknowledgement refused",
+      "triedBy": "Tried by {name}",
+      "resolved": "The late step was done",
+      "resolvedDetail": "The escalation is closed."
+    }
   }
 }

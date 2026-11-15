@@ -38,6 +38,39 @@ export type TrackKind = Schemas['TrackKind']
 /** One of the five pathway stages a case moves through in the API. */
 export type CaseStage = Schemas['CaseStage']
 
+/** One of the ten display stages a case shows, computed by the API from its stage and tracks. */
+export type CaseDisplayLabel = Schemas['CaseDisplayLabel']
+
+/** One escalation raised on a case, with who acknowledged it and when the late step was done. */
+export type Escalation = Schemas['EscalationResponse']
+
+/** One row of the exception queue, as returned by `GET /exceptions`. */
+export type ExceptionItem = Schemas['ExceptionItemResponse']
+
+/** A screening programme's settings, as returned by `GET /programmes` and `GET /programmes/{pathwayId}`. */
+export type Programme = Schemas['ProgrammeResponse']
+
+/** How long one next action may take, who holds the case meanwhile and where the value comes from. */
+export type DeadlineDefinition = Schemas['DeadlineDefinition']
+
+/** One step of a programme's escalation ladder. */
+export type EscalationStep = Schemas['EscalationStep']
+
+/** What a programme requires before a case may close for one reason. */
+export type ClosureRule = Schemas['ClosureEvidenceRule']
+
+/** One kind of outcome evidence a programme recognises. */
+export type EvidenceKind = Schemas['EvidenceKindDefinition']
+
+/** One entry in a programme's change history. */
+export type ProgrammeChange = Schemas['PathwayChangeLogEntry']
+
+/** A rate with the cases it counts and the cases it is out of. */
+export type RateMeasure = Schemas['RateMeasureResponse']
+
+/** A median elapsed time, with how many cases reached the step. */
+export type DurationMeasure = Schemas['DurationMeasureResponse']
+
 /** The kind of event recorded in a timeline entry. */
 export type CaseEventType = Schemas['CaseEventType']
 

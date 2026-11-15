@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent } from 'react'
-import { AppHeader } from './components'
+import { AppHeader, ErrorBoundary } from './components'
 import { CasePage } from './features/case'
 import { ImpactPage } from './features/impact'
 import { NotFoundPage } from './features/not-found'
@@ -7,7 +7,8 @@ import { ProgrammesPage } from './features/programmes'
 import { SummaryPage } from './features/summary'
 import { WorklistPage } from './features/worklist'
 import { t } from './i18n'
-import { useRoute, type Route } from './routing'
+import { useSignedInStaff } from './identity'
+import { routeHref, useRoute, type Route } from './routing'
 
 function Screen({ route }: { readonly route: Route }) {
   switch (route.name) {
@@ -32,10 +33,12 @@ function Screen({ route }: { readonly route: Route }) {
  * @remarks
  * On every change of screen, focus moves to the main content and the page scrolls to the top, so
  * keyboard and screen-reader users land on the new screen. The skip link moves focus without
- * changing the address, which the router owns.
+ * changing the address, which the router owns. Each screen sits in an error boundary keyed by the
+ * address and the signed-in person, so a screen that fails says so and the next one starts afresh.
  */
 export function App() {
   const route = useRoute()
+  const me = useSignedInStaff()
   const mainRef = useRef<HTMLElement>(null)
   const shownRoute = useRef(route)
 
@@ -60,7 +63,9 @@ export function App() {
       </a>
       <AppHeader route={route} />
       <main id="main" ref={mainRef} tabIndex={-1}>
-        <Screen route={route} />
+        <ErrorBoundary key={`${me.id}${route.name === 'notFound' ? '' : routeHref(route)}`}>
+          <Screen route={route} />
+        </ErrorBoundary>
       </main>
     </>
   )

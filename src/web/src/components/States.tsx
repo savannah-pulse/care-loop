@@ -140,6 +140,8 @@ export function NotAvailableState({ title, body, icon = 'clock', onCheckAgain }:
 export interface ErrorStateProps {
   /** What could not be done, for example `We couldn't load your worklist`. */
   readonly title: string
+  /** What to do about it; "Check your connection and try again." by default. */
+  readonly body?: string
   /** When the failed attempt was made; shown so people know how fresh the message is. */
   readonly failedAt?: Date
   /** Called when the person asks to try again; no button when absent. */
@@ -153,7 +155,7 @@ export interface ErrorStateProps {
  * Shown when the API fails in any way other than "not built yet": a network failure, a server error
  * or an unexpected answer. It is announced to screen readers straight away.
  */
-export function ErrorState({ title, failedAt, onRetry }: ErrorStateProps) {
+export function ErrorState({ title, body, failedAt, onRetry }: ErrorStateProps) {
   return (
     <div className="state-card error" role="alert">
       <span className="state-icon" aria-hidden="true">
@@ -162,7 +164,7 @@ export function ErrorState({ title, failedAt, onRetry }: ErrorStateProps) {
       <div className="state-text">
         <b>{title}</b>
         <span>
-          {t('states.errorBody')}
+          {body ?? t('states.errorBody')}
           {failedAt ? ` ${t('states.lastTried', { time: formatTime(failedAt) })}` : null}
         </span>
         {onRetry ? (
@@ -226,16 +228,19 @@ export interface ReadViewProps<T> {
   readonly errorTitle: string
   /** Heading and text shown when the API answers 404; a 404 is treated as an error when absent. */
   readonly notFound?: { readonly title: string; readonly body: string; readonly action?: ReactNode }
+  /** Heading and text shown when the API answers 403; a calm "not open to your role" by default. */
+  readonly forbidden?: { readonly title: string; readonly body: string }
   /** Renders the data once it has arrived. */
   readonly children: (data: T) => ReactNode
 }
 
 /**
- * Shows a read from the API in whichever state it is in: loading, data, not ready yet, not found or
- * failed with a way to try again.
+ * Shows a read from the API in whichever state it is in: loading, data, not ready yet, not found,
+ * not open to the signed-in person, or failed with a way to try again.
  *
  * @remarks
- * Every screen uses it so the states look and behave the same everywhere.
+ * Every screen uses it so the states look and behave the same everywhere. A refusal (HTTP 403) is
+ * not an error: it says calmly, with a lock, that this is not open to the person.
  */
 export function ReadView<T>({
   read,
@@ -244,6 +249,7 @@ export function ReadView<T>({
   notAvailable,
   errorTitle,
   notFound,
+  forbidden,
   children,
 }: ReadViewProps<T>) {
   const { state, retry } = read
@@ -258,6 +264,15 @@ export function ReadView<T>({
   }
   if (state.failure.kind === 'notFound' && notFound) {
     return <EmptyState title={notFound.title} body={notFound.body} action={notFound.action} />
+  }
+  if (state.failure.kind === 'forbidden') {
+    return (
+      <NotAvailableState
+        icon="lock"
+        title={forbidden?.title ?? t('states.forbiddenTitle')}
+        body={forbidden?.body ?? t('states.forbiddenBody')}
+      />
+    )
   }
   return <ErrorState title={errorTitle} failedAt={state.failedAt} onRetry={retry} />
 }

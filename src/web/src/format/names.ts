@@ -66,9 +66,9 @@ export function groupDigits(digits: string): string {
  * letter prefix; otherwise `Patient` followed by that identifier.
  *
  * @remarks
- * CareLoop deliberately stores no patient names: the API contract says the patient reference is
- * "never a name". Names and other details stay in the hospital record. Screens keep the full
- * reference in a `title` attribute so a case can still be traced.
+ * The patient reference is "never a name". Staff screens show the patient's name and MRN when the
+ * API sends them (see `describePatient`); this friendly number stands in when it does not. Screens
+ * keep the full reference in a `title` attribute so a case can still be traced.
  *
  * @example
  * ```ts

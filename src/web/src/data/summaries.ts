@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, type CareLoopClient } from './client'
 import { callApi, type ApiOutcome } from './outcome'
 import type { HandoffSummary } from './types'
 
@@ -6,6 +6,7 @@ import type { HandoffSummary } from './types'
  * Asks AI to draft a handoff summary for a case.
  *
  * @param caseId - The case to summarise.
+ * @param client - The client to call with; the dashboard's own by default.
  * @returns The new draft (HTTP 201). Fails with `conflict` when AI is off or a summary is already
  * approved, `unavailable` when AI could not produce a valid draft and `notAvailable` while the
  * endpoint is not built.
@@ -14,8 +15,11 @@ import type { HandoffSummary } from './types'
  * Side effect: posts to `POST /cases/{caseId}/handoff-summary`, which replaces any unapproved draft.
  * The draft is never used until a person approves it.
  */
-export function draftHandoffSummary(caseId: string): Promise<ApiOutcome<HandoffSummary>> {
-  return callApi(() => api.POST('/cases/{caseId}/handoff-summary', { params: { path: { caseId } } }))
+export function draftHandoffSummary(
+  caseId: string,
+  client: CareLoopClient = api,
+): Promise<ApiOutcome<HandoffSummary>> {
+  return callApi(() => client.POST('/cases/{caseId}/handoff-summary', { params: { path: { caseId } } }))
 }
 
 /**
@@ -23,7 +27,9 @@ export function draftHandoffSummary(caseId: string): Promise<ApiOutcome<HandoffS
  *
  * @param caseId - The case the summary belongs to.
  * @param summaryId - The draft being approved.
- * @param approvedText - Exactly the text the reviewer approves, which may differ from the draft.
+ * @param approvedText - Exactly the text the reviewer approves, which may differ from the draft. It is
+ * sent unchanged, spaces and line breaks included.
+ * @param client - The client to call with; the dashboard's own by default.
  * @returns The approved summary. Fails with `forbidden` when the signed-in role may not approve and
  * `conflict` when the draft was already decided or replaced.
  *
@@ -35,9 +41,10 @@ export function approveHandoffSummary(
   caseId: string,
   summaryId: string,
   approvedText: string,
+  client: CareLoopClient = api,
 ): Promise<ApiOutcome<HandoffSummary>> {
   return callApi(() =>
-    api.POST('/cases/{caseId}/handoff-summary/{summaryId}/approval', {
+    client.POST('/cases/{caseId}/handoff-summary/{summaryId}/approval', {
       params: { path: { caseId, summaryId } },
       body: { approvedText },
     }),
@@ -50,6 +57,7 @@ export function approveHandoffSummary(
  * @param caseId - The case the summary belongs to.
  * @param summaryId - The draft being rejected.
  * @param reason - Why the reviewer turned the draft down; kept with the rejection.
+ * @param client - The client to call with; the dashboard's own by default.
  * @returns The rejected summary. Fails with `forbidden` when the signed-in role may not reject and
  * `conflict` when the draft was already decided or replaced.
  *
@@ -60,9 +68,10 @@ export function rejectHandoffSummary(
   caseId: string,
   summaryId: string,
   reason: string,
+  client: CareLoopClient = api,
 ): Promise<ApiOutcome<HandoffSummary>> {
   return callApi(() =>
-    api.POST('/cases/{caseId}/handoff-summary/{summaryId}/rejection', {
+    client.POST('/cases/{caseId}/handoff-summary/{summaryId}/rejection', {
       params: { path: { caseId, summaryId } },
       body: { reason },
     }),

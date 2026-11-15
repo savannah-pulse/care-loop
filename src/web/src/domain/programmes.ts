@@ -8,8 +8,9 @@ import { hasMessage, t } from '../i18n'
  * dashboard has no name for it.
  *
  * @remarks
- * Programme names belong to the pathway definitions, which the API does not share yet
- * (`GET /programmes`, C1). Until it does, the names are in the language catalogue.
+ * Lists and case screens use the short name in the language catalogue, such as `Breast screening`.
+ * The Programmes screen shows each programme's configured name from `GET /programmes`, which can be
+ * longer and say that the settings are placeholders.
  */
 export function programmeName(pathwayId: string): string {
   const key = `programmes.${pathwayId}`

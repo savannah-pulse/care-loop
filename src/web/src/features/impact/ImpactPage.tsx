@@ -1,25 +1,39 @@
 import { useId, type ReactNode } from 'react'
-import { Icon, ReadView } from '../../components'
-import { useMetrics, useSimulation, type Metrics, type SimulationArm, type SimulationResult } from '../../data'
-import { CASE_STAGES, EXCEPTION_NAMES, exceptionLabel, stageLabel } from '../../domain'
+import { Icon, LoadingState, NotAvailableState, ReadView } from '../../components'
+import { useMetrics, useSimulation, type Metrics, type Read, type SimulationArm, type SimulationResult } from '../../data'
+import { DISPLAY_LABELS, EXCEPTION_NAMES, displayLabelText, exceptionLabel, isDisplayLabel } from '../../domain'
 import {
+  facilityName,
   formatCount,
   formatDateTime,
-  formatDuration,
-  formatPercent,
+  formatDecimal,
+  formatSpan,
+  measuredDuration,
   parseInstant,
-  parseTimeSpan,
   toCount,
-  toNumber,
 } from '../../format'
 import { useDocumentTitle } from '../../hooks'
-import { t, tp } from '../../i18n'
+import { useSignedInStaff } from '../../identity'
+import { hasMessage, t, tp } from '../../i18n'
+import {
+  MEASURE_KEYS,
+  STEP_KEYS,
+  barItems,
+  confidenceView,
+  durationView,
+  rateView,
+  type BarItem,
+  type MeasureKey,
+} from './impact'
 
-interface BarItem {
-  readonly key: string
-  readonly label: string
-  readonly value: number
-}
+const CLOSURE_REASONS = [
+  'Treated',
+  'OnSurveillance',
+  'NegativeOnConfirmation',
+  'Declined',
+  'TransferredAndAccepted',
+  'Untraceable',
+] as const
 
 interface BarsProps {
   readonly items: readonly BarItem[]
@@ -41,15 +55,6 @@ function Bars({ items, scale, amber = false }: BarsProps) {
       ))}
     </ul>
   )
-}
-
-function countsIn(
-  values: Readonly<Record<string, number | string>>,
-  known: readonly string[],
-  label: (key: string) => string,
-): BarItem[] {
-  const keys = [...known, ...Object.keys(values).filter((key) => !known.includes(key))]
-  return keys.map((key) => ({ key, label: label(key), value: toCount(values[key]) }))
 }
 
 interface KpiProps {
@@ -92,59 +97,182 @@ function Card({ title, aside, children }: CardProps) {
   )
 }
 
+function measureOf(key: MeasureKey, numerator: number, denominator: number): string {
+  return tp(`impact.measureOf.${key}`, denominator, { numerator })
+}
+
+function RateRows({ metrics, keys }: { readonly metrics: Metrics; readonly keys: readonly MeasureKey[] }) {
+  return (
+    <>
+      {keys.map((key) => {
+        const view = rateView(metrics.measures[key])
+        return (
+          <tr key={key}>
+            <th scope="row">
+              {t(`impact.measures.${key}`)}
+              <span className="l2">{measureOf(key, view.numerator, view.denominator)}</span>
+            </th>
+            <td className="num">{view.rate ? <b>{view.rate}</b> : <span className="muted">{t('impact.notMeasured')}</span>}</td>
+          </tr>
+        )
+      })}
+    </>
+  )
+}
+
 function MetricsView({ metrics }: { readonly metrics: Metrics }) {
   const total = toCount(metrics.totalCases)
   const open = toCount(metrics.openCases)
   const closed = toCount(metrics.closedCases)
-  const closureRate = toNumber(metrics.closureRate)
-  const acknowledgementRate = toNumber(metrics.acknowledgementRate)
-  const median = parseTimeSpan(metrics.medianTimeToClosure)
-  const byStage = countsIn(
-    metrics.casesByStage,
-    CASE_STAGES.filter((stage) => stage !== 'Closed'),
-    (key) => ((CASE_STAGES as readonly string[]).includes(key) ? stageLabel(key as (typeof CASE_STAGES)[number]) : key),
+  const onTime = rateView(metrics.measures.nextStepOnTime)
+  const understood = rateView(metrics.measures.understanding)
+  const acknowledged = rateView(metrics.measures.acknowledgement)
+  const closure = rateView(metrics.measures.closure)
+  const confidence = confidenceView(metrics)
+  const reached = barItems(metrics.casesReachingDisplayLabel, DISPLAY_LABELS, (key) =>
+    isDisplayLabel(key) ? displayLabelText(key) : key,
   )
-  const byException = countsIn(metrics.casesByException, EXCEPTION_NAMES, exceptionLabel)
-  const stageTotal = byStage.reduce((sum, item) => sum + item.value, 0)
-  const exceptionMax = Math.max(0, ...byException.map((item) => item.value))
+  const now = barItems(
+    metrics.casesByDisplayLabel,
+    DISPLAY_LABELS.filter((label) => label !== 'Closed'),
+    (key) => (isDisplayLabel(key) ? displayLabelText(key) : key),
+  ).filter((item) => item.key !== 'Closed')
+  const waiting = barItems(metrics.casesByException, EXCEPTION_NAMES, exceptionLabel)
+  const closures = barItems(metrics.closuresByReason, CLOSURE_REASONS, (key) => {
+    const message = `closureReasons.${key}`
+    return hasMessage(message) ? t(message) : key
+  })
+  const waitingMax = Math.max(0, ...waiting.map((item) => item.value))
+  const closuresTotal = closures.reduce((sum, item) => sum + item.value, 0)
+  const nowTotal = now.reduce((sum, item) => sum + item.value, 0)
   return (
     <>
       <div className="kpis">
         <Kpi
-          label={t('impact.closedLabel')}
-          value={closureRate === undefined ? t('impact.noRate') : formatPercent(closureRate)}
-          of={t('impact.closedOf', { closed, total })}
+          label={t('impact.measures.nextStepOnTime')}
+          value={onTime.rate ?? t('impact.notMeasured')}
+          of={measureOf('nextStepOnTime', onTime.numerator, onTime.denominator)}
           detail={
-            median === undefined
-              ? t('impact.noClosureYet')
-              : t('impact.medianClosure', { duration: formatDuration(median, 'fine') })
+            closure.rate
+              ? t('impact.closedDetail', { rate: closure.rate, closed, total })
+              : t('impact.closedNone', { total })
           }
         />
         <Kpi
           label={t('impact.overdueLabel')}
           value={formatCount(toCount(metrics.overdueCases))}
-          of={t('impact.overdueOf', { open })}
+          of={tp('impact.overdueOf', open)}
           detail={t('impact.overdueDetail', {
             escalated: toCount(metrics.escalatedCases),
             unassigned: toCount(metrics.unassignedCases),
           })}
         />
         <Kpi
-          label={t('impact.ackLabel')}
-          value={acknowledgementRate === undefined ? t('impact.noRate') : formatPercent(acknowledgementRate)}
-          of={t('impact.ackOf')}
-          detail={t('impact.ackDetail')}
+          label={t('impact.measures.understanding')}
+          value={understood.rate ?? t('impact.notMeasured')}
+          of={measureOf('understanding', understood.numerator, understood.denominator)}
+          detail={
+            acknowledged.rate
+              ? t('impact.ackDetail', {
+                  rate: acknowledged.rate,
+                  numerator: acknowledged.numerator,
+                  denominator: acknowledged.denominator,
+                })
+              : t('impact.ackNone')
+          }
         />
       </div>
       <div className="grid-even">
-        <Card title={t('impact.byStageTitle')} aside={t('impact.byStageOf', { open })}>
-          <Bars items={byStage} scale={Math.max(open, stageTotal)} />
+        <Card title={t('impact.stepsTitle')} aside={t('impact.stepsAside')}>
+          <table className="mini">
+            <thead>
+              <tr>
+                <th scope="col">{t('impact.columns.step')}</th>
+                <th scope="col" className="num">
+                  {t('impact.columns.median')}
+                </th>
+                <th scope="col" className="num">
+                  {t('impact.columns.cases')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {STEP_KEYS.map((key) => {
+                const view = durationView(metrics.timeToStep[key])
+                return (
+                  <tr key={key}>
+                    <th scope="row">{t(`impact.steps.${key}`)}</th>
+                    <td className="num">
+                      {view.median ? <b>{view.median}</b> : <span className="muted">{t('impact.notReached')}</span>}
+                    </td>
+                    <td className="num">{formatCount(view.cases)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </Card>
+        <Card title={t('impact.completedTitle')} aside={t('impact.completedAside')}>
+          <table className="mini">
+            <thead>
+              <tr>
+                <th scope="col">{t('impact.columns.measure')}</th>
+                <th scope="col" className="num">
+                  {t('impact.columns.rate')}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <RateRows
+                metrics={metrics}
+                keys={MEASURE_KEYS.filter((key) => key !== 'nextStepOnTime' && key !== 'understanding')}
+              />
+              <tr>
+                <th scope="row">
+                  {t('impact.confidence')}
+                  <span className="l2">
+                    {tp('impact.confidenceOf', confidence.responses, {
+                      told: confidence.told,
+                      rate: confidence.rate ?? t('impact.notMeasured'),
+                    })}
+                  </span>
+                </th>
+                <td className="num">
+                  {confidence.average === undefined ? (
+                    <span className="muted">{t('impact.notMeasured')}</span>
+                  ) : (
+                    <b>{formatDecimal(confidence.average)}</b>
+                  )}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </Card>
+      </div>
+      <div className="grid-even">
+        <Card title={t('impact.reachedTitle')} aside={t('impact.outOf', { count: total })}>
+          <Bars items={reached} scale={total} />
+        </Card>
+        <Card title={t('impact.nowTitle')} aside={t('impact.outOf', { count: open })}>
+          {nowTotal === 0 ? <p className="note">{t('impact.nowNone')}</p> : <Bars items={now} scale={Math.max(open, nowTotal)} />}
+        </Card>
+      </div>
+      <div className="grid-even">
         <Card title={t('impact.byExceptionTitle')} aside={t('impact.byExceptionOf')}>
-          {exceptionMax === 0 ? (
+          {waitingMax === 0 ? (
             <p className="note">{t('impact.byExceptionNone')}</p>
           ) : (
-            <Bars items={byException} scale={exceptionMax} amber />
+            <Bars items={waiting} scale={waitingMax} amber />
+          )}
+        </Card>
+        <Card title={t('impact.closuresTitle')} aside={t('impact.outOf', { count: closed })}>
+          {closuresTotal === 0 ? (
+            <p className="note">{t('impact.closuresNone')}</p>
+          ) : (
+            <>
+              <Bars items={closures} scale={Math.max(closed, closuresTotal)} />
+              <p className="note linkrow">{t('impact.closuresNote')}</p>
+            </>
           )}
         </Card>
       </div>
@@ -153,8 +281,8 @@ function MetricsView({ metrics }: { readonly metrics: Metrics }) {
 }
 
 function medianText(arm: SimulationArm): string {
-  const median = parseTimeSpan(arm.medianTimeToClosure)
-  return median === undefined ? t('impact.rows.noneClosed') : formatDuration(median, 'fine')
+  const median = measuredDuration(arm.medianTimeToClosure)
+  return median === undefined ? t('impact.rows.noneClosed') : formatSpan(median)
 }
 
 function closedText(arm: SimulationArm): string {
@@ -237,31 +365,58 @@ function Comparison({ result, labelledBy }: { readonly result: SimulationResult;
   )
 }
 
+function ComparisonBody({ read, labelledBy }: { readonly read: Read<SimulationResult>; readonly labelledBy: string }) {
+  const { state, retry } = read
+  if (state.status === 'loading') {
+    return <LoadingState label={t('impact.comparisonLoading')} />
+  }
+  if (state.status === 'ready') {
+    return <Comparison result={state.data} labelledBy={labelledBy} />
+  }
+  if (state.failure.kind === 'notAvailable') {
+    return <NotAvailableState body={t('impact.comparisonNotAvailable')} onCheckAgain={retry} />
+  }
+  return (
+    <NotAvailableState
+      title={t('impact.comparisonUnavailableTitle')}
+      body={t('impact.comparisonUnavailableBody')}
+      onCheckAgain={retry}
+    />
+  )
+}
+
 /**
- * Screen 3, impact: whether actionable results lead to closed loops, and what escalation changes.
+ * Screen 3, impact: whether actionable results lead to timely care and closed loops, each measure
+ * with what it counts and what it is out of, and what reminders and escalation change.
  *
  * @remarks
- * Read-only. The headline cards and bars come from `GET /metrics`. The comparison comes from
- * `POST /metrics/simulation`, which replays a cohort scenario twice, with reminders and escalation
- * on and off; it illustrates the coordination effect and is not evidence of real-world results.
- * The scenario's name and seed stay out of view; the method is explained under "How this is worked
- * out". Only measures the API returns are shown; the fuller set in the design waits for C5.
+ * Read-only. The cards and tables come from `GET /metrics`: the facility of the signed-in person,
+ * or every facility for the programme coordinator. Rates show their numerator and denominator, and
+ * an empty population says "not measured yet" instead of 0%. Times to each step are medians of
+ * clock time from the result. The comparison comes from `POST /metrics/simulation`, which replays a
+ * cohort with reminders and escalation on and off; while it is not built (501) it says so calmly,
+ * and any other failure says it is not available right now. These numbers show how CareLoop works;
+ * they are not evidence of real-world results.
  */
 export function ImpactPage() {
   useDocumentTitle(t('impact.title'))
+  const me = useSignedInStaff()
   const metrics = useMetrics()
   const simulation = useSimulation()
   const comparisonId = useId()
-  const generatedAt = metrics.state.status === 'ready' ? parseInstant(metrics.state.data.generatedAt) : undefined
+  const data = metrics.state.status === 'ready' ? metrics.state.data : undefined
+  const generatedAt = data ? parseInstant(data.generatedAt) : undefined
+  const scope = me.facilityId ? facilityName(me.facilityId) : t('impact.allFacilities')
   return (
     <div className="page">
       <div className="page-head">
         <h1>{t('impact.title')}</h1>
-        {metrics.state.status === 'ready' && generatedAt ? (
+        {data && generatedAt ? (
           <p className="lede">
             {t('impact.subtitle', {
+              scope,
               date: formatDateTime(generatedAt),
-              count: tp('impact.cases', toCount(metrics.state.data.totalCases)),
+              count: tp('impact.cases', toCount(data.totalCases)),
             })}
           </p>
         ) : null}
@@ -273,21 +428,15 @@ export function ImpactPage() {
         notAvailable={t('impact.notAvailable')}
         errorTitle={t('impact.errorTitle')}
       >
-        {(data) => <MetricsView metrics={data} />}
+        {(loaded) => <MetricsView metrics={loaded} />}
       </ReadView>
       <section className="card" aria-labelledby={comparisonId}>
         <h2 className="card-title" id={comparisonId}>
           {t('impact.comparisonTitle')}
         </h2>
-        <ReadView
-          read={simulation}
-          loadingLabel={t('impact.comparisonLoading')}
-          notAvailable={t('impact.comparisonNotAvailable')}
-          errorTitle={t('impact.comparisonError')}
-        >
-          {(result) => <Comparison result={result} labelledBy={comparisonId} />}
-        </ReadView>
+        <ComparisonBody read={simulation} labelledBy={comparisonId} />
       </section>
+      <p className="note">{t('impact.footnote')}</p>
     </div>
   )
 }

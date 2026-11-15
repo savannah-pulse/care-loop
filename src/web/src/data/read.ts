@@ -29,6 +29,7 @@ interface Settled<T> {
   readonly load: Loader<T>
   readonly attempt: number
   readonly person: StaffMember
+  readonly refreshKey: unknown
   readonly state: ReadState<T>
 }
 
@@ -36,39 +37,51 @@ interface Settled<T> {
  * Reads data from the API and follows the read through loading, data and failure.
  *
  * @param load - Starts the read. Keep it stable with `useCallback`; a new function starts a new read.
+ * @param refreshKey - Any value that, when it changes, starts a new read: for example a counter that
+ * goes up after a change elsewhere.
  * @returns The current state and a `retry` function.
  *
  * @remarks
- * Side effects: calls the API when the component mounts, when `load` changes, when `retry` is called
- * and when someone signs in as another person, because what a person may see depends on who they
- * are. A read that is no longer wanted is aborted, so a slow answer never overwrites a newer one.
+ * Side effects: calls the API when the component mounts, when `load` or `refreshKey` changes, when
+ * `retry` is called and when someone signs in as another person, because what a person may see
+ * depends on who they are. A read that is no longer wanted is aborted, so a slow answer never
+ * overwrites a newer one, and the previous person's data is never shown to the next. A read that
+ * throws instead of resolving, for example on an answer that does not match the contract, shows as
+ * a failure rather than loading for ever.
  */
-export function useApiRead<T>(load: Loader<T>): Read<T> {
+export function useApiRead<T>(load: Loader<T>, refreshKey?: unknown): Read<T> {
   const person = useSignedInStaff()
   const [attempt, setAttempt] = useState(0)
   const [settled, setSettled] = useState<Settled<T>>()
 
   useEffect(() => {
     const controller = new AbortController()
-    void load(controller.signal).then((outcome) => {
-      if (controller.signal.aborted) {
-        return
-      }
-      setSettled({
-        load,
-        attempt,
-        person,
-        state: outcome.ok
-          ? { status: 'ready', data: outcome.data }
-          : { status: 'failed', failure: outcome.failure, failedAt: new Date() },
+    void load(controller.signal)
+      .catch((): ApiOutcome<T> => ({ ok: false, failure: { kind: 'error' } }))
+      .then((outcome) => {
+        if (controller.signal.aborted) {
+          return
+        }
+        setSettled({
+          load,
+          attempt,
+          person,
+          refreshKey,
+          state: outcome.ok
+            ? { status: 'ready', data: outcome.data }
+            : { status: 'failed', failure: outcome.failure, failedAt: new Date() },
+        })
       })
-    })
     return () => controller.abort()
-  }, [load, attempt, person])
+  }, [load, attempt, person, refreshKey])
 
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
 
   const current =
-    settled !== undefined && settled.load === load && settled.attempt === attempt && settled.person === person
+    settled !== undefined &&
+    settled.load === load &&
+    settled.attempt === attempt &&
+    settled.person === person &&
+    Object.is(settled.refreshKey, refreshKey)
   return { state: current ? settled.state : { status: 'loading' }, retry }
 }

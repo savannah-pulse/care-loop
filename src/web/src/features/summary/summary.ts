@@ -52,11 +52,12 @@ export function hasEdits(sections: readonly SummarySection[], edits: SectionEdit
 }
 
 /**
- * Runs sections together as plain text: each heading on its own line, followed by its text, with a
- * blank line between sections.
+ * Runs sections together as plain text: each heading on its own line, followed by its text exactly
+ * as written, with a blank line between sections.
  *
  * @param sections - The sections, in reading order.
- * @returns The plain text a reviewer approves.
+ * @returns The plain text a reviewer approves. Section texts are not trimmed or changed, so what is
+ * approved is exactly what the reviewer wrote.
  *
  * @example
  * ```ts
@@ -64,7 +65,7 @@ export function hasEdits(sections: readonly SummarySection[], edits: SectionEdit
  * ```
  */
 export function composeSummaryText(sections: readonly Pick<SummarySection, 'heading' | 'text'>[]): string {
-  return sections.map((section) => `${section.heading}\n${section.text.trim()}`).join('\n\n')
+  return sections.map((section) => `${section.heading}\n${section.text}`).join('\n\n')
 }
 
 /**

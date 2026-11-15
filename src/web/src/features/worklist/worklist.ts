@@ -1,14 +1,16 @@
 import type { CaseSummary } from '../../data'
 import {
   caseStatus,
+  describePatient,
+  displayLabelText,
   isUrgent,
   nextActionReason,
   programmeName,
-  stageLabel,
   type CaseStatus,
+  type PatientView,
   type Tone,
 } from '../../domain'
-import { isSameDay, parseInstant, patientLabel } from '../../format'
+import { isSameDay, parseInstant } from '../../format'
 
 /**
  * The worklist's filter chips: all open cases, then one per exception queue.
@@ -73,11 +75,11 @@ export interface WorklistRow {
   readonly urgent: boolean
   /** When the next action is due, when it has a due time. */
   readonly due?: Date
-  /** The patient's friendly identifier, for example `Patient 100 245 891`. */
-  readonly patient: string
+  /** The patient: their name and MRN, a friendly number, or a case number when names are hidden. */
+  readonly patient: PatientView
   /** The programme's name. */
   readonly programme: string
-  /** The stage in plain words, for example `In follow-up`. */
+  /** The display stage the API reports, in plain words, for example `Follow-up`. */
   readonly stage: string
   /** Why the next action is needed, in a few words, when there is something to explain. */
   readonly reason?: string
@@ -87,9 +89,10 @@ export interface WorklistRow {
  * Prepares the open cases of a case list for the worklist.
  *
  * @param cases - The cases from `GET /cases`.
+ * @param viewerRole - The role of the person reading, which decides whether names are hidden.
  * @returns One row per case that is not closed, in the order given.
  */
-export function toWorklistRows(cases: readonly CaseSummary[]): WorklistRow[] {
+export function toWorklistRows(cases: readonly CaseSummary[], viewerRole: string): WorklistRow[] {
   return cases
     .filter((summary) => summary.stage !== 'Closed')
     .map((summary) => ({
@@ -97,9 +100,9 @@ export function toWorklistRows(cases: readonly CaseSummary[]): WorklistRow[] {
       status: caseStatus(summary),
       urgent: isUrgent(summary.urgency),
       due: parseInstant(summary.dueAt),
-      patient: patientLabel(summary.patientReference),
+      patient: describePatient(summary, viewerRole),
       programme: programmeName(summary.pathwayId),
-      stage: stageLabel(summary.stage),
+      stage: displayLabelText(summary.displayLabel),
       reason: nextActionReason(summary),
     }))
 }
@@ -160,15 +163,13 @@ function compact(text: string): string {
  *
  * @param row - A worklist row.
  * @param query - The search text; blank matches everything.
- * @returns `true` when the patient's number or reference contains the text, ignoring case and
- * spaces, so `100 245`, `100245` and `p-100245891` all find `Patient 100 245 891`.
- *
- * @remarks
- * Case reads carry only the patient reference, not a name, so search is by number.
+ * @returns `true` when the patient's name, MRN, reference or, where names are hidden, case number
+ * contains the text, ignoring case and spaces, so `hessa`, `100 245` and `100245` all find Hessa
+ * Al Dhaheri, MRN 100 245 891.
  */
 export function matchesSearch(row: WorklistRow, query: string): boolean {
   const text = compact(query)
-  return text === '' || compact(row.patient).includes(text) || compact(row.summary.patientReference).includes(text)
+  return text === '' || compact(row.patient.searchText).includes(text)
 }
 
 /**

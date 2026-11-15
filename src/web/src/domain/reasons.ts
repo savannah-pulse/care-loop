@@ -1,4 +1,7 @@
 import { t } from '../i18n'
+import type { CaseDetail } from '../data'
+import { exceptionReason, isExceptionName } from './exceptions'
+import { describeOwner } from './people'
 import type { CaseStatusInput } from './status'
 import { isUrgent } from './urgency'
 
@@ -45,4 +48,37 @@ export function nextActionReason(input: CaseStatusInput): string | undefined {
     return t('reasons.urgent')
   }
   return has('Overdue') ? t('reasons.overdue') : undefined
+}
+
+/**
+ * Explains, in a sentence or two, why a case's next action is needed, for the case and escalation
+ * screens.
+ *
+ * @param detail - The case.
+ * @returns The meaning of each unresolved exception other than lateness, and any pending transfer;
+ * lateness alone when it is the only problem; or that nothing is blocking the case.
+ *
+ * @remarks
+ * Until a proposed owner accepts, the current owner stays responsible, so a pending transfer is
+ * named with both people.
+ */
+export function nextActionWhy(
+  detail: Pick<CaseDetail, 'exceptions' | 'proposedOwner' | 'owner'>,
+): string {
+  const sentences = detail.exceptions
+    .filter(isExceptionName)
+    .filter((name) => name !== 'Overdue')
+    .map(exceptionReason)
+  if (detail.proposedOwner) {
+    sentences.push(
+      t('case.proposedOwner', {
+        name: describeOwner(detail.proposedOwner).inSentence,
+        owner: describeOwner(detail.owner).subject,
+      }),
+    )
+  }
+  if (sentences.length === 0 && detail.exceptions.includes('Overdue')) {
+    sentences.push(exceptionReason('Overdue'))
+  }
+  return sentences.length > 0 ? sentences.join(' ') : t('case.noProblem')
 }

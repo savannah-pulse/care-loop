@@ -41,6 +41,46 @@ export function isClinicianRole(role: string): boolean {
 }
 
 /**
+ * Roles on the escalation ladder: they are told when a step is late, and acknowledge it.
+ *
+ * @remarks
+ * The pathway's escalation ladder goes to the facility lead, then the programme coordinator. The
+ * dashboard gives these roles the Escalations screen; anyone else sees a case's escalation on the
+ * case itself.
+ */
+export const ESCALATION_ROLES: readonly RoleKey[] = ['facility-lead', 'coordinator']
+
+/**
+ * Tells whether a role has the Escalations screen.
+ *
+ * @param role - A role key.
+ * @returns `true` for the roles in {@link ESCALATION_ROLES}.
+ */
+export function isEscalationRole(role: string): boolean {
+  return (ESCALATION_ROLES as readonly string[]).includes(role)
+}
+
+/**
+ * Roles that never see patient names or second identifiers.
+ *
+ * @remarks
+ * The programme coordinator sees totals with no names, and a case only while it is escalated to
+ * them (who sees what, board 14). The API leaves the name and MRN out for this role; the dashboard
+ * says so plainly and shows a case number instead.
+ */
+export const NAMES_HIDDEN_ROLES: readonly RoleKey[] = ['coordinator']
+
+/**
+ * Tells whether patient names are hidden from a role.
+ *
+ * @param role - A role key.
+ * @returns `true` for the roles in {@link NAMES_HIDDEN_ROLES}.
+ */
+export function namesHiddenFor(role: string): boolean {
+  return (NAMES_HIDDEN_ROLES as readonly string[]).includes(role)
+}
+
+/**
  * Names a role in plain words.
  *
  * @param role - A role key, for example `facility-lead`.

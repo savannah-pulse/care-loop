@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type Ref } from 'react'
-import { Badge, Dialog, Icon, LoadingState, NotAvailableState, ReadView, Toast } from '../../components'
+import { Badge, Dialog, Icon, LoadingState, NotAvailableState, OutsideTeamCard, ReadView, Toast } from '../../components'
 import {
   approveHandoffSummary,
   draftHandoffSummary,
@@ -11,12 +11,21 @@ import {
   type HandoffSummary,
   type SummarySection,
 } from '../../data'
-import { describeOwner, programmeName } from '../../domain'
-import { factLabel, formatDateTime, parseInstant, patientLabel } from '../../format'
+import { describeOwner, describePatient, programmeName } from '../../domain'
+import { factLabel, formatDateTime, parseInstant } from '../../format'
 import { useDocumentTitle } from '../../hooks'
-import { findStaffByReference, isClinicianRole, useSignedInStaff, type StaffMember } from '../../identity'
+import {
+  findStaffByReference,
+  isClinicianRole,
+  rememberAccessReason,
+  sameReference,
+  useAccessReason,
+  useSignedInStaff,
+  type StaffMember,
+} from '../../identity'
 import { t, type MessageKey } from '../../i18n'
-import { routeHref } from '../../routing'
+import { navigate, routeHref } from '../../routing'
+import { OtherScreeningCard } from '../case'
 import { applyEdits, approvedTextFor, hasEdits, isAssessmentSection, type SectionEdits } from './summary'
 
 /** Props for {@link SummaryPage}. */
@@ -50,7 +59,7 @@ function decisionMessage(kind: FailureKind): string {
 }
 
 function personName(reference: string | null | undefined, me: StaffMember): string | undefined {
-  if (!reference || reference === me.reference) {
+  if (!reference || sameReference(reference, me.reference)) {
     return undefined
   }
   return findStaffByReference(reference)?.name ?? t('summary.anotherClinician')
@@ -156,12 +165,14 @@ function Decision({ summary, me }: DecisionProps) {
 }
 
 interface DraftViewProps {
-  readonly caseId: string
+  readonly detail: CaseDetail
+  readonly accessReason?: string
   readonly initial: HandoffSummary
   readonly me: StaffMember
 }
 
-function DraftView({ caseId, initial, me }: DraftViewProps) {
+function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
+  const caseId = detail.caseId
   const [summary, setSummary] = useState(initial)
   const [edits, setEdits] = useState<SectionEdits>({})
   const [editing, setEditing] = useState(false)
@@ -340,6 +351,7 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
             </ul>
             <p className="note linkrow">{t('summary.keptNote')}</p>
           </section>
+          <OtherScreeningCard detail={detail} reason={accessReason} />
         </div>
       </div>
 
@@ -420,9 +432,10 @@ function DraftView({ caseId, initial, me }: DraftViewProps) {
 
 interface WorkspaceProps {
   readonly detail: CaseDetail
+  readonly reason?: string
 }
 
-function SummaryWorkspace({ detail }: WorkspaceProps) {
+function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
   const me = useSignedInStaff()
   const [draft, setDraft] = useState<DraftState>({ step: 'idle' })
   const ids = useId()
@@ -435,7 +448,8 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
 
   const drafted = draft.step === 'ready' ? parseInstant(draft.summary.draftedAt) : undefined
   const owner = describeOwner(detail.owner)
-  const ownerIsMe = !detail.owner.isQueue && detail.owner.reference === me.reference
+  const ownerIsMe = !detail.owner.isQueue && sameReference(detail.owner.reference, me.reference)
+  const patient = describePatient(detail, me.role)
 
   return (
     <>
@@ -450,10 +464,11 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
           <Icon name="user" />
         </span>
         <div className="who">
-          <p className="nm" title={detail.patientReference}>
-            {patientLabel(detail.patientReference)}
+          <p className="nm" title={patient.reference}>
+            {patient.name}
           </p>
           <p className="meta">
+            {patient.identifier && !patient.hidden ? <span>{patient.identifier}</span> : null}
             <span title={detail.pathwayId}>{programmeName(detail.pathwayId)}</span>
             <span title={detail.sourceSystem}>{t('case.resultFrom', { result: detail.sourceResultId })}</span>
           </p>
@@ -467,7 +482,13 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
           body={ownerIsMe ? t('summary.clinicianOnlyYou') : t('summary.clinicianOnly', { name: owner.subject })}
         />
       ) : draft.step === 'ready' ? (
-        <DraftView key={draft.summary.summaryId} caseId={detail.caseId} initial={draft.summary} me={me} />
+        <DraftView
+          key={draft.summary.summaryId}
+          detail={detail}
+          accessReason={reason}
+          initial={draft.summary}
+          me={me}
+        />
       ) : draft.step === 'failed' ? (
         <section className="card" aria-labelledby={`${ids}-none`}>
           <h2 className="card-title" id={`${ids}-none`}>
@@ -526,24 +547,39 @@ function SummaryWorkspace({ detail }: WorkspaceProps) {
  */
 export function SummaryPage({ caseId }: SummaryPageProps) {
   useDocumentTitle(t('summary.title'))
-  const read = useCase(caseId)
+  const me = useSignedInStaff()
+  const reason = useAccessReason(caseId)
+  const read = useCase(caseId, reason)
+  const askReason =
+    read.state.status === 'failed' && read.state.failure.kind === 'forbidden' && !reason && me.facilityId !== undefined
   return (
     <div className="page">
       <a className="crumb" href={routeHref({ name: 'case', caseId })}>
         <Icon name="left" />
-        {read.state.status === 'ready' ? patientLabel(read.state.data.patientReference) : t('case.titleFallback')}
+        {read.state.status === 'ready' ? describePatient(read.state.data, me.role).name : t('case.titleFallback')}
       </a>
       {read.state.status === 'ready' ? null : <h1 className="visually-hidden">{t('summary.title')}</h1>}
-      <ReadView
-        read={read}
-        loadingLabel={t('case.loading')}
-        skeleton="page"
-        notAvailable={t('case.notAvailable')}
-        errorTitle={t('case.errorTitle')}
-        notFound={{ title: t('case.notFoundTitle'), body: t('case.notFoundBody') }}
-      >
-        {(detail) => <SummaryWorkspace detail={detail} />}
-      </ReadView>
+      {askReason ? (
+        <OutsideTeamCard
+          onReason={(text) => rememberAccessReason(caseId, text)}
+          onCancel={() => navigate({ name: 'worklist' })}
+        />
+      ) : (
+        <ReadView
+          read={read}
+          loadingLabel={t('case.loading')}
+          skeleton="page"
+          notAvailable={t('case.notAvailable')}
+          errorTitle={t('case.errorTitle')}
+          notFound={{ title: t('case.notFoundTitle'), body: t('case.notFoundBody') }}
+          forbidden={{
+            title: t('case.forbiddenTitle'),
+            body: me.role === 'coordinator' ? t('case.forbiddenCoordinator') : t('case.forbiddenBody'),
+          }}
+        >
+          {(detail) => <SummaryWorkspace detail={detail} reason={reason} />}
+        </ReadView>
+      )}
     </div>
   )
 }

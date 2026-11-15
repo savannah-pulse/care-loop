@@ -3,14 +3,14 @@ import { dayKey, parseInstant } from '../format'
 import type { CaseEventType, TimelineEntry } from '../data'
 
 /**
- * Names a timeline entry in plain words, for an entry that has no reason to show.
+ * Names a timeline entry in plain words, for an entry whose reason says nothing more.
  *
  * @param eventType - The kind of event, from the API.
  * @returns For example `Referral updated` or `Handoff summary approved`.
  *
  * @remarks
- * Each entry's reason says what happened, so it is the entry's main line; this title stands in
- * only when the reason is empty.
+ * When an entry's reason says what happened, it is the entry's main line; this title stands in when
+ * the reason is empty or only repeats the kind (see {@link hasOwnReason}).
  */
 export function timelineTitle(eventType: CaseEventType): string {
   return t(`timeline.events.${eventType}`)
@@ -26,27 +26,85 @@ export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)
 }
 
-/** Where a timeline entry was recorded, as far as the dashboard can tell. */
-export type TimelineSource = 'careLoop' | 'hospital'
+/** Where a timeline entry came from: CareLoop itself, a hospital system or the patient channel. */
+export type TimelineSource = 'careLoop' | 'hospital' | 'patientChannel'
 
 /**
- * Works out where a timeline entry was recorded.
- *
- * @param entry - The entry's kind and the role its actor acted in.
- * @returns `undefined` for CareLoop's own actions, whose actor already reads `CareLoop`;
- * `careLoop` for a handoff summary decision, which people make in this dashboard; and `hospital`
- * for anything else a person did.
+ * Source systems the dashboard names, by the key the API reports in `sourceSystem`.
  *
  * @remarks
- * Timeline entries carry no source system yet (C3). People record clinical steps in the hospital
- * system, which reaches CareLoop only through its FHIR boundary; the one thing a person does in
- * CareLoop itself is decide on a handoff summary.
+ * CareLoop records its own events (deadlines, escalations, acknowledgements and approved summaries)
+ * as `careloop`. Every other system that reaches CareLoop is a hospital system, through its FHIR
+ * boundary, unless it is listed here as the patient channel.
  */
-export function timelineSource(entry: Pick<TimelineEntry, 'eventType' | 'actorRole'>): TimelineSource | undefined {
-  if (entry.actorRole === 'system') {
-    return undefined
+export const SOURCE_SYSTEMS: Readonly<Record<string, TimelineSource>> = {
+  careloop: 'careLoop',
+  'patient-channel': 'patientChannel',
+}
+
+/**
+ * Works out where a timeline entry came from (C3).
+ *
+ * @param entry - The entry, with the source system the API joined from the stored event.
+ * @returns `careLoop` for CareLoop's own events, `patientChannel` for the patient channel and
+ * `hospital` for any other system.
+ */
+export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem'>): TimelineSource {
+  return SOURCE_SYSTEMS[entry.sourceSystem.trim().toLowerCase()] ?? 'hospital'
+}
+
+/**
+ * Names where a timeline entry came from, in plain words.
+ *
+ * @param source - Where the entry came from.
+ * @returns `CareLoop`, `Hospital system` or `Patient channel`.
+ */
+export function sourceLabel(source: TimelineSource): string {
+  return t(`timeline.sources.${source}`)
+}
+
+/**
+ * Reasons the API writes on every entry of a kind, which say nothing more than the kind itself.
+ *
+ * @remarks
+ * Lower case. The API records "Overdue deadline checked; exception flags or escalation steps
+ * raised" on every overdue `DeadlineElapsed` entry; the screen names the kind in words instead.
+ */
+export const GENERIC_REASONS: readonly string[] = ['overdue deadline checked; exception flags or escalation steps raised']
+
+/**
+ * Tells whether an entry's reason says more than its kind.
+ *
+ * @param entry - The entry's kind and reason.
+ * @returns `false` when the reason is empty, only repeats the kind and whether it was applied or
+ * refused, as in `ReferralUpdated applied`, or is one of the {@link GENERIC_REASONS}; the screen
+ * then names the kind in words instead.
+ */
+export function hasOwnReason(entry: Pick<TimelineEntry, 'eventType' | 'reason'>): boolean {
+  const reason = entry.reason.trim().toLowerCase()
+  const kind = entry.eventType.toLowerCase()
+  return reason !== '' && reason !== `${kind} applied` && reason !== `${kind} rejected` && !GENERIC_REASONS.includes(reason)
+}
+
+/**
+ * Words the main line of a timeline entry.
+ *
+ * @param entry - The entry's kind, disposition and reason.
+ * @returns For an entry CareLoop refused, what was refused in plain words, so a refused attempt
+ * never reads as done: for example `Acknowledgement refused` or `Referral update not accepted`.
+ * Otherwise the reason when it says more than the kind (see {@link hasOwnReason}), or the kind in
+ * words.
+ *
+ * @remarks
+ * The API writes refused acknowledgements to the timeline as `EscalationAcknowledged` entries with
+ * the disposition `Rejected`, even the programme coordinator's, so the disposition decides the
+ * words, never the kind alone.
+ */
+export function timelineEntryTitle(entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason'>): string {
+  if (entry.disposition === 'Rejected') {
+    return t(`timeline.refusedEvents.${entry.eventType}`)
   }
-  return entry.eventType === 'HandoffSummaryApproved' ? 'careLoop' : 'hospital'
+  return hasOwnReason(entry) ? entry.reason : timelineTitle(entry.eventType)
 }
 
 function instant(entry: TimelineEntry): Date | undefined {

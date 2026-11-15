@@ -1,17 +1,32 @@
 import { useCallback } from 'react'
-import { api } from './client'
-import { callApi } from './outcome'
+import { api, type CareLoopClient } from './client'
+import { callApi, type ApiOutcome } from './outcome'
 import { useApiRead, type Read } from './read'
-import type { CaseDetail, CaseSummary, Metrics, SimulationResult, TimelineEntry } from './types'
+import type {
+  CaseDetail,
+  CaseSummary,
+  Metrics,
+  Programme,
+  SimulationResult,
+  TimelineEntry,
+} from './types'
 
 /**
- * Most cases the worklist asks for in one call (`take`).
+ * Most cases `GET /cases` returns in one page (`take`).
  *
  * @remarks
- * The worklist shows every open case of the signed-in person's team. Limiting the list to their
- * team is C4 and paging is not built, so one large page is requested.
+ * The API refuses a page size outside 1 to 200, so longer lists are read page by page.
  */
-export const CASE_LIST_LIMIT = 500
+export const PAGE_SIZE = 200
+
+/**
+ * Most cases a list reads, page by page, before it stops.
+ *
+ * @remarks
+ * A team's open cases fit well within it. When a list reaches it, the screen says that only the
+ * most recently updated cases are shown.
+ */
+export const CASE_LIST_LIMIT = 1000
 
 /**
  * Name of the cohort scenario the impact screen replays with and without escalation.
@@ -21,19 +36,114 @@ export const CASE_LIST_LIMIT = 500
  */
 export const COMPARISON_COHORT = 'cohort'
 
+/** Which cases a list read asks for. Every field is optional. */
+export interface CaseListQuery {
+  /** A facility other than the reader's own, which then needs a {@link CaseListQuery.reason}. */
+  readonly facilityId?: string
+  /** Why the reader needs cases outside their team; recorded by the API with the read. */
+  readonly reason?: string
+  /** `true` for cases with an open escalation only. */
+  readonly escalated?: boolean
+  /** One patient's cases only; the API allows this search to clinician roles only. */
+  readonly patientReference?: string
+}
+
+/** Cases read page by page, and whether every page was read. */
+export interface CaseList {
+  /** The cases, most recently updated first, each once. */
+  readonly cases: readonly CaseSummary[]
+  /** `false` when the list stopped at its limit and more cases may exist. */
+  readonly complete: boolean
+}
+
+/** Settings for {@link loadCaseList}. */
+export interface LoadCaseListOptions {
+  /** Cancels the read. */
+  readonly signal?: AbortSignal
+  /** Most cases to read; {@link CASE_LIST_LIMIT} by default. */
+  readonly limit?: number
+  /** The client to read with; the dashboard's own by default. */
+  readonly client?: CareLoopClient
+}
+
 /**
- * Reads the case list for the worklist.
+ * Turns a reason into the `reason` query parameter.
  *
- * @returns The read of `GET /cases`, asking for up to {@link CASE_LIST_LIMIT} cases.
+ * @param reason - The reason given, if any.
+ * @returns The reason without surrounding spaces, or `undefined` when there is none, so a blank
+ * reason is never sent.
+ */
+export function reasonParameter(reason: string | undefined): string | undefined {
+  const text = reason?.trim()
+  return text ? text : undefined
+}
+
+/**
+ * Reads cases page by page with `skip` and `take`, up to a limit.
+ *
+ * @param query - Which cases to read.
+ * @param options - Cancellation, the limit and the client.
+ * @returns Every matching case up to the limit, each once, and whether the list is complete; or the
+ * failure of the first page that failed.
  *
  * @remarks
- * Side effects: calls `GET /cases` on mount and again when someone else signs in.
+ * Side effect: calls `GET /cases` once per page of {@link PAGE_SIZE} cases, until a page comes back
+ * short or the limit is reached.
  */
-export function useCases(): Read<CaseSummary[]> {
+export async function loadCaseList(
+  query: CaseListQuery,
+  options: LoadCaseListOptions = {},
+): Promise<ApiOutcome<CaseList>> {
+  const client = options.client ?? api
+  const limit = Math.max(1, Math.floor(options.limit ?? CASE_LIST_LIMIT))
+  const filters = {
+    facilityId: query.facilityId,
+    reason: reasonParameter(query.reason),
+    escalated: query.escalated,
+    patientReference: query.patientReference,
+  }
+  const seen = new Set<string>()
+  const cases: CaseSummary[] = []
+  let skip = 0
+  for (;;) {
+    const take = Math.min(PAGE_SIZE, limit - skip)
+    const page = await callApi(() =>
+      client.GET('/cases', { params: { query: { ...filters, skip, take } }, signal: options.signal }),
+    )
+    if (!page.ok) {
+      return page
+    }
+    for (const row of page.data) {
+      if (!seen.has(row.caseId)) {
+        seen.add(row.caseId)
+        cases.push(row)
+      }
+    }
+    skip += take
+    if (page.data.length < take) {
+      return { ok: true, data: { cases, complete: true } }
+    }
+    if (skip >= limit) {
+      return { ok: true, data: { cases, complete: false } }
+    }
+  }
+}
+
+/**
+ * Reads a list of cases for a screen, page by page.
+ *
+ * @param query - Which cases to read; by default the open and closed cases of the reader's team.
+ * @returns The read of the list.
+ *
+ * @remarks
+ * Side effects: calls `GET /cases`, one call per page, on mount, when the query changes and when
+ * someone else signs in.
+ */
+export function useCaseList(query: CaseListQuery = {}): Read<CaseList> {
+  const { facilityId, reason, escalated, patientReference } = query
   const load = useCallback(
-    (signal: AbortSignal) =>
-      callApi(() => api.GET('/cases', { params: { query: { take: CASE_LIST_LIMIT } }, signal })),
-    [],
+    (signal: AbortSignal) => loadCaseList({ facilityId, reason, escalated, patientReference }, { signal }),
+    [facilityId, reason, escalated, patientReference],
   )
   return useApiRead(load)
 }
@@ -42,16 +152,24 @@ export function useCases(): Read<CaseSummary[]> {
  * Reads one case.
  *
  * @param caseId - CareLoop's identifier of the case.
- * @returns The read of `GET /cases/{caseId}`; a missing case fails with `notFound`.
+ * @param reason - Why the reader opens a case outside their team, when they gave one.
+ * @returns The read of `GET /cases/{caseId}`. A missing case fails with `notFound`; a case outside
+ * the reader's team without a reason, or one their role may not read, fails with `forbidden`.
  *
  * @remarks
- * Side effects: calls the API on mount, when `caseId` changes and when someone else signs in.
+ * Side effects: calls the API on mount, when the case or reason changes and when someone else signs
+ * in. The API records every read, with the reason.
  */
-export function useCase(caseId: string): Read<CaseDetail> {
+export function useCase(caseId: string, reason?: string): Read<CaseDetail> {
   const load = useCallback(
     (signal: AbortSignal) =>
-      callApi(() => api.GET('/cases/{caseId}', { params: { path: { caseId } }, signal })),
-    [caseId],
+      callApi(() =>
+        api.GET('/cases/{caseId}', {
+          params: { path: { caseId }, query: { reason: reasonParameter(reason) } },
+          signal,
+        }),
+      ),
+    [caseId, reason],
   )
   return useApiRead(load)
 }
@@ -60,22 +178,46 @@ export function useCase(caseId: string): Read<CaseDetail> {
  * Reads the timeline of one case.
  *
  * @param caseId - CareLoop's identifier of the case.
+ * @param reason - Why the reader opens a case outside their team, when they gave one.
  * @returns The read of `GET /cases/{caseId}/timeline`, in the order the API sends it.
  *
  * @remarks
- * Side effects: calls the API on mount, when `caseId` changes and when someone else signs in.
+ * Side effects: calls the API on mount, when the case or reason changes and when someone else signs
+ * in.
  */
-export function useCaseTimeline(caseId: string): Read<TimelineEntry[]> {
+export function useCaseTimeline(caseId: string, reason?: string): Read<TimelineEntry[]> {
   const load = useCallback(
     (signal: AbortSignal) =>
-      callApi(() => api.GET('/cases/{caseId}/timeline', { params: { path: { caseId } }, signal })),
-    [caseId],
+      callApi(() =>
+        api.GET('/cases/{caseId}/timeline', {
+          params: { path: { caseId }, query: { reason: reasonParameter(reason) } },
+          signal,
+        }),
+      ),
+    [caseId, reason],
   )
   return useApiRead(load)
 }
 
 /**
- * Reads the current loop-closure metrics.
+ * Reads a patient's other cases, for clinicians.
+ *
+ * @param patientReference - The patient's source-system reference.
+ * @param facilityId - The facility of the case being looked at.
+ * @param reason - The reason given for that case, when it is outside the reader's team.
+ * @returns The read of `GET /cases?patientReference=…`, in the case's facility.
+ *
+ * @remarks
+ * Side effects: calls the API on mount, when the arguments change and when someone else signs in.
+ * The API allows this search to clinician roles only and records it.
+ */
+export function usePatientCases(patientReference: string, facilityId: string, reason?: string): Read<CaseList> {
+  return useCaseList({ patientReference, facilityId: reason ? facilityId : undefined, reason })
+}
+
+/**
+ * Reads the current loop-closure metrics of the reader's team, or of every facility for the
+ * programme coordinator.
  *
  * @returns The read of `GET /metrics`.
  *
@@ -107,4 +249,61 @@ export function useSimulation(cohortScenario: string = COMPARISON_COHORT): Read<
     [cohortScenario],
   )
   return useApiRead(load)
+}
+
+/**
+ * Reads every screening programme's settings.
+ *
+ * @returns The read of `GET /programmes`.
+ *
+ * @remarks
+ * Side effects: calls the API on mount and when someone else signs in.
+ */
+export function useProgrammes(): Read<Programme[]> {
+  const load = useCallback(
+    (signal: AbortSignal) => callApi(() => api.GET('/programmes', { signal })),
+    [],
+  )
+  return useApiRead(load)
+}
+
+/**
+ * Reads one screening programme's settings.
+ *
+ * @param pathwayId - The programme's pathway identifier, for example `breast-screening`.
+ * @returns The read of `GET /programmes/{pathwayId}`; an unknown programme fails with `notFound`.
+ *
+ * @remarks
+ * Side effects: calls the API on mount, when the programme changes and when someone else signs in.
+ */
+export function useProgramme(pathwayId: string): Read<Programme> {
+  const load = useCallback(
+    (signal: AbortSignal) =>
+      callApi(() => api.GET('/programmes/{pathwayId}', { params: { path: { pathwayId } }, signal })),
+    [pathwayId],
+  )
+  return useApiRead(load)
+}
+
+/**
+ * Reads one case in a single call, outside React.
+ *
+ * @param caseId - The case.
+ * @param reason - The reason given for a case outside the reader's team.
+ * @param signal - Cancels the read.
+ * @param client - The client to read with; the dashboard's own by default.
+ * @returns The case, or why it could not be read.
+ */
+export function readCase(
+  caseId: string,
+  reason?: string,
+  signal?: AbortSignal,
+  client: CareLoopClient = api,
+): Promise<ApiOutcome<CaseDetail>> {
+  return callApi(() =>
+    client.GET('/cases/{caseId}', {
+      params: { path: { caseId }, query: { reason: reasonParameter(reason) } },
+      signal,
+    }),
+  )
 }

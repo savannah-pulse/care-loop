@@ -19,6 +19,7 @@ export const NEXT_ACTION_KEYS = [
   'reassign-consultation',
   'arrange-alternative-referral',
   'rebook-appointment',
+  'start-treatment',
   'decide-closure',
 ] as const
 

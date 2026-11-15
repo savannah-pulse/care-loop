@@ -1,7 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Badge, ReadView } from '../../components'
 import type { Read, TimelineEntry } from '../../data'
-import { describeActor, groupByDay, newestFirst, timelineKind, timelineSource, timelineTitle } from '../../domain'
+import {
+  describeActor,
+  groupByDay,
+  hasOwnReason,
+  newestFirst,
+  sourceLabel,
+  timelineEntryTitle,
+  timelineKind,
+  timelineSource,
+} from '../../domain'
 import { formatDayHeading, formatTime, parseInstant } from '../../format'
 import { t, tp } from '../../i18n'
 
@@ -14,18 +23,6 @@ export interface TimelineCardProps {
   readonly read: Read<TimelineEntry[]>
 }
 
-function actorLine(entry: TimelineEntry): string {
-  const actor = describeActor(entry.actorReference, entry.actorRole)
-  switch (timelineSource(entry)) {
-    case 'hospital':
-      return t('timeline.fromHospital', { actor })
-    case 'careLoop':
-      return t('timeline.inCareLoop', { actor })
-    case undefined:
-      return actor
-  }
-}
-
 interface ItemProps {
   readonly entry: TimelineEntry
   readonly focusTarget?: boolean
@@ -34,6 +31,11 @@ interface ItemProps {
 function TimelineItem({ entry, focusTarget = false }: ItemProps) {
   const ref = useRef<HTMLLIElement>(null)
   const at = parseInstant(entry.sourceTimestamp)
+  const actor = describeActor(entry.actorReference, entry.actorRole)
+  const refusedReason =
+    entry.disposition === 'Rejected' && entry.eventType !== 'EscalationAcknowledged' && hasOwnReason(entry)
+      ? entry.reason
+      : undefined
   useEffect(() => {
     if (focusTarget) {
       ref.current?.focus()
@@ -48,11 +50,17 @@ function TimelineItem({ entry, focusTarget = false }: ItemProps) {
         <span className="tl-kind">
           {timelineKind(entry.eventType)}
           {entry.disposition === 'Rejected' ? <Badge tone="red">{t('timeline.refused')}</Badge> : null}
+          <span className="tl-source" title={entry.sourceSystem}>
+            {sourceLabel(timelineSource(entry))}
+          </span>
         </span>
-        <p>{entry.reason.trim() === '' ? timelineTitle(entry.eventType) : entry.reason}</p>
-        <p className="tl-by" title={entry.actorReference}>
-          {actorLine(entry)}
-        </p>
+        <p>{timelineEntryTitle(entry)}</p>
+        {refusedReason ? <p className="tl-by">{refusedReason}</p> : null}
+        {actor ? (
+          <p className="tl-by" title={entry.actorReference}>
+            {actor}
+          </p>
+        ) : null}
       </div>
     </li>
   )
@@ -101,9 +109,12 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
  * and who did it where.
  *
  * @remarks
- * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Each entry's reason is its main
- * line. Events CareLoop refused, such as a closure without evidence, are marked "Refused". The
- * first {@link TIMELINE_PAGE} entries show, with a button for the earlier ones; once they show,
+ * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Each entry names its source system
+ * in plain words (CareLoop, Hospital system or Patient channel, C3) and who acted, when a person
+ * did. Its main line is its reason when the reason says more than the kind of event, and otherwise
+ * the kind in words; nothing is made up. Events CareLoop refused, such as a closure without
+ * evidence or an acknowledgement by the wrong role, are marked "Refused" and never read as done.
+ * The first {@link TIMELINE_PAGE} entries show, with a button for the earlier ones; once they show,
  * focus moves to the first of them.
  */
 export function TimelineCard({ read }: TimelineCardProps) {

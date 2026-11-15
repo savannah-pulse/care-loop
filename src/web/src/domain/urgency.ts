@@ -8,10 +8,9 @@ export type UrgencyLevel = 'urgent' | 'routine'
  *
  * @remarks
  * Urgency arrives as an opaque code that the reviewing clinician set in the hospital system;
- * CareLoop never sets or changes it. What each code means belongs to the pathway definition, which
- * the API does not share yet (`GET /programmes`, C1). Until it does, this one table names the
- * placeholder codes of the breast-screening pathway file so the worklist can put urgent cases
- * first. Every shared scenario reviews results as `PLACEHOLDER-URGENCY-A`, so that code is routine.
+ * CareLoop never sets or changes it. `GET /programmes` lists the codes a programme accepts, but not
+ * what each one means, so this one table names the placeholder codes of the breast-screening
+ * pathway file and the worklist can put urgent cases first. Every shared scenario reviews results as `PLACEHOLDER-URGENCY-A`, so that code is routine.
  * A code missing from the table is shown as it is and never treated as urgent.
  */
 export const URGENCY_LEVELS: Readonly<Record<string, UrgencyLevel>> = {

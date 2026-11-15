@@ -1,90 +1,54 @@
-import { t, type MessageKey } from '../i18n'
-import type { CaseStage, TrackStatus } from '../data'
+import { t } from '../i18n'
+import type { CaseDisplayLabel } from '../data'
 
-/** The five pathway stages in the API, in the order a case moves through them. */
-export const CASE_STAGES: readonly CaseStage[] = [
-  'Received',
-  'ReviewPending',
-  'FollowUpActive',
+/**
+ * The ten display stages, in the order a case moves through them.
+ *
+ * @remarks
+ * Every case, in every programme, shows one of these ten labels. The API works the label out from
+ * the case's five-stage pathway position and its four tracks (decision 19) and sends it with every
+ * case read; the dashboard shows what it is given and never works it out itself.
+ */
+export const DISPLAY_LABELS: readonly CaseDisplayLabel[] = [
+  'ResultReceived',
+  'CaseOpened',
+  'OwnerAssigned',
+  'PatientNotified',
+  'PatientAcknowledged',
+  'Consultation',
+  'FollowUp',
+  'OutcomeRecorded',
   'ClosureReview',
   'Closed',
 ]
 
 /**
- * The ten stages shown on screen, in order: catalogue keys of their labels.
+ * Names a display stage in plain words.
  *
- * @remarks
- * Every case, in every programme, moves through the same ten display stages. They are labels over
- * the API's five stages and four tracks; {@link currentStepIndex} maps one to the other.
+ * @param label - The display label from the API.
+ * @returns For example `Follow-up` for `FollowUp`.
  */
-export const DISPLAY_STEPS: readonly MessageKey[] = [
-  'stages.steps.resultReceived',
-  'stages.steps.caseOpened',
-  'stages.steps.ownerAssigned',
-  'stages.steps.patientNotified',
-  'stages.steps.patientAcknowledged',
-  'stages.steps.consultation',
-  'stages.steps.followUp',
-  'stages.steps.outcomeRecorded',
-  'stages.steps.closureReview',
-  'stages.steps.closed',
-]
-
-const ACKNOWLEDGED_STATUSES: readonly string[] = ['Acknowledged', 'Understood']
-
-function trackStatus(tracks: readonly TrackStatus[], kind: TrackStatus['kind']): string | undefined {
-  return tracks.find((track) => track.kind === kind)?.status ?? undefined
+export function displayLabelText(label: CaseDisplayLabel): string {
+  return t(`stages.labels.${label}`)
 }
 
 /**
- * Works out which of the ten display stages a case is at (rule C9 of the UI design).
+ * Tells which of the ten display stages a label is.
  *
- * @param stage - The case's stage in the API.
- * @param tracks - The state of its four tracks, from `GET /cases/{caseId}`.
- * @returns The zero-based index into {@link DISPLAY_STEPS}.
- *
- * @remarks
- * Labels 1 to 3 and 8 to 10 follow the stage. In `FollowUpActive` the tracks run side by side, so
- * the label shows the furthest step reached: Follow-up once a referral or appointment exists,
- * otherwise Consultation once one is requested, otherwise Patient acknowledged once the
- * notification is acknowledged or understood, otherwise Patient notified.
- *
- * @example
- * ```ts
- * currentStepIndex('FollowUpActive', [{ kind: 'Referral', status: 'Rejected', isComplete: false }]) // 6, "Follow-up"
- * ```
+ * @param label - The display label from the API.
+ * @returns Its zero-based position in {@link DISPLAY_LABELS}, for example `6` for `FollowUp`; `-1`
+ * for a label the dashboard does not know.
  */
-export function currentStepIndex(stage: CaseStage, tracks: readonly TrackStatus[]): number {
-  switch (stage) {
-    case 'Received':
-      return 1
-    case 'ReviewPending':
-      return 2
-    case 'FollowUpActive':
-      if (trackStatus(tracks, 'Referral') || trackStatus(tracks, 'Appointment')) {
-        return 6
-      }
-      if (trackStatus(tracks, 'Consultation')) {
-        return 5
-      }
-      return ACKNOWLEDGED_STATUSES.includes(trackStatus(tracks, 'Notification') ?? '') ? 4 : 3
-    case 'ClosureReview':
-      return 8
-    case 'Closed':
-      return 9
-  }
+export function displayStepIndex(label: CaseDisplayLabel): number {
+  return DISPLAY_LABELS.indexOf(label)
 }
 
 /**
- * Names a stage for the worklist, where the tracks are not known.
+ * Tells whether a value from the API is one of the ten display labels.
  *
- * @param stage - The case's stage in the API.
- * @returns `Case opened`, `Owner assigned`, `In follow-up`, `Closure review` or `Closed`.
- *
- * @remarks
- * `GET /cases` does not return track statuses, so the worklist cannot apply rule C9 and shows one
- * label per API stage. The case screen shows the exact display stage.
+ * @param value - A key from the API, such as a key of `casesByDisplayLabel`.
+ * @returns `true`, narrowing the value, when it is one of {@link DISPLAY_LABELS}.
  */
-export function stageLabel(stage: CaseStage): string {
-  return t(`stages.list.${stage}`)
+export function isDisplayLabel(value: string): value is CaseDisplayLabel {
+  return (DISPLAY_LABELS as readonly string[]).includes(value)
 }

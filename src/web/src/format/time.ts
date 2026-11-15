@@ -130,6 +130,16 @@ export function formatDate(date: Date): string {
 }
 
 /**
+ * Formats a day with the year but without the time, in Abu Dhabi time.
+ *
+ * @param date - The instant to show.
+ * @returns For example `Mon 3 Mar 2025`.
+ */
+export function formatDateWithYear(date: Date): string {
+  return t('time.dateWithYear', { ...toParts(shortParts, date) })
+}
+
+/**
  * Formats a day in full without the year, as a heading over that day's events, in Abu Dhabi time.
  *
  * @param date - Any instant on the day.
@@ -219,6 +229,34 @@ export function formatDuration(milliseconds: number, precision: DurationPrecisio
   const days = Math.floor(totalMinutes / MINUTES_PER_DAY)
   const hours = Math.floor((totalMinutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR)
   return precision === 'fine' && hours > 0 ? tp('time.daysHours', days, { hours }) : tp('time.days', days)
+}
+
+const SECOND = 1000
+
+/**
+ * Formats a configured duration exactly, such as a programme's deadline or reminder time.
+ *
+ * @param milliseconds - The duration; the sign is ignored.
+ * @returns The largest unit with the next one when it is not zero, without rounding the largest
+ * unit away: for example `1 day`, `1 day 6 h`, `4 h`, `2 h 30 min`, `30 min`, `1 min 30 s` or
+ * `48 s`. Settings can be seconds long, as in a shortened pathway for a live run.
+ */
+export function formatSpan(milliseconds: number): string {
+  const totalSeconds = Math.round(Math.abs(milliseconds) / SECOND)
+  const days = Math.floor(totalSeconds / 86_400)
+  const hours = Math.floor((totalSeconds % 86_400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  if (days > 0) {
+    return hours > 0 ? tp('time.daysHours', days, { hours }) : tp('time.days', days)
+  }
+  if (hours > 0) {
+    return minutes > 0 ? t('time.hoursMinutes', { hours, minutes }) : t('time.hours', { count: hours })
+  }
+  if (minutes > 0) {
+    return seconds > 0 ? t('time.minutesSeconds', { minutes, seconds }) : t('time.minutes', { count: minutes })
+  }
+  return t('time.seconds', { count: seconds })
 }
 
 /** A due time described for a person: the main line, the line under it and whether it has passed. */

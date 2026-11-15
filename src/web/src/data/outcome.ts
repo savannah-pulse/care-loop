@@ -7,10 +7,13 @@ import type { NotImplemented, Problem } from './types'
  * - `notAvailable`: HTTP 501. The endpoint exists in the contract but is not built yet, so the
  *   screen says so calmly instead of reporting an error.
  * - `notFound`: HTTP 404.
- * - `forbidden`: HTTP 403; the signed-in person's role may not do this.
- * - `conflict`: HTTP 409; for a handoff summary, AI is off or a summary is already approved.
+ * - `forbidden`: HTTP 403; the signed-in person may not do this: their role may not, or the case is
+ *   outside their team and no reason was given.
+ * - `conflict`: HTTP 409; the case changed first. For a handoff summary, AI is off or a summary is
+ *   already approved; for an escalation, it was already acknowledged or a newer one replaced it.
  * - `unavailable`: HTTP 503; for a handoff summary, AI could not produce a valid draft.
  * - `invalid`: HTTP 400 or 422; the request was refused as malformed.
+ * - `aborted`: the read was cancelled because its answer was no longer wanted; screens ignore it.
  * - `error`: anything else, including a network failure.
  */
 export type FailureKind =
@@ -20,6 +23,7 @@ export type FailureKind =
   | 'conflict'
   | 'unavailable'
   | 'invalid'
+  | 'aborted'
   | 'error'
 
 /** A failed call to the API. */
@@ -83,7 +87,8 @@ function detailOf(body: unknown): string | undefined {
  *
  * @param request - Starts the call with the typed client and resolves to its result.
  * @returns The data on a successful answer; otherwise the kind of failure, the status and any
- * explanation the API gave. Never rejects: a network failure becomes an `error` failure.
+ * explanation the API gave. Never rejects: a cancelled call becomes an `aborted` failure and any
+ * other failure to reach the API an `error` failure.
  */
 export async function callApi<T>(request: () => Promise<FetchResult<T>>): Promise<ApiOutcome<T>> {
   try {
@@ -95,7 +100,8 @@ export async function callApi<T>(request: () => Promise<FetchResult<T>>): Promis
       ok: false,
       failure: { kind: failureKindFor(response.status), status: response.status, detail: detailOf(error) },
     }
-  } catch {
-    return { ok: false, failure: { kind: 'error' } }
+  } catch (error) {
+    const aborted = typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+    return { ok: false, failure: { kind: aborted ? 'aborted' : 'error' } }
   }
 }

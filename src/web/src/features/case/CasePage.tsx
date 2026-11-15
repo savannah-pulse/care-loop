@@ -1,11 +1,14 @@
-import { Icon, ReadView } from '../../components'
+import { Icon, OutsideTeamCard, ReadView } from '../../components'
 import { useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
-import { programmeName } from '../../domain'
-import { facilityName, formatDate, parseInstant, patientLabel } from '../../format'
+import { describePatient, openEscalations, programmeName } from '../../domain'
+import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
+import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
-import { routeHref } from '../../routing'
+import { navigate, routeHref } from '../../routing'
+import { EscalationLadder } from '../escalations'
 import { NextActionCard } from './NextActionCard'
+import { OtherScreeningCard } from './OtherScreeningCard'
 import { StageStepper } from './StageStepper'
 import { TimelineCard } from './TimelineCard'
 import { TracksCard } from './TracksCard'
@@ -22,11 +25,17 @@ interface MetaItem {
 }
 
 function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
+  const me = useSignedInStaff()
+  const patient = describePatient(detail, me.role)
   const opened = parseInstant(detail.createdAt)
-  const meta: MetaItem[] = [
+  const meta: MetaItem[] = []
+  if (patient.identifier && !patient.hidden) {
+    meta.push({ text: patient.identifier })
+  }
+  meta.push(
     { text: programmeName(detail.pathwayId), title: detail.pathwayId },
     { text: facilityName(detail.facilityId), title: detail.facilityId },
-  ]
+  )
   if (opened) {
     meta.push({ text: t('case.opened', { date: formatDate(opened) }) })
   }
@@ -36,7 +45,7 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
         <Icon name="user" />
       </span>
       <div className="who">
-        <h1 title={detail.patientReference}>{patientLabel(detail.patientReference)}</h1>
+        <h1 title={patient.reference}>{patient.name}</h1>
         <p className="meta">
           {meta.map((item) => (
             <span key={item.text} title={item.title}>
@@ -47,7 +56,7 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
         <p className="quiet" title={detail.sourceSystem}>
           {t('case.resultFrom', { result: detail.sourceResultId })}
         </p>
-        <p className="quiet">{t('patient.detail')}</p>
+        <p className="quiet">{patient.hidden ? t('patient.hiddenDetail') : t('patient.detail')}</p>
       </div>
     </div>
   )
@@ -56,18 +65,30 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
 interface CaseViewProps {
   readonly detail: CaseDetail
   readonly timeline: Read<TimelineEntry[]>
+  readonly reason?: string
   readonly now: Date
 }
 
-function CaseView({ detail, timeline, now }: CaseViewProps) {
+function CaseView({ detail, timeline, reason, now }: CaseViewProps) {
+  const me = useSignedInStaff()
+  const escalated = openEscalations(detail.escalations).length > 0
   return (
     <>
       <PatientHeader detail={detail} />
-      <StageStepper stage={detail.stage} tracks={detail.tracks} />
+      <StageStepper label={detail.displayLabel} />
       <div className="case-grid">
-        <NextActionCard detail={detail} now={now} />
+        <NextActionCard detail={detail} now={now}>
+          {escalated ? (
+            <EscalationLadder
+              detail={detail}
+              timeline={timeline.state.status === 'ready' ? timeline.state.data : undefined}
+              now={now}
+            />
+          ) : null}
+        </NextActionCard>
         <div className="side">
           <TracksCard tracks={detail.tracks} />
+          {isClinicianRole(me.role) ? <OtherScreeningCard detail={detail} reason={reason} /> : null}
         </div>
         <TimelineCard read={timeline} />
       </div>
@@ -76,23 +97,30 @@ function CaseView({ detail, timeline, now }: CaseViewProps) {
 }
 
 /**
- * Screen 2, a case: who the patient is (by number), where the case is, the one next action with who
- * is responsible, when it is due and whether it was escalated, how each part is going, and what has
- * happened.
+ * Screen 2, a case: who the patient is, where the case is, the one next action with who is
+ * responsible, when it is due and how its escalation stands, how each part is going, the patient's
+ * other screening for clinicians, and what has happened.
  *
  * @remarks
- * Read-only; reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. Case reads carry no
- * patient name, so the page title is the patient's number, with the full reference kept in a
- * tooltip. Clinicians reach the AI handoff summary from the next action when a referral is due.
+ * Read-only; reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. Staff see the patient's
+ * name and MRN; the programme coordinator sees a case number and a note that names are hidden for
+ * their role. A case at another facility opens only after the person says why (board 14): the API
+ * refuses the read without a reason, the screen asks for one, and the reason then goes with every
+ * read of the case. Any other refusal says calmly that the case is not open to the person.
+ * Clinicians reach the AI handoff summary from the next action when a referral is due.
  */
 export function CasePage({ caseId }: CasePageProps) {
-  const read = useCase(caseId)
-  const timeline = useCaseTimeline(caseId)
+  const me = useSignedInStaff()
+  const reason = useAccessReason(caseId)
+  const read = useCase(caseId, reason)
+  const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
   const ready = read.state.status === 'ready'
   useDocumentTitle(
-    read.state.status === 'ready' ? patientLabel(read.state.data.patientReference) : t('case.titleFallback'),
+    read.state.status === 'ready' ? describePatient(read.state.data, me.role).name : t('case.titleFallback'),
   )
+  const askReason =
+    read.state.status === 'failed' && read.state.failure.kind === 'forbidden' && !reason && me.facilityId !== undefined
   return (
     <div className="page">
       <a className="crumb" href={routeHref({ name: 'worklist' })}>
@@ -100,16 +128,27 @@ export function CasePage({ caseId }: CasePageProps) {
         {t('case.back')}
       </a>
       {ready ? null : <h1 className="visually-hidden">{t('case.titleFallback')}</h1>}
-      <ReadView
-        read={read}
-        loadingLabel={t('case.loading')}
-        skeleton="page"
-        notAvailable={t('case.notAvailable')}
-        errorTitle={t('case.errorTitle')}
-        notFound={{ title: t('case.notFoundTitle'), body: t('case.notFoundBody') }}
-      >
-        {(detail) => <CaseView detail={detail} timeline={timeline} now={now} />}
-      </ReadView>
+      {askReason ? (
+        <OutsideTeamCard
+          onReason={(text) => rememberAccessReason(caseId, text)}
+          onCancel={() => navigate({ name: 'worklist' })}
+        />
+      ) : (
+        <ReadView
+          read={read}
+          loadingLabel={t('case.loading')}
+          skeleton="page"
+          notAvailable={t('case.notAvailable')}
+          errorTitle={t('case.errorTitle')}
+          notFound={{ title: t('case.notFoundTitle'), body: t('case.notFoundBody') }}
+          forbidden={{
+            title: t('case.forbiddenTitle'),
+            body: me.role === 'coordinator' ? t('case.forbiddenCoordinator') : t('case.forbiddenBody'),
+          }}
+        >
+          {(detail) => <CaseView detail={detail} timeline={timeline} reason={reason} now={now} />}
+        </ReadView>
+      )}
       <p className="note">{t('case.note')}</p>
     </div>
   )

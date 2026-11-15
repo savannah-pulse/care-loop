@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { forgetAccessReasons } from './access'
 import { DEFAULT_STAFF_MEMBER, findStaffById, type StaffMember } from './staff'
 
 /** Browser storage key under which the signed-in person is remembered. */
@@ -42,7 +43,8 @@ export function getSignedInStaff(): StaffMember {
  *
  * @remarks
  * Prototype identity scheme, to be replaced by real sign-in. Unknown identifiers are ignored.
- * Every screen reading data refetches, because what a person may see depends on who they are.
+ * Every screen reading data refetches, because what a person may see depends on who they are, and
+ * the reasons given for cases outside the previous person's team are forgotten.
  */
 export function signInAs(id: string): void {
   const member = findStaffById(id)
@@ -50,6 +52,7 @@ export function signInAs(id: string): void {
     return
   }
   signedIn = member
+  forgetAccessReasons()
   try {
     window.localStorage.setItem(SIGNED_IN_STORAGE_KEY, member.id)
   } catch {
@@ -63,6 +66,7 @@ function subscribe(listener: () => void): () => void {
   const onStorage = (event: StorageEvent): void => {
     if (event.key === SIGNED_IN_STORAGE_KEY) {
       signedIn = readStoredMember()
+      forgetAccessReasons()
       notify()
     }
   }

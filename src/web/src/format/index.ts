@@ -11,9 +11,11 @@ export {
   formatDate,
   formatDateTime,
   formatDateTimeWithYear,
+  formatDateWithYear,
   formatDayHeading,
   formatDuration,
   formatLongDateTime,
+  formatSpan,
   formatTime,
   formatWhen,
   isSameDay,
@@ -21,6 +23,15 @@ export {
   partOfDay,
 } from './time'
 export type { DueDescription, DurationPrecision, PartOfDay } from './time'
-export { formatCount, formatPercent, parseTimeSpan, toCount, toNumber } from './numbers'
+export {
+  formatCount,
+  formatDecimal,
+  formatPercent,
+  formatRate,
+  measuredDuration,
+  parseTimeSpan,
+  toCount,
+  toNumber,
+} from './numbers'
 export { KNOWN_FACILITIES, factLabel, facilityName, groupDigits, humaniseId, patientLabel } from './names'
 export type { KnownFacility } from './names'

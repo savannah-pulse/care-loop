@@ -81,19 +81,20 @@ export function describeOwner(owner: Owner, detail: PersonDetail = 'long'): Pers
 }
 
 /**
- * Names whoever caused a timeline entry.
+ * Names the person who caused a timeline entry.
  *
- * @param reference - The actor or source-system reference from the API.
- * @param role - The role the actor acted in; `system` for CareLoop itself.
- * @returns `CareLoop` for CareLoop's own actions, a person's name when the dashboard knows them, and
- * otherwise the role in words, for example `Receiving clinician`. Never the reference itself.
+ * @param reference - The actor reference from the API.
+ * @param role - The role the actor acted in; `system` when a system, not a person, caused it.
+ * @returns A person's name when the dashboard knows them, otherwise their role in words, for example
+ * `Receiving clinician`; never the reference itself. `undefined` for a system, because the entry's
+ * source already says which system it came from.
  *
  * @remarks
  * Timeline entries carry no facility, so people outside the sign-in list are named by role only.
  */
-export function describeActor(reference: string, role: string): string {
+export function describeActor(reference: string, role: string): string | undefined {
   if (role === 'system') {
-    return t('roles.system')
+    return undefined
   }
   return findStaffByReference(reference)?.name ?? roleWords(role)
 }

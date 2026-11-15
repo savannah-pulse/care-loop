@@ -1,17 +1,19 @@
-import { useId } from 'react'
+import { useId, type ReactNode } from 'react'
 import { Badge, Icon } from '../../components'
 import type { CaseDetail } from '../../data'
 import {
   caseStatus,
+  currentEscalation,
   describeOwner,
-  exceptionReason,
-  isExceptionName,
+  escalationTarget,
   isReferralAction,
   isUrgent,
   nextActionText,
+  nextActionWhy,
+  noticeActor,
 } from '../../domain'
-import { describeDue, parseInstant } from '../../format'
-import { isClinicianRole, useSignedInStaff } from '../../identity'
+import { describeDue, formatWhen, parseInstant } from '../../format'
+import { isClinicianRole, sameReference, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { routeHref } from '../../routing'
 
@@ -21,25 +23,43 @@ export interface NextActionCardProps {
   readonly detail: CaseDetail
   /** The current time, for how late or how long is left. */
   readonly now: Date
+  /** The escalation ladder, shown under the facts while the case is escalated. */
+  readonly children?: ReactNode
 }
 
-function why(detail: CaseDetail): string {
-  const sentences = detail.exceptions
-    .filter(isExceptionName)
-    .filter((name) => name !== 'Overdue')
-    .map(exceptionReason)
-  if (detail.proposedOwner) {
-    sentences.push(
-      t('case.proposedOwner', {
-        name: describeOwner(detail.proposedOwner).inSentence,
-        owner: describeOwner(detail.owner).subject,
-      }),
-    )
+interface EscalationFactProps {
+  readonly detail: CaseDetail
+  readonly now: Date
+}
+
+function EscalationFact({ detail, now }: EscalationFactProps) {
+  const me = useSignedInStaff()
+  const current = currentEscalation(detail.escalations)
+  if (!current) {
+    return <span className="fact-main">{t('case.escalationNone')}</span>
   }
-  if (sentences.length === 0 && detail.exceptions.includes('Overdue')) {
-    sentences.push(exceptionReason('Overdue'))
-  }
-  return sentences.length > 0 ? sentences.join(' ') : t('case.noProblem')
+  const raised = parseInstant(current.raisedAt)
+  const acknowledged = parseInstant(current.acknowledgedAt)
+  const target = escalationTarget(current.escalatedTo)
+  return (
+    <>
+      <span className="fact-plain">
+        {raised
+          ? t('case.escalatedTo', { target: target.inSentence, date: formatWhen(raised, now) })
+          : t('case.escalatedToNoDate', { target: target.inSentence })}{' '}
+        {acknowledged
+          ? t('case.escalationAcknowledged', {
+              name: noticeActor(
+                { reference: current.acknowledgedBy ?? '', role: current.acknowledgedByRole ?? current.escalatedTo.role },
+                me.reference,
+              ),
+              date: formatWhen(acknowledged, now),
+            })
+          : t('case.escalationNotAcknowledged')}{' '}
+        {t('case.escalationSameOwner')}
+      </span>
+    </>
+  )
 }
 
 /**
@@ -49,11 +69,12 @@ function why(detail: CaseDetail): string {
  * @remarks
  * The status pill uses the same rule as the worklist. The explanation comes from the unresolved
  * exceptions and any pending transfer: until a proposed owner accepts, the current owner stays
- * responsible. Escalation tells the facility lead but never changes who is responsible. Clinicians
- * get a way into the handoff summary when the action is to send or arrange a referral; everyone
- * else sees who needs to act.
+ * responsible. Escalation brings in the facility lead, then the programme coordinator, but never
+ * changes who is responsible; the card says who it went to and whether they acknowledged it.
+ * Clinicians get a way into the handoff
+ * summary when the action is to send or arrange a referral; everyone else sees who needs to act.
  */
-export function NextActionCard({ detail, now }: NextActionCardProps) {
+export function NextActionCard({ detail, now, children }: NextActionCardProps) {
   const headingId = useId()
   const me = useSignedInStaff()
   const status = caseStatus(detail)
@@ -62,7 +83,7 @@ export function NextActionCard({ detail, now }: NextActionCardProps) {
   const due = dueAt ? describeDue(dueAt, now) : undefined
   const closed = detail.stage === 'Closed'
   const offerSummary = !closed && isClinicianRole(me.role) && isReferralAction(detail.nextAction)
-  const mine = !detail.owner.isQueue && detail.owner.reference === me.reference
+  const mine = !detail.owner.isQueue && sameReference(detail.owner.reference, me.reference)
   return (
     <section className="card hero" aria-labelledby={headingId}>
       <div className="hero-top">
@@ -76,7 +97,7 @@ export function NextActionCard({ detail, now }: NextActionCardProps) {
       <h2 className="hero-title" id={headingId}>
         {nextActionText(detail.nextAction)}
       </h2>
-      <p className="why">{why(detail)}</p>
+      <p className="why">{nextActionWhy(detail)}</p>
       {detail.closureReason ? (
         <p className="closed-line">{t('case.closedAs', { reason: t(`closureReasons.${detail.closureReason}`) })}</p>
       ) : null}
@@ -107,14 +128,11 @@ export function NextActionCard({ detail, now }: NextActionCardProps) {
         <div className="fact-wide">
           <dt>{t('case.escalation')}</dt>
           <dd>
-            {detail.isEscalated ? (
-              <span className="fact-plain">{t('case.escalationOpen')}</span>
-            ) : (
-              <span className="fact-main">{t('case.escalationNone')}</span>
-            )}
+            <EscalationFact detail={detail} now={now} />
           </dd>
         </div>
       </dl>
+      {children}
       {offerSummary ? (
         <div className="hero-cta">
           <a className="btn primary" href={routeHref({ name: 'summary', caseId: detail.caseId })}>
