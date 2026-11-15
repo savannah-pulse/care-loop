@@ -26,7 +26,7 @@ function Screen({ route }: { readonly route: Route }) {
     case 'impact':
       return <ImpactPage />
     case 'programmes':
-      return <ProgrammesPage />
+      return <ProgrammesPage pathwayId={route.pathwayId} />
     case 'notFound':
       return <NotFoundPage />
   }

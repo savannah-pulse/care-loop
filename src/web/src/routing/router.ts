@@ -14,7 +14,7 @@ export type Route =
   | { readonly name: 'escalation'; readonly caseId: string }
   | { readonly name: 'escalations' }
   | { readonly name: 'impact' }
-  | { readonly name: 'programmes' }
+  | { readonly name: 'programmes'; readonly pathwayId?: string }
   | { readonly name: 'notFound' }
 
 /** A route that has an address of its own; every route except "not found". */
@@ -40,6 +40,7 @@ function decodeSegments(path: string): string[] | undefined {
  * @example
  * ```ts
  * parseRoute('#/impact') // { name: 'impact' }
+ * parseRoute('#/programmes/breast-screening') // { name: 'programmes', pathwayId: 'breast-screening' }
  * parseRoute('') // { name: 'worklist' }
  * ```
  */
@@ -67,14 +68,14 @@ export function parseRoute(hash: string): Route {
     }
     return { name: 'notFound' }
   }
+  if (first === 'programmes' && third === undefined) {
+    return second === undefined ? { name: 'programmes' } : { name: 'programmes', pathwayId: second }
+  }
   if (second !== undefined) {
     return { name: 'notFound' }
   }
   if (first === 'impact') {
     return { name: 'impact' }
-  }
-  if (first === 'programmes') {
-    return { name: 'programmes' }
   }
   if (first === 'escalations') {
     return { name: 'escalations' }
@@ -103,7 +104,7 @@ export function routeHref(route: AddressableRoute): string {
     case 'impact':
       return '#/impact'
     case 'programmes':
-      return '#/programmes'
+      return route.pathwayId ? `#/programmes/${encodeURIComponent(route.pathwayId)}` : '#/programmes'
   }
 }
 
