@@ -1,8 +1,11 @@
 /**
- * Fixtures for the local mock API: the eight worklist cases of UI design board 1, Hessa's case and
- * timeline from board 2, loop-closure numbers from board 3 and the handoff summary draft from
- * board 18. Every person, reference and number is invented. Typed against the generated API schema,
- * so a contract change that breaks them fails the type check.
+ * Fixtures for the local mock API: the eight worklist cases of UI design board 1 with the patients'
+ * names and MRNs, Hessa's case, timeline and escalation from boards 2 and 17, a case escalated to the
+ * programme coordinator, Hessa's earlier screening (board 18), two cases at the General Hospital,
+ * the five programmes of board 4, loop-closure numbers from board 3 and the handoff summary draft
+ * from board 18. References are written as the API stores them, without a FHIR type. Every person,
+ * reference and number is invented. Typed against the generated API schema, so a contract change
+ * that breaks them fails the type check.
  *
  * Times are written as on the boards, in Abu Dhabi time on Thursday 12 November 2026 at 09:00, and
  * moved so that moment falls when the dev server starts. Set `CARELOOP_MOCK_NOW` (an ISO 8601
@@ -22,10 +25,13 @@ export type TimelineEntry = Schemas['TimelineEntryResponse']
 export type HandoffSummary = Schemas['HandoffSummaryResponse']
 /** Loop-closure metrics as `GET /metrics` returns them. */
 export type Metrics = Schemas['MetricsResponse']
+/** A programme's settings as `GET /programmes` returns them. */
+export type Programme = Schemas['ProgrammeResponse']
 /** One arm of the escalation comparison. */
 export type SimulationArm = Schemas['SimulationArmResponse']
 
 type Owner = Schemas['OwnerResponse']
+type Escalation = Schemas['EscalationResponse']
 type Stage = Schemas['CaseStage']
 type EventType = Schemas['CaseEventType']
 type Track = Schemas['TrackStatusResponse']
@@ -70,27 +76,65 @@ export function at(boardTime: string): string {
 }
 
 const FACILITY = 'family-health-centre'
+const GENERAL_HOSPITAL = 'general-hospital'
 
-const REKHA: Owner = { reference: 'Practitioner/rekha-varghese', role: 'clinician', facilityId: FACILITY, isQueue: false }
-const HUDA: Owner = { reference: 'Practitioner/huda-saleh', role: 'nurse-navigator', facilityId: FACILITY, isQueue: false }
-const SARA: Owner = { reference: 'Practitioner/sara-al-hammadi', role: 'clinician', facilityId: FACILITY, isQueue: false }
+/** The hospital system the Family Health Centre's results come from. */
+const HOSPITAL_SYSTEM = 'fhc-his'
+/** The General Hospital's hospital system. */
+const GENERAL_HOSPITAL_SYSTEM = 'gh-his'
+/** The patient channel, which reports deliveries and patients' replies. */
+const PATIENT_CHANNEL = 'patient-channel'
+
+const REKHA: Owner = { reference: 'rekha-varghese', role: 'clinician', facilityId: FACILITY, isQueue: false }
+const HUDA: Owner = { reference: 'huda-saleh', role: 'nurse-navigator', facilityId: FACILITY, isQueue: false }
+const SARA: Owner = { reference: 'sara-al-hammadi', role: 'clinician', facilityId: FACILITY, isQueue: false }
 const LEAD_QUEUE: Owner = {
-  reference: 'queue/facility-lead/family-health-centre',
+  reference: 'facility-lead:family-health-centre',
   role: 'facility-lead',
   facilityId: FACILITY,
   isQueue: true,
 }
 const ENDOSCOPY_UNIT: Owner = {
-  reference: 'Organization/endoscopy-unit-general-hospital',
+  reference: 'endoscopy-unit-general-hospital',
   role: 'receiving-clinician',
   facilityId: 'general-hospital',
   isQueue: false,
 }
 
+const LAYLA: Owner = { reference: 'layla-haddad', role: 'receiving-clinician', facilityId: GENERAL_HOSPITAL, isQueue: false }
+const JOY = { actor: 'joy-bautista', role: 'facility-lead' } as const
+
 const SYSTEM = { actor: 'careloop', role: 'system' } as const
 const BY_REKHA = { actor: REKHA.reference, role: REKHA.role } as const
 const BY_HUDA = { actor: HUDA.reference, role: HUDA.role } as const
 const BY_SARA = { actor: SARA.reference, role: SARA.role } as const
+const BY_LAYLA = { actor: LAYLA.reference, role: LAYLA.role } as const
+
+interface EscalationSpec {
+  readonly id: string
+  readonly level: number
+  readonly to: 'facility-lead' | 'coordinator'
+  readonly raised: string
+  readonly nextAction: string
+  readonly due: string
+  readonly facilityId?: string
+  readonly acknowledged?: { readonly by: string; readonly role: string; readonly at: string }
+}
+
+function escalation(spec: EscalationSpec): Escalation {
+  const facilityId = spec.facilityId ?? FACILITY
+  return {
+    escalationId: spec.id,
+    level: spec.level,
+    escalatedTo: { reference: `${spec.to}:${facilityId}`, role: spec.to, facilityId, isQueue: true },
+    raisedAt: at(spec.raised),
+    reason: `Next action '${spec.nextAction}' was due at ${at(spec.due)}.`,
+    acknowledgedBy: spec.acknowledged?.by ?? null,
+    acknowledgedByRole: spec.acknowledged?.role ?? null,
+    acknowledgedAt: spec.acknowledged ? at(spec.acknowledged.at) : null,
+    resolvedAt: null,
+  }
+}
 
 /** The urgency code every shared scenario uses for routine reviews. */
 const ROUTINE = 'PLACEHOLDER-URGENCY-A'
@@ -106,6 +150,8 @@ function notStarted(kind: Track['kind']): Track {
 }
 
 interface EntrySpec {
+  /** Where the event came from: the hospital system by default, CareLoop for its own events. */
+  readonly source?: 'patient'
   readonly type: EventType
   readonly time: string
   readonly by: { readonly actor: string; readonly role: string }
@@ -121,7 +167,7 @@ function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
     const source = at(spec.time)
     return {
       auditEventId: `${caseId.slice(0, -3)}${String(index + 1).padStart(3, '0')}`,
-      sourceSystem: spec.by.role === 'system' ? 'careloop' : 'fhc-his',
+      sourceSystem: spec.source === 'patient' ? PATIENT_CHANNEL : spec.by.actor === 'careloop' ? 'careloop' : HOSPITAL_SYSTEM,
       eventType: spec.type,
       disposition: spec.refused ? 'Rejected' : 'Applied',
       actorReference: spec.by.actor,
@@ -154,7 +200,9 @@ function hessa(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'MAMMO-2026-110941',
-      patientReference: 'Patient/p-100245891',
+      patientReference: 'p-100245891',
+      patientDisplayName: 'Hessa Al Dhaheri',
+      patientSecondaryIdentifier: '100245891',
       pathwayId: 'breast-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -172,7 +220,16 @@ function hessa(): CaseFixture {
         notStarted('Appointment'),
       ],
       displayLabel: 'FollowUp',
-      escalations: [],
+      escalations: [
+        escalation({
+          id: '5d1e2f3a-4b5c-4d6e-8f70-100245891e01',
+          level: 1,
+          to: 'facility-lead',
+          raised: '2026-11-11T15:00:00+04:00',
+          nextAction: 'arrange-alternative-referral',
+          due: '2026-11-11T15:00:00+04:00',
+        }),
+      ],
       outcomeEvidenceReference: null,
       closureReason: null,
       createdAt: at('2026-11-10T09:00:00+04:00'),
@@ -208,7 +265,8 @@ function hessa(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
-        by: SYSTEM,
+        source: 'patient',
+        by: { actor: PATIENT_CHANNEL, role: 'system' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered asking her to expect a call from her care team.',
@@ -248,7 +306,7 @@ function hessa(): CaseFixture {
       {
         type: 'ReferralUpdated',
         time: '2026-11-10T15:00:00+04:00',
-        by: { actor: 'Organization/breast-clinic-regional-hospital', role: 'receiving-clinician' },
+        by: { actor: 'breast-clinic-regional-hospital', role: 'receiving-clinician' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Referral declined by the Breast Clinic, Regional Hospital: no capacity.',
@@ -280,7 +338,9 @@ function noura(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'MAMMO-2026-111207',
-      patientReference: 'Patient/p-100318402',
+      patientReference: 'p-100318402',
+      patientDisplayName: 'Noura Al Shamsi',
+      patientSecondaryIdentifier: '100318402',
       pathwayId: 'breast-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -349,7 +409,9 @@ function salem(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'LDCT-2026-110388',
-      patientReference: 'Patient/p-100377615',
+      patientReference: 'p-100377615',
+      patientDisplayName: 'Salem Al Ketbi',
+      patientSecondaryIdentifier: '100377615',
       pathwayId: 'lung-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -394,7 +456,8 @@ function salem(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-11T16:20:00+04:00',
-        by: SYSTEM,
+        source: 'patient',
+        by: { actor: PATIENT_CHANNEL, role: 'system' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Acknowledged in his health app.',
@@ -402,7 +465,8 @@ function salem(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-12T08:40:00+04:00',
-        by: SYSTEM,
+        source: 'patient',
+        by: { actor: PATIENT_CHANNEL, role: 'system' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'He asked for a call back.',
@@ -418,7 +482,9 @@ function khalid(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'FIT-2026-110514',
-      patientReference: 'Patient/p-100402233',
+      patientReference: 'p-100402233',
+      patientDisplayName: 'Khalid Al Marzouqi',
+      patientSecondaryIdentifier: '100402233',
       pathwayId: 'bowel-screening',
       facilityId: FACILITY,
       stage: 'ReviewPending',
@@ -466,7 +532,9 @@ function maricel(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'HPV-2026-110622',
-      patientReference: 'Patient/p-100455790',
+      patientReference: 'p-100455790',
+      patientDisplayName: 'Maricel Reyes',
+      patientSecondaryIdentifier: '100455790',
       pathwayId: 'cervical-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -535,7 +603,9 @@ function nasreen(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'MAMMO-2026-110903',
-      patientReference: 'Patient/p-100468104',
+      patientReference: 'p-100468104',
+      patientDisplayName: 'Nasreen Akhtar',
+      patientSecondaryIdentifier: '100468104',
       pathwayId: 'breast-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -580,7 +650,8 @@ function nasreen(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
-        by: SYSTEM,
+        source: 'patient',
+        by: { actor: PATIENT_CHANNEL, role: 'system' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered.',
@@ -604,7 +675,9 @@ function rashid(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'FIT-2026-110207',
-      patientReference: 'Patient/p-100512337',
+      patientReference: 'p-100512337',
+      patientDisplayName: 'Rashid Al Hosani',
+      patientSecondaryIdentifier: '100512337',
       pathwayId: 'bowel-screening',
       facilityId: FACILITY,
       stage: 'FollowUpActive',
@@ -681,7 +754,9 @@ function mohammed(): CaseFixture {
       caseId,
       sourceSystem: 'fhc-his',
       sourceResultId: 'LAB-2026-111102',
-      patientReference: 'Patient/p-100538920',
+      patientReference: 'p-100538920',
+      patientDisplayName: 'Mohammed Rafiq',
+      patientSecondaryIdentifier: '100538920',
       pathwayId: 'heart-kidney-diabetes',
       facilityId: FACILITY,
       stage: 'ReviewPending',
@@ -714,13 +789,303 @@ function mohammed(): CaseFixture {
   }
 }
 
+function latifa(): CaseFixture {
+  const caseId = 'c6d8e0f2-8d7b-4a9c-9db4-100587221000'
+  return {
+    detail: {
+      caseId,
+      sourceSystem: HOSPITAL_SYSTEM,
+      sourceResultId: 'HPV-2026-110455',
+      patientReference: 'p-100587221',
+      patientDisplayName: 'Latifa Al Mazrouei',
+      patientSecondaryIdentifier: '100587221',
+      displayLabel: 'PatientNotified',
+      escalations: [
+        escalation({
+          id: '6e2f3a4b-5c6d-4e7f-8a91-100587221e01',
+          level: 1,
+          to: 'facility-lead',
+          raised: '2026-11-10T17:00:00+04:00',
+          nextAction: 'contact-patient-another-way',
+          due: '2026-11-10T17:00:00+04:00',
+          acknowledged: { by: JOY.actor, role: JOY.role, at: '2026-11-11T08:10:00+04:00' },
+        }),
+        escalation({
+          id: '6e2f3a4b-5c6d-4e7f-8a91-100587221e02',
+          level: 2,
+          to: 'coordinator',
+          raised: '2026-11-11T17:00:00+04:00',
+          nextAction: 'contact-patient-another-way',
+          due: '2026-11-10T17:00:00+04:00',
+        }),
+      ],
+      outcomeEvidenceKind: null,
+      confidence: null,
+      pathwayId: 'cervical-screening',
+      facilityId: FACILITY,
+      stage: 'FollowUpActive',
+      urgency: ROUTINE,
+      owner: HUDA,
+      proposedOwner: null,
+      nextAction: 'contact-patient-another-way',
+      dueAt: at('2026-11-10T17:00:00+04:00'),
+      isEscalated: true,
+      exceptions: ['Overdue', 'Unreachable'],
+      tracks: [
+        track('Notification', 'Failed', false, '2026-11-09T16:00:00+04:00'),
+        notStarted('Consultation'),
+        notStarted('Referral'),
+        notStarted('Appointment'),
+      ],
+      outcomeEvidenceReference: null,
+      closureReason: null,
+      createdAt: at('2026-11-08T10:00:00+04:00'),
+      updatedAt: at('2026-11-11T17:00:00+04:00'),
+    },
+    timeline: entries(caseId, [
+      {
+        type: 'ScreeningResultReceived',
+        time: '2026-11-08T10:00:00+04:00',
+        by: BY_SARA,
+        from: null,
+        to: 'ReviewPending',
+        reason: 'Screening result needs follow-up.',
+        evidence: 'DiagnosticReport/hpv-2026-110455',
+      },
+      {
+        type: 'ClinicalReviewCompleted',
+        time: '2026-11-08T13:00:00+04:00',
+        by: BY_SARA,
+        from: 'ReviewPending',
+        to: 'FollowUpActive',
+        reason: 'Reviewed as routine.',
+      },
+      {
+        source: 'patient',
+        type: 'NotificationUpdated',
+        time: '2026-11-09T16:00:00+04:00',
+        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'Text not delivered: the number is not in service.',
+      },
+      {
+        type: 'DeadlineElapsed',
+        time: '2026-11-10T11:00:00+04:00',
+        by: SYSTEM,
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'Reminder sent to Huda Saleh: another way to reach her is due at 17:00.',
+      },
+      {
+        type: 'DeadlineElapsed',
+        time: '2026-11-10T17:00:00+04:00',
+        by: SYSTEM,
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'No other way to reach her was found by the deadline. Escalated to the facility lead.',
+      },
+      {
+        type: 'EscalationAcknowledged',
+        time: '2026-11-11T08:10:00+04:00',
+        by: JOY,
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'Escalation acknowledged. The person responsible and the deadline stay the same.',
+      },
+      {
+        type: 'DeadlineElapsed',
+        time: '2026-11-11T17:00:00+04:00',
+        by: SYSTEM,
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'Still late a day after the deadline. Escalated to the programme coordinator.',
+      },
+    ]),
+  }
+}
+
+function hessaEarlier(): CaseFixture {
+  const caseId = '2a4c6e80-9e8c-4b0d-8ec5-100245891025'
+  return {
+    detail: {
+      caseId,
+      sourceSystem: HOSPITAL_SYSTEM,
+      sourceResultId: 'FIT-2025-030311',
+      patientReference: 'p-100245891',
+      patientDisplayName: 'Hessa Al Dhaheri',
+      patientSecondaryIdentifier: '100245891',
+      displayLabel: 'Closed',
+      escalations: [],
+      outcomeEvidenceKind: 'diagnosis',
+      confidence: null,
+      pathwayId: 'bowel-screening',
+      facilityId: FACILITY,
+      stage: 'Closed',
+      urgency: ROUTINE,
+      owner: SARA,
+      proposedOwner: null,
+      nextAction: null,
+      dueAt: null,
+      isEscalated: false,
+      exceptions: [],
+      tracks: [
+        track('Notification', 'Understood', true, '2025-03-04T10:00:00+04:00'),
+        track('Consultation', 'OutcomeRecorded', true, '2025-03-05T09:00:00+04:00'),
+        track('Referral', 'Accepted', true, '2025-03-06T12:00:00+04:00'),
+        track('Appointment', 'Attended', true, '2025-04-15T09:00:00+04:00'),
+      ],
+      outcomeEvidenceReference: 'Procedure/colonoscopy-2025-04-15',
+      closureReason: 'NegativeOnConfirmation',
+      createdAt: at('2025-03-03T09:00:00+04:00'),
+      updatedAt: at('2025-04-24T11:00:00+04:00'),
+    },
+    timeline: entries(caseId, [
+      {
+        type: 'ScreeningResultReceived',
+        time: '2025-03-03T09:00:00+04:00',
+        by: BY_SARA,
+        from: null,
+        to: 'ReviewPending',
+        reason: 'Screening result needs a colonoscopy.',
+        evidence: 'DiagnosticReport/fit-2025-030311',
+      },
+      {
+        type: 'ClosureDecided',
+        time: '2025-04-24T11:00:00+04:00',
+        by: BY_SARA,
+        from: 'ClosureReview',
+        to: 'Closed',
+        reason: 'Closed: the colonoscopy found no cancer.',
+        evidence: 'Procedure/colonoscopy-2025-04-15',
+      },
+    ]),
+  }
+}
+
+function shamma(): CaseFixture {
+  const caseId = 'd7e9f1a3-9e8c-4cad-8ec5-100611045000'
+  return {
+    detail: {
+      caseId,
+      sourceSystem: GENERAL_HOSPITAL_SYSTEM,
+      sourceResultId: 'MAMMO-2026-210118',
+      patientReference: 'p-100611045',
+      patientDisplayName: 'Shamma Al Kaabi',
+      patientSecondaryIdentifier: '100611045',
+      displayLabel: 'FollowUp',
+      escalations: [],
+      outcomeEvidenceKind: null,
+      confidence: 5,
+      pathwayId: 'breast-screening',
+      facilityId: GENERAL_HOSPITAL,
+      stage: 'FollowUpActive',
+      urgency: ROUTINE,
+      owner: LAYLA,
+      proposedOwner: null,
+      nextAction: 'rebook-appointment',
+      dueAt: at('2026-11-13T12:00:00+04:00'),
+      isEscalated: false,
+      exceptions: [],
+      tracks: [
+        track('Notification', 'Understood', true, '2026-11-09T10:00:00+04:00'),
+        notStarted('Consultation'),
+        track('Referral', 'Accepted', false, '2026-11-09T15:00:00+04:00'),
+        track('Appointment', 'Missed', false, '2026-11-12T08:00:00+04:00'),
+      ],
+      outcomeEvidenceReference: null,
+      closureReason: null,
+      createdAt: at('2026-11-08T09:00:00+04:00'),
+      updatedAt: at('2026-11-12T08:00:00+04:00'),
+    },
+    timeline: entries(caseId, [
+      {
+        type: 'ScreeningResultReceived',
+        time: '2026-11-08T09:00:00+04:00',
+        by: BY_LAYLA,
+        from: null,
+        to: 'ReviewPending',
+        reason: 'Screening result needs further assessment.',
+        evidence: 'DiagnosticReport/mammo-2026-210118',
+      },
+      {
+        type: 'AppointmentUpdated',
+        time: '2026-11-12T08:00:00+04:00',
+        by: BY_LAYLA,
+        from: 'FollowUpActive',
+        to: 'FollowUpActive',
+        reason: 'Assessment appointment missed.',
+      },
+    ]),
+  }
+}
+
+function mariam(): CaseFixture {
+  const caseId = 'e8f0a2b4-af9d-4dbe-9fd6-100624310000'
+  return {
+    detail: {
+      caseId,
+      sourceSystem: GENERAL_HOSPITAL_SYSTEM,
+      sourceResultId: 'LDCT-2026-210307',
+      patientReference: 'p-100624310',
+      patientDisplayName: 'Mariam Al Mansoori',
+      patientSecondaryIdentifier: '100624310',
+      displayLabel: 'OwnerAssigned',
+      escalations: [],
+      outcomeEvidenceKind: null,
+      confidence: null,
+      pathwayId: 'lung-screening',
+      facilityId: GENERAL_HOSPITAL,
+      stage: 'ReviewPending',
+      urgency: null,
+      owner: LAYLA,
+      proposedOwner: null,
+      nextAction: 'review-result',
+      dueAt: at('2026-11-12T17:00:00+04:00'),
+      isEscalated: false,
+      exceptions: [],
+      tracks: [notStarted('Notification'), notStarted('Consultation'), notStarted('Referral'), notStarted('Appointment')],
+      outcomeEvidenceReference: null,
+      closureReason: null,
+      createdAt: at('2026-11-12T07:00:00+04:00'),
+      updatedAt: at('2026-11-12T07:00:00+04:00'),
+    },
+    timeline: entries(caseId, [
+      {
+        type: 'ScreeningResultReceived',
+        time: '2026-11-12T07:00:00+04:00',
+        by: BY_LAYLA,
+        from: null,
+        to: 'ReviewPending',
+        reason: 'Screening result needs review.',
+        evidence: 'DiagnosticReport/ldct-2026-210307',
+      },
+    ]),
+  }
+}
+
 /**
- * Builds a fresh set of the eight worklist cases from board 1, each with its timeline.
+ * Builds a fresh set of cases, each with its timeline: the eight worklist cases of board 1, a ninth
+ * case at the Family Health Centre escalated to the programme coordinator, Hessa's earlier, closed
+ * bowel screening (her other screening on board 18), and two cases at the General Hospital.
  *
  * @returns New objects every call, so each server starts from the same state.
  */
 export function createCases(): CaseFixture[] {
-  return [hessa(), noura(), salem(), khalid(), maricel(), nasreen(), rashid(), mohammed()]
+  return [
+    hessa(),
+    noura(),
+    salem(),
+    khalid(),
+    maricel(),
+    nasreen(),
+    rashid(),
+    mohammed(),
+    latifa(),
+    hessaEarlier(),
+    shamma(),
+    mariam(),
+  ]
 }
 
 /**
@@ -885,4 +1250,100 @@ export function draftHessaSummary(summaryId: string): HandoffSummary {
     rejectedAt: null,
     rejectionReason: null,
   }
+}
+
+const PLACEHOLDER_CITATION = 'PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser'
+
+type Deadline = Programme['deadlines'][number]
+
+function deadline(nextAction: string, duration: string, warnBefore: string, ownerRole: string, urgencyCode: string | null = null): Deadline {
+  return { nextAction, urgencyCode, duration, warnBefore, clinicallyApproved: false, ownerRole, citation: PLACEHOLDER_CITATION }
+}
+
+function programme(pathwayId: string, displayName: string): Programme {
+  return {
+    pathwayId,
+    version: '0.0.1-placeholder',
+    displayName,
+    isPlaceholder: true,
+    urgencyCodes: [ROUTINE, URGENT],
+    unassignedQueueRole: 'facility-lead',
+    stages: [
+      { stage: 'Received', leavesOn: ['ScreeningResultReceived'], next: 'ReviewPending', allowedRoles: ['system'], nextActionOnEntry: 'assign-owner' },
+      { stage: 'ReviewPending', leavesOn: ['ClinicalReviewCompleted'], next: 'FollowUpActive', allowedRoles: ['clinician'], nextActionOnEntry: 'review-result' },
+      { stage: 'FollowUpActive', leavesOn: ['OutcomeRecorded'], next: 'ClosureReview', allowedRoles: ['clinician', 'receiving-clinician', 'lab'], nextActionOnEntry: 'acknowledge-notification' },
+      { stage: 'ClosureReview', leavesOn: ['ClosureDecided'], next: 'Closed', allowedRoles: ['clinician', 'receiving-clinician'], nextActionOnEntry: 'decide-closure' },
+      { stage: 'Closed', leavesOn: [], next: null, allowedRoles: [], nextActionOnEntry: null },
+    ],
+    tracks: [
+      { kind: 'Notification', requiredForClosure: true, nextActionOnException: 'contact-patient-another-way' },
+      { kind: 'Consultation', requiredForClosure: false, nextActionOnException: 'reassign-consultation' },
+      { kind: 'Referral', requiredForClosure: false, nextActionOnException: 'arrange-alternative-referral' },
+      { kind: 'Appointment', requiredForClosure: true, nextActionOnException: 'rebook-appointment' },
+    ],
+    deadlines: [
+      deadline('assign-owner', '1.00:00:00', '06:00:00', 'facility-lead'),
+      deadline('review-result', '1.00:00:00', '06:00:00', 'clinician'),
+      deadline('acknowledge-notification', '1.00:00:00', '06:00:00', 'nurse-navigator'),
+      deadline('answer-consultation', '1.00:00:00', '06:00:00', 'receiving-clinician'),
+      deadline('respond-to-referral', '04:00:00', '01:00:00', 'receiving-clinician'),
+      deadline('arrange-follow-up', '1.00:00:00', '06:00:00', 'clinician'),
+      deadline('call-patient', '02:00:00', '00:30:00', 'nurse-navigator'),
+      deadline('contact-patient-another-way', '1.00:00:00', '06:00:00', 'nurse-navigator'),
+      deadline('reassign-consultation', '1.00:00:00', '06:00:00', 'clinician'),
+      deadline('arrange-alternative-referral', '1.00:00:00', '04:00:00', 'clinician'),
+      deadline('rebook-appointment', '1.00:00:00', '06:00:00', 'receiving-clinician'),
+      deadline('start-treatment', '1.00:00:00', '06:00:00', 'receiving-clinician'),
+      deadline('decide-closure', '1.00:00:00', '06:00:00', 'receiving-clinician'),
+    ],
+    escalationLadder: [
+      { level: 1, escalateToRole: 'facility-lead', afterOverdue: '00:00:00', clinicallyApproved: false },
+      { level: 2, escalateToRole: 'coordinator', afterOverdue: '1.00:00:00', clinicallyApproved: false },
+    ],
+    closureRules: [
+      { reason: 'Treated', authorizedRoles: ['clinician', 'receiving-clinician'], isException: false, requiresEvidenceReference: true, requiresExceptionNote: false, requiresNextSurveillanceDate: false, minimumDocumentedAttempts: 0, citation: PLACEHOLDER_CITATION },
+      { reason: 'OnSurveillance', authorizedRoles: ['clinician', 'receiving-clinician'], isException: false, requiresEvidenceReference: true, requiresExceptionNote: false, requiresNextSurveillanceDate: true, minimumDocumentedAttempts: 0, citation: PLACEHOLDER_CITATION },
+      { reason: 'NegativeOnConfirmation', authorizedRoles: ['clinician', 'receiving-clinician'], isException: false, requiresEvidenceReference: true, requiresExceptionNote: false, requiresNextSurveillanceDate: false, minimumDocumentedAttempts: 0, citation: PLACEHOLDER_CITATION },
+      { reason: 'Declined', authorizedRoles: ['clinician', 'receiving-clinician'], isException: true, requiresEvidenceReference: false, requiresExceptionNote: true, requiresNextSurveillanceDate: false, minimumDocumentedAttempts: 0, citation: PLACEHOLDER_CITATION },
+      { reason: 'TransferredAndAccepted', authorizedRoles: ['clinician', 'receiving-clinician'], isException: true, requiresEvidenceReference: true, requiresExceptionNote: true, requiresNextSurveillanceDate: false, minimumDocumentedAttempts: 0, citation: PLACEHOLDER_CITATION },
+      { reason: 'Untraceable', authorizedRoles: ['clinician', 'receiving-clinician'], isException: true, requiresEvidenceReference: false, requiresExceptionNote: true, requiresNextSurveillanceDate: false, minimumDocumentedAttempts: 1, citation: PLACEHOLDER_CITATION },
+    ],
+    evidenceKinds: [
+      { kind: 'diagnosis', description: 'PLACEHOLDER - a confirmed diagnosis was documented at the source', clinicallyApproved: false, nextAction: null },
+      { kind: 'treatment-plan', description: 'PLACEHOLDER - a treatment plan was documented; treatment must then start by the start-treatment deadline', clinicallyApproved: false, nextAction: 'start-treatment' },
+      { kind: 'treatment-started', description: 'PLACEHOLDER - treatment started; the case returns to closure review', clinicallyApproved: false, nextAction: 'decide-closure' },
+      { kind: 'surveillance-started', description: 'PLACEHOLDER - the patient was placed on surveillance; the case returns to closure review', clinicallyApproved: false, nextAction: 'decide-closure' },
+    ],
+    changeLog: [
+      { version: '0.0.0-placeholder', date: '2026-11-13', approver: 'PLACEHOLDER - not clinically approved; drafted by the engineering team', summary: 'Placeholder definition for the prototype.' },
+      { version: '0.0.1-placeholder', date: '2026-11-13', approver: 'PLACEHOLDER - not clinically approved; drafted by the engineering team', summary: 'Reply deadlines for consultations, referrals and call-backs, and the kinds of outcome evidence.' },
+    ],
+  }
+}
+
+/**
+ * The five screening programmes of board 4, as \`GET /programmes\` returns them.
+ *
+ * @returns New objects every call. Every value is a placeholder waiting for a clinical adviser, as in
+ * the API's own pathway files.
+ */
+export function createProgrammes(): Programme[] {
+  return [
+    programme('bowel-screening', 'PLACEHOLDER - Bowel screening follow-up'),
+    programme('breast-screening', 'PLACEHOLDER - Breast screening follow-up'),
+    programme('cervical-screening', 'PLACEHOLDER - Cervical screening follow-up'),
+    programme('heart-kidney-diabetes', 'PLACEHOLDER - Heart, kidney and diabetes check follow-up'),
+    programme('lung-screening', 'PLACEHOLDER - Lung screening follow-up'),
+  ].map((item) =>
+    item.pathwayId === 'breast-screening'
+      ? {
+          ...item,
+          deadlines: [
+            ...item.deadlines.slice(0, 3),
+            deadline('acknowledge-notification', '1.00:00:00', '06:00:00', 'nurse-navigator', ROUTINE),
+            ...item.deadlines.slice(3),
+          ],
+        }
+      : item,
+  )
 }
