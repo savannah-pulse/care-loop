@@ -23,12 +23,12 @@ describe('App (smoke)', () => {
     }
   });
 
-  it('redirects the root route to the scenario runner placeholder', () => {
+  it('redirects the root route to the scenario runner', () => {
     rendered = renderAt(<App />, '/');
     expect(rendered.container.querySelector('h2')?.textContent).toBe(en.scenarioRunner.title);
   });
 
-  it('renders each placeholder screen with its translated title', () => {
+  it('renders each screen with its translated title', () => {
     const screens: [string, string][] = [
       ['/scenarios', en.scenarioRunner.title],
       ['/inbox', en.staffInbox.title],

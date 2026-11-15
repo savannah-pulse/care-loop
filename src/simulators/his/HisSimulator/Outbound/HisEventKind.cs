@@ -12,7 +12,7 @@ public enum HisEventKind
     /// <summary>A screening result: <c>DiagnosticReport</c> with <c>Observation</c>s. Opens a case in CareLoop.</summary>
     ScreeningResult,
 
-    /// <summary>A completed clinical review <c>Task</c> whose priority is the clinician-reviewed urgency.</summary>
+    /// <summary>A completed clinical review <c>Task</c> carrying the clinician-reviewed urgency extension.</summary>
     ClinicalReview,
 
     /// <summary>A consultation <c>ServiceRequest</c> plus <c>Task</c>: requested, accepted, rejected or completed.</summary>
@@ -29,4 +29,7 @@ public enum HisEventKind
 
     /// <summary>A closure decision: CareLoop's case <c>Task</c> set to completed plus a <c>Provenance</c> naming the authorizer.</summary>
     Closure,
+
+    /// <summary>A source-recorded caregiver consent grant or withdrawal.</summary>
+    ConsentRecorded,
 }

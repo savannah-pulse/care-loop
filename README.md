@@ -106,7 +106,7 @@ live runs, and applies database migrations at startup.
 
 ## Work on one part
 
-Prerequisites: .NET 10 SDK, Node.js 24 with npm for the dashboard, Node.js 22 with Corepack for the simulator
+Prerequisites: .NET 10 SDK, Node.js 24 with npm for the dashboard and Corepack/Yarn for the simulator
 ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for the AI workflow.
 
 | Part | Build and test |
@@ -118,6 +118,10 @@ ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for
 | Simulator ClientApps | in each `ClientApp/`: `corepack yarn install && corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build` |
 | Dashboard | `cd src/web && npm ci && npm run dev` |
 | AI workflow | see [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
+
+The HIS simulator now supports headless HIS replay, source clinician actions, a staff inbox and exact FHIR logs.
+See its [demo and test guide](src/simulators/his/README.md). Replay completion does not assert completed care:
+patient behaviour, cohort expansion and full screening-to-care E2E assertions remain WS8/WS10.
 
 When the API's routes or contracts change, rebuild the API: the build rewrites `contracts/openapi/careloop.json`, and
 CI fails if the committed document is out of date.

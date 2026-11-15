@@ -1,10 +1,55 @@
-import { describe, it } from 'vitest';
+import { act } from 'react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FhirLogPage } from '../../src/features/fhir-log';
+import { fill, flush, get, renderAt } from './render';
+import type { RenderResult } from './render';
 
-// TODO(WS-7): implement these once the screen is built.
 describe('FhirLogPage', () => {
-  it.todo('lists sent and received messages');
-  it.todo('filters by direction');
-  it.todo('filters by case');
-  it.todo('shows the HTTP status of sent messages');
-  it.todo('shows the FHIR JSON body of a selected message');
+  let rendered: RenderResult;
+  afterEach(() => {
+    rendered.unmount();
+    vi.unstubAllGlobals();
+  });
+  it('shows exact rejected request and response bodies with direction and case filters', async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            entries: [
+              {
+                id: 'log-1',
+                direction: 'sent',
+                method: 'PUT',
+                resourceType: 'Task',
+                statusCode: 422,
+                caseRef: 'run/c1',
+                at: '2026-01-01T12:00:00Z',
+                body: '{"resourceType":"Task"}',
+                responseBody: '{"resourceType":"OperationOutcome"}',
+              },
+            ],
+          }),
+        ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    rendered = renderAt(<FhirLogPage />);
+    await flush();
+    act(() => {
+      get<HTMLButtonElement>(rendered.container, 'button').click();
+    });
+    expect(
+      Array.from(rendered.container.querySelectorAll('pre'), (element) => element.textContent),
+    ).toEqual(['{"resourceType":"Task"}', '{"resourceType":"OperationOutcome"}']);
+    fill(rendered.container, 'direction', 'received');
+    await flush();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('direction=received'))).toBe(
+      true,
+    );
+    fill(rendered.container, 'caseRef', 'run/c1');
+    await flush();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('caseRef=run%2Fc1'))).toBe(
+      true,
+    );
+  });
 });

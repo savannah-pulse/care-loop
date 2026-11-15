@@ -1,35 +1,36 @@
+using HisSimulator.Outbound;
+using FhirTask = Hl7.Fhir.Model.Task;
+
 namespace HisSimulator.Tests.Outbound;
 
-/// <summary>Planned behaviour of <c>ReferralBuilder</c> (ServiceRequest plus Task).</summary>
 public sealed class ReferralBuilderTests
 {
-    [Fact(Skip = "WS7: not implemented")]
-    public void BuildServiceRequest_returns_referral_request_for_the_synthetic_patient()
+    private readonly ReferralBuilder _builder = new();
+    [Fact] public void BuildServiceRequest_returns_referral_request_for_the_synthetic_patient()
     {
+        var resource = _builder.BuildServiceRequest(SimulatorTestData.Case,
+            SimulatorTestData.With(SimulatorTestData.Request(), "receivingFacility", "SYN-FAC-B"));
+        Assert.Equal("Patient/SYN-PT-1", resource.Subject!.Reference); Assert.Equal("referral", resource.Category[0].Coding[0].Code);
+        Assert.Equal("Organization/SYN-FAC-B", Assert.Single(resource.Performer).Reference);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void BuildTask_maps_requested_accepted_rejected_and_completed_statuses()
+    [Theory] [InlineData("requested", FhirTask.TaskStatus.Requested)] [InlineData("accepted", FhirTask.TaskStatus.Accepted)]
+    [InlineData("rejected", FhirTask.TaskStatus.Rejected)] [InlineData("completed", FhirTask.TaskStatus.Completed)]
+    public void BuildTask_maps_requested_accepted_rejected_and_completed_statuses(string status, FhirTask.TaskStatus expected) =>
+        Assert.Equal(expected, _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.With(SimulatorTestData.Request(status: status), "reason", "SIMULATED rejection")).Status);
+    [Fact] public void BuildTask_keeps_one_id_and_changes_version_per_state()
     {
+        var one = _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request());
+        var two = _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request(key: "s2", status: "accepted"));
+        Assert.Equal(one.Id, two.Id); Assert.NotEqual(one.Meta!.VersionId, two.Meta!.VersionId);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void BuildTask_keeps_one_id_and_changes_version_per_state()
+    [Fact] public void BuildTask_rejected_carries_status_reason() =>
+        Assert.Equal("SIMULATED rejection", _builder.BuildTask(SimulatorTestData.Case,
+            SimulatorTestData.With(SimulatorTestData.Request(status: "rejected"), "reason", "SIMULATED rejection")).StatusReason!.Text);
+    [Fact] public void BuildTask_rejects_an_unsupported_status() =>
+        Assert.Throws<ArgumentException>(() => _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request(status: "invented")));
+    [Fact] public void Built_resources_are_tagged_as_simulated()
     {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void BuildTask_rejected_carries_status_reason()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void BuildTask_rejects_an_unsupported_status()
-    {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Built_resources_are_tagged_as_simulated()
-    {
+        SimulatorTestData.Tagged(_builder.BuildServiceRequest(SimulatorTestData.Case, SimulatorTestData.Request()));
+        SimulatorTestData.Tagged(_builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request()));
     }
 }

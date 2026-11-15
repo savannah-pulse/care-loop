@@ -1,8 +1,5 @@
 import type { HealthResponse } from './types';
 
-// TODO(WS-7): add typed functions for GET /scenarios, POST /scenarios/{name}/run,
-// GET /scenarios/runs/{runId}, GET /staff-inbox, GET /fhir-log, GET /cases and POST /actions/*.
-
 /**
  * Reads the simulator's liveness endpoint.
  *
