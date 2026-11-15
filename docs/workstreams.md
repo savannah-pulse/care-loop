@@ -232,9 +232,10 @@ aggregate measures but case reads only for open coordinator escalations, with na
 Confidence is rating participation with the latest-rating average separately reported; all durations are clock time.
 Historical metrics use applied snapshots and the shared Domain display-label rule.
 
-Validation: 98 focused API/Domain/deadline tests passed. The dashboard is the designed one from PR #29, connected to
-these endpoints when this branch was merged into `feature/web-careloop-screens` (product manager's decision, 15 November
-2026); the first dashboard's 25 tests were ported to its Vitest suite, and lint, type-check, unit tests and build pass.
+Validation: 98 focused API/Domain/deadline tests passed. The dashboard is the designed one from PR #29 (the web app was
+given to Birir at the 13 November sync), connected to these endpoints by merging this branch into
+`feature/web-careloop-screens`; the first dashboard's 25 tests were ported to its Vitest suite, and lint, type-check,
+unit tests and build pass.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/
