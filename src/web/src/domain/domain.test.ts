@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { caseSummary, timelineEntry } from '../testing/builders'
-import { caseNumber, describePatient } from './patients'
+import { caseLinkNames, caseNumber, describePatient } from './patients'
 import { DISPLAY_LABELS, displayLabelText, displayStepIndex, isDisplayLabel } from './stages'
 import { hasOwnReason, sourceLabel, timelineEntryTitle, timelineSource } from './timeline'
 
@@ -82,5 +82,33 @@ describe('timeline (C3)', () => {
       timelineEntryTitle(timelineEntry({ reason: 'Overdue deadline checked; exception flags or escalation steps raised' }), STAFF_ROLE),
     ).toBe('Deadline reached')
     expect(timelineEntryTitle(timelineEntry({ reason: 'Deadline warning raised' }), STAFF_ROLE)).toBe('Deadline warning raised')
+  })
+})
+
+describe('case link names', () => {
+  const subject = (caseId: string, programme: string, role: string = STAFF_ROLE) => ({
+    caseId,
+    patient: describePatient(caseSummary({ caseId }), role),
+    programme,
+  })
+
+  it('adds the programme, then the case number, only where two links would still read the same', () => {
+    expect(
+      caseLinkNames([
+        subject('1a2b3c4d-0000-4000-8000-000000000001', 'Breast screening'),
+        subject('2b3c4d5e-0000-4000-8000-000000000002', 'Breast screening'),
+        subject('3c4d5e6f-0000-4000-8000-000000000003', 'Bowel screening'),
+      ]),
+    ).toEqual([
+      `Hessa Al Dhaheri, MRN 100${NBSP}245${NBSP}891, Breast screening, Case 1A2B3C4D`,
+      `Hessa Al Dhaheri, MRN 100${NBSP}245${NBSP}891, Breast screening, Case 2B3C4D5E`,
+      `Hessa Al Dhaheri, MRN 100${NBSP}245${NBSP}891, Bowel screening`,
+    ])
+  })
+
+  it('names the coordinator’s links by case number alone, with no MRN even if the API sent one', () => {
+    expect(caseLinkNames([subject('1a2b3c4d-0000-4000-8000-000000000001', 'Breast screening', 'coordinator')])).toEqual([
+      'Case 1A2B3C4D',
+    ])
   })
 })

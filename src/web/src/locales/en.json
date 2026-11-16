@@ -5,7 +5,8 @@
     "skipToContent": "Skip to main content"
   },
   "common": {
-    "separator": " · "
+    "separator": " · ",
+    "listSeparator": ", "
   },
   "nav": {
     "label": "Main",

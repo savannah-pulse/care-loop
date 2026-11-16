@@ -1,5 +1,6 @@
 import type { CaseSummary } from '../../data'
 import {
+  caseLinkNames,
   caseStatus,
   describePatient,
   displayLabelText,
@@ -77,6 +78,11 @@ export interface WorklistRow {
   readonly due?: Date
   /** The patient: their name and MRN, a friendly number, or a case number when names are hidden. */
   readonly patient: PatientView
+  /**
+   * The name of the link to the case: the patient as shown, with the MRN and, where needed, more,
+   * so no two links on the worklist share a name (see `caseLinkNames`).
+   */
+  readonly linkName: string
   /** The programme's name. */
   readonly programme: string
   /** The display stage the API reports, in plain words, for example `Follow-up`. */
@@ -90,10 +96,11 @@ export interface WorklistRow {
  *
  * @param cases - The cases from `GET /cases`.
  * @param viewerRole - The role of the person reading, which decides whether names are hidden.
- * @returns One row per case that is not closed, in the order given.
+ * @returns One row per case that is not closed, in the order given, each with a link name no other
+ * row has.
  */
 export function toWorklistRows(cases: readonly CaseSummary[], viewerRole: string): WorklistRow[] {
-  return cases
+  const rows = cases
     .filter((summary) => summary.stage !== 'Closed')
     .map((summary) => ({
       summary,
@@ -105,6 +112,10 @@ export function toWorklistRows(cases: readonly CaseSummary[], viewerRole: string
       stage: displayLabelText(summary.displayLabel),
       reason: nextActionReason(summary),
     }))
+  const linkNames = caseLinkNames(
+    rows.map((row) => ({ caseId: row.summary.caseId, patient: row.patient, programme: row.programme })),
+  )
+  return rows.map((row, index) => ({ ...row, linkName: linkNames[index] }))
 }
 
 /**

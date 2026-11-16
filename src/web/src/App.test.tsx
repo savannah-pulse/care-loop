@@ -43,7 +43,7 @@ describe('who is acting', () => {
   it('sends the next person’s identity as soon as they sign in, with no facility for the programme coordinator', async () => {
     answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'] })]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
-    await screen.findByRole('link', { name: 'Hessa Al Dhaheri' })
+    await screen.findByRole('link', { name: 'Hessa Al Dhaheri, MRN 100\u00a0245\u00a0891' })
     const before = sentRequests().length
 
     await user.click(screen.getByRole('button', { name: (label) => label.startsWith('Signed in as') }))

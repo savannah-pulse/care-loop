@@ -125,3 +125,59 @@ export function resultSourceText(sourceResultId: string, viewerRole: string): st
 export function outcomeEvidenceText(reference: string, viewerRole: string): string {
   return namesHiddenFor(viewerRole) ? t('case.outcomeEvidenceHidden') : t('case.outcomeEvidence', { reference })
 }
+
+/** What {@link caseLinkNames} needs to know about each case in a list. */
+export interface CaseLinkSubject {
+  /** CareLoop's identifier of the case. */
+  readonly caseId: string
+  /** The case's patient, as {@link describePatient} describes them to the reader. */
+  readonly patient: PatientView
+  /** The name of the case's programme, for example `Breast screening`. */
+  readonly programme: string
+}
+
+/**
+ * Names the links to the cases in a list, so that each starts with the patient as shown on screen
+ * and no two are the same.
+ *
+ * @param cases - The cases in the list, in any order.
+ * @returns One name per case, in the same order: the patient's name with their MRN, for example
+ * `Hessa Al Dhaheri, MRN 100 245 891`, or just what is shown where there is no MRN, such as the
+ * case number where names are hidden. Where two cases would still share a name, as when one
+ * patient has two open cases, the programme is added, then the case number.
+ *
+ * @remarks
+ * Screen-reader users move between links by their names, so no two links to different cases may
+ * read the same, and each name starts with the words on screen, so people using speech can say
+ * what they see (WCAG 2.5.3, label in name).
+ *
+ * @example
+ * ```ts
+ * caseLinkNames([{ caseId, patient: describePatient(summary, 'nurse-navigator'), programme: 'Breast screening' }])
+ * // ["Hessa Al Dhaheri, MRN 100 245 891"]
+ * ```
+ */
+export function caseLinkNames(cases: readonly CaseLinkSubject[]): string[] {
+  const separator = t('common.listSeparator')
+  const names = cases.map((item) =>
+    !item.patient.hidden && item.patient.identifier ? [item.patient.name, item.patient.identifier] : [item.patient.name],
+  )
+  const tiebreakers: readonly ((item: CaseLinkSubject) => string)[] = [
+    (item) => item.programme,
+    (item) => t('patient.case', { number: caseNumber(item.caseId) }),
+  ]
+  for (const tiebreaker of tiebreakers) {
+    const counts = new Map<string, number>()
+    for (const parts of names) {
+      const name = parts.join(separator)
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    names.forEach((parts, index) => {
+      const extra = tiebreaker(cases[index])
+      if ((counts.get(parts.join(separator)) ?? 0) > 1 && !parts.includes(extra)) {
+        parts.push(extra)
+      }
+    })
+  }
+  return names.map((parts) => parts.join(separator))
+}

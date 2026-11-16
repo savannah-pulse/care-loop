@@ -26,29 +26,49 @@ const MARIAM = caseSummary({
   patientSecondaryIdentifier: '100245894',
   urgency: 'PLACEHOLDER-URGENCY-B',
 })
+const MARIAM_BOWEL = caseSummary({
+  ...MARIAM,
+  caseId: '5e6f7a8b-4444-4444-8444-100245894005',
+  pathwayId: 'bowel-screening',
+})
+const NAMESAKE = caseSummary({
+  caseId: '6f7a8b9c-6666-4666-8666-100245896006',
+  patientReference: 'p-100245896',
+  patientDisplayName: 'Mariam Al Mansoori',
+  patientSecondaryIdentifier: '100245896',
+  exceptions: ['Overdue'],
+})
 
 function caseLinks(): HTMLElement[] {
   return screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#/cases/'))
+}
+
+function mrn(digits: string): string {
+  return `MRN ${digits.slice(0, 3)}\u00a0${digits.slice(3, 6)}\u00a0${digits.slice(6)}`
 }
 
 describe('worklist', () => {
   it.each([
     ['in tables, on a wide screen', 1024],
     ['on cards, on a narrow screen', 640],
-  ])('names every case by its patient %s, so no two share a name', async (_layout, width) => {
-    answer('GET /cases', json([HESSA, NOURA, UNNAMED, MARIAM]))
+  ])('names every case by its patient and MRN %s, so no two share a name', async (_layout, width) => {
+    answer('GET /cases', json([HESSA, NOURA, UNNAMED, MARIAM, MARIAM_BOWEL, NAMESAKE]))
     renderApp({ at: '#/', as: 'huda-saleh', width })
-    await screen.findByRole('link', { name: 'Hessa Al Dhaheri' })
+    await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })
 
     expect(screen.queryAllByRole('table').length > 0).toBe(width >= 900)
-    const expected: ReadonlyArray<readonly [string | RegExp, string]> = [
-      ['Hessa Al Dhaheri', HESSA.caseId],
-      ['Noura Al Shamsi', NOURA.caseId],
-      [/^Patient 100.245.893$/, UNNAMED.caseId],
-      ['Mariam Al Mansoori', MARIAM.caseId],
+    const expected: ReadonlyArray<readonly [string, string]> = [
+      [`Hessa Al Dhaheri, ${mrn('100245891')}`, HESSA.caseId],
+      [`Noura Al Shamsi, ${mrn('100245892')}`, NOURA.caseId],
+      ['Patient 100\u00a0245\u00a0893', UNNAMED.caseId],
+      [`Mariam Al Mansoori, ${mrn('100245894')}, Breast screening`, MARIAM.caseId],
+      [`Mariam Al Mansoori, ${mrn('100245894')}, Bowel screening`, MARIAM_BOWEL.caseId],
+      [`Mariam Al Mansoori, ${mrn('100245896')}`, NAMESAKE.caseId],
     ]
     for (const [name, caseId] of expected) {
-      expect(screen.getByRole('link', { name })).toHaveAttribute('href', `#/cases/${caseId}`)
+      const link = screen.getByRole('link', { name })
+      expect(link).toHaveAttribute('href', `#/cases/${caseId}`)
+      expect(name.startsWith(link.textContent ?? '')).toBe(true)
     }
     expect(caseLinks()).toHaveLength(expected.length)
   })
@@ -71,7 +91,7 @@ describe('worklist', () => {
       return json(facilityId === 'regional-hospital' ? [theirs] : [HESSA])
     })
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
-    await screen.findByRole('link', { name: 'Hessa Al Dhaheri' })
+    await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })
 
     await user.click(screen.getByRole('button', { name: "View another team's cases" }))
     const dialog = screen.getByRole('dialog', { name: "View another team's cases" })
@@ -83,7 +103,7 @@ describe('worklist', () => {
     await user.click(within(dialog).getByRole('radio', { name: 'I am covering for a colleague there today' }))
     await user.click(within(dialog).getByRole('button', { name: 'Show their cases' }))
 
-    expect(await screen.findByRole('link', { name: 'Shamma Al Kaabi' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: `Shamma Al Kaabi, ${mrn('100245895')}` })).toBeInTheDocument()
     const listRead = sentRequests('GET /cases').at(-1)
     expect(listRead?.query.get('facilityId')).toBe('regional-hospital')
     expect(listRead?.query.get('reason')).toBe('I am covering for a colleague there today')
@@ -94,7 +114,7 @@ describe('worklist', () => {
 
     answer(`GET /cases/${theirs.caseId}`, json(caseDetail({ ...theirs })))
     answer(`GET /cases/${theirs.caseId}/timeline`, json([]))
-    await user.click(screen.getByRole('link', { name: 'Shamma Al Kaabi' }))
+    await user.click(screen.getByRole('link', { name: `Shamma Al Kaabi, ${mrn('100245895')}` }))
     expect(await screen.findByRole('heading', { level: 1, name: 'Shamma Al Kaabi' })).toBeInTheDocument()
     for (const route of [`GET /cases/${theirs.caseId}`, `GET /cases/${theirs.caseId}/timeline`]) {
       expect(sentRequests(route).map((request) => request.query.get('reason'))).toEqual([
