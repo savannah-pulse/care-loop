@@ -17,4 +17,7 @@ public enum PatientResponseKind
 
     /// <summary>The patient asks to be called; CareLoop raises a next action for the current owner.</summary>
     CallMe,
+
+    /// <summary>The patient rates their confidence from 1 to 5 (C10). A measure, never an acknowledgement.</summary>
+    ConfidenceRating,
 }

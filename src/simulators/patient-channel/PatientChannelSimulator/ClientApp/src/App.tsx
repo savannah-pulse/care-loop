@@ -9,6 +9,9 @@ import { MessageLogPage } from './features/message-log';
 import { ScenarioRunnerPage } from './features/scenario-runner';
 import { ROUTES } from './routes';
 
+/** How often the inbox and a scenario run are re-read, so reactions appear without a refresh. */
+const POLL_INTERVAL_MS = 2000;
+
 /**
  * The patient-channel simulator shell: simulated-data banner, navigation and one route per screen.
  *
@@ -28,10 +31,13 @@ export function App() {
       </header>
       <main className="app-main">
         <Routes>
-          <Route path={ROUTES.inbox} element={<InboxPage />} />
+          <Route path={ROUTES.inbox} element={<InboxPage pollIntervalMs={POLL_INTERVAL_MS} />} />
           <Route path={ROUTES.caseStatus} element={<CaseStatusPage />} />
           <Route path={ROUTES.patientBehaviours} element={<PatientBehavioursPage />} />
-          <Route path={ROUTES.scenarioRunner} element={<ScenarioRunnerPage />} />
+          <Route
+            path={ROUTES.scenarioRunner}
+            element={<ScenarioRunnerPage pollIntervalMs={POLL_INTERVAL_MS} />}
+          />
           <Route path={ROUTES.messageLog} element={<MessageLogPage />} />
         </Routes>
       </main>

@@ -1,3 +1,5 @@
+using Hl7.Fhir.Utility;
+
 namespace PatientChannelSimulator.Outbound;
 
 /// <summary>
@@ -27,11 +29,25 @@ public sealed class CaseStatusReader
     /// <param name="ct">Cancels the call.</param>
     /// <returns>The patient-facing status, or <see langword="null"/> when CareLoop has no such task.</returns>
     /// <exception cref="HttpRequestException">CareLoop could not be reached.</exception>
-    public Task<PatientCaseStatus?> ReadAsync(string taskId, CancellationToken ct)
+    /// <exception cref="FormatException">CareLoop's answer was not a valid FHIR <c>Task</c>.</exception>
+    public async Task<PatientCaseStatus?> ReadAsync(string taskId, CancellationToken ct)
     {
-        // TODO(WS-8): call CareLoopFhirClient.GetTaskAsync and map status, businessStatus, statusReason,
-        // restriction.period.end and lastModified into PatientCaseStatus.
-        _ = _careLoop;
-        throw new NotImplementedException("WS8: CaseStatusReader.ReadAsync");
+        var task = await _careLoop.GetTaskAsync(taskId, ct);
+        if (task is null)
+        {
+            return null;
+        }
+
+        // Only coordination fields are copied. Owner, requester, focus, input and output stay behind.
+        return new PatientCaseStatus(
+            TaskId: task.Id ?? taskId,
+            TaskStatus: task.Status?.GetLiteral() ?? "unknown",
+            Stage: FirstNonBlank(task.BusinessStatus?.Coding.Select(c => c.Code), task.BusinessStatus?.Text),
+            StatusReason: FirstNonBlank([task.StatusReason?.Text], FirstNonBlank(task.StatusReason?.Coding.Select(c => c.Display ?? c.Code), null)),
+            DueBy: task.Restriction?.Period?.EndElement?.ToDateTimeOffset(TimeSpan.Zero),
+            LastUpdated: task.LastModifiedElement?.ToDateTimeOffset(TimeSpan.Zero) ?? task.Meta?.LastUpdated);
     }
+
+    private static string? FirstNonBlank(IEnumerable<string?>? candidates, string? fallback) =>
+        candidates?.FirstOrDefault(c => !string.IsNullOrWhiteSpace(c)) ?? (string.IsNullOrWhiteSpace(fallback) ? null : fallback);
 }

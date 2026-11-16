@@ -1,6 +1,5 @@
-# list
+# FHIR message log
 
-FHIR message log: shows every FHIR request and response exchanged between this simulator and CareLoop.
+Shows every FHIR exchange between this simulator and CareLoop, newest first, with the FHIR JSON of the selected exchange.
 
-Status: placeholder (`TODO(WS-8)`). All text comes from `src/locales/en.json` under `messageLog.*`.
-All data shown is simulated.
+All text comes from `src/locales/en.json` under `messageLog.*`. All data shown is simulated.

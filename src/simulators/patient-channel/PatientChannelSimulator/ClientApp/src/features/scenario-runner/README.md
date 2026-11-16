@@ -1,6 +1,5 @@
-# scenario-runner
+# Scenario runner
 
-Scenario runner: lists the shared scenario files, puts the patient behaviours of one in force, and shows how those patients react as CareLoop's notifications arrive. It sends nothing to CareLoop by itself.
+Lists the shared scenarios, puts the patient behaviours of one in force and shows each reaction as notifications arrive. A run sends nothing by itself, and a cohort scenario cannot be run here.
 
-Status: placeholder (`TODO(WS-8)`). All text comes from `src/locales/en.json` under `scenarioRunner.*`.
-All data shown is simulated.
+All text comes from `src/locales/en.json` under `scenarioRunner.*`. All data shown is simulated.

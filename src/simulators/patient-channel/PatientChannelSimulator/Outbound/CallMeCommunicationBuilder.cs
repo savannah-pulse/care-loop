@@ -11,8 +11,9 @@ namespace PatientChannelSimulator.Outbound;
 /// A call-me request is not an acknowledgement: CareLoop raises a next action for the current
 /// case owner and keeps its clocks running.
 /// Every built resource is tagged as simulated (<see cref="CommunicationCodes.SimulatedTagCode"/>),
-/// points back to the originating request through <c>basedOn</c>, and carries a deterministic
-/// <c>identifier</c> so CareLoop deduplicates a resend of the same event.
+/// points back to the originating request through <c>basedOn</c> and to the case <c>Task</c> through
+/// <c>about</c>, and has a deterministic id and <c>meta.versionId</c> so CareLoop deduplicates a
+/// resend of the same event.
 /// </remarks>
 public sealed class CallMeCommunicationBuilder
 {
@@ -24,7 +25,11 @@ public sealed class CallMeCommunicationBuilder
     /// <returns>A FHIR R4 <c>Communication</c> ready to send to CareLoop.</returns>
     public Communication Build(InboxMessage message, DateTimeOffset occurredAt)
     {
-        // TODO(WS-8): build a Communication from the patient with status completed, category CallMe, basedOn the CommunicationRequest, the simulated tag and a deterministic identifier.
-        throw new NotImplementedException("WS8: CallMeCommunicationBuilder.Build");
+        ArgumentNullException.ThrowIfNull(message);
+
+        // A patient may ask for a call more than once. Each request is its own event, so it gets
+        // the next version; a resend of the same request reuses the version and is deduplicated.
+        return CommunicationFactory.PatientResponse(
+            message, occurredAt, CommunicationCodes.CallMe, CommunicationFactory.CallMeSuffix, version: message.CallRequestCount + 1);
     }
 }

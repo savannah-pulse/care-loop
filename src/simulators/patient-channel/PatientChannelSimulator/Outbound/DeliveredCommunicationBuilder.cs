@@ -11,8 +11,9 @@ namespace PatientChannelSimulator.Outbound;
 /// Delivery is a transport fact only: it is not an acknowledgement, so this resource must never
 /// carry a patient-response category and never stops a CareLoop deadline.
 /// Every built resource is tagged as simulated (<see cref="CommunicationCodes.SimulatedTagCode"/>),
-/// points back to the originating request through <c>basedOn</c>, and carries a deterministic
-/// <c>identifier</c> so CareLoop deduplicates a resend of the same event.
+/// points back to the originating request through <c>basedOn</c> and to the case <c>Task</c> through
+/// <c>about</c>, and has a deterministic id and <c>meta.versionId</c> so CareLoop deduplicates a
+/// resend of the same event.
 /// </remarks>
 public sealed class DeliveredCommunicationBuilder
 {
@@ -24,7 +25,6 @@ public sealed class DeliveredCommunicationBuilder
     /// <returns>A FHIR R4 <c>Communication</c> ready to send to CareLoop.</returns>
     public Communication Build(InboxMessage message, DateTimeOffset occurredAt)
     {
-        // TODO(WS-8): build a Communication with status completed, category DeliveryStatus, basedOn the CommunicationRequest, subject the patient, sent = occurredAt, the simulated tag and a deterministic identifier.
-        throw new NotImplementedException("WS8: DeliveredCommunicationBuilder.Build");
+        return CommunicationFactory.TransportReport(message, occurredAt, EventStatus.Completed);
     }
 }

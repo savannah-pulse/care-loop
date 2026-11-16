@@ -19,6 +19,20 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// The host's own route prefixes are never client-side routes: an unknown path under one of them is
+// a wrong address and answers 404, not the ClientApp shell with 200.
+app.Use(async (context, next) =>
+{
+    if (context.GetEndpoint()?.Metadata.GetMetadata<ClientAppFallback>() is not null
+        && ClientAppFallback.IsHostPath(context.Request.Path))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    await next(context);
+});
+
 app.MapOpenApi();
 
 // Serves the built ClientApp from wwwroot when it exists; harmless when it does not.
@@ -39,6 +53,12 @@ app.MapScenarioEndpoints();
 
 // Single-page-app fallback: unknown GET paths return the ClientApp shell so client-side routes
 // survive a refresh. Returns 404 when the ClientApp has not been built into wwwroot.
-app.MapFallbackToFile("index.html");
+app.MapFallbackToFile("index.html").WithMetadata(ClientAppFallback.Instance);
 
 app.Run();
+
+/// <summary>
+/// The simulator's entry point. Declared public so the test project can host the real
+/// application in memory.
+/// </summary>
+public partial class Program;

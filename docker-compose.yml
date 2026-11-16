@@ -103,6 +103,8 @@ services:
       ASPNETCORE_URLS: http://+:8080
       CareLoop__FhirBaseUrl: http://api:8080/fhir
       CareLoop__NotificationCallbackUrl: http://api:8080/notifications/inbound/simulator
+      # Signs every callback; must equal the API's Notifications__Simulator__InboundSecret above.
+      CareLoop__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
       Scenarios__Directory: /app/scenarios
       Scenarios__RealSecondsPerScenarioHour: "2"
     ports:

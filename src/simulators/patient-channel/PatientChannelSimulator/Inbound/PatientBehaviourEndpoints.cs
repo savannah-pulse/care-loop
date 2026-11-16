@@ -7,7 +7,8 @@ namespace PatientChannelSimulator.Inbound;
 /// </summary>
 /// <remarks>
 /// A scenario run sets the behaviours of its patients. These routes are for doing the same by
-/// hand, and for changing the default that applies to every other patient.
+/// hand, and for changing the default that applies to every other patient. A change applies to
+/// notifications received from then on; messages already in the inbox keep what happened to them.
 /// </remarks>
 public static class PatientBehaviourEndpoints
 {
@@ -20,62 +21,63 @@ public static class PatientBehaviourEndpoints
     {
         var group = routes.MapGroup("/api/patient-behaviours").WithTags("Patient behaviours");
 
-        group.MapGet("/", () =>
-            {
-                // TODO(WS-8): return SimulatorStore.GetBehaviours().
-                return NotImplementedResponse.For("GET /api/patient-behaviours");
-            })
+        group.MapGet("/", (SimulatorStore store) => TypedResults.Ok(store.GetBehaviours()))
             .WithName("ListPatientBehaviours")
             .WithSummary("Lists the patients that have a behaviour of their own (SIMULATED).")
-            .Produces<IReadOnlyList<PatientBehaviourAssignment>>()
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .Produces<IReadOnlyList<PatientBehaviourAssignment>>();
 
-        group.MapGet("/default", () =>
-            {
-                // TODO(WS-8): return SimulatorStore.GetDefaultBehaviour().
-                return NotImplementedResponse.For("GET /api/patient-behaviours/default");
-            })
+        group.MapGet("/default", (SimulatorStore store) => TypedResults.Ok(store.GetDefaultBehaviour()))
             .WithName("GetDefaultPatientBehaviour")
             .WithSummary("Reads the behaviour used for patients that have none of their own (SIMULATED).")
-            .Produces<PatientBehaviour>()
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .Produces<PatientBehaviour>();
 
-        group.MapPut("/default", (PatientBehaviour behaviour) =>
+        group.MapPut("/default", (PatientBehaviour behaviour, SimulatorStore store) =>
             {
-                // TODO(WS-8): validate (see PUT /{patientSyntheticId}), call SimulatorStore.SetDefaultBehaviour
-                // and return the stored behaviour.
-                return NotImplementedResponse.For("PUT /api/patient-behaviours/default");
+                if (PatientBehaviourRules.Check(behaviour) is { } problem)
+                {
+                    return Invalid(problem);
+                }
+
+                var stored = behaviour with { Simulated = true };
+                store.SetDefaultBehaviour(stored);
+                return Results.Ok(stored);
             })
             .WithName("SetDefaultPatientBehaviour")
             .WithSummary("Changes the behaviour used for patients that have none of their own (SIMULATED).")
             .Produces<PatientBehaviour>()
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
-        group.MapPut("/{patientSyntheticId}", (string patientSyntheticId, PatientBehaviour behaviour) =>
+        group.MapPut("/{patientSyntheticId}", (string patientSyntheticId, PatientBehaviour behaviour, SimulatorStore store) =>
             {
-                // TODO(WS-8): reject an identifier not prefixed SYN-, Fail without a reason, a response other
-                // than None when delivery is not Deliver, a negative RespondAfter and RespondToNotification
-                // below 1; then call SimulatorStore.SetBehaviour and return the stored assignment.
-                return NotImplementedResponse.For("PUT /api/patient-behaviours/{patientSyntheticId}");
+                if (!PatientBehaviourRules.IsSynthetic(patientSyntheticId))
+                {
+                    return Invalid($"The patient identifier must be synthetic (prefixed {PatientBehaviourRules.SyntheticPrefix}). The simulator only handles simulated data.");
+                }
+
+                if (PatientBehaviourRules.Check(behaviour) is { } problem)
+                {
+                    return Invalid(problem);
+                }
+
+                var assignment = new PatientBehaviourAssignment(patientSyntheticId, behaviour with { Simulated = true }, ScenarioName: null);
+                store.SetBehaviour(assignment);
+                return Results.Ok(assignment);
             })
             .WithName("SetPatientBehaviour")
             .WithSummary("Sets how one patient reacts to notifications received from now on (SIMULATED).")
             .Produces<PatientBehaviourAssignment>()
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .ProducesProblem(StatusCodes.Status400BadRequest);
 
-        group.MapDelete("/{patientSyntheticId}", (string patientSyntheticId) =>
-            {
-                // TODO(WS-8): call SimulatorStore.RemoveBehaviour; 204 when removed, 404 when the patient had none.
-                return NotImplementedResponse.For("DELETE /api/patient-behaviours/{patientSyntheticId}");
-            })
+        group.MapDelete("/{patientSyntheticId}", (string patientSyntheticId, SimulatorStore store) =>
+                store.RemoveBehaviour(patientSyntheticId) ? Results.NoContent() : Results.NotFound())
             .WithName("RemovePatientBehaviour")
             .WithSummary("Removes a patient's own behaviour so the default applies again (SIMULATED).")
             .Produces(StatusCodes.Status204NoContent)
-            .Produces(StatusCodes.Status404NotFound)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented);
+            .Produces(StatusCodes.Status404NotFound);
 
         return routes;
     }
+
+    private static IResult Invalid(string detail) =>
+        Results.Problem(detail, statusCode: StatusCodes.Status400BadRequest, title: "The patient behaviour is not allowed.");
 }

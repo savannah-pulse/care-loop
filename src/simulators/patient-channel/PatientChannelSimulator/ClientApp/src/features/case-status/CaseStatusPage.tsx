@@ -1,13 +1,16 @@
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
-import { PlaceholderNotice } from '../../components';
-
-/** i18n keys of the behaviours planned for this screen. */
-const PLANNED_KEYS = ['caseStatus.planned.lookup', 'caseStatus.planned.status'] as const;
+import { ApiError, getCaseStatus } from '../../api';
+import type { PatientCaseStatus } from '../../api';
+import { SimulatedBadge } from '../../components';
+import { formatTime } from '../../format';
+import { errorMessage } from '../../hooks';
 
 /** Props for {@link CaseStatusPage}. */
 export interface CaseStatusPageProps {
-  /** Logical id of the case `Task` to show. When omitted the screen asks for one. */
+  /** Logical id of the case `Task` to show. When omitted the `taskId` query parameter is used, and otherwise the screen asks for one. */
   taskId?: string;
 }
 
@@ -15,18 +18,111 @@ export interface CaseStatusPageProps {
  * The patient's view of a case, read from the CareLoop case `Task`.
  *
  * @remarks
- * Shows coordination status only (stage, deadline, last update). It never shows a result,
- * diagnosis or urgency: the patient channel is not a clinical system. Placeholder until WS8.
+ * Shows coordination status only (stage, status, deadline, last update). It never shows a result,
+ * diagnosis, urgency or who owns the case: the patient channel is not a clinical system. Looking
+ * a case up makes one request to the simulator's host, which reads the `Task` from CareLoop.
  */
-export function CaseStatusPage(_props: CaseStatusPageProps) {
+export function CaseStatusPage({ taskId }: CaseStatusPageProps) {
   const { t } = useTranslation();
+  const [params] = useSearchParams();
+  const initial = taskId ?? params.get('taskId') ?? '';
+  const [input, setInput] = useState(initial);
+  // An object, so looking up the same identifier again is a new lookup and reads the status again.
+  const [lookup, setLookup] = useState({ taskId: initial });
+  const wanted = lookup.taskId;
+  const [status, setStatus] = useState<PatientCaseStatus | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // TODO(WS-8): add a Task id lookup and render the PatientCaseStatus returned by getCaseStatus().
+  useEffect(() => {
+    if (!wanted) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getCaseStatus(wanted)
+      .then((value) => {
+        if (!cancelled) {
+          setStatus(value);
+        }
+      })
+      .catch((failure: unknown) => {
+        if (!cancelled) {
+          setStatus(null);
+          setError(
+            failure instanceof ApiError && failure.status === 404
+              ? t('caseStatus.notFound')
+              : errorMessage(failure),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lookup, wanted, t]);
+
+  const lookUp = (event: FormEvent) => {
+    event.preventDefault();
+    setLookup({ taskId: input.trim() });
+  };
+
+  const fields: readonly (readonly [string, string | null])[] = status
+    ? [
+        ['taskId', status.taskId],
+        ['stage', status.stage],
+        ['taskStatus', status.taskStatus],
+        ['dueBy', status.dueBy && formatTime(status.dueBy)],
+        ['lastUpdated', status.lastUpdated && formatTime(status.lastUpdated)],
+        ['statusReason', status.statusReason],
+      ]
+    : [];
+
   return (
-    <section aria-labelledby="lookup-title">
-      <h2 id="lookup-title">{t('caseStatus.title')}</h2>
+    <section aria-labelledby="case-status-title">
+      <h2 id="case-status-title">{t('caseStatus.title')}</h2>
       <p>{t('caseStatus.description')}</p>
-      <PlaceholderNotice plannedKeys={PLANNED_KEYS} />
+
+      <form className="inline-form" onSubmit={lookUp}>
+        <label htmlFor="case-task-id">{t('caseStatus.taskIdLabel')}</label>
+        <input
+          id="case-task-id"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          autoComplete="off"
+        />
+        <button type="submit" disabled={loading || input.trim().length === 0}>
+          {t('caseStatus.lookUp')}
+        </button>
+      </form>
+
+      {loading && <p>{t('common.loading')}</p>}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+
+      {status && !loading && (
+        <article className="panel" aria-label={t('caseStatus.title')}>
+          <SimulatedBadge />
+          <dl className="field-list">
+            {fields.map(([key, value]) => (
+              <div key={key}>
+                <dt>{t(`caseStatus.fields.${key}`)}</dt>
+                <dd data-testid={`case-${key}`}>{value || t('caseStatus.notStated')}</dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+      )}
     </section>
   );
 }

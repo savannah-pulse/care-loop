@@ -15,7 +15,10 @@ public enum ScenarioRunStatus
     /// <summary>The patient behaviours are in force and the simulator is reacting to notifications as they arrive.</summary>
     Running,
 
-    /// <summary>The run was stopped and every reaction so far was accepted by CareLoop.</summary>
+    /// <summary>
+    /// The run was stopped and every reaction so far was accepted by CareLoop. Not used yet: the
+    /// simulator has no route that stops a run, so a run stays <see cref="Running"/> or becomes <see cref="Failed"/>.
+    /// </summary>
     Completed,
 
     /// <summary>At least one reaction could not be sent or was rejected by CareLoop.</summary>

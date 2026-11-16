@@ -11,8 +11,9 @@ namespace PatientChannelSimulator.Outbound;
 /// Understanding is a stronger statement than acknowledgement and is recorded as its own event;
 /// it must only be built from an explicit patient action or a scripted scenario step.
 /// Every built resource is tagged as simulated (<see cref="CommunicationCodes.SimulatedTagCode"/>),
-/// points back to the originating request through <c>basedOn</c>, and carries a deterministic
-/// <c>identifier</c> so CareLoop deduplicates a resend of the same event.
+/// points back to the originating request through <c>basedOn</c> and to the case <c>Task</c> through
+/// <c>about</c>, and has a deterministic id and <c>meta.versionId</c> so CareLoop deduplicates a
+/// resend of the same event.
 /// </remarks>
 public sealed class TeachBackCommunicationBuilder
 {
@@ -24,7 +25,7 @@ public sealed class TeachBackCommunicationBuilder
     /// <returns>A FHIR R4 <c>Communication</c> ready to send to CareLoop.</returns>
     public Communication Build(InboxMessage message, DateTimeOffset occurredAt)
     {
-        // TODO(WS-8): build a Communication from the patient with status completed, category TeachBack, basedOn the CommunicationRequest, the simulated tag and a deterministic identifier.
-        throw new NotImplementedException("WS8: TeachBackCommunicationBuilder.Build");
+        return CommunicationFactory.PatientResponse(
+            message, occurredAt, CommunicationCodes.TeachBack, CommunicationFactory.TeachBackSuffix, version: 1);
     }
 }

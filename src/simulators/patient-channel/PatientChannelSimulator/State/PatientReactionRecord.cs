@@ -11,7 +11,7 @@ namespace PatientChannelSimulator.State;
 /// <param name="PatientSyntheticId">Synthetic identifier of the patient who reacted.</param>
 /// <param name="Reaction">What was done.</param>
 /// <param name="Automatic">Whether the reaction came from the patient's behaviour (<see langword="true"/>) or from someone acting in the ClientApp.</param>
-/// <param name="SourceEventId">The deterministic identifier given to the emitted <c>Communication</c>; <see langword="null"/> when nothing was sent.</param>
+/// <param name="SourceEventId">The identity CareLoop deduplicates the emitted <c>Communication</c> on, <c>Communication/{id}/_history/{version}</c>; <see langword="null"/> when nothing was sent.</param>
 /// <param name="At">When the reaction happened, by the simulator clock.</param>
 /// <param name="HttpStatusCode">CareLoop's answer; <see langword="null"/> when nothing was sent or CareLoop could not be reached.</param>
 /// <param name="Succeeded">Whether the reaction was carried out; for one that sends, whether CareLoop accepted it.</param>

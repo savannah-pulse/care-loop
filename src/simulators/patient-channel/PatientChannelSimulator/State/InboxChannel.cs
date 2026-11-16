@@ -21,4 +21,10 @@ public enum InboxChannel
 
     /// <summary>A simulated patient-portal message. May carry the standard template.</summary>
     Portal,
+
+    /// <summary>
+    /// A simulated email. Caregiver copies land here (C13): they are read-only, and nothing done
+    /// with them is ever reported as the patient's.
+    /// </summary>
+    Email,
 }
