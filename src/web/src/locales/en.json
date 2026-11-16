@@ -729,6 +729,7 @@
     "since": "Since {date}",
     "noneOpen": "No open escalation",
     "ladderLabel": "When a step is late",
+    "ladderPartial": "The programme's escalation steps aren't available right now, so this shows only the escalations raised so far.",
     "rungStates": {
       "done": "done",
       "current": "where it is now",
