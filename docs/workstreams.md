@@ -276,7 +276,7 @@ Because the contracts already exist, every workstream can start now against the 
 - `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
 - `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
 - `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `POST /summaries/handoff` in `src/ai_workflow/`: owns the prompt, the response schema and the Foundry call. Specified in [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md); not built
+- `POST /summaries/handoff` in `src/ai_workflow/`: owns the prompt, the response schema and the Foundry call. Specified in [`ai-design/integration.md`](ai-design/integration.md); not built
 - `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
 Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. Neither route has an API key: both authenticate with Entra ID.
@@ -287,7 +287,7 @@ Since decision 15 (C20), the case holds `PatientDisplayName` and `PatientSeconda
 
 Two contract points are still open for WS9 (see the table below): summary approver roles, and the removed `Ai:AzureOpenAi` section and API key setting that `appsettings.json` and `docker-compose.yml` still carry.
 
-**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-spec.md`](ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
+**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`ai-design/integration.md`](ai-design/integration.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-design/ai-spec.md`](ai-design/ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
 
 ## WS10 Scenarios and end-to-end tests
 

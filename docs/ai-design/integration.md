@@ -1,8 +1,8 @@
-# API and AI workflow: the handoff summary
+# API and AI workflow integration: the handoff summary
 
 How the .NET API and the Python AI workflow service work together to draft a clinician handoff summary, what the API can and cannot do with AI, and what is built today.
 
-This is FR-11, and this document is the contract. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](ui-design-gap-analysis.md) section 5). [`ai-spec.md`](ai-spec.md) is the design proposal behind it and is superseded here where the two differ.
+This is FR-11, and this document is the contract. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](../ui-design-gap-analysis.md) section 5). [`ai-spec.md`](ai-spec.md) is the design proposal behind it and is superseded here where the two differ.
 
 ## The boundary
 
@@ -57,6 +57,36 @@ flowchart LR
 | `NoOp` | Default. AI is off. Drafting answers 409 and every other feature runs untouched |
 | `AiWorkflow` | The API calls the Python service, which calls Foundry |
 | `FoundryDirect` | The API calls a Foundry deployment itself |
+
+## Draft-request integration
+
+```mermaid
+sequenceDiagram
+    actor Clinician
+    participant UI as CareLoop review UI
+    participant API as .NET API
+    participant Store as Coordination store
+    participant AI as Python AI service
+    participant Foundry as Microsoft Foundry
+
+    Clinician->>UI: Request handoff draft
+    UI->>API: Authorized draft request
+    API->>Store: Load eligible finalized facts
+    Store-->>API: Facts and source references
+    API->>AI: Purpose-scoped JSON request
+    AI->>AI: Validate request and assemble versioned prompt
+    AI->>Foundry: Entra-authenticated inference
+    Foundry-->>AI: Model response
+    AI->>AI: Validate schema, citations and language
+    AI-->>API: Draft with source references or explicit failure
+    API->>API: Revalidate and persist draft, audit provenance
+    API-->>UI: Draft state and cited facts
+    Clinician->>UI: Edit, approve or reject
+    UI->>API: Review decision for exact draft version
+    API->>Store: Append review event
+```
+
+The design document also proposes patient-message drafting, Arabic translation and aggregate insight narratives. These remain governed extensions; they do not alter the implemented FR-11 boundary or allow the AI service to dispatch messages or mutate case state.
 
 ## What flows between them
 
