@@ -93,7 +93,7 @@ Some events can arrive at any stage without moving it: `NotificationUpdated/Call
 
 ![Who sees what](14-who-sees-what.png)
 
-Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines, who is responsible and links to records. Reports, images and notes stay in each hospital system, under that system's own access rules.
+Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines, who is responsible and links to records. Reports, images and notes stay in each hospital system, under that system's own access rules. Patients and the family members they name are reached by text message and email only, with no app or portal.
 
 | Person | Role in CareLoop | Sees | Can do | Cannot |
 |---|---|---|---|---|
@@ -119,6 +119,7 @@ The rules behind the table:
 - **Data stays in the UAE.** All patient data, backups and AI processing stay in the UAE (DoH Standard, 4.1.4; Federal Law No. 2 of 2019, Article 13).
 - **Written consent for anything beyond care.** Sharing with family, or research that names patients, needs the patient's written consent (DoH Standard, 4.2.3; Federal Law No. 2 of 2019, Article 16; HIPAA, 45 CFR 164.510(b)).
 - **Automated calls check who answered.** When automated calls are added, a call gives no details until the person who answers says they are the patient.
+- **Staff notices come by email or text message.** Staff are told about tasks and escalations at one address per role, kept in CareLoop's settings (decisions 27 and 28), not in the hospital system's inbox. Like every message, a notice never carries a result.
 
 ## Screens
 
