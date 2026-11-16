@@ -244,7 +244,9 @@ Known design question for WS1: once a level 2 escalation exists, level 1 can no 
 Confidence is rating participation with the latest-rating average separately reported; all durations are clock time.
 Historical metrics use applied snapshots and the shared Domain display-label rule.
 
-Validation: 560 API tests (34 skipped, all WS9/WS10) and 59 dashboard tests (jsdom interaction tests, run by CI) passed; dashboard lint/type-check/build passed.
+Validation: 560 API tests (34 skipped, all WS9/WS10) passed. The dashboard is the designed one from PR #29 (the web app
+was given to Birir at the 13 November sync), connected to these endpoints; it replaces the first dashboard, whose original
+25 tests were ported to its Vitest suite. Lint, type-check, unit tests and build run in CI.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/

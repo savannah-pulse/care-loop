@@ -1,75 +1,92 @@
 # CareLoop web
 
-The staff coordination dashboard: React, strict TypeScript and Vite. It reads CareLoop's REST API, never a simulator
-store, and does not make clinical decisions. Screen designs are in [docs/ui-design](../../docs/ui-design/README.md).
+CareLoop's own dashboard for staff: the worklist, a case, escalations, the AI handoff summary, impact and programmes (screens 1, 2, 17, 18, 3 and 4 in [docs/ui-design](../../docs/ui-design/README.md)). React 19, strict TypeScript and Vite. It reads and writes through the CareLoop REST API only, never a simulator's store, and makes no clinical decisions; the hospital-system and patient-channel screens belong to the simulators.
 
-## Run and configuration
+## Run it
 
-From this directory:
+From this folder:
 
-```sh
+```powershell
 npm ci
-npm run dev
+npm run dev                                                       # http://localhost:5173, /api forwarded to http://localhost:5080
+$env:CARELOOP_API_URL='http://localhost:8080'; npm run dev        # the API that Docker Compose publishes
+$env:CARELOOP_MOCK_API='1'; npm run dev                           # local data, no API needed
 ```
 
-Vite proxies `/api` to `http://localhost:5080`. Set `CARELOOP_API_URL` in the development server's environment to
-use another API. The Docker image serves the built dashboard through nginx and proxies `/api/` to `http://api:8080/`.
-Start the whole system with `docker compose up --build` at the repository root.
+In bash, use `CARELOOP_API_URL=http://localhost:8080 npm run dev` or `CARELOOP_MOCK_API=1 npm run dev`. The same works for `npm run preview` after `npm run build`.
 
-Enter a staff reference, role and facility in **Staff identity**. These become `X-Demo-User`, `X-Demo-Role` and
-`X-Demo-Facility` headers, not authentication. Staff reads default to their facility; cross-facility reads require
-an access reason. Coordinators see global measures and only cases with an open coordinator escalation, without
-names or MRNs. Identity changes clear mounted case/draft state and cancel old reads. Nothing is stored in browser
-storage. This prototype is not fit for real patient data; production requires real sign-in and authorization.
+- **Against the API.** The dev server forwards `/api/*`, without the `/api` prefix, to `CARELOOP_API_URL`: `http://localhost:5080` by default, where `dotnet run --project src/api/CareLoop.Api` starts the API. Docker Compose publishes the API on `http://localhost:8080`. The API has no CORS policy, so the browser always calls `/api` on the dashboard's own origin. In the container, nginx forwards `/api/` to the `api` service, and the dashboard is on <http://localhost:4173>; start everything with `docker compose up --build` at the repository root.
+- **Without the API.** `CARELOOP_MOCK_API=1` answers `/api` from `mock/`, typed against the generated API types, with the API's read rules: identity headers, the reader's facility, a reason for other facilities, the coordinator's narrower view without names, the clinician-only patient search, paging limits and who may acknowledge. It also answers the handoff summary and the comparison, which the API does not build yet (501), so those screens can be worked on; it returns the same measures for every facility. It runs only inside `vite` and `vite preview`; the app does not know it exists and the build never contains it. Changes last until the server stops. The fixtures' times (Thu 12 Nov 2026, 09:00 in Abu Dhabi) move to the moment the server starts; set `CARELOOP_MOCK_NOW=2026-11-12T09:00:00+04:00` to keep them.
 
-## Screens and boundaries
+## Configuration
 
-- Worklist: paged cases, full scoped exception queues, current-page search and recorded cross-facility access.
-- Case: API-provided display label, accountable owner, next action/deadline, parallel tracks and received-order audit
-  timeline with source attribution. Clinician roles can read the patient's other cases in the selected facility.
-- Escalations: configured ladder, notice history and explicit confirmation before acknowledging the current notice.
-  Acknowledgement never transfers ownership, clears flags or stops the clock.
-- Impact: rates with numerators and denominators, elapsed medians, historically observed labels and confidence
-  participation. Empty populations remain unmeasured. Simulation comparisons and AI insight narratives are deferred.
-- Programmes: current pathway definitions, deadlines, clinical approval, closure/evidence rules and change history.
-- Handoff summary: clinician-facing draft, source citations, missing facts, edited-text approval and rejection.
-  WS9 owns the backend/provider. Its current 501/unavailable replies are displayed as failures, never invented drafts.
-  Draft state is session-local; the dashboard does not imply durable latest-draft retrieval.
+| Setting | Where | Default | Purpose |
+|---|---|---|---|
+| `CARELOOP_API_URL` | `vite`, `vite preview` | `http://localhost:5080` | Where `/api` is forwarded |
+| `CARELOOP_MOCK_API` | `vite`, `vite preview` | unset | `1` answers `/api` from `mock/` instead |
+| `CARELOOP_MOCK_NOW` | `vite`, `vite preview` | server start | The moment the mock's fixtures describe |
 
-All UI copy uses the English catalogue; CSS uses logical properties. Source-authored identifiers and descriptions
-are displayed unchanged. Local and test data must be synthetic, but the dashboard has no simulated-data branches.
+Settings can also go in `.env.local`. Times are shown in Abu Dhabi time (`TIME_ZONE` in `src/format/time.ts`) on the 24-hour clock. All text is in `src/locales/en.json`; layouts use logical CSS so Arabic can follow.
 
-## Generate contracts and validate
+**Screen widths.** Every screen works from 640 px (a side panel) upwards without sideways scrolling, and content is at most 1200 px wide. Below 900 px the worklist shows one card per case, the case shows a compact stage bar, and filters and columns stack; from 900 px the worklist has a table per group and the case shows all ten stages; from 1200 px the worklist adds a status column and the case adds a side column. Controls are at least 44 px tall.
 
-Build the API to refresh [careloop.json](../../contracts/openapi/careloop.json), then:
+## Who sees what
 
-```sh
+The header's "Signed in as" menu offers six invented staff, remembered in this browser: Huda Saleh (nurse navigator), Dr. Rekha Varghese and Dr. Sara Al Hammadi (clinicians) and Joy Bautista (facility lead), all at the Family Health Centre; Dr. Layla Haddad (receiving clinician, General Hospital); and Dr. Obaid Al Suwaidi (programme coordinator, no facility). This is the API's prototype identity scheme; real sign-in replaces it before any real patient data.
+
+- **Identity.** Every call states the person, role and facility in `X-Demo-User`, `X-Demo-Role` and `X-Demo-Facility` (`src/data/client.ts`). The coordinator sends no facility. `X-Demo-User` is the person's reference without a FHIR type (`rekha-varghese`), the form the API stores staff in.
+- **Team and reasons.** Reads default to the person's facility. Opening a case at another facility first asks why, as on board 14 ("Opening a case outside your team"); the worklist's "View another team's cases" asks for the team and a reason. The reason goes as `reason` on every read of that case (case, timeline, other screening) and is remembered for this sign-in only. A refusal (403) reads calmly.
+- **Coordinator.** Sees measures for all facilities, and cases only while one is escalated to them, without names or MRNs: the screens say "Name hidden for your role" and show a case number.
+- **Names.** Staff see the patient's name with the MRN as the second identifier; without a name, a friendly number such as "Patient 100 245 891".
+- **Escalations.** The facility lead and the coordinator have an Escalations screen with a count. Only the role the latest open escalation went to, at the case's facility, sees "Acknowledge", and a confirmation says acknowledging does not change who is responsible or stop the clock. A 409 (already acknowledged or replaced) or 403 reads calmly and the screen reads the case again.
+- **Clinicians** (clinician, receiving clinician) see a patient's other screening and the handoff summary; the API refuses the patient search to other roles.
+- **People.** Owners and actors are matched to the sign-in list by `sameReference` (`src/identity/staff.ts`), which ignores a FHIR type in front, so `Practitioner/joy-bautista` and `joy-bautista` are the same person.
+
+## Screens
+
+| Address | Screen | Reads |
+|---|---|---|
+| `#/` | Worklist (1): open cases by what needs action now, with filters, search by name, MRN or number, and how many are shown | `GET /cases`, page by page (`take` 200, up to 1,000 cases) |
+| `#/cases/{id}` | Case (2): where the case is (the API's display label), the next action, escalation state, tracks, timeline with its sources in words, other screening for clinicians | `GET /cases/{id}`, `/timeline`, `GET /cases?patientReference=…`, `GET /programmes/{id}` |
+| `#/escalations` | Escalations: open escalations, those needing the signed-in person first | `GET /cases?escalated=true`, then each case |
+| `#/cases/{id}/escalation` | Escalation (17): what is late and why, who is responsible, how late, the ladder from the programme with the current level, the notice history, "Acknowledge" | `GET /cases/{id}`, `/timeline`, `GET /programmes/{id}`, `POST …/escalations/{escalationId}/acknowledgement` |
+| `#/cases/{id}/summary` | Handoff summary (18): draft, edit, approve exactly the edited text, or reject | `POST /cases/{id}/handoff-summary`, `…/approval`, `…/rejection` |
+| `#/impact` | Impact (3): measures with what each is out of, median time to each step, closures by reason, cases by stage, patient confidence, and the comparison with and without reminders | `GET /metrics`, `POST /metrics/simulation` |
+| `#/programmes`, `#/programmes/{id}` | Programmes (4): steps with deadline, reminder and owner, citations, what happens when a step is late, evidence and closure rules, change history | `GET /programmes`, `GET /programmes/{id}` |
+
+The dashboard shows what the API sends and makes nothing up: display labels as given (decision 19), `sourceSystem` as CareLoop, the patient channel or a hospital system, a refused timeline entry as refused (never as done), durations from .NET `TimeSpan` (`1.00:00:00`) or ISO 8601, and a rate with nobody to count as "Not measured yet", never 0%. A feature the API answers with 501 (the AI summary, WS9; the comparison, WS10) shows a calm "isn't ready yet".
+
+## Test it
+
+```powershell
+npm run lint        # oxlint (react, jsx-a11y, typescript; warnings fail), then ESLint with eslint-plugin-tsdoc and eslint-plugin-jsdoc
+npm run typecheck   # tsc -b, strict, for the app and for vite.config.ts and mock/
+npm test            # Vitest, in jsdom
+npm run build       # lint, typecheck, then the production bundle in dist/
+```
+
+The unit tests (`src/**/*.test.ts`, run in jsdom with `src/testing/setup.ts`, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting. Every exported component, hook, function, type, interface and constant has TSDoc; ESLint fails the build when one is missing or malformed. End-to-end tests (Playwright) belong to WS10.
+
+## API types
+
+`src/api/schema.d.ts` is generated from [`contracts/openapi/careloop.json`](../../contracts/openapi/careloop.json), which the API build rewrites. Never edit it by hand; after the contract changes, run:
+
+```powershell
 npm run generate:api
-npm run test
-npm run build
 ```
 
-Never edit `src/api/schema.d.ts` manually. `src/api/client.ts` is the handwritten identity/error-handling wrapper.
-TypeScript 5.9.x is retained for compatibility with OpenAPI generation and the ESLint parser. `npm run build` runs
-oxlint, required-export JSDoc/TSDoc linting, type-checking and the production Vite build. `npm run test` runs Vitest in
-jsdom with Testing Library against a mocked API client and synthetic data. It covers:
+`scripts/generate-api.mjs` runs `openapi-typescript`, a dev dependency. TypeScript stays on 5.9 because `openapi-typescript` and the ESLint TypeScript parser need its compiler API. `src/data/` wraps the generated types in an `openapi-fetch` client and small read hooks; nothing hand-written goes in `src/api/`. The identity headers are not in the OpenAPI document, so the client adds them in a middleware.
 
-- the REST boundary (request headers, identity header validation, error mapping, non-JSON replies, exact approval payloads);
-- `useResource` (abort on key change, stale-while-revalidate within a scope, no data shown across scopes);
-- the worklist (paging at exactly one page, queue chips, coordinator search, rows without a deadline);
-- the case screen (acknowledgement for the addressed role only, no names for a coordinator, programme-read failure
-  degrading only the parts that need it, error cleared on Refresh, handoff draft kept across tabs and Refresh, approval
-  sending the textarea text exactly and gated by the confirmation);
-- the identity form, sorting and measure/locale formatting.
+## Code
 
-Not covered by automated tests: `Impact`, `Programmes` rendering, and any real API, browser or end-to-end journey
-(Playwright journeys belong to WS10).
-
-Validation for WS6 was done in an integrated browser against synthetic API interception, covering case/escalation
-navigation and acknowledgement, role redaction, a 375px viewport, programmes/impact, summary unavailability and
-exact-text approval. This is not a real API/database end-to-end journey; those journeys belong to WS10. CI runs lint,
-type-checking, the Vitest suite and the production build for this folder.
-
-`npm audit --omit=dev` reports zero findings. The installed documentation/parser tooling still reports eight moderate
-development-only findings through `minimatch`; the suggested forced downgrade conflicts with TypeScript compatibility.
-No forced fix or unsupported dependency override is applied.
+| Folder | What it holds |
+|---|---|
+| `src/api/` | Generated API types |
+| `src/data/` | API client and identity headers, paged list reads, read hooks, acknowledgement and summary calls |
+| `src/domain/` | Display rules: display stages, status words, next actions and why they are needed, patients and names, escalations (who may acknowledge, the ladder, notices), tracks, people, timeline entries |
+| `src/features/` | One folder per screen |
+| `src/components/`, `src/hooks/` | Header, icons, status pills, dialog, toast, states (loading placeholders, not ready yet, not open to you, error, empty), the reason form, shared hooks |
+| `src/i18n/`, `src/locales/`, `src/format/`, `src/routing/`, `src/identity/` | Text, dates, durations and numbers, readable names, the hash router, sign-in and reasons for other teams |
+| `src/testing/` | Test setup (DOM matchers from Testing Library) and builders of synthetic API responses |
+| `mock/` | The local mock API (dev and preview only) |
+| `scripts/` | `generate-api.mjs`, which regenerates `src/api/schema.d.ts` |

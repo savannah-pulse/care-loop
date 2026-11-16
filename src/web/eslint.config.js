@@ -5,7 +5,7 @@ import tsdoc from 'eslint-plugin-tsdoc'
 export default [
   { ignores: ['dist/**', 'node_modules/**', 'src/api/schema.d.ts'] },
   {
-    files: ['src/**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'mock/**/*.ts', 'vite.config.ts'],
     languageOptions: { parser: tseslint.parser, parserOptions: { ecmaFeatures: { jsx: true } } },
     plugins: { jsdoc, tsdoc },
     settings: { jsdoc: { mode: 'typescript' } },
