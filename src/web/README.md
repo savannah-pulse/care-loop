@@ -65,7 +65,17 @@ npm test            # Vitest, in jsdom
 npm run build       # lint, typecheck, then the production bundle in dist/
 ```
 
-The unit tests (`src/**/*.test.ts`, run in jsdom with `src/testing/setup.ts`, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting. Every exported component, hook, function, type, interface and constant has TSDoc; ESLint fails the build when one is missing or malformed. End-to-end tests (Playwright) belong to WS10.
+The unit tests (`src/**/*.test.ts`, run in jsdom with `src/testing/setup.ts`, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting.
+
+The screen tests (`src/**/*.test.tsx`) open the whole dashboard with `renderApp` (`src/testing/screens.tsx`), signed in as one of the six staff, and act on it with Testing Library and user-event. A fake API (`src/testing/api.ts`) answers the app's own `fetch`, so the real client and identity headers run, and fails any test whose screen calls a route the test did not answer; `src/testing/browser.ts` fills what jsdom lacks (media queries, modal dialogs, scrolling). They cover:
+
+- **Handoff summary.** Approving sends exactly the edited text, untrimmed, and only after the confirmation; the draft and its edits survive leaving the page and coming back (D1), and are forgotten once approved or rejected, when the API says the draft was decided or replaced, and when someone else signs in; rejecting needs a reason; a 501 reads calmly as not ready yet.
+- **Escalation.** "Acknowledge" shows only for the role the latest open escalation went to, at the case's facility, and never for another facility's lead; the confirmation says acknowledging changes neither who is responsible nor the clock; success shows the toast and the acknowledged state; a 409 reads calmly, and closing it clears the message and reads the case again (D3); a programme that cannot be read leaves the rest of the page working (D5).
+- **Case.** The coordinator sees a case number and the note that names and MRNs are hidden, never a name or MRN; other roles see both; only clinicians see the patient's other screening; a 403 reads calmly as not open to you; a programme that cannot be read leaves the case working (D5).
+- **Worklist.** Every case is named by its patient, in tables and on cards, so no two share a name; another team's cases ask for a reason, then send `reason` and `facilityId` with every read; the coordinator searches by case number, never by name.
+- **Identity.** Every request states the person, role and facility in the `X-Demo-*` headers, with no facility for the coordinator, including straight after a change of person.
+
+Every exported component, hook, function, type, interface and constant has TSDoc; ESLint fails the build when one is missing or malformed. End-to-end tests (Playwright) belong to WS10.
 
 ## API types
 
@@ -87,6 +97,6 @@ npm run generate:api
 | `src/features/` | One folder per screen |
 | `src/components/`, `src/hooks/` | Header, icons, status pills, dialog, toast, states (loading placeholders, not ready yet, not open to you, error, empty), the reason form, shared hooks |
 | `src/i18n/`, `src/locales/`, `src/format/`, `src/routing/`, `src/identity/` | Text, dates, durations and numbers, readable names, the hash router, sign-in and reasons for other teams |
-| `src/testing/` | Test setup (DOM matchers from Testing Library) and builders of synthetic API responses |
+| `src/testing/` | Test setup (DOM matchers from Testing Library, the fake API at the `fetch` level and what jsdom lacks), builders of synthetic API responses, and `renderApp` for the screen tests |
 | `mock/` | The local mock API (dev and preview only) |
 | `scripts/` | `generate-api.mjs`, which regenerates `src/api/schema.d.ts` |
