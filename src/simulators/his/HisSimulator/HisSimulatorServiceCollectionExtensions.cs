@@ -33,6 +33,7 @@ public static class HisSimulatorServiceCollectionExtensions
         services.AddExceptionHandler<Middleware.SimulatorExceptionHandler>();
         services.Configure<CareLoopOptions>(configuration.GetSection(CareLoopOptions.SectionName));
         services.Configure<ScenarioOptions>(configuration.GetSection(ScenarioOptions.SectionName));
+        services.Configure<ContactOptions>(configuration.GetSection(ContactOptions.SectionName));
 
         // Enums travel as lower-case kebab strings (for example "screening-result"), matching the scenario schema.
         services.ConfigureHttpJsonOptions(options =>

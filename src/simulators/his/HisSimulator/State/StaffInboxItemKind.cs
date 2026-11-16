@@ -4,8 +4,9 @@ namespace HisSimulator.State;
 /// Why an item was placed in the simulated staff inbox.
 /// </summary>
 /// <remarks>
-/// Each kind corresponds to one CareLoop domain event that reaches staff, either as a FHIR
-/// resource or as a direct staff notification.
+/// Each kind corresponds to one CareLoop domain event that reaches the hospital system as a FHIR
+/// resource. A direct staff notification ("a case needs your action") is not one of them: CareLoop
+/// sends those by text message or email.
 /// </remarks>
 public enum StaffInboxItemKind
 {
@@ -31,7 +32,8 @@ public enum StaffInboxItemKind
     HandoffSummary,
 
     /// <summary>
-    /// A direct staff notification: "a case needs your action" plus a link, carrying no patient detail.
+    /// Any other <c>Task</c> CareLoop sent that is none of the above, for example the case <c>Task</c> once it
+    /// is completed. Kept so that nothing CareLoop sends is dropped unseen.
     /// </summary>
-    StaffNotification,
+    Other,
 }

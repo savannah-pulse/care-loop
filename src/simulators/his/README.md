@@ -71,13 +71,13 @@ resource IDs. Creation uses POST; updates use `PUT /fhir/{type}/{id}`.
 
 | Source event | Carrier |
 |---|---|
-| Screening | Final `DiagnosticReport`, contained `Patient` and `Observation`; name/MRN/language and `telecom.system=other` |
+| Screening | Final `DiagnosticReport`, contained `Patient` and `Observation`; name/MRN/language and one `telecom` contact, `system=sms` by default or `email` (`Contacts:PatientChannel`), whose value is the patient's synthetic id |
 | Clinical review | Completed `Task` with `reviewed-urgency` extension; source urgency passed through unchanged |
 | Consultation/referral | `ServiceRequest` first, then a stable `Task`; subsequent state changes update the Task |
 | Appointment | `Appointment` status and supplied time; optional synthetic `Location` participant |
 | Outcome | `Procedure` or follow-up `DiagnosticReport`, code system `https://careloop.invalid/fhir/CodeSystem/evidence-kind` |
 | Closure | One completed **actual CareLoop case Task**, containing matching human `Provenance` |
-| Caregiver consent | `Consent`, report-correlation extension, contained `RelatedPerson` on a grant, `telecom.system=other` |
+| Caregiver consent | `Consent`, report-correlation extension, contained `RelatedPerson` on a grant, `telecom.system=email` |
 
 Successful partial sends persist their resource references, so retrying a refused Task does not
 resend its accepted dependency. Closure sends one carrier: `relevantHistory` references its contained
@@ -116,8 +116,11 @@ entries) so a poller need not read everything; `GET /fhir-log/{id}` reads one en
 for `limit=200`.
 
 Inbox resource replay replaces one deterministic inbox item; every exchange remains in the wire log.
-Staff notifications arrive as `staff-notice` Tasks via id-bearing PUT, with `owner`, `focus` and
-staff-safe `description`. There is **no** `POST /staff-inbox/notifications`.
+Direct staff notifications ("a case needs your action") do **not** arrive here: CareLoop sends them
+by text message or email, and the SMS and email simulator shows them. The staff inbox holds what
+CareLoop tells the hospital system as FHIR: escalations, handoffs, call requests and handoff
+summaries. A `CommunicationRequest` is refused (422), and any other Task is filed as "Other case
+update". There is **no** `POST /staff-inbox/notifications`.
 Receipt and opening an item never accept ownership or acknowledge a notification.
 
 ## Routes
@@ -151,6 +154,7 @@ The [.http harness](HisSimulator/HisSimulator.http) covers each route.
 | Key | Default | Meaning |
 |---|---|---|
 | `CareLoop:FhirBaseUrl` | `http://localhost:5080/fhir` | The only CareLoop address used |
+| `Contacts:PatientChannel` | `sms` | How patients are reached: `sms` or `email`. CareLoop reaches people by text message and email only, so no other value is accepted. Scenario files carry no phone number or email address yet (WS10), so the patient's synthetic id is sent as the address |
 | `Scenarios:Directory` | `../../scenarios` | Relative to host content root; `/app/scenarios` in Docker |
 | `Scenarios:RealSecondsPerScenarioHour` | `2` | Must match demo pathways' factor 1800 and WS8 pacing |
 | `ASPNETCORE_URLS` | Launch profile 5081 / Docker 8080 | Host listen address |

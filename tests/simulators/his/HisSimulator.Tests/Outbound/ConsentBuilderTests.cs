@@ -11,7 +11,8 @@ public sealed class ConsentBuilderTests
         var consent = new ConsentBuilder().Build(SimulatorTestData.Case, request);
         var caregiver = Assert.Single(consent.Contained.OfType<RelatedPerson>());
         Assert.Equal(Consent.ConsentState.Active, consent.Status);
-        Assert.Equal(ContactPoint.ContactPointSystem.Other, Assert.Single(caregiver.Telecom).System);
+        Assert.Equal(ContactPoint.ContactPointSystem.Email, Assert.Single(caregiver.Telecom).System);
+        Assert.Equal("SYN-CG-1", Assert.Single(caregiver.Telecom).Value);
         Assert.Equal("#" + caregiver.Id, Assert.Single(consent.Provision!.Actor).Reference!.Reference);
         Assert.Contains(consent.Extension, e => e.Url == SimulatorTestData.Base + "/StructureDefinition/screening-result");
         SimulatorTestData.Tagged(consent);

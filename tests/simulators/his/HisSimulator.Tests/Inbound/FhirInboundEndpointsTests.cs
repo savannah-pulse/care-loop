@@ -17,7 +17,7 @@ public sealed class FhirInboundEndpointsTests
         Description = "SIMULATED a case needs your action",
     };
     [Theory] [InlineData("escalation", StaffInboxItemKind.Escalation)] [InlineData("call-request", StaffInboxItemKind.CallRequested)]
-    [InlineData("staff-notice", StaffInboxItemKind.StaffNotification)]
+    [InlineData("staff-notice", StaffInboxItemKind.Other)]
     public async Task Notice_is_created_correlated_and_replay_updates_one_inbox_item_without_acceptance(string code, StaffInboxItemKind kind)
     {
         await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
@@ -43,7 +43,7 @@ public sealed class FhirInboundEndpointsTests
         Assert.Equal(StaffInboxItemKind.HandoffRejected, Assert.Single(host.Store.GetInboxItems()).Kind);
         task.Status = FhirTask.TaskStatus.Completed;
         await host.Http.PutAsync("/fhir/Task/" + task.Id, FhirContent(SimulatorTestData.Json(task)));
-        Assert.Equal(StaffInboxItemKind.StaffNotification, Assert.Single(host.Store.GetInboxItems()).Kind);
+        Assert.Equal(StaffInboxItemKind.Other, Assert.Single(host.Store.GetInboxItems()).Kind);
         Assert.Empty(host.Handler.Requests);
     }
     [Fact] public async Task A_referral_rejection_is_not_filed_as_a_handoff_rejection_and_a_later_proposal_is_not_labelled_rejected()
@@ -106,7 +106,7 @@ public sealed class FhirInboundEndpointsTests
     [Theory] [InlineData("/fhir/Task", "{broken", 400)]
     [InlineData("/fhir/Task", "{\"resourceType\":\"Patient\"}", 400)]
     [InlineData("/fhir/Patient", "{\"resourceType\":\"Patient\",\"id\":\"SYN-PT-1\"}", 422)]
-    [InlineData("/fhir/Task", "{\"resourceType\":\"Task\",\"code\":{\"coding\":[{\"system\":\"https://careloop.invalid/fhir/CodeSystem/task-code\",\"code\":\"staff-notice\"}]} }", 400)]
+    [InlineData("/fhir/CommunicationRequest", "{\"resourceType\":\"CommunicationRequest\",\"id\":\"SYN-CR-1\",\"status\":\"active\"}", 422)]
     [InlineData("/fhir/Task", "{\"resourceType\":\"Task\",\"status\":\"requested\",\"intent\":\"order\",\"code\":{\"coding\":[{\"system\":\"https://careloop.invalid/fhir/CodeSystem/task-code\",\"code\":\"case\"}]},\"basedOn\":[{\"reference\":\"DiagnosticReport/SYN-REPORT-1\"}]}", 400)]
     public async Task Bad_input_is_refused_and_attempt_is_logged(string path, string json, int status)
     {
