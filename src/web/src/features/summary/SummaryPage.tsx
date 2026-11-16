@@ -11,7 +11,7 @@ import {
   type HandoffSummary,
   type SummarySection,
 } from '../../data'
-import { describeOwner, describePatient, programmeName } from '../../domain'
+import { describeOwner, describePatient, programmeName, resultSourceText } from '../../domain'
 import { factLabel, formatDateTime, parseInstant } from '../../format'
 import { useDocumentTitle } from '../../hooks'
 import {
@@ -493,7 +493,7 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
           <p className="meta">
             {patient.identifier && !patient.hidden ? <span>{patient.identifier}</span> : null}
             <span title={detail.pathwayId}>{programmeName(detail.pathwayId)}</span>
-            <span title={detail.sourceSystem}>{t('case.resultFrom', { result: detail.sourceResultId })}</span>
+            <span title={detail.sourceSystem}>{resultSourceText(detail.sourceResultId, me.role)}</span>
           </p>
         </div>
       </div>

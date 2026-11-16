@@ -23,7 +23,13 @@ export { EXCEPTION_NAMES, exceptionLabel, exceptionReason, isExceptionName } fro
 export type { ExceptionName } from './exceptions'
 export { NEXT_ACTION_KEYS, REFERRAL_ACTIONS, isNextActionKey, isReferralAction, nextActionText } from './nextActions'
 export type { NextActionKey } from './nextActions'
-export { caseNumber, describePatient, secondaryIdentifierText } from './patients'
+export {
+  caseNumber,
+  describePatient,
+  outcomeEvidenceText,
+  resultSourceText,
+  secondaryIdentifierText,
+} from './patients'
 export type { PatientFields, PatientView } from './patients'
 export { describeActor, describeOwner } from './people'
 export type { PersonDetail, PersonView } from './people'
@@ -37,7 +43,9 @@ export {
   SOURCE_SYSTEMS,
   groupByDay,
   hasOwnReason,
+  mayQuoteReason,
   newestFirst,
+  refusalReason,
   sourceLabel,
   timelineEntryTitle,
   timelineKind,

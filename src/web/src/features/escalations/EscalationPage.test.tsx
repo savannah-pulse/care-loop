@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { CaseDetail } from '../../data'
 import { answer, json, problem, sentRequests } from '../../testing/api'
-import { TEST_NOW, caseDetail, caseSummary, escalation, owner, programme } from '../../testing/builders'
+import { TEST_NOW, caseDetail, caseSummary, escalation, owner, programme, timelineEntry } from '../../testing/builders'
 import { renderApp } from '../../testing/screens'
 
 const TO_LEAD = escalation()
@@ -138,6 +138,32 @@ describe('escalation', () => {
     expect(await screen.findByText('Only the programme coordinator can acknowledge this escalation.')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(sentRequests(CASE_ROUTE)).toHaveLength(reads + 1)
+  })
+
+  it('shows the programme coordinator no name, MRN or hospital record number on the escalation', async () => {
+    answerReads({ ...WITH_COORDINATOR, outcomeEvidenceReference: 'Procedure/proc-100245891' })
+    answer(
+      `GET /cases/${CASE_ID}/timeline`,
+      json([
+        timelineEntry({
+          sourceSystem: 'fhc-his',
+          eventType: 'ScreeningResultReceived',
+          disposition: 'Rejected',
+          actorReference: 'fhc-his',
+          actorRole: 'system',
+          reason: "A case already exists for result 'fhc-his/DiagnosticReport/r-100245891'; one result opens one case.",
+        }),
+      ]),
+    )
+    renderApp({ at: ESCALATION_PAGE, as: 'obaid-al-suwaidi' })
+
+    expect(await screen.findByText('Case 3F6B1C2A · Name hidden for your role · Breast screening')).toBeInTheDocument()
+    await screen.findByRole('region', { name: 'What acknowledging means' })
+    const page = document.body.textContent ?? ''
+    for (const identifier of ['Hessa', '100245891', 'p-100245891', 'DiagnosticReport', 'Procedure/']) {
+      expect(page).not.toContain(identifier)
+    }
+    expect(document.querySelector('[title*="100245891"]')).toBeNull()
   })
 
   it('still shows the escalation when the programme cannot be read, and says the ladder is incomplete (D5)', async () => {

@@ -61,17 +61,22 @@ export function isEscalationRole(role: string): boolean {
 }
 
 /**
- * Roles that never see patient names or second identifiers.
+ * Roles that never see patient names, second identifiers or any other identifier that can point to
+ * the patient.
  *
  * @remarks
  * The programme coordinator sees totals with no names, and a case only while it is escalated to
  * them (who sees what, board 14). The API leaves the name and MRN out for this role; the dashboard
- * says so plainly and shows a case number instead.
+ * says so plainly and shows a case number instead. It also keeps the hospital system's own numbers
+ * from them, such as the result number and outcome evidence references, and any wording from a
+ * hospital system that could quote them, because those point to the patient as surely as the MRN
+ * does. The rule goes by role, so it holds even if the API sends these to the role.
  */
 export const NAMES_HIDDEN_ROLES: readonly RoleKey[] = ['coordinator']
 
 /**
- * Tells whether patient names are hidden from a role.
+ * Tells whether patient names, and every other identifier that can point to the patient, are hidden
+ * from a role.
  *
  * @param role - A role key.
  * @returns `true` for the roles in {@link NAMES_HIDDEN_ROLES}.

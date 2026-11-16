@@ -31,36 +31,92 @@ function searches(): SentRequest[] {
   return sentRequests('GET /cases').filter((request) => request.query.has('patientReference'))
 }
 
+const AT_CLOSURE_REVIEW = caseDetail({
+  stage: 'ClosureReview',
+  displayLabel: 'ClosureReview',
+  nextAction: 'decide-closure',
+  outcomeEvidenceKind: 'diagnosis',
+  outcomeEvidenceReference: 'Procedure/proc-100245891',
+  isEscalated: true,
+  exceptions: ['Overdue'],
+  escalations: [
+    escalation(),
+    escalation({
+      escalationId: '5d1e2f3a-4b5c-4d6e-8f70-100245891e02',
+      level: 2,
+      escalatedTo: { reference: 'coordinator:family-health-centre', role: 'coordinator', facilityId: 'family-health-centre', isQueue: true },
+      raisedAt: '2026-11-12T04:00:00Z',
+    }),
+  ],
+})
+const REPEATED_RESULT = timelineEntry({
+  auditEventId: 'a0000000-0000-4000-8000-000000000002',
+  sourceSystem: 'fhc-his',
+  eventType: 'ScreeningResultReceived',
+  disposition: 'Rejected',
+  actorReference: 'fhc-his',
+  actorRole: 'system',
+  sourceTimestamp: '2026-11-11T08:00:00Z',
+  receivedTimestamp: '2026-11-11T08:00:00Z',
+  reason: "A case already exists for result 'fhc-his/DiagnosticReport/r-100245891'; one result opens one case.",
+})
+const OUTCOME = timelineEntry({
+  auditEventId: 'a0000000-0000-4000-8000-000000000003',
+  sourceSystem: 'fhc-his',
+  eventType: 'OutcomeRecorded',
+  actorReference: 'rekha-varghese',
+  actorRole: 'clinician',
+  sourceTimestamp: '2026-11-11T09:00:00Z',
+  receivedTimestamp: '2026-11-11T09:00:00Z',
+  reason: 'OutcomeRecorded applied',
+  evidenceReference: 'Procedure/proc-100245891',
+})
+
+function answerHospitalTrail(): void {
+  answerReads(AT_CLOSURE_REVIEW)
+  answer(`GET /cases/${CASE.caseId}/timeline`, json([timelineEntry(), REPEATED_RESULT, OUTCOME]))
+}
+
 describe('case', () => {
-  it('shows the programme coordinator a case number, never the patient’s name or MRN', async () => {
-    const toCoordinator = caseDetail({
-      sourceResultId: 'DiagnosticReport/r-5501',
-      isEscalated: true,
-      exceptions: ['Overdue'],
-      escalations: [
-        escalation(),
-        escalation({
-          escalationId: '5d1e2f3a-4b5c-4d6e-8f70-100245891e02',
-          level: 2,
-          escalatedTo: { reference: 'coordinator:family-health-centre', role: 'coordinator', facilityId: 'family-health-centre', isQueue: true },
-          raisedAt: '2026-11-12T04:00:00Z',
-        }),
-      ],
-    })
-    answerReads(toCoordinator)
+  it('shows the programme coordinator a case number, never the patient’s name, MRN or hospital record numbers', async () => {
+    answerHospitalTrail()
     renderApp({ at: CASE_PAGE, as: 'obaid-al-suwaidi' })
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Case 3F6B1C2A' })).toBeInTheDocument()
-    expect(screen.getByText('Names and MRNs are hidden for your role. Everything else on the case is here.')).toBeInTheDocument()
-    await screen.findByText('Deadline warning raised')
+    expect(
+      screen.getByText('Names, MRNs and hospital record numbers are hidden for your role. Everything else on the case is here.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Result from the hospital system')).toBeInTheDocument()
+    expect(screen.getByText('Outcome evidence is recorded in the hospital system.')).toBeInTheDocument()
+    expect(await screen.findByText('Result not accepted')).toBeInTheDocument()
+    expect(screen.getByText('Deadline warning raised')).toBeInTheDocument()
     const page = document.body.textContent ?? ''
-    for (const identifier of ['Hessa', 'Al Dhaheri', '100245891', '100\u00a0245\u00a0891', 'p-100245891']) {
+    for (const identifier of [
+      'Hessa',
+      'Al Dhaheri',
+      '100245891',
+      '100\u00a0245\u00a0891',
+      'p-100245891',
+      'DiagnosticReport',
+      'Procedure/',
+    ]) {
       expect(page).not.toContain(identifier)
     }
     expect(page).not.toMatch(/MRN\s\d/)
     expect(document.querySelector('[title*="100245891"]')).toBeNull()
     expect(document.title).toBe('Case 3F6B1C2A · CareLoop')
     expect(searches()).toHaveLength(0)
+  })
+
+  it('still shows staff the hospital’s result number, outcome evidence and the reason a result was refused', async () => {
+    answerHospitalTrail()
+    renderApp({ at: CASE_PAGE, as: 'rekha-varghese' })
+
+    expect(await screen.findByText('Result DiagnosticReport/r-100245891 from the hospital system')).toBeInTheDocument()
+    expect(screen.getByText('Outcome evidence: Procedure/proc-100245891')).toBeInTheDocument()
+    expect(
+      await screen.findByText("A case already exists for result 'fhc-his/DiagnosticReport/r-100245891'; one result opens one case."),
+    ).toBeInTheDocument()
   })
 
   it.each([

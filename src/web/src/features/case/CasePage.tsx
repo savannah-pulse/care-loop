@@ -1,6 +1,6 @@
 import { Icon, OutsideTeamCard, ReadView } from '../../components'
 import { useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
-import { describePatient, openEscalations, programmeName } from '../../domain'
+import { describePatient, openEscalations, programmeName, resultSourceText } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
 import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
@@ -54,7 +54,7 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
           ))}
         </p>
         <p className="quiet" title={detail.sourceSystem}>
-          {t('case.resultFrom', { result: detail.sourceResultId })}
+          {resultSourceText(detail.sourceResultId, me.role)}
         </p>
         <p className="quiet">{patient.hidden ? t('patient.hiddenDetail') : t('patient.detail')}</p>
       </div>
@@ -103,11 +103,12 @@ function CaseView({ detail, timeline, reason, now }: CaseViewProps) {
  *
  * @remarks
  * Read-only; reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. Staff see the patient's
- * name and MRN; the programme coordinator sees a case number and a note that names are hidden for
- * their role. A case at another facility opens only after the person says why (board 14): the API
- * refuses the read without a reason, the screen asks for one, and the reason then goes with every
- * read of the case. Any other refusal says calmly that the case is not open to the person.
- * Clinicians reach the AI handoff summary from the next action when a referral is due.
+ * name and MRN; the programme coordinator sees a case number and a note that names and hospital
+ * record numbers are hidden for their role, and the result reads as coming from the hospital
+ * system, without its number. A case at another facility opens only after the person says why
+ * (board 14): the API refuses the read without a reason, the screen asks for one, and the reason
+ * then goes with every read of the case. Any other refusal says calmly that the case is not open to
+ * the person. Clinicians reach the AI handoff summary from the next action when a referral is due.
  */
 export function CasePage({ caseId }: CasePageProps) {
   const me = useSignedInStaff()

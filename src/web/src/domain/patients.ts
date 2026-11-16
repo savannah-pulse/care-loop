@@ -96,3 +96,32 @@ export function describePatient(patient: PatientFields, viewerRole: string): Pat
     searchText: [label, identifier ?? '', patient.patientReference].join(' '),
   }
 }
+
+/**
+ * Says where a case's result came from, for the person reading.
+ *
+ * @param sourceResultId - The hospital system's identifier of the result, as the API sent it.
+ * @param viewerRole - The role of the person reading.
+ * @returns `Result DiagnosticReport/r-100245891 from the hospital system` for staff, so the result
+ * can be found in the hospital record; `Result from the hospital system`, without the number, for
+ * a role names are hidden from.
+ *
+ * @remarks
+ * The hospital system's own numbers point to the patient as surely as the MRN does, so the
+ * programme coordinator never sees them, even when the API sends them.
+ */
+export function resultSourceText(sourceResultId: string, viewerRole: string): string {
+  return namesHiddenFor(viewerRole) ? t('case.resultFromHidden') : t('case.resultFrom', { result: sourceResultId })
+}
+
+/**
+ * Says what outcome evidence a case has, for the person reading.
+ *
+ * @param reference - The hospital system's reference of the outcome evidence, as the API sent it.
+ * @param viewerRole - The role of the person reading.
+ * @returns `Outcome evidence: Procedure/…` for staff; for a role names are hidden from, that the
+ * evidence is recorded in the hospital system, without its reference, which points to the patient.
+ */
+export function outcomeEvidenceText(reference: string, viewerRole: string): string {
+  return namesHiddenFor(viewerRole) ? t('case.outcomeEvidenceHidden') : t('case.outcomeEvidence', { reference })
+}

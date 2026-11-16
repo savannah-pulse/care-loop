@@ -60,7 +60,7 @@
     "case": "Case {number}",
     "hidden": "Name hidden for your role",
     "detail": "Reports, images and other details are in the hospital record.",
-    "hiddenDetail": "Names and MRNs are hidden for your role. Everything else on the case is here."
+    "hiddenDetail": "Names, MRNs and hospital record numbers are hidden for your role. Everything else on the case is here."
   },
   "facts": {
     "dated": "{name}, {date}",
@@ -283,9 +283,11 @@
     "titleFallback": "Case",
     "back": "Worklist",
     "resultFrom": "Result {result} from the hospital system",
+    "resultFromHidden": "Result from the hospital system",
     "opened": "Opened {date}",
     "closedAs": "This case is closed: {reason}.",
     "outcomeEvidence": "Outcome evidence: {reference}",
+    "outcomeEvidenceHidden": "Outcome evidence is recorded in the hospital system.",
     "nextActionLabel": "Next action",
     "responsible": "Responsible",
     "due": "Due",

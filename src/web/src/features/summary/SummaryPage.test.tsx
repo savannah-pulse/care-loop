@@ -221,6 +221,20 @@ describe('handoff summary', () => {
     expect(screen.getByText('Reason: The history is out of date.')).toBeInTheDocument()
   })
 
+  it('shows the programme coordinator where the result came from, without the hospital’s number', async () => {
+    answerCaseReads()
+    renderApp({ at: SUMMARY_PAGE, as: 'obaid-al-suwaidi' })
+
+    expect(await screen.findByText('Result from the hospital system')).toBeInTheDocument()
+    expect(screen.getByText('For clinicians')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Case 3F6B1C2A' })).toBeInTheDocument()
+    const page = document.body.textContent ?? ''
+    for (const identifier of ['Hessa', '100245891', 'DiagnosticReport']) {
+      expect(page).not.toContain(identifier)
+    }
+    expect(document.querySelector('[title*="100245891"]')).toBeNull()
+  })
+
   it('says calmly that drafting is not ready yet when the API answers 501', async () => {
     answerCaseReads()
     answer(DRAFT_ROUTE, problem(501, 'Handoff summaries are not available yet.'))

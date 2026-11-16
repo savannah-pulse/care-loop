@@ -123,5 +123,13 @@ describe('worklist', () => {
     await user.type(search, 'Noura')
     expect(screen.getByRole('heading', { name: 'No cases match these filters' })).toBeInTheDocument()
     expect(screen.queryByText(/Noura|Hessa/)).not.toBeInTheDocument()
+
+    for (const identifier of ['100245892', 'p-100245892']) {
+      await user.clear(search)
+      await user.type(search, identifier)
+      expect(screen.getByRole('heading', { name: 'No cases match these filters' })).toBeInTheDocument()
+    }
+    expect(document.body.textContent).not.toMatch(/100245891|100245892|MRN\s\d/)
+    expect(document.querySelector('[title*="p-1002458"]')).toBeNull()
   })
 })
