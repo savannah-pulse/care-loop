@@ -26,6 +26,7 @@ import {
 import { t, type MessageKey } from '../../i18n'
 import { navigate, routeHref } from '../../routing'
 import { OtherScreeningCard } from '../case'
+import { forgetOpenDraft, keepOpenDraft, openDraftFor } from './drafts'
 import { applyEdits, approvedTextFor, hasEdits, isAssessmentSection, type SectionEdits } from './summary'
 
 /** Props for {@link SummaryPage}. */
@@ -38,7 +39,7 @@ type DraftState =
   | { readonly step: 'idle' }
   | { readonly step: 'drafting' }
   | { readonly step: 'failed'; readonly failure: ApiFailure }
-  | { readonly step: 'ready'; readonly summary: HandoffSummary }
+  | { readonly step: 'ready'; readonly summary: HandoffSummary; readonly edits: SectionEdits }
 
 const NO_DRAFT_MESSAGES: Readonly<Partial<Record<FailureKind, MessageKey>>> = {
   notAvailable: 'summary.noDraft.notAvailable',
@@ -168,13 +169,14 @@ interface DraftViewProps {
   readonly detail: CaseDetail
   readonly accessReason?: string
   readonly initial: HandoffSummary
+  readonly initialEdits: SectionEdits
   readonly me: StaffMember
 }
 
-function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
+function DraftView({ detail, accessReason, initial, initialEdits, me }: DraftViewProps) {
   const caseId = detail.caseId
   const [summary, setSummary] = useState(initial)
-  const [edits, setEdits] = useState<SectionEdits>({})
+  const [edits, setEdits] = useState<SectionEdits>(initialEdits)
   const [editing, setEditing] = useState(false)
   const [dialog, setDialog] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
@@ -228,7 +230,11 @@ function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
   const facts = summary.missingOrConflictingFacts
   const firstEditable = sections.findIndex((section) => !isAssessmentSection(section))
 
-  const onEdit = (index: number, text: string): void => setEdits((current) => ({ ...current, [index]: text }))
+  const onEdit = (index: number, text: string): void => {
+    const next = { ...edits, [index]: text }
+    setEdits(next)
+    keepOpenDraft(caseId, { reviewerId: me.id, summary, edits: next })
+  }
 
   const openDialog = (which: 'approve' | 'reject'): void => {
     setDecisionError(undefined)
@@ -243,10 +249,19 @@ function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
   }
 
   const decided = (next: HandoffSummary, message: string): void => {
+    forgetOpenDraft(caseId)
     setSummary(next)
     setEditing(false)
     setDialog(undefined)
     setToast(message)
+  }
+
+  const refused = (failure: ApiFailure): void => {
+    if (failure.kind === 'conflict' || failure.kind === 'notFound') {
+      // The draft was decided or replaced elsewhere, so coming back must offer a new one.
+      forgetOpenDraft(caseId)
+    }
+    setDecisionError(failure.kind)
   }
 
   const approve = async (): Promise<void> => {
@@ -257,7 +272,7 @@ function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
     if (outcome.ok) {
       decided(outcome.data, t('summary.approvedToast'))
     } else {
-      setDecisionError(outcome.failure.kind)
+      refused(outcome.failure)
     }
   }
 
@@ -274,7 +289,7 @@ function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
     if (outcome.ok) {
       decided(outcome.data, t('summary.rejectedToast'))
     } else {
-      setDecisionError(outcome.failure.kind)
+      refused(outcome.failure)
     }
   }
 
@@ -437,13 +452,21 @@ interface WorkspaceProps {
 
 function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
   const me = useSignedInStaff()
-  const [draft, setDraft] = useState<DraftState>({ step: 'idle' })
+  const [draft, setDraft] = useState<DraftState>(() => {
+    const kept = openDraftFor(detail.caseId)
+    return kept ? { step: 'ready', summary: kept.summary, edits: kept.edits } : { step: 'idle' }
+  })
   const ids = useId()
 
   const requestDraft = async (): Promise<void> => {
     setDraft({ step: 'drafting' })
     const outcome = await draftHandoffSummary(detail.caseId)
-    setDraft(outcome.ok ? { step: 'ready', summary: outcome.data } : { step: 'failed', failure: outcome.failure })
+    if (outcome.ok) {
+      keepOpenDraft(detail.caseId, { reviewerId: me.id, summary: outcome.data, edits: {} })
+      setDraft({ step: 'ready', summary: outcome.data, edits: {} })
+    } else {
+      setDraft({ step: 'failed', failure: outcome.failure })
+    }
   }
 
   const drafted = draft.step === 'ready' ? parseInstant(draft.summary.draftedAt) : undefined
@@ -487,6 +510,7 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
           detail={detail}
           accessReason={reason}
           initial={draft.summary}
+          initialEdits={draft.edits}
           me={me}
         />
       ) : draft.step === 'failed' ? (
@@ -541,9 +565,12 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
  * they approved. AI never writes the assessment, so that section cannot be edited here. Approving
  * asks for a confirmation and rejecting asks for a reason, each in a small dialog, and a short
  * message confirms the decision. The actions stay in reach in a bar at the bottom of the screen;
- * the page keeps room above it so a focused field is never hidden. When there is no draft (AI off,
- * not built yet, or failed), the screen says so plainly and never shows half-made text. Only
- * clinician roles get the actions; the API decides who may approve.
+ * the page keeps room above it so a focused field is never hidden. An open draft and its edits are
+ * kept in memory while the reviewer looks at other screens, until they approve or reject it or
+ * someone else signs in; the API cannot send a draft back, and clinical text is never written to
+ * browser storage, so reloading the page loses it. When there is no draft (AI off, not built yet,
+ * or failed), the screen says so plainly and never shows half-made text. Only clinician roles get
+ * the actions; the API decides who may approve.
  */
 export function SummaryPage({ caseId }: SummaryPageProps) {
   useDocumentTitle(t('summary.title'))
