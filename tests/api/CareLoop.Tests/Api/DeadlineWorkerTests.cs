@@ -31,6 +31,7 @@ public sealed class DeadlineWorkerTests : IDisposable
     private readonly DeadlineWorker _worker;
     private readonly TestLogger _logger = new();
     private Func<Task>? _beforeDeadlineSave;
+    private readonly TaskCompletionSource _deadlineSaved = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
@@ -299,11 +300,9 @@ public sealed class DeadlineWorkerTests : IDisposable
         await _worker.StartAsync(CancellationToken.None);
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            while ((await DeadlineEventsAsync()).Count == 0)
-            {
-                await Task.Delay(10, timeout.Token);
-            }
+            // The in-memory SQLite connection is shared and not safe for concurrent use, so the test
+            // waits on a signal from the repository and reads only after the worker has stopped.
+            await _deadlineSaved.Task.WaitAsync(TimeSpan.FromSeconds(10));
         }
         finally
         {
@@ -391,6 +390,10 @@ public sealed class DeadlineWorkerTests : IDisposable
             }
 
             await inner.SaveAsync(@case, appliedEvent, ct);
+            if (appliedEvent.Type == CaseEventType.DeadlineElapsed)
+            {
+                tests._deadlineSaved.TrySetResult();
+            }
         }
     }
 
