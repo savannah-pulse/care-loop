@@ -171,9 +171,10 @@ interface DraftViewProps {
   readonly initial: HandoffSummary
   readonly initialEdits: SectionEdits
   readonly me: StaffMember
+  readonly onRedraft: () => void
 }
 
-function DraftView({ detail, accessReason, initial, initialEdits, me }: DraftViewProps) {
+function DraftView({ detail, accessReason, initial, initialEdits, me, onRedraft }: DraftViewProps) {
   const caseId = detail.caseId
   const [summary, setSummary] = useState(initial)
   const [edits, setEdits] = useState<SectionEdits>(initialEdits)
@@ -229,6 +230,8 @@ function DraftView({ detail, accessReason, initial, initialEdits, me }: DraftVie
   const edited = hasEdits(summary.sections, edits)
   const facts = summary.missingOrConflictingFacts
   const firstEditable = sections.findIndex((section) => !isAssessmentSection(section))
+  // The API says this draft was decided, replaced or removed elsewhere: only a new draft can go on.
+  const draftGone = decisionError === 'conflict' || decisionError === 'notFound'
 
   const onEdit = (index: number, text: string): void => {
     const next = { ...edits, [index]: text }
@@ -397,9 +400,15 @@ function DraftView({ detail, accessReason, initial, initialEdits, me }: DraftVie
           <button type="button" className="btn" onClick={closeDialog}>
             {t('summary.cancel')}
           </button>
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void approve()}>
-            {busy ? t('summary.approving') : t('summary.approve')}
-          </button>
+          {draftGone ? (
+            <button type="button" className="btn primary" onClick={onRedraft}>
+              {t('summary.redraft')}
+            </button>
+          ) : (
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void approve()}>
+              {busy ? t('summary.approving') : t('summary.approve')}
+            </button>
+          )}
         </div>
       </Dialog>
 
@@ -434,9 +443,15 @@ function DraftView({ detail, accessReason, initial, initialEdits, me }: DraftVie
           <button type="button" className="btn" onClick={closeDialog}>
             {t('summary.cancel')}
           </button>
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void reject()}>
-            {busy ? t('summary.rejecting') : t('summary.rejectConfirm')}
-          </button>
+          {draftGone ? (
+            <button type="button" className="btn primary" onClick={onRedraft}>
+              {t('summary.redraft')}
+            </button>
+          ) : (
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void reject()}>
+              {busy ? t('summary.rejecting') : t('summary.rejectConfirm')}
+            </button>
+          )}
         </div>
       </Dialog>
 
@@ -512,6 +527,7 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
           initial={draft.summary}
           initialEdits={draft.edits}
           me={me}
+          onRedraft={() => void requestDraft()}
         />
       ) : draft.step === 'failed' ? (
         <section className="card" aria-labelledby={`${ids}-none`}>
@@ -564,13 +580,15 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
  * clinician approves it, and the approval is recorded with their name, the time and the exact text
  * they approved. AI never writes the assessment, so that section cannot be edited here. Approving
  * asks for a confirmation and rejecting asks for a reason, each in a small dialog, and a short
- * message confirms the decision. The actions stay in reach in a bar at the bottom of the screen;
- * the page keeps room above it so a focused field is never hidden. An open draft and its edits are
- * kept in memory while the reviewer looks at other screens, until they approve or reject it or
- * someone else signs in; the API cannot send a draft back, and clinical text is never written to
- * browser storage, so reloading the page loses it. When there is no draft (AI off, not built yet,
- * or failed), the screen says so plainly and never shows half-made text. Only clinician roles get
- * the actions; the API decides who may approve.
+ * message confirms the decision. If the API says the draft was decided, replaced or removed
+ * meanwhile, the dialog says the decision was not saved and offers to draft the summary again. The
+ * actions stay in reach in a bar at the bottom of the screen; the page keeps room above it so a
+ * focused field is never hidden. An open draft and its edits are kept in memory while the reviewer
+ * looks at other screens, until they approve or reject it or someone else signs in; the API cannot
+ * send a draft back, and clinical text is never written to browser storage, so reloading the page
+ * loses it. When there is no draft (AI off, not built yet, or failed), the screen says so plainly
+ * and never shows half-made text. Only clinician roles get the actions; the API decides who may
+ * approve.
  */
 export function SummaryPage({ caseId }: SummaryPageProps) {
   useDocumentTitle(t('summary.title'))

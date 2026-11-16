@@ -185,13 +185,37 @@ describe('handoff summary', () => {
     await approve(user)
     const dialog = screen.getByRole('dialog', { name: 'Approve this summary?' })
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'This draft was already decided or replaced. Draft the summary again.',
+      'This draft was already decided or replaced, so your decision was not saved.',
     )
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     await leaveAndComeBack(user)
 
     expect(await screen.findByRole('button', { name: 'Draft the summary' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['approving', 409, APPROVAL_ROUTE, approve, 'Approve this summary?', 'This draft was already decided or replaced, so your decision was not saved.'],
+    ['rejecting', 404, REJECTION_ROUTE, (user: UserEvent) => reject(user, 'Out of date.'), 'Reject this draft?', 'This draft no longer exists, so your decision was not saved.'],
+  ])('offers to draft the summary again when %s finds the draft decided or gone (%i)', async (_decision, status, route, decide, dialogName, message) => {
+    const { user } = await openDraft()
+    answer(route, problem(status, 'The draft was decided, replaced or removed.'))
+    const next = handoffSummary({ summaryId: '7e8f9a0b-1c2d-4e3f-8a4b-100245891502' })
+    const nextApproval = `POST /cases/${CASE.caseId}/handoff-summary/${next.summaryId}/approval`
+    answer(DRAFT_ROUTE, json(next, 201))
+    answer(nextApproval, approved)
+    await decide(user)
+    const dialog = screen.getByRole('dialog', { name: dialogName })
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Draft the summary again' }))
+
+    expect(await screen.findByRole('group', { name: 'Decide on this summary' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(sentRequests(DRAFT_ROUTE)).toHaveLength(2)
+    await approve(user)
+    expect(await screen.findByText('Summary approved.')).toBeInTheDocument()
+    expect(sentRequests(nextApproval)).toHaveLength(1)
   })
 
   it('rejects only with a reason, sent without the spaces around it', async () => {

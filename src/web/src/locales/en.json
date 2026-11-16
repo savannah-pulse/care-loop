@@ -430,6 +430,7 @@
     "startTitle": "No draft yet",
     "startBody": "AI can draft a summary from the facts in this case. You check every line, then approve or reject it. Nothing is used until you approve it.",
     "draft": "Draft the summary",
+    "redraft": "Draft the summary again",
     "drafting": "Drafting…",
     "draftingLabel": "Drafting the summary",
     "cardTitle": "Summary",
@@ -481,9 +482,9 @@
     "noDraftBody": "CareLoop cannot take a summary you write yourself yet. Write it in your hospital system and attach it to the referral. Every other step still works.",
     "decisionFailed": {
       "forbidden": "Only a clinician can approve or reject this summary.",
-      "conflict": "This draft was already decided or replaced. Draft the summary again.",
+      "conflict": "This draft was already decided or replaced, so your decision was not saved.",
       "notAvailable": "Saving a decision is not available yet.",
-      "notFound": "This draft no longer exists. Draft the summary again.",
+      "notFound": "This draft no longer exists, so your decision was not saved.",
       "invalid": "The decision could not be saved. Check the text and try again.",
       "error": "Your decision could not be saved. Try again."
     },
