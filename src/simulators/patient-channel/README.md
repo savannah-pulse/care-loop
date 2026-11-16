@@ -101,8 +101,11 @@ corepack yarn format:check  # Prettier
 | `CareLoop:FhirBaseUrl` | `CareLoop__FhirBaseUrl` | `http://localhost:5080/fhir` | Base URL of CareLoop's FHIR R4 endpoints, used to read case status. |
 | `CareLoop:NotificationCallbackUrl` | `CareLoop__NotificationCallbackUrl` | `http://localhost:5080/notifications/inbound/simulator` | Callback of CareLoop's simulator notification provider. Delivery reports and patient responses are posted here. |
 | `CareLoop:InboundSecret` | `CareLoop__InboundSecret` | empty | Secret every callback is signed with. Must equal CareLoop's `Notifications:Simulator:InboundSecret`. Docker Compose passes `SIMULATOR_INBOUND_SECRET` to both. While it is empty nothing is sent and an inbound request answers 502. |
-| `CareLoop:SendAttempts` | `CareLoop__SendAttempts` | `3` | How many times a callback is sent in total when CareLoop answers with a server error or does not answer in time. A refusal (4xx) is never retried. |
+| `CareLoop:SendAttempts` | `CareLoop__SendAttempts` | `3` | How many times a callback is sent in total when CareLoop answers with a server error or does not answer in time. A refusal (4xx) is not sent again within the same attempt. |
 | `CareLoop:RetryDelayMilliseconds` | `CareLoop__RetryDelayMilliseconds` | `200` | Pause before each further attempt, multiplied by the attempts already made. |
+| `CareLoop:DeliveryReportRetries` | `CareLoop__DeliveryReportRetries` | `10` | How many more times a delivery report is tried in the background after it failed while the notification was being received. CareLoop does not send a patient notification again, so without this a failed report would leave the message undelivered for good. `0` switches the retries off. |
+| `CareLoop:DeliveryReportRetrySeconds` | `CareLoop__DeliveryReportRetrySeconds` | `5` | Wait before the first background retry. Each further retry waits twice as long. |
+| `CareLoop:DeliveryReportRetryMaximumSeconds` | `CareLoop__DeliveryReportRetryMaximumSeconds` | `60` | The longest wait between two background retries. |
 | `CareLoop:TimeoutSeconds` | `CareLoop__TimeoutSeconds` | `10` | How long one call to CareLoop may take before it counts as not answered. All attempts together must finish inside CareLoop's own HTTP timeout, because the delivery report is sent while CareLoop is still waiting for the answer to its `CommunicationRequest`. |
 | `PatientChannel:DefaultChannel` | `PatientChannel__DefaultChannel` | `App` | Inbox for a patient message whose inbox address names no channel. An address starting `SYN-SMS-` goes to the text-message inbox and `SYN-PORTAL-` to the portal; a caregiver message always goes to email. |
 | `Scenarios:Directory` | `Scenarios__Directory` | `../../scenarios` (relative to the content root; `/app/scenarios` in Docker) | Folder holding the shared scenario JSON files, `src/simulators/scenarios`. |
@@ -123,7 +126,7 @@ The `/api` and `/scenarios` routes answer errors as problem details (`title`, `d
 |---|---|---|
 | GET | `/health` | Liveness: `{ "status": "ok", "service": "patient-channel-simulator", "synthetic": true }`. |
 | GET | `/openapi/v1.json` | OpenAPI document. |
-| POST | `/fhir/{resourceType}` | FHIR inbound from CareLoop; `CommunicationRequest` lands in the patient inbox. 201 for a new request, 200 for a resend, 400 for anything else or an unreadable body, 502 when the delivery outcome could not be reported (a resend retries it). |
+| POST | `/fhir/{resourceType}` | FHIR inbound from CareLoop; `CommunicationRequest` lands in the patient inbox. 201 for a new request, 200 for a resend, 400 for anything else or an unreadable body (logged without its body). When the delivery outcome cannot be reported the request is still accepted, the message stays pending and the report is retried in the background; 502 only when it cannot be reported at all (no signing secret, or retries switched off). |
 | GET | `/api/inbox` | List simulated inbox messages. |
 | GET | `/api/inbox/{messageId}` | One inbox message. |
 | POST | `/api/inbox/{messageId}/acknowledge` | Patient acknowledges ("I will come") → acknowledgement `Communication` and nothing else. Every action answers 404 for an unknown message, 409 for a caregiver's copy or a message that did not reach the patient, and 502 when CareLoop refused or could not be reached. |
@@ -138,7 +141,7 @@ The `/api` and `/scenarios` routes answer errors as problem details (`title`, `d
 | DELETE | `/api/patient-behaviours/{patientSyntheticId}` | Remove a patient's behaviour; the default applies again. |
 | GET | `/api/fhir-log` | FHIR message log. |
 | GET | `/api/case-status/{taskId}` | Patient case status from the CareLoop case `Task`. |
-| GET | `/scenarios` | List scenarios. |
+| GET | `/scenarios` | List scenarios. A file that cannot be used is still listed, with the reason in `problem`, and cannot be run. |
 | POST | `/scenarios/{name}/run` | Put the scenario's patient behaviours in force. Optional body `{ "realSecondsPerScenarioHour": 2 }`. 202 with the run, 404 for an unknown scenario, 400 for a cohort. |
 | GET | `/scenarios/runs/{runId}` | The run's patients and how they have reacted so far. |
 

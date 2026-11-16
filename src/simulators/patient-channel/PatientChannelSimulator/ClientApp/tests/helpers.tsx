@@ -102,6 +102,8 @@ export function inboxMessage(overrides: Partial<InboxMessage> = {}): InboxMessag
     confidenceRatedAt: null,
     callRequestCount: 0,
     confidenceRatingCount: 0,
+    acknowledgedAt: null,
+    understoodAt: null,
     ...overrides,
   };
 }

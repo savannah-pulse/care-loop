@@ -236,6 +236,26 @@ describe('Patient inbox', () => {
     ]);
   });
 
+  it('a call request after an acknowledgement is shown beside it, not instead of it', async () => {
+    mockApi({
+      'GET /api/inbox': [
+        inboxMessage({
+          response: 'Acknowledged',
+          acknowledgedAt: '2026-03-02T09:31:00+00:00',
+          callRequestCount: 1,
+        }),
+      ],
+    });
+
+    renderAt(<InboxPage />);
+
+    expect((await screen.findByTestId('response-state')).textContent).toBe(
+      records.response.Acknowledged,
+    );
+    expect(screen.getByTestId('call-state').textContent).toBe(records.response.CallRequested);
+    expect(screen.getByText(app.thanksCallRequested)).toBeTruthy();
+  });
+
   it('a delivered message is shown as not yet acknowledged', async () => {
     mockApi({ 'GET /api/inbox': [inboxMessage({ delivery: 'Delivered', response: 'None' })] });
 

@@ -14,6 +14,7 @@ const SCENARIOS = [
     isCohort: true,
     patientCount: 0,
     synthetic: true,
+    problem: null,
   },
   {
     name: 'happy-path',
@@ -22,6 +23,7 @@ const SCENARIOS = [
     isCohort: false,
     patientCount: 1,
     synthetic: true,
+    problem: null,
   },
 ];
 
@@ -34,6 +36,37 @@ describe('Scenario runner', () => {
     expect(await screen.findByText('SIMULATED journey that completes.')).toBeTruthy();
     expect(screen.getByText('Patients: 1 · Pathway: PLACEHOLDER-PATHWAY')).toBeTruthy();
     expect(screen.getAllByText(en.common.simulated)).toHaveLength(2);
+  });
+
+  it('lists a scenario file that cannot be used with its problem and no way to run it', async () => {
+    mockApi({
+      'GET /scenarios': [
+        ...SCENARIOS,
+        {
+          name: 'broken',
+          description: '',
+          pathwayId: '',
+          isCohort: false,
+          patientCount: 0,
+          synthetic: true,
+          problem: 'SIMULATED: not valid scenario JSON.',
+        },
+      ],
+    });
+
+    renderAt(<ScenarioRunnerPage />);
+
+    expect(
+      await screen.findByText(
+        'This scenario file cannot be used: SIMULATED: not valid scenario JSON.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Run broken' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Run happy-path' }).disabled).toBe(
+      false,
+    );
   });
 
   it('starts a run and shows its run id', async () => {

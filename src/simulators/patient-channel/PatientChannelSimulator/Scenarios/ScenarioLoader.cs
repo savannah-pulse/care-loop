@@ -69,6 +69,46 @@ public sealed partial class ScenarioLoader
     }
 
     /// <summary>
+    /// Lists every scenario file, keeping the ones that cannot be used instead of failing on them.
+    /// </summary>
+    /// <remarks>
+    /// One file with a mistake must not hide the scenarios that are fine. A file that cannot be
+    /// used is still listed, with the reason, so the mistake is visible rather than silently skipped.
+    /// </remarks>
+    /// <param name="ct">Cancels the read.</param>
+    /// <returns>One entry per scenario file, ordered by name.</returns>
+    /// <exception cref="DirectoryNotFoundException">The scenario directory does not exist.</exception>
+    public async Task<IReadOnlyList<ScenarioListEntry>> ListEntriesAsync(CancellationToken ct)
+    {
+        var directory = Directory;
+        if (!System.IO.Directory.Exists(directory))
+        {
+            throw new DirectoryNotFoundException($"The scenario directory '{directory}' does not exist.");
+        }
+
+        var entries = new List<ScenarioListEntry>();
+        foreach (var path in System.IO.Directory.EnumerateFiles(directory, "*.json"))
+        {
+            if (string.Equals(Path.GetFileName(path), SchemaFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(path);
+            try
+            {
+                entries.Add(new ScenarioListEntry(name, await ReadAsync(path, ct), null));
+            }
+            catch (InvalidDataException ex)
+            {
+                entries.Add(new ScenarioListEntry(name, null, ex.Message));
+            }
+        }
+
+        return [.. entries.OrderBy(e => e.Name, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
     /// Loads one scenario by name.
     /// </summary>
     /// <param name="name">Scenario key; the file name without extension. Must match <c>^[a-z0-9-]+$</c> so it can never escape the directory.</param>

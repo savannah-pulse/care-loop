@@ -34,6 +34,38 @@ public sealed class InboxActionTests : IDisposable
     }
 
     [Fact]
+    public async Task A_call_request_after_an_acknowledgement_does_not_hide_it_or_cause_a_resend()
+    {
+        await _simulator.NotifyAsync();
+        await _simulator.ActAsync("acknowledge");
+        await _simulator.ActAsync("call-me");
+
+        var message = await _simulator.InboxMessageAsync();
+        Assert.Equal(ResponseState.Acknowledged, message.Response);
+        Assert.NotNull(message.AcknowledgedAt);
+        Assert.Equal(1, message.CallRequestCount);
+
+        await _simulator.ActAsync("acknowledge");
+        Assert.Equal(["delivery-status", "acknowledgement", "call-me"], _simulator.CareLoop.Categories);
+    }
+
+    [Fact]
+    public async Task Two_call_requests_at_once_are_two_requests_with_their_own_versions()
+    {
+        await _simulator.NotifyAsync();
+
+        await Task.WhenAll(Task.Run(() => _simulator.ActAsync("call-me")), Task.Run(() => _simulator.ActAsync("call-me")));
+
+        var versions = _simulator.CareLoop.Callbacks
+            .Where(c => c.Category == "call-me")
+            .Select(c => c.Json.GetProperty("meta").GetProperty("versionId").GetString())
+            .Order()
+            .ToList();
+        Assert.Equal(["1", "2"], versions);
+        Assert.Equal(2, (await _simulator.InboxMessageAsync()).CallRequestCount);
+    }
+
+    [Fact]
     public async Task Sms_reply_2_asks_for_a_call_and_does_not_acknowledge()
     {
         await _simulator.NotifyAsync(inboxAddress: SmsInbox);

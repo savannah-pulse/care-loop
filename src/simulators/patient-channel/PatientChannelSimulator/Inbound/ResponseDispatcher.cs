@@ -1,13 +1,15 @@
 namespace PatientChannelSimulator.Inbound;
 
 /// <summary>
-/// Background loop that sends delayed patient responses when they fall due.
+/// Background loop that sends what is due: delayed patient responses and delivery reports that
+/// are being tried again.
 /// </summary>
 /// <remarks>
-/// A behaviour may say the patient responds some time after delivery. Those responses wait in the
-/// store; this service asks <see cref="AutomaticResponder.SendDueAsync"/> for the due ones a few
-/// times a second. It holds no state of its own, so a failure in one pass cannot lose a response
-/// that is not yet due.
+/// A behaviour may say the patient responds some time after delivery, and a delivery report that
+/// failed is retried later. Both wait in the store; this service asks
+/// <see cref="DeliveryReportRetrier.RetryDueAsync"/> and <see cref="AutomaticResponder.SendDueAsync"/>
+/// for the due ones a few times a second. It holds no state of its own, so a failure in one pass
+/// cannot lose anything that is not yet due.
 /// </remarks>
 public sealed class ResponseDispatcher : BackgroundService
 {
@@ -38,6 +40,7 @@ public sealed class ResponseDispatcher : BackgroundService
                 try
                 {
                     await using var scope = _scopes.CreateAsyncScope();
+                    await scope.ServiceProvider.GetRequiredService<DeliveryReportRetrier>().RetryDueAsync(stoppingToken);
                     await scope.ServiceProvider.GetRequiredService<AutomaticResponder>().SendDueAsync(stoppingToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)

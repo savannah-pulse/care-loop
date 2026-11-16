@@ -20,7 +20,7 @@ namespace PatientChannelSimulator.State;
 /// <param name="ReceivedAt">When the simulator received the request, taken from the simulator clock.</param>
 /// <param name="Delivery">What has been reported to CareLoop about delivery.</param>
 /// <param name="DeliveryFailureReason">Reason text reported with a failed delivery; <see langword="null"/> unless <paramref name="Delivery"/> is <see cref="DeliveryState.Failed"/>.</param>
-/// <param name="Response">The patient's latest response.</param>
+/// <param name="Response">The strongest response CareLoop has accepted from the patient: understood, else acknowledged, else a call request. A later call request never hides an acknowledgement.</param>
 /// <param name="RespondedAt">When the patient last responded; <see langword="null"/> while <paramref name="Response"/> is <see cref="ResponseState.None"/>.</param>
 /// <param name="Simulated">Visible simulated-data marker; always <see langword="true"/>.</param>
 /// <param name="RecipientKind">Whether the message is for the patient or is a caregiver's copy. A caregiver's copy can never be answered.</param>
@@ -28,6 +28,8 @@ namespace PatientChannelSimulator.State;
 /// <param name="ConfidenceRatedAt">When the patient last rated; <see langword="null"/> while <paramref name="Confidence"/> is.</param>
 /// <param name="CallRequestCount">How many call-me requests CareLoop has accepted for this message; gives each further request its own version.</param>
 /// <param name="ConfidenceRatingCount">How many confidence ratings CareLoop has accepted for this message; gives each further rating its own version.</param>
+/// <param name="AcknowledgedAt">When CareLoop accepted the patient's acknowledgement; <see langword="null"/> until then. Kept apart from <paramref name="Response"/> so an acknowledgement is sent once whatever the patient does afterwards.</param>
+/// <param name="UnderstoodAt">When CareLoop accepted the patient's teach-back; <see langword="null"/> until then.</param>
 public sealed record InboxMessage(
     string MessageId,
     string CommunicationRequestId,
@@ -47,4 +49,6 @@ public sealed record InboxMessage(
     int? Confidence = null,
     DateTimeOffset? ConfidenceRatedAt = null,
     int CallRequestCount = 0,
-    int ConfidenceRatingCount = 0);
+    int ConfidenceRatingCount = 0,
+    DateTimeOffset? AcknowledgedAt = null,
+    DateTimeOffset? UnderstoodAt = null);

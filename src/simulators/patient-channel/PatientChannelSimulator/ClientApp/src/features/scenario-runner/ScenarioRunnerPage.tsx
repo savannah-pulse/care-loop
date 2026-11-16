@@ -147,7 +147,12 @@ export function ScenarioRunnerPage({ pollIntervalMs }: ScenarioRunnerPageProps) 
               <div>
                 <strong>{scenario.name}</strong> <SimulatedBadge />
                 <p>{scenario.description}</p>
-                <p className="message-note">
+                {scenario.problem && (
+                  <p className="error">
+                    {t('scenarioRunner.unusable', { problem: scenario.problem })}
+                  </p>
+                )}
+                <p className="message-note" hidden={scenario.problem !== null}>
                   {scenario.isCohort
                     ? t('scenarioRunner.cohort')
                     : `${t('scenarioRunner.patients', { count: scenario.patientCount })} · ${t(
@@ -158,7 +163,7 @@ export function ScenarioRunnerPage({ pollIntervalMs }: ScenarioRunnerPageProps) 
               </div>
               <button
                 type="button"
-                disabled={busy || scenario.isCohort}
+                disabled={busy || scenario.isCohort || scenario.problem !== null}
                 onClick={() => void start(scenario.name)}
               >
                 {t('scenarioRunner.run', { name: scenario.name })}

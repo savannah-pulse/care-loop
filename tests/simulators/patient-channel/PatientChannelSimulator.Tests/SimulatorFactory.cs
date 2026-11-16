@@ -167,6 +167,13 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
         return await scope.ServiceProvider.GetRequiredService<AutomaticResponder>().SendDueAsync(CancellationToken.None);
     }
 
+    /// <summary>Tries the delivery reports that are due on the fake clock, as the dispatcher would.</summary>
+    public async Task<int> RetryDueAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<DeliveryReportRetrier>().RetryDueAsync(CancellationToken.None);
+    }
+
     public IReadOnlyList<PatientReactionRecord> Reactions(string patientId = TestData.PatientId) => Store.GetReactions([patientId]);
 
     /// <summary>The CommunicationRequest CareLoop sends: same fields as its simulator notification provider.</summary>

@@ -20,13 +20,15 @@ public static class ScenarioEndpoints
             {
                 try
                 {
-                    var scenarios = await loader.ListAsync(ct);
-                    return Results.Ok(scenarios.Select(s => new ScenarioSummary(
-                        s.Name,
-                        s.Description,
-                        s.PathwayId,
-                        IsCohort: s.Cohort is not null,
-                        PatientCount: s.Cohort is null ? s.Patients?.Count ?? 0 : 0)).ToList());
+                    var entries = await loader.ListEntriesAsync(ct);
+                    return Results.Ok(entries.Select(e => e.Scenario is { } s
+                        ? new ScenarioSummary(
+                            s.Name,
+                            s.Description,
+                            s.PathwayId,
+                            IsCohort: s.Cohort is not null,
+                            PatientCount: s.Cohort is null ? s.Patients?.Count ?? 0 : 0)
+                        : new ScenarioSummary(e.Name, string.Empty, string.Empty, IsCohort: false, PatientCount: 0, Problem: e.Problem)).ToList());
                 }
                 catch (Exception ex) when (ex is DirectoryNotFoundException or InvalidDataException)
                 {

@@ -223,6 +223,7 @@ public class PatientBehaviourTests
     [InlineData("""{"delivery":"Deliver","response":"None","confidence":3}""")]
     [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondToNotification":0}""")]
     [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondAfter":"-00:00:01"}""")]
+    [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondAfter":"366.00:00:00"}""")]
     [InlineData("""{"delivery":"Sideways","response":"None"}""")]
     public async Task Behaviour_that_breaks_a_rule_is_rejected(string json)
     {

@@ -48,8 +48,9 @@ public static class FhirInboundEndpoints
                 }
                 catch (Exception ex) when (ex is HttpRequestException or CareLoopNotConfiguredException)
                 {
-                    // The message is in the inbox but its delivery outcome could not be reported.
-                    // A failure answer lets CareLoop's outbox send again, which retries the report.
+                    // The message is in the inbox but its delivery outcome cannot be reported and will
+                    // not be retried in the background (no signing secret, or retries switched off).
+                    // A failure answer tells CareLoop so, instead of letting it count the message as sent.
                     return FhirOutcome.Error(
                         StatusCodes.Status502BadGateway,
                         OperationOutcome.IssueType.Transient,

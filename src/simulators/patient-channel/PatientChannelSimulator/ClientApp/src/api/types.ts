@@ -51,7 +51,7 @@ export interface InboxMessage {
   delivery: DeliveryState;
   /** Reason reported with a failed delivery, otherwise `null`. */
   deliveryFailureReason: string | null;
-  /** The patient's latest response. */
+  /** The strongest response CareLoop accepted: understood, else acknowledged, else a call request. */
   response: ResponseState;
   /** ISO 8601 time of the latest response, otherwise `null`. */
   respondedAt: string | null;
@@ -67,6 +67,10 @@ export interface InboxMessage {
   callRequestCount: number;
   /** How many confidence ratings CareLoop has accepted for this message. */
   confidenceRatingCount: number;
+  /** ISO 8601 time CareLoop accepted the patient's acknowledgement, otherwise `null`. */
+  acknowledgedAt: string | null;
+  /** ISO 8601 time CareLoop accepted the patient's teach-back, otherwise `null`. */
+  understoodAt: string | null;
 }
 
 /**
@@ -184,6 +188,8 @@ export interface ScenarioSummary {
   patientCount: number;
   /** Simulated-data marker; always `true`. */
   synthetic: boolean;
+  /** Why the scenario file cannot be used, otherwise `null`. A scenario with a problem cannot be run. */
+  problem: string | null;
 }
 
 /** Lifecycle of a scenario run. */

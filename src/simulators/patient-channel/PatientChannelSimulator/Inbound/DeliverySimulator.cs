@@ -62,7 +62,7 @@ public sealed class DeliverySimulator
     public async Task<InboxMessage> ApplyAsync(InboxMessage message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
-        var behaviour = _store.GetBehaviour(message.PatientSyntheticId);
+        var behaviour = BehaviourFor(message);
         var now = _clock.UtcNow;
 
         if (behaviour.Delivery == DeliveryBehaviour.StaySilent)
@@ -93,15 +93,11 @@ public sealed class DeliverySimulator
             var error = $"CareLoop answered {send.StatusCode}.";
             Record(message, reaction, sourceEventId, now, send.StatusCode, false, error);
 
-            // A server error that outlasted the retries is CareLoop being unavailable, not a decision:
-            // failing here lets CareLoop's outbox send the request again, which retries the report.
-            // A refusal (4xx) is a decision, and sending again would not change it.
-            if (send.StatusCode >= StatusCodes.Status500InternalServerError)
-            {
-                throw new HttpRequestException(error, null, (System.Net.HttpStatusCode)send.StatusCode);
-            }
-
-            return message;
+            // Whether CareLoop was unavailable (5xx) or refused the report (4xx), it does not know
+            // the outcome, so the request must not be answered as a success: CareLoop would count
+            // the message as sent while the inbox can never show it as delivered. Failing lets
+            // CareLoop's outbox send again, which reports again once the cause is put right.
+            throw new HttpRequestException(error, null, (System.Net.HttpStatusCode)send.StatusCode);
         }
 
         Record(message, reaction, sourceEventId, now, send.StatusCode, true, null);
@@ -109,6 +105,14 @@ public sealed class DeliverySimulator
             ? m with { Delivery = DeliveryState.Failed, DeliveryFailureReason = reason }
             : m with { Delivery = DeliveryState.Delivered });
     }
+
+    // The default behaviour describes patients. A caregiver's copy follows it only when a behaviour
+    // was set for that caregiver's own inbox address; otherwise it is simply delivered, so testing
+    // unreachable patients does not also make every caregiver unreachable.
+    private PatientBehaviour BehaviourFor(InboxMessage message) =>
+        message.RecipientKind == RecipientKind.Caregiver
+            ? _store.FindOwnBehaviour(message.PatientSyntheticId) ?? new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None)
+            : _store.GetBehaviour(message.PatientSyntheticId);
 
     private void Record(InboxMessage message, PatientReactionKind reaction, string? sourceEventId, DateTimeOffset at, int? statusCode, bool succeeded, string? error) =>
         _store.AppendReaction(new PatientReactionRecord(message.MessageId, message.PatientSyntheticId, reaction, true, sourceEventId, at, statusCode, succeeded, error));

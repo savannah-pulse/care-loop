@@ -13,6 +13,12 @@ public static class PatientBehaviourRules
     public const string SyntheticPrefix = "SYN-";
 
     /// <summary>
+    /// The longest delay a behaviour may wait before responding. Far longer than any pathway
+    /// deadline, and short enough that a due time can always be computed.
+    /// </summary>
+    public static readonly TimeSpan MaximumRespondAfter = TimeSpan.FromDays(365);
+
+    /// <summary>
     /// Checks a behaviour.
     /// </summary>
     /// <param name="behaviour">The behaviour to check.</param>
@@ -39,6 +45,11 @@ public static class PatientBehaviourRules
         if (behaviour.RespondAfter < TimeSpan.Zero)
         {
             return "RespondAfter cannot be negative.";
+        }
+
+        if (behaviour.RespondAfter > MaximumRespondAfter)
+        {
+            return $"RespondAfter cannot be longer than {MaximumRespondAfter.TotalDays:0} days.";
         }
 
         if (behaviour.RespondToNotification < 1)

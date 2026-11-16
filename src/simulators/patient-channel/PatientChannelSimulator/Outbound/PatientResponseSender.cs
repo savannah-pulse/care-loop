@@ -20,6 +20,7 @@ public sealed class PatientResponseSender
     private readonly ConfidenceRatingCommunicationBuilder _confidenceRating;
     private readonly CareLoopFhirClient _careLoop;
     private readonly SimulatorStore _store;
+    private readonly MessageGate _gate;
     private readonly ISimulatorClock _clock;
 
     /// <summary>
@@ -31,6 +32,7 @@ public sealed class PatientResponseSender
     /// <param name="confidenceRating">Builds confidence-rating resources.</param>
     /// <param name="careLoop">Sends the built resource to CareLoop.</param>
     /// <param name="store">Holds the inbox message to read and update, and the reactions.</param>
+    /// <param name="gate">Makes two responses to the same message take turns, so each sees what the other recorded.</param>
     /// <param name="clock">Source of the response time.</param>
     public PatientResponseSender(
         AcknowledgementCommunicationBuilder acknowledgement,
@@ -39,6 +41,7 @@ public sealed class PatientResponseSender
         ConfidenceRatingCommunicationBuilder confidenceRating,
         CareLoopFhirClient careLoop,
         SimulatorStore store,
+        MessageGate gate,
         ISimulatorClock clock)
     {
         _acknowledgement = acknowledgement;
@@ -47,6 +50,7 @@ public sealed class PatientResponseSender
         _confidenceRating = confidenceRating;
         _careLoop = careLoop;
         _store = store;
+        _gate = gate;
         _clock = clock;
     }
 
@@ -56,7 +60,7 @@ public sealed class PatientResponseSender
     /// <remarks>
     /// A response is allowed only on a message for the patient that reached them: delivery was
     /// reported, or the channel stayed silent about it. A caregiver's copy can never be answered.
-    /// An acknowledgement or teach-back the inbox already shows is not sent again.
+    /// An acknowledgement or teach-back CareLoop already accepted is not sent again.
     /// </remarks>
     /// <param name="messageId">Simulator-local identifier of the inbox message being answered.</param>
     /// <param name="kind">Which response the patient gave.</param>
@@ -78,6 +82,10 @@ public sealed class PatientResponseSender
             throw new ArgumentOutOfRangeException(nameof(confidence), confidence, "A confidence rating must be a whole number from 1 to 5.");
         }
 
+        // Read, send and record as one turn per message: a second response waits and then builds
+        // on what the first recorded, so its version and the "already sent" check are right.
+        using var turn = await _gate.EnterAsync(messageId, ct);
+
         var message = _store.FindInboxMessage(messageId);
         if (message is null)
         {
@@ -94,8 +102,8 @@ public sealed class PatientResponseSender
             return new PatientResponseResult(PatientResponseStatus.NotAllowed, message, null, "The message did not reach the patient, so the patient cannot respond to it.");
         }
 
-        if ((kind == PatientResponseKind.Acknowledgement && message.Response == ResponseState.Acknowledged)
-            || (kind == PatientResponseKind.TeachBack && message.Response == ResponseState.Understood))
+        if ((kind == PatientResponseKind.Acknowledgement && message.AcknowledgedAt is not null)
+            || (kind == PatientResponseKind.TeachBack && message.UnderstoodAt is not null))
         {
             return new PatientResponseResult(PatientResponseStatus.Sent, message, null);
         }
@@ -132,9 +140,9 @@ public sealed class PatientResponseSender
 
         var updated = _store.UpdateInboxMessage(message.MessageId, current => kind switch
         {
-            PatientResponseKind.Acknowledgement => current with { Response = ResponseState.Acknowledged, RespondedAt = now },
-            PatientResponseKind.TeachBack => current with { Response = ResponseState.Understood, RespondedAt = now },
-            PatientResponseKind.CallMe => current with { Response = ResponseState.CallRequested, RespondedAt = now, CallRequestCount = current.CallRequestCount + 1 },
+            PatientResponseKind.Acknowledgement => current with { Response = Stronger(current.Response, ResponseState.Acknowledged), RespondedAt = now, AcknowledgedAt = now },
+            PatientResponseKind.TeachBack => current with { Response = ResponseState.Understood, RespondedAt = now, UnderstoodAt = now },
+            PatientResponseKind.CallMe => current with { Response = Stronger(current.Response, ResponseState.CallRequested), RespondedAt = now, CallRequestCount = current.CallRequestCount + 1 },
 
             // A rating is a measure, not an acknowledgement: the response state is left alone.
             _ => current with { Confidence = confidence, ConfidenceRatedAt = now, ConfidenceRatingCount = current.ConfidenceRatingCount + 1 },
@@ -142,6 +150,19 @@ public sealed class PatientResponseSender
         _store.AppendReaction(new PatientReactionRecord(message.MessageId, message.PatientSyntheticId, reaction, automatic, sourceEventId, now, send.StatusCode, true, null));
         return new PatientResponseResult(PatientResponseStatus.Sent, updated, send);
     }
+
+    // Understood outranks acknowledged, which outranks a call request: asking for a call after
+    // acknowledging must not make the inbox forget the acknowledgement CareLoop still holds.
+    private static ResponseState Stronger(ResponseState current, ResponseState candidate) =>
+        Rank(candidate) > Rank(current) ? candidate : current;
+
+    private static int Rank(ResponseState state) => state switch
+    {
+        ResponseState.Understood => 3,
+        ResponseState.Acknowledged => 2,
+        ResponseState.CallRequested => 1,
+        _ => 0,
+    };
 
     private static PatientReactionKind ReactionOf(PatientResponseKind kind) => kind switch
     {

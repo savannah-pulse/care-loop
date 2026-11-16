@@ -88,6 +88,14 @@ export function MessageRecords({ message }: MessageRecordsProps) {
               time={formatTime(message.respondedAt)}
               testId="response-state"
             />
+            {message.callRequestCount > 0 && message.response !== 'CallRequested' && (
+              <RecordRow
+                mark="ok"
+                title={t('inbox.records.response.CallRequested')}
+                detail={t('inbox.records.responseDetail.CallRequested')}
+                testId="call-state"
+              />
+            )}
             <RecordRow
               mark={message.confidence === null ? 'todo' : 'ok'}
               title={

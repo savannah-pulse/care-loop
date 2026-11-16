@@ -138,6 +138,18 @@ describe('API client', () => {
     expect((unreachable as ApiError).message).toBe(en.errors.unreachable);
   });
 
+  it('rejects a successful answer that is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('<!doctype html><title>shell</title>', { status: 200 })),
+    );
+
+    const failure = await listInbox().catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).message).toBe(en.errors.notJson);
+  });
+
   it('falls back to the status when the failure has no readable body', async () => {
     vi.stubGlobal(
       'fetch',

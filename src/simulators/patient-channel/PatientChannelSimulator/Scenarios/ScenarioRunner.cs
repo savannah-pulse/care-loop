@@ -166,11 +166,17 @@ public sealed class ScenarioRunner
 
         // The scenario states the delay in journey time; CareLoop runs on real time, so the delay
         // is compressed by the pacing (real seconds per scenario hour).
+        var realSeconds = journeyDelay.TotalHours * pacing;
+        if (!(realSeconds <= PatientBehaviourRules.MaximumRespondAfter.TotalSeconds))
+        {
+            throw Invalid($"'{file.RespondAfter}' at {pacing} real seconds per scenario hour is longer than {PatientBehaviourRules.MaximumRespondAfter.TotalDays:0} days.");
+        }
+
         var behaviour = new PatientBehaviour(
             delivery,
             response,
             file.FailureReason,
-            TimeSpan.FromSeconds(journeyDelay.TotalHours * pacing),
+            TimeSpan.FromSeconds(realSeconds),
             file.RespondToNotification ?? 1,
             confidence: file.Confidence);
 

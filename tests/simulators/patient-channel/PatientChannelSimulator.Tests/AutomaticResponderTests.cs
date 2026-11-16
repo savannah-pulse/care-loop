@@ -121,6 +121,21 @@ public sealed class AutomaticResponderTests : IDisposable
     }
 
     [Fact]
+    public async Task A_response_still_waiting_is_dropped_when_the_behaviour_changes()
+    {
+        _simulator.SetBehaviour(Responds(PatientResponseBehaviour.Acknowledge, after: TimeSpan.FromSeconds(30)));
+        await _simulator.NotifyAsync();
+        Assert.Equal(1, _simulator.Store.CountPendingResponses());
+
+        _simulator.SetBehaviour(Responds(PatientResponseBehaviour.None));
+        _simulator.Clock.Advance(TimeSpan.FromMinutes(1));
+
+        Assert.Equal(0, await _simulator.SendDueAsync());
+        Assert.Equal(["delivery-status"], _simulator.CareLoop.Categories);
+        Assert.Equal(ResponseState.None, (await _simulator.InboxMessageAsync()).Response);
+    }
+
+    [Fact]
     public async Task Patient_who_responds_to_the_second_notification_ignores_the_first()
     {
         _simulator.SetBehaviour(Responds(PatientResponseBehaviour.Acknowledge, toNotification: 2));

@@ -27,6 +27,7 @@ public sealed class SimulatorStore
     private readonly List<PatientReactionRecord> _reactions = [];
     private readonly Dictionary<string, ScenarioRunState> _runs = new(StringComparer.Ordinal);
     private readonly List<PendingResponse> _pending = [];
+    private readonly List<PendingDeliveryReport> _deliveryReports = [];
     private PatientBehaviour _defaultBehaviour = new(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None);
     private int _defaultInForceFrom;
 
@@ -224,6 +225,19 @@ public sealed class SimulatorStore
     }
 
     /// <summary>
+    /// Finds the behaviour set for one identifier, ignoring the default.
+    /// </summary>
+    /// <param name="syntheticId">Synthetic identifier of a patient, or a caregiver's inbox address.</param>
+    /// <returns>The behaviour set for exactly that identifier, or <see langword="null"/> when there is none.</returns>
+    public PatientBehaviour? FindOwnBehaviour(string syntheticId)
+    {
+        lock (_gate)
+        {
+            return _behaviours.TryGetValue(syntheticId, out var assignment) ? assignment.Behaviour : null;
+        }
+    }
+
+    /// <summary>
     /// Lists the patients that have a behaviour of their own.
     /// </summary>
     /// <returns>One assignment per patient, ordered by patient identifier. The default behaviour is not included.</returns>
@@ -240,7 +254,8 @@ public sealed class SimulatorStore
     /// </summary>
     /// <param name="assignment">The patient, their behaviour and the scenario that set it, if any.</param>
     /// <remarks>
-    /// Notifications already in the inbox keep the reactions they already had, and the patient's
+    /// Notifications already in the inbox keep the reactions they already had, a response still
+    /// waiting for its due time under the previous behaviour is dropped, and the patient's
     /// notification numbers start again: <see cref="PatientBehaviour.RespondToNotification"/> counts
     /// the notifications received under this behaviour. Otherwise a scenario run a second time
     /// would find its patient already past the notification they respond to.
@@ -252,6 +267,7 @@ public sealed class SimulatorStore
         {
             _behaviours[assignment.PatientSyntheticId] = assignment;
             _behaviourInForceFrom[assignment.PatientSyntheticId] = _messageOrder.Count;
+            DropPendingResponses(id => string.Equals(id, assignment.PatientSyntheticId, StringComparison.Ordinal));
         }
     }
 
@@ -265,6 +281,7 @@ public sealed class SimulatorStore
         lock (_gate)
         {
             _behaviourInForceFrom.Remove(patientSyntheticId);
+            DropPendingResponses(id => string.Equals(id, patientSyntheticId, StringComparison.Ordinal));
             return _behaviours.Remove(patientSyntheticId);
         }
     }
@@ -296,6 +313,7 @@ public sealed class SimulatorStore
         {
             _defaultBehaviour = behaviour;
             _defaultInForceFrom = _messageOrder.Count;
+            DropPendingResponses(id => !_behaviours.ContainsKey(id));
         }
     }
 
@@ -446,6 +464,46 @@ public sealed class SimulatorStore
             return _pending.Count;
         }
     }
+
+    /// <summary>
+    /// Queues a delivery report to be tried again later, unless one is already queued for the message.
+    /// </summary>
+    /// <param name="report">The message and the time the retry is due.</param>
+    /// <returns><see langword="true"/> when the retry was queued; <see langword="false"/> when the message already has one waiting.</returns>
+    public bool ScheduleDeliveryReport(PendingDeliveryReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        lock (_gate)
+        {
+            if (_deliveryReports.Exists(r => string.Equals(r.MessageId, report.MessageId, StringComparison.Ordinal)))
+            {
+                return false;
+            }
+
+            _deliveryReports.Add(report);
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Takes the queued delivery reports that are due, removing them from the queue.
+    /// </summary>
+    /// <param name="now">The current time on the simulator clock.</param>
+    /// <returns>The reports whose due time is at or before <paramref name="now"/>, earliest first.</returns>
+    public IReadOnlyList<PendingDeliveryReport> ClaimDueDeliveryReports(DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            var due = _deliveryReports.Where(r => r.DueAt <= now).OrderBy(r => r.DueAt).ToList();
+            _deliveryReports.RemoveAll(r => r.DueAt <= now);
+            return due;
+        }
+    }
+
+    // A response that is still waiting was decided by the behaviour that has just been replaced.
+    // Sending it anyway would make a patient who was just set to stay silent respond.
+    private void DropPendingResponses(Func<string, bool> forPatient) =>
+        _pending.RemoveAll(p => _messages.TryGetValue(p.MessageId, out var message) && forPatient(message.PatientSyntheticId));
 
     private void Store(InboxMessage message)
     {

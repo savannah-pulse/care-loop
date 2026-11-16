@@ -176,7 +176,7 @@ export function SmartphoneView({ message, onChanged }: SmartphoneViewProps) {
                 </span>
                 <h4>{t('inbox.app.thanks', { name: message.patientDisplayName })}</h4>
                 <p>
-                  {message.response === 'CallRequested'
+                  {message.response === 'CallRequested' || message.callRequestCount > 0
                     ? t('inbox.app.thanksCallRequested')
                     : t('inbox.app.thanksAcknowledged')}
                 </p>

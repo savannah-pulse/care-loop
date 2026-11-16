@@ -152,16 +152,46 @@ public sealed class InboundCommunicationRequestTests : IDisposable
     }
 
     [Fact]
-    public async Task When_CareLoop_keeps_failing_the_request_fails_and_a_resend_finishes_the_delivery()
+    public async Task A_request_refused_as_not_synthetic_is_logged_without_its_body()
     {
+        var response = await _simulator.NotifyAsync(patientId: "PT-REAL-LOOKING-0001");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var entry = Assert.Single(_simulator.Store.GetLogEntries());
+        Assert.Equal(400, entry.StatusCode);
+        Assert.Null(entry.Body);
+    }
+
+    [Fact]
+    public async Task When_the_report_fails_the_message_is_accepted_and_reported_later()
+    {
+        _simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge));
         _simulator.CareLoop.AnswerWith(HttpStatusCode.ServiceUnavailable);
+
         var first = await _simulator.NotifyAsync();
 
+        // CareLoop does not send a patient notification again, so the channel accepts it and reports later.
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         Assert.Equal(DeliveryState.Pending, (await _simulator.InboxMessageAsync()).Delivery);
         Assert.Equal(3, _simulator.CareLoop.Callbacks.Count);
 
-        // The report never got through, so the request fails and CareLoop's outbox sends it again.
-        Assert.Equal(HttpStatusCode.BadGateway, first.StatusCode);
+        _simulator.CareLoop.AnswerWith(HttpStatusCode.OK);
+        Assert.Equal(0, await _simulator.RetryDueAsync());
+
+        _simulator.Clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, await _simulator.RetryDueAsync());
+
+        var message = await _simulator.InboxMessageAsync();
+        Assert.Equal(DeliveryState.Delivered, message.Delivery);
+        Assert.Equal(ResponseState.Acknowledged, message.Response);
+        Assert.Equal(0, await _simulator.RetryDueAsync());
+    }
+
+    [Fact]
+    public async Task A_resend_finishes_a_delivery_that_is_still_unreported_and_the_retry_then_does_nothing()
+    {
+        _simulator.CareLoop.AnswerWith(HttpStatusCode.ServiceUnavailable);
+        await _simulator.NotifyAsync();
 
         _simulator.CareLoop.AnswerWith(HttpStatusCode.OK);
         var resend = await _simulator.NotifyAsync();
@@ -169,21 +199,123 @@ public sealed class InboundCommunicationRequestTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, resend.StatusCode);
         Assert.Equal(DeliveryState.Delivered, (await _simulator.InboxMessageAsync()).Delivery);
         Assert.Single(_simulator.Store.GetInboxMessages());
+
+        var callbacks = _simulator.CareLoop.Callbacks.Count;
+        _simulator.Clock.Advance(TimeSpan.FromMinutes(5));
+        await _simulator.RetryDueAsync();
+        Assert.Equal(callbacks, _simulator.CareLoop.Callbacks.Count);
     }
 
     [Fact]
-    public async Task When_the_callback_throws_the_request_answers_502_so_CareLoop_sends_again()
+    public async Task When_the_callback_throws_the_message_stays_pending_and_the_failure_is_recorded()
     {
         _simulator.CareLoop.Answer = _ => throw new HttpRequestException("SIMULATED: connection refused");
 
         var response = await _simulator.NotifyAsync();
 
-        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
-        await AssertOperationOutcomeAsync(response, "transient", HttpStatusCode.BadGateway);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         Assert.Equal(DeliveryState.Pending, _simulator.Store.FindInboxMessage(TestData.RequestId)!.Delivery);
         var reaction = Assert.Single(_simulator.Reactions());
         Assert.False(reaction.Succeeded);
         Assert.Null(reaction.HttpStatusCode);
+    }
+
+    [Fact]
+    public async Task A_refused_delivery_report_is_retried_with_a_growing_wait_and_then_given_up()
+    {
+        _simulator.CareLoop.AnswerWith(HttpStatusCode.Unauthorized);
+
+        var response = await _simulator.NotifyAsync();
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.Single(_simulator.CareLoop.Callbacks);
+
+        // The second retry waits longer than the first.
+        _simulator.Clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, await _simulator.RetryDueAsync());
+        _simulator.Clock.Advance(TimeSpan.FromSeconds(5));
+        Assert.Equal(0, await _simulator.RetryDueAsync());
+
+        for (var i = 0; i < 20; i++)
+        {
+            _simulator.Clock.Advance(TimeSpan.FromMinutes(2));
+            await _simulator.RetryDueAsync();
+        }
+
+        // One report while receiving, then the ten background retries, then nothing more.
+        Assert.Equal(11, _simulator.CareLoop.Callbacks.Count);
+        Assert.Equal(DeliveryState.Pending, (await _simulator.InboxMessageAsync()).Delivery);
+        Assert.Equal(HttpStatusCode.Conflict, (await _simulator.ActAsync("acknowledge")).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_log_shows_the_status_CareLoop_received_when_the_report_cannot_be_made()
+    {
+        using var simulator = new SimulatorFactory(secret: string.Empty);
+
+        var response = await simulator.NotifyAsync();
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var inbound = Assert.Single(simulator.Store.GetLogEntries(), e => e.Direction == FhirMessageDirection.Inbound);
+        Assert.Equal(502, inbound.StatusCode);
+    }
+
+    [Fact]
+    public async Task Two_deliveries_of_the_same_request_at_once_report_and_respond_once()
+    {
+        _simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.CallMe));
+        using var firstReportStarted = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        _simulator.CareLoop.Answer = call =>
+        {
+            if (call.Category == "delivery-status")
+            {
+                firstReportStarted.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        };
+
+        var first = Task.Run(() => _simulator.NotifyAsync());
+        Assert.True(firstReportStarted.Wait(TimeSpan.FromSeconds(10)));
+        var second = Task.Run(() => _simulator.NotifyAsync());
+        await Task.Delay(200);
+        release.Set();
+
+        Assert.Equal(HttpStatusCode.Created, (await first).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await second).StatusCode);
+        Assert.Equal(["delivery-status", "call-me"], _simulator.CareLoop.Categories);
+        Assert.Equal(1, (await _simulator.InboxMessageAsync()).CallRequestCount);
+    }
+
+    [Fact]
+    public async Task A_caregiver_copy_is_delivered_even_when_the_default_patient_behaviour_fails_delivery()
+    {
+        _simulator.Store.SetDefaultBehaviour(new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: unreachable"));
+
+        await _simulator.NotifyAsync(requestId: "caregiver-copy", inboxAddress: "SYN-CG-INBOX-0001", caregiver: true);
+
+        Assert.Equal(DeliveryState.Delivered, Assert.Single(_simulator.Store.GetInboxMessages()).Delivery);
+    }
+
+    [Fact]
+    public async Task A_caregiver_copy_follows_a_behaviour_set_for_its_own_inbox_address()
+    {
+        _simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: mailbox full"), "SYN-CG-INBOX-0001");
+
+        await _simulator.NotifyAsync(requestId: "caregiver-copy", inboxAddress: "SYN-CG-INBOX-0001", caregiver: true);
+
+        Assert.Equal(DeliveryState.Failed, Assert.Single(_simulator.Store.GetInboxMessages()).Delivery);
+    }
+
+    [Fact]
+    public async Task An_unknown_path_under_a_host_prefix_is_not_found()
+    {
+        var client = _simulator.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/no-such-route")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/fhir/Task/123")).StatusCode);
     }
 
     private static async Task AssertOperationOutcomeAsync(HttpResponseMessage response, string issueCode, HttpStatusCode status = HttpStatusCode.BadRequest)

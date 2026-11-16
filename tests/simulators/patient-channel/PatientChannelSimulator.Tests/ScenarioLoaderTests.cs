@@ -72,6 +72,21 @@ public sealed class ScenarioLoaderTests : IDisposable
     }
 
     [Fact]
+    public async Task One_unusable_file_is_listed_with_its_problem_and_does_not_hide_the_others()
+    {
+        _files.AddScenario("good", Acknowledges);
+        _files.AddScenario("real-data", Acknowledges, synthetic: false);
+
+        var entries = await Loader().ListEntriesAsync(CancellationToken.None);
+
+        Assert.Equal(["good", "real-data"], entries.Select(e => e.Name));
+        Assert.NotNull(entries[0].Scenario);
+        Assert.Null(entries[0].Problem);
+        Assert.Null(entries[1].Scenario);
+        Assert.Contains("synthetic", entries[1].Problem, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Load_rejects_a_file_whose_name_differs_from_its_file_name()
     {
         _files.AddScenario("renamed", Acknowledges, declaredName: "something-else");

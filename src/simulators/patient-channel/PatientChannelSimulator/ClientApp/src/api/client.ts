@@ -85,7 +85,16 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 
   const text = await response.text();
-  return (text.length > 0 ? JSON.parse(text) : undefined) as T;
+  if (text.length === 0) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // A 2xx answer that is not JSON is not the host's API (for example a page served in its place).
+    throw new ApiError(response.status, i18n.t('errors.notJson'));
+  }
 }
 
 /**

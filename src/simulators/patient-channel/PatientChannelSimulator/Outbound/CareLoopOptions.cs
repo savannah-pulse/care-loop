@@ -56,4 +56,23 @@ public sealed class CareLoopOptions
     /// still handling.
     /// </remarks>
     public int TimeoutSeconds { get; set; } = 10;
+
+    /// <summary>
+    /// How many more times the simulator reports a delivery outcome by itself, in the background,
+    /// after the report failed while the notification was being received.
+    /// </summary>
+    /// <remarks>
+    /// CareLoop does not send a patient notification again, so a report that fails once would
+    /// otherwise leave the message undelivered for good. Zero switches the background retries off.
+    /// </remarks>
+    public int DeliveryReportRetries { get; set; } = 10;
+
+    /// <summary>
+    /// Seconds before the first background retry of a delivery report. Each further retry waits
+    /// twice as long as the one before, up to <see cref="DeliveryReportRetryMaximumSeconds"/>.
+    /// </summary>
+    public int DeliveryReportRetrySeconds { get; set; } = 5;
+
+    /// <summary>The longest wait between two background retries of a delivery report, in seconds.</summary>
+    public int DeliveryReportRetryMaximumSeconds { get; set; } = 60;
 }

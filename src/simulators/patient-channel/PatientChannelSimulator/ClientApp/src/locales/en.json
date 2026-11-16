@@ -22,7 +22,8 @@
   },
   "errors": {
     "unreachable": "The simulator could not be reached.",
-    "status": "The request failed with status {{status}}."
+    "status": "The request failed with status {{status}}.",
+    "notJson": "The simulator's answer was not understood."
   },
   "inbox": {
     "title": "Patient inbox",
@@ -201,6 +202,7 @@
     "pathway": "Pathway: {{pathway}}",
     "run": "Run {{name}}",
     "cohort": "A cohort cannot be run here. Run the scenarios it draws from.",
+    "unusable": "This scenario file cannot be used: {{problem}}",
     "runHeading": "Run",
     "runId": "Run identifier: {{runId}}",
     "runScenario": "Scenario: {{name}}",

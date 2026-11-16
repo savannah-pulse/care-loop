@@ -35,6 +35,7 @@ public static class ServiceRegistration
 
         // State and time.
         services.AddSingleton<SimulatorStore>();
+        services.AddSingleton<MessageGate>();
         services.AddSingleton<ISimulatorClock, SystemSimulatorClock>();
 
         // Outbound: patient channel -> CareLoop.
@@ -58,6 +59,7 @@ public static class ServiceRegistration
         services.AddSingleton<CommunicationRequestMapper>();
         services.AddTransient<DeliverySimulator>();
         services.AddTransient<AutomaticResponder>();
+        services.AddTransient<DeliveryReportRetrier>();
         services.AddTransient<CommunicationRequestReceiver>();
         services.AddHostedService<ResponseDispatcher>();
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** What {@link useLoad} gives a screen. */
 export interface LoadState<T> {
@@ -28,12 +28,15 @@ export function errorMessage(error: unknown): string {
  * Loads a value from the simulator's host when the screen appears, and optionally keeps it fresh.
  *
  * @remarks
- * Makes a network call on mount, on every `reload()` and, when `pollIntervalMs` is given, on that
- * interval. An answer that arrives after the screen has gone, or after a newer request started,
- * is dropped.
+ * Makes a network call on mount, on every `reload()` and, when `pollIntervalMs` is given, again
+ * that long after each request has settled. Waiting for the answer before scheduling the next
+ * request means a slow host never has its answers thrown away by the next poll. An answer is
+ * dropped when the screen has gone, and when `setData` replaced the value while the request was
+ * under way: that answer describes the state before the change, and showing it would undo what
+ * the screen just displayed. The next poll brings the current state.
  *
  * @param load - Performs the request. It must keep its identity between renders (a module-level function or a `useCallback`).
- * @param pollIntervalMs - How often to load again, in milliseconds. Polling is off when omitted or zero.
+ * @param pollIntervalMs - How long to wait after one request before loading again, in milliseconds. Polling is off when omitted or zero.
  * @returns The loaded value with its loading and error state.
  */
 export function useLoad<T>(load: () => Promise<T>, pollIntervalMs?: number): LoadState<T> {
@@ -41,46 +44,49 @@ export function useLoad<T>(load: () => Promise<T>, pollIntervalMs?: number): Loa
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  // Counts the times setData replaced the value, so a request can tell it started before one.
+  const changes = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    load()
-      .then((value) => {
-        if (!cancelled) {
-          setValue(value);
-          setError(null);
-        }
-      })
-      .catch((failure: unknown) => {
-        if (!cancelled) {
-          setError(errorMessage(failure));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
+    const run = () => {
+      const changesAtStart = changes.current;
+      load()
+        .then((value) => {
+          if (!cancelled && changes.current === changesAtStart) {
+            setValue(value);
+            setError(null);
+          }
+        })
+        .catch((failure: unknown) => {
+          if (!cancelled) {
+            setError(errorMessage(failure));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setLoading(false);
+            if (pollIntervalMs) {
+              timer = setTimeout(run, pollIntervalMs);
+            }
+          }
+        });
+    };
+
+    run();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
-  }, [load, tick]);
-
-  useEffect(() => {
-    if (!pollIntervalMs) {
-      return undefined;
-    }
-
-    const timer = setInterval(() => setTick((value) => value + 1), pollIntervalMs);
-    return () => clearInterval(timer);
-  }, [pollIntervalMs]);
+  }, [load, tick, pollIntervalMs]);
 
   const reload = useCallback(() => setTick((value) => value + 1), []);
-  const setData = useCallback(
-    (update: (current: T | undefined) => T | undefined) => setValue((current) => update(current)),
-    [],
-  );
+  const setData = useCallback((update: (current: T | undefined) => T | undefined) => {
+    changes.current += 1;
+    setValue((current) => update(current));
+  }, []);
 
   return { data, error, loading, reload, setData };
 }
