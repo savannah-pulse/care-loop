@@ -5,6 +5,7 @@ using CareLoop.Api.Features.Exceptions;
 using CareLoop.Api.Features.Fhir;
 using CareLoop.Api.Features.Metrics;
 using CareLoop.Api.Features.Notifications;
+using CareLoop.Api.Features.Programmes;
 using CareLoop.Api.Features.Summaries;
 using CareLoop.Api.Infrastructure;
 using CareLoop.Api.Infrastructure.Persistence;
@@ -23,7 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // The OpenAPI document includes the XML documentation comments of endpoints and contracts.
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer<OpenApiLineEndingTransformer>());
 
 builder.Services
     .AddCoreAndPersistence(builder.Configuration)
@@ -51,6 +52,8 @@ app.MapGetCase();
 app.MapGetTimeline();
 app.MapGetExceptions();
 app.MapGetMetrics();
+app.MapGetProgrammes();
+app.MapAcknowledgeEscalation();
 app.MapRunSimulation();
 app.MapDraftHandoffSummary();
 app.MapApproveSummary();

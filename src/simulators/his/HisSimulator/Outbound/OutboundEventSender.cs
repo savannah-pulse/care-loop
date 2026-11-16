@@ -1,4 +1,6 @@
 using HisSimulator.State;
+using Hl7.Fhir.Model;
+using Task = System.Threading.Tasks.Task;
 
 namespace HisSimulator.Outbound;
 
@@ -9,7 +11,8 @@ namespace HisSimulator.Outbound;
 /// This is the single outbound path shared by the scenario runner and the manual clinician actions,
 /// so scripted and hand-triggered events are built identically. It picks the builder for the
 /// <see cref="HisEventKind"/>, sends the resources in dependency order (for example <c>ServiceRequest</c>
-/// before its <c>Task</c>, case <c>Task</c> before its <c>Provenance</c>) and updates the
+/// before its <c>Task</c>). Closure travels as one completed Task containing its matching human
+/// Provenance, because CareLoop requires the authorizer in the same inbound resource. It updates the
 /// <see cref="SimulatedCase"/> with the ids it sent.
 /// </remarks>
 public sealed class OutboundEventSender
@@ -23,6 +26,7 @@ public sealed class OutboundEventSender
     private readonly AppointmentBuilder _appointments;
     private readonly OutcomeBuilder _outcomes;
     private readonly ClosureBuilder _closures;
+    private readonly ConsentBuilder _consents;
 
     /// <summary>
     /// Creates the sender.
@@ -36,6 +40,7 @@ public sealed class OutboundEventSender
     /// <param name="appointments">Builds appointments.</param>
     /// <param name="outcomes">Builds outcome resources.</param>
     /// <param name="closures">Builds closure tasks and provenance.</param>
+    /// <param name="consents">Builds caregiver consent grants and withdrawals.</param>
     public OutboundEventSender(
         CareLoopFhirClient client,
         SimulatorStore store,
@@ -45,7 +50,8 @@ public sealed class OutboundEventSender
         ReferralBuilder referrals,
         AppointmentBuilder appointments,
         OutcomeBuilder outcomes,
-        ClosureBuilder closures)
+        ClosureBuilder closures,
+        ConsentBuilder consents)
     {
         _client = client;
         _store = store;
@@ -56,6 +62,7 @@ public sealed class OutboundEventSender
         _appointments = appointments;
         _outcomes = outcomes;
         _closures = closures;
+        _consents = consents;
     }
 
     /// <summary>
@@ -72,10 +79,78 @@ public sealed class OutboundEventSender
     /// </exception>
     /// <exception cref="ArgumentException">The request lacks a value its builder requires.</exception>
     /// <exception cref="HttpRequestException">CareLoop could not be reached.</exception>
-    public Task<OutboundEventResult> SendAsync(OutboundEventRequest request, CancellationToken cancellationToken)
+    public async Task<OutboundEventResult> SendAsync(OutboundEventRequest request, CancellationToken cancellationToken)
     {
-        // TODO(WS-7): switch on request.Kind, build with the matching builder, send via CareLoopFhirClient
-        // (POST for a first state, PUT for a later state of the same resource), upsert the SimulatedCase.
-        throw new NotImplementedException("WS7: OutboundEventSender.SendAsync");
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.CaseRef);
+        var gate = _store.GateFor(request.CaseRef);
+        await gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (request.Kind == HisEventKind.ScreeningResult)
+            {
+                var report = _screeningResults.Build(request);
+                var sent = await _client.CreateAsync(report, request.CaseRef, cancellationToken);
+                if (sent.Accepted) _store.UpsertCase(_screeningResults.CreateCase(request, report));
+                return new OutboundEventResult(request.Kind, request.CaseRef, request.SourceEventKey, [sent]);
+            }
+            var @case = _store.GetCase(request.CaseRef) ?? throw new KeyNotFoundException("The simulator has not sent a result for this case.");
+            var resources = new List<(Resource Resource, string Key)>();
+            switch (request.Kind)
+            {
+                case HisEventKind.ClinicalReview: resources.Add((_clinicalReviews.Build(@case, request), "review-task")); break;
+                case HisEventKind.ConsultationUpdate:
+                    if (!@case.ResourceIds.ContainsKey("consultation-service-request"))
+                        resources.Add((_consultations.BuildServiceRequest(@case, request), "consultation-service-request"));
+                    resources.Add((_consultations.BuildTask(@case, request), "consultation-task")); break;
+                case HisEventKind.ReferralUpdate:
+                    // An answer is sent alone: CareLoop starts the referral track itself, and a request authored by the
+                    // answering clinician would be a referral that person never made.
+                    if (request.Status == "requested" && !@case.ResourceIds.ContainsKey("referral-service-request"))
+                        resources.Add((_referrals.BuildServiceRequest(@case, request), "referral-service-request"));
+                    resources.Add((_referrals.BuildTask(@case, request), "referral-task")); break;
+                case HisEventKind.AppointmentUpdate: resources.Add((_appointments.Build(@case, request), "appointment")); break;
+                case HisEventKind.Outcome:
+                    var asReport = false;
+                    if (request.Params.TryGetValue("asFollowUpReport", out var value))
+                    {
+                        if (value.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False))
+                            throw new ArgumentException("asFollowUpReport must be a boolean.");
+                        asReport = value.GetBoolean();
+                    }
+                    resources.Add((asReport ? _outcomes.BuildFollowUpReport(@case, request) : _outcomes.BuildProcedure(@case, request), "outcome"));
+                    break;
+                case HisEventKind.Closure:
+                    var closure = _closures.BuildTask(@case, request);
+                    var provenance = _closures.BuildProvenance(@case, request, closure);
+                    provenance.Target = [new ResourceReference("#")];
+                    provenance.Meta = new Meta { Tag = provenance.Meta?.Tag ?? [] };
+                    closure.Contained.Add(provenance);
+                    closure.RelevantHistory.Add(new ResourceReference("#" + provenance.Id));
+                    resources.Add((closure, "closure-task")); break;
+                case HisEventKind.ConsentRecorded: resources.Add((_consents.Build(@case, request), "consent")); break;
+                default: throw new ArgumentException("This HIS event kind is unsupported.");
+            }
+            var results = new List<FhirSendResult>();
+            foreach (var (resource, key) in resources)
+            {
+                var update = key == "closure-task" || @case.ResourceIds.ContainsKey(key) && key != "outcome";
+                var result = update
+                    ? await _client.UpdateAsync(resource, request.CaseRef, cancellationToken)
+                    : await _client.CreateAsync(resource, request.CaseRef, cancellationToken);
+                results.Add(result);
+                if (!result.Accepted) break;
+                var ids = new Dictionary<string, string>(@case.ResourceIds) { [key] = resource.Id! };
+                if (key == "outcome")
+                {
+                    var reference = resource.TypeName + "/" + resource.Id;
+                    ids[key] = reference;
+                    ids[request.SourceEventKey] = reference;
+                }
+                @case = @case with { ResourceIds = ids };
+                _store.UpsertCase(@case);
+            }
+            return new OutboundEventResult(request.Kind, request.CaseRef, request.SourceEventKey, results);
+        }
+        finally { gate.Release(); }
     }
 }

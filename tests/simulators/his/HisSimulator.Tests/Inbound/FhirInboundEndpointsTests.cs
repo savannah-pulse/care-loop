@@ -1,55 +1,124 @@
+using System.Net;
+using HisSimulator.State;
+using Hl7.Fhir.Model;
+using FhirTask = Hl7.Fhir.Model.Task;
+using Task = System.Threading.Tasks.Task;
+
 namespace HisSimulator.Tests.Inbound;
 
-/// <summary>Planned behaviour of <c>POST /fhir/{resourceType}</c> and <c>PUT /fhir/{resourceType}/{id}</c>.</summary>
 public sealed class FhirInboundEndpointsTests
 {
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_escalation_task_returns_201_and_adds_an_inbox_item()
+    private static StringContent FhirContent(string body) => new(body, System.Text.Encoding.UTF8, "application/fhir+json");
+    internal static FhirTask Notice(string code) => new()
     {
+        Id = "SYN-NOTICE-1", Status = FhirTask.TaskStatus.Requested, Intent = FhirTask.TaskIntent.Order,
+        Code = new CodeableConcept(SimulatorTestData.Base + "/CodeSystem/task-code", code),
+        Owner = new ResourceReference("Practitioner/SYN-STAFF-2"), Focus = new ResourceReference("Task/SYN-CASE-1"),
+        Description = "SIMULATED a case needs your action",
+    };
+    [Theory] [InlineData("escalation", StaffInboxItemKind.Escalation)] [InlineData("call-request", StaffInboxItemKind.CallRequested)]
+    [InlineData("staff-notice", StaffInboxItemKind.StaffNotification)]
+    public async Task Notice_is_created_correlated_and_replay_updates_one_inbox_item_without_acceptance(string code, StaffInboxItemKind kind)
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        var body = SimulatorTestData.Json(Notice(code));
+        var first = await host.Http.PostAsync("/fhir/Task", FhirContent(body));
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode); Assert.NotNull(first.Headers.Location);
+        Assert.IsType<FhirTask>(SimulatorTestData.Parse(await first.Content.ReadAsStringAsync()));
+        Assert.Equal(HttpStatusCode.OK, (await host.Http.PutAsync("/fhir/Task/SYN-NOTICE-1", FhirContent(body))).StatusCode);
+        var item = Assert.Single(host.Store.GetInboxItems()); Assert.Equal(kind, item.Kind); Assert.Equal("SYN-STAFF-2", item.RecipientSyntheticId);
+        Assert.Equal("SYN-CASE-1", host.Store.GetCase("case-1")!.CareLoopTaskId);
+        Assert.All(host.Handler.Requests, r => Assert.Equal("GET", r.Method));
+        Assert.Equal(2, host.Store.GetLogEntries(FhirMessageDirection.Received).Count);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_handoff_proposed_task_adds_an_inbox_item_for_the_proposed_owner()
+    [Fact] public async Task Early_case_task_delivery_is_retained_and_rejection_updates_handoff_item()
     {
+        await using var host = await SimulatorHost.StartAsync(); var task = SimulatorTestData.CaseTask;
+        await host.Http.PostAsync("/fhir/Task", FhirContent(SimulatorTestData.Json(task)));
+        host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        Assert.Equal("SYN-CASE-1", host.Store.GetCase("case-1")!.CareLoopTaskId);
+        Assert.Equal(StaffInboxItemKind.HandoffProposed, Assert.Single(host.Store.GetInboxItems()).Kind);
+        task.Status = FhirTask.TaskStatus.Rejected;
+        await host.Http.PutAsync("/fhir/Task/" + task.Id, FhirContent(SimulatorTestData.Json(task)));
+        Assert.Equal(StaffInboxItemKind.HandoffRejected, Assert.Single(host.Store.GetInboxItems()).Kind);
+        task.Status = FhirTask.TaskStatus.Completed;
+        await host.Http.PutAsync("/fhir/Task/" + task.Id, FhirContent(SimulatorTestData.Json(task)));
+        Assert.Equal(StaffInboxItemKind.StaffNotification, Assert.Single(host.Store.GetInboxItems()).Kind);
+        Assert.Empty(host.Handler.Requests);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_call_request_task_adds_an_inbox_item_for_the_current_owner()
+    [Fact] public async Task A_referral_rejection_is_not_filed_as_a_handoff_rejection_and_a_later_proposal_is_not_labelled_rejected()
     {
+        await using var host = await SimulatorHost.StartAsync(); var task = SimulatorTestData.CaseTask;
+        async Task<StaffInboxItemKind> Put()
+        {
+            await host.Http.PutAsync("/fhir/Task/" + task.Id, FhirContent(SimulatorTestData.Json(task)));
+            return Assert.Single(host.Store.GetInboxItems()).Kind;
+        }
+        task.Status = FhirTask.TaskStatus.InProgress;
+        task.StatusReason = new CodeableConcept(SimulatorTestData.Base + "/CodeSystem/status-reason", "rejected") { Text = "SIMULATED no capacity" };
+        Assert.Equal(StaffInboxItemKind.ReferralRejected, await Put());
+        task.Status = FhirTask.TaskStatus.Requested;
+        Assert.Equal(StaffInboxItemKind.HandoffProposed, await Put());
+        task.Status = FhirTask.TaskStatus.Rejected;
+        Assert.Equal(StaffInboxItemKind.HandoffRejected, await Put());
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_document_reference_adds_a_handoff_summary_item()
+    [Theory] [InlineData(HttpStatusCode.NotFound)] [InlineData(HttpStatusCode.BadGateway)]
+    public async Task A_notice_is_stored_even_when_CareLoop_cannot_supply_its_case_task(HttpStatusCode answer)
     {
+        await using var host = await SimulatorHost.StartAsync(); host.Handler.Reply = _ => new HttpResponseMessage(answer);
+        host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        var response = await host.Http.PostAsync("/fhir/Task", FhirContent(SimulatorTestData.Json(Notice("escalation"))));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var item = Assert.Single(host.Store.GetInboxItems()); Assert.Equal("SYN-CASE-1", item.CareLoopTaskId);
+        Assert.Null(host.Store.GetCase("case-1")!.CareLoopTaskId);
+        Assert.Equal(201, Assert.Single(host.Store.GetLogEntries(FhirMessageDirection.Received)).StatusCode);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Put_task_update_records_a_rejection_item()
+    [Fact] public async Task A_notice_is_stored_when_the_callback_cannot_reach_CareLoop()
     {
+        await using var host = await SimulatorHost.StartAsync(); host.Handler.Reply = _ => throw new HttpRequestException("Test transport failure");
+        var response = await host.Http.PostAsync("/fhir/Task", FhirContent(SimulatorTestData.Json(Notice("call-request"))));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode); Assert.Equal(StaffInboxItemKind.CallRequested, Assert.Single(host.Store.GetInboxItems()).Kind);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_malformed_fhir_returns_400()
+    [Fact] public async Task A_message_naming_no_task_is_not_attributed_to_a_case_whose_task_is_unknown()
     {
+        await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        var document = new DocumentReference
+        {
+            Id = "SYN-DOC-2", Status = DocumentReferenceStatus.Current, Description = "SIMULATED text",
+            Content = [new DocumentReference.ContentComponent { Attachment = new Attachment { ContentType = "text/plain", Data = System.Text.Encoding.UTF8.GetBytes("SIMULATED text") } }],
+        };
+        await host.Http.PostAsync("/fhir/DocumentReference", FhirContent(SimulatorTestData.Json(document)));
+        Assert.Null(Assert.Single(host.Store.GetLogEntries(FhirMessageDirection.Received)).CaseRef);
+        Assert.Empty(host.Store.GetLogEntries(caseRef: "case-1"));
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_mismatched_resource_type_returns_400()
+    [Fact] public async Task Approved_document_reference_is_received_as_handoff_summary()
     {
+        await using var host = await SimulatorHost.StartAsync();
+        var document = new DocumentReference
+        {
+            Id = "SYN-DOC-1", Status = DocumentReferenceStatus.Current, Description = "SIMULATED approved text",
+            Content = [new DocumentReference.ContentComponent { Attachment = new Attachment { ContentType = "text/plain", Data = System.Text.Encoding.UTF8.GetBytes("SIMULATED approved text") } }],
+        };
+        var response = await host.Http.PostAsync("/fhir/DocumentReference", FhirContent(SimulatorTestData.Json(document)));
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        Assert.Equal(StaffInboxItemKind.HandoffSummary, Assert.Single(host.Store.GetInboxItems()).Kind);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Post_unsupported_resource_type_returns_422()
+    [Theory] [InlineData("/fhir/Task", "{broken", 400)]
+    [InlineData("/fhir/Task", "{\"resourceType\":\"Patient\"}", 400)]
+    [InlineData("/fhir/Patient", "{\"resourceType\":\"Patient\",\"id\":\"SYN-PT-1\"}", 422)]
+    [InlineData("/fhir/Task", "{\"resourceType\":\"Task\",\"code\":{\"coding\":[{\"system\":\"https://careloop.invalid/fhir/CodeSystem/task-code\",\"code\":\"staff-notice\"}]} }", 400)]
+    [InlineData("/fhir/Task", "{\"resourceType\":\"Task\",\"status\":\"requested\",\"intent\":\"order\",\"code\":{\"coding\":[{\"system\":\"https://careloop.invalid/fhir/CodeSystem/task-code\",\"code\":\"case\"}]},\"basedOn\":[{\"reference\":\"DiagnosticReport/SYN-REPORT-1\"}]}", 400)]
+    public async Task Bad_input_is_refused_and_attempt_is_logged(string path, string json, int status)
     {
+        await using var host = await SimulatorHost.StartAsync();
+        var response = await host.Http.PostAsync(path, FhirContent(json));
+        Assert.True((int)response.StatusCode == status, await response.Content.ReadAsStringAsync());
+        Assert.Empty(host.Store.GetInboxItems()); Assert.Equal(status, Assert.Single(host.Store.GetLogEntries()).StatusCode);
     }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Every_received_message_is_logged_as_received()
+    [Fact] public async Task Put_requires_matching_url_and_body_id()
     {
-    }
-
-    [Fact(Skip = "WS7: not implemented")]
-    public void Receiving_a_handoff_does_not_send_an_acceptance()
-    {
+        await using var host = await SimulatorHost.StartAsync();
+        Assert.Equal(HttpStatusCode.BadRequest, (await host.Http.PutAsync("/fhir/Task/different", FhirContent(SimulatorTestData.Json(Notice("escalation"))))).StatusCode);
+        Assert.Empty(host.Store.GetInboxItems());
     }
 }

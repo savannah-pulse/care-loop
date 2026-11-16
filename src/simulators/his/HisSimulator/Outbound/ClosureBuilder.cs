@@ -16,24 +16,80 @@ namespace HisSimulator.Outbound;
 public sealed class ClosureBuilder
 {
     /// <summary>
+    /// The wire codes CareLoop accepts for <c>Task.statusReason</c> on closure, keyed by the closure-reason name used by
+    /// scenarios and the UI. The wire code is the kebab-case form; both are accepted case-insensitively.
+    /// </summary>
+    private static readonly (string Name, string Code)[] ClosureReasons =
+    [
+        ("Treated", "treated"), ("OnSurveillance", "on-surveillance"), ("NegativeOnConfirmation", "negative-on-confirmation"),
+        ("Declined", "declined"), ("TransferredAndAccepted", "transferred-and-accepted"), ("Untraceable", "untraceable"),
+    ];
+
+    /// <summary>
     /// Builds the case <c>Task</c> in completed state.
     /// </summary>
     /// <param name="case">The simulated case; supplies CareLoop's case <c>Task</c> id and any outcome resource ids.</param>
     /// <param name="request">
-    /// The event to represent; the <c>closureReason</c> param is required. Evidence comes from
+    /// The event to represent; the <c>closureReason</c> param is required and is one of the six closure reasons, given by
+    /// name (for example <c>OnSurveillance</c>, any case) or by wire code (<c>on-surveillance</c>). Evidence comes from
     /// <c>Params["evidenceFromStep"]</c> (resolved to the outcome resource sent by that step), an explicit
     /// evidence reference, or a documented exception note; all are optional.
     /// </param>
     /// <returns>
-    /// A <c>Task</c> with status completed, the typed closure reason in <c>statusReason</c>, the evidence reference
+    /// A <c>Task</c> with status completed, the typed closure reason as its kebab-case wire code in <c>statusReason</c>, the evidence reference
     /// in <c>output</c> when supplied, a deterministic version and a simulated-data tag.
     /// </returns>
-    /// <exception cref="ArgumentException">The closure reason is missing.</exception>
+    /// <exception cref="ArgumentException">
+    /// The closure reason is missing or is not one of the six closure reasons, or the cited evidence is not an outcome resource.
+    /// </exception>
     /// <exception cref="InvalidOperationException">CareLoop's case <c>Task</c> id is not known for the case.</exception>
     public FhirTask BuildTask(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the completed case Task; look up CareLoopTaskId (GET /fhir/Task) if not yet known.
-        throw new NotImplementedException("WS7: ClosureBuilder.BuildTask");
+        var taskId = @case.CareLoopTaskId ?? throw new InvalidOperationException("The CareLoop case Task id is not known; receive a correlated FHIR notice first.");
+        var task = FhirSupport.Stamp(new FhirTask
+        {
+            Status = FhirTask.TaskStatus.Completed, Intent = FhirTask.TaskIntent.Order,
+            Code = FhirSupport.Concept("task-code", "case"),
+            StatusReason = FhirSupport.Concept("status-reason", ClosureCode(FhirSupport.Text(request, "closureReason"))),
+            BasedOn = [new ResourceReference("DiagnosticReport/" + @case.DiagnosticReportId)],
+            For = new ResourceReference("Patient/" + @case.Patient.SyntheticId),
+            LastModifiedElement = new FhirDateTime(request.OccurredAt),
+        }, request, taskId);
+        var evidence = FhirSupport.OptionalText(request, "evidenceReference");
+        var key = FhirSupport.OptionalText(request, "evidenceFromStep") ?? FhirSupport.OptionalText(request, "evidenceResourceKey");
+        if (key is not null)
+        {
+            evidence = @case.ResourceIds.GetValueOrDefault(key) ?? throw new ArgumentException("The cited evidence resource has not been successfully sent.");
+            if (!evidence.StartsWith("Procedure/", StringComparison.Ordinal) && !evidence.StartsWith("DiagnosticReport/", StringComparison.Ordinal))
+                throw new ArgumentException("The cited evidence must be an outcome resource (a Procedure or follow-up DiagnosticReport).");
+        }
+        if (evidence is not null) task.Output.Add(new FhirTask.OutputComponent
+        {
+            Type = FhirSupport.Concept("closure-output", "evidence"), Value = new ResourceReference(evidence),
+        });
+        var note = FhirSupport.OptionalText(request, "exceptionNote");
+        if (note is not null) task.Output.Add(new FhirTask.OutputComponent
+        {
+            Type = FhirSupport.Concept("closure-output", "exception-note"), Value = new FhirString(note),
+        });
+        var date = FhirSupport.OptionalText(request, "nextSurveillanceDate");
+        if (date is not null)
+        {
+            if (!DateOnly.TryParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out _)) throw new ArgumentException("The surveillance date must be YYYY-MM-DD.");
+            task.Output.Add(new FhirTask.OutputComponent { Type = FhirSupport.Concept("closure-output", "next-surveillance-date"), Value = new Date(date) });
+        }
+        if (request.Params.TryGetValue("documentedAttemptReferences", out var attempts))
+        {
+            if (attempts.ValueKind != System.Text.Json.JsonValueKind.Array) throw new ArgumentException("Documented attempts must be an array of references.");
+            foreach (var attempt in attempts.EnumerateArray())
+            {
+                if (attempt.ValueKind != System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(attempt.GetString()))
+                    throw new ArgumentException("Each documented attempt must be a nonblank reference.");
+                task.Output.Add(new FhirTask.OutputComponent { Type = FhirSupport.Concept("closure-output", "documented-attempt"), Value = new ResourceReference(attempt.GetString()) });
+            }
+        }
+        return task;
     }
 
     /// <summary>
@@ -49,7 +105,17 @@ public sealed class ClosureBuilder
     /// <exception cref="ArgumentException">The performer is missing.</exception>
     public Provenance BuildProvenance(SimulatedCase @case, OutboundEventRequest request, FhirTask closureTask)
     {
-        // TODO(WS-7): build the Provenance naming the authorizer.
-        throw new NotImplementedException("WS7: ClosureBuilder.BuildProvenance");
+        return FhirSupport.Stamp(new Provenance
+        {
+            Target = [new ResourceReference("Task/" + closureTask.Id)], Recorded = request.OccurredAt,
+            Agent = [new Provenance.AgentComponent { Who = FhirSupport.Actor(FhirSupport.Staff(request.Performer)) }],
+        }, request);
+    }
+
+    private static string ClosureCode(string reason)
+    {
+        foreach (var (name, code) in ClosureReasons)
+            if (string.Equals(reason, name, StringComparison.OrdinalIgnoreCase) || string.Equals(reason, code, StringComparison.OrdinalIgnoreCase)) return code;
+        throw new ArgumentException("The closure reason must be one of: " + string.Join(", ", ClosureReasons.Select(r => r.Code)) + ".");
     }
 }

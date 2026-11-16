@@ -2,6 +2,7 @@ using HisSimulator.State;
 using HisSimulator.Time;
 using Hl7.Fhir.Model;
 using FhirTask = Hl7.Fhir.Model.Task;
+using Task = System.Threading.Tasks.Task;
 
 namespace HisSimulator.Outbound;
 
@@ -47,15 +48,12 @@ public sealed class CareLoopFhirClient
     /// <param name="cancellationToken">Cancels the HTTP call.</param>
     /// <returns>The HTTP status and the identifier of the log entry for the exchange.</returns>
     /// <exception cref="HttpRequestException">CareLoop could not be reached at all (the failure is still logged).</exception>
-    public Task<FhirSendResult> CreateAsync(Resource resource, string? caseRef, CancellationToken cancellationToken)
-    {
-        // TODO(WS-7): serialize with Firely (FhirJsonSerializer / JsonSerializerOptions.ForFhir), POST to
-        // resource.TypeName as application/fhir+json, append a Sent FhirMessageLogEntry, return the status.
-        throw new NotImplementedException("WS7: CareLoopFhirClient.CreateAsync");
-    }
+    /// <exception cref="ArgumentException">The simulator source or simulated-data marker is absent.</exception>
+    public Task<FhirSendResult> CreateAsync(Resource resource, string? caseRef, CancellationToken cancellationToken) =>
+        SendAsync(HttpMethod.Post, resource, caseRef, cancellationToken);
 
     /// <summary>
-    /// Sends a resource state change with <c>PUT {FhirBaseUrl}/{resourceType}</c>.
+    /// Sends a resource state change with <c>PUT {FhirBaseUrl}/{resourceType}/{id}</c>.
     /// </summary>
     /// <remarks>
     /// CareLoop turns FHIR state into events using the resource identifier plus its version (or
@@ -70,9 +68,8 @@ public sealed class CareLoopFhirClient
     /// <exception cref="HttpRequestException">CareLoop could not be reached at all (the failure is still logged).</exception>
     public Task<FhirSendResult> UpdateAsync(Resource resource, string? caseRef, CancellationToken cancellationToken)
     {
-        // TODO(WS-7): as CreateAsync but with PUT; confirm with WS6 whether the id travels in the URL
-        // (PUT /fhir/{type}/{id}) or only in the body (AGENTS.md lists PUT /fhir/{resourceType}).
-        throw new NotImplementedException("WS7: CareLoopFhirClient.UpdateAsync");
+        if (string.IsNullOrWhiteSpace(resource.Id)) throw new ArgumentException("An updated resource must have a logical id.", nameof(resource));
+        return SendAsync(HttpMethod.Put, resource, caseRef, cancellationToken);
     }
 
     /// <summary>
@@ -83,9 +80,59 @@ public sealed class CareLoopFhirClient
     /// <returns>The case <c>Task</c>, or <see langword="null"/> if CareLoop answers 404.</returns>
     /// <exception cref="HttpRequestException">CareLoop could not be reached or answered with another error status.</exception>
     /// <exception cref="FormatException">The response body is not a valid FHIR R4 <c>Task</c>.</exception>
-    public Task<FhirTask?> GetTaskAsync(string taskId, CancellationToken cancellationToken)
+    /// <exception cref="ArgumentException">The Task id is blank.</exception>
+    public async Task<FhirTask?> GetTaskAsync(string taskId, CancellationToken cancellationToken)
     {
-        // TODO(WS-7): GET Task/{taskId} with Accept application/fhir+json, parse with Firely, log the exchange.
-        throw new NotImplementedException("WS7: CareLoopFhirClient.GetTaskAsync");
+        ArgumentException.ThrowIfNullOrWhiteSpace(taskId);
+        var logId = Guid.NewGuid();
+        int? status = null;
+        var body = string.Empty;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "Task/" + Uri.EscapeDataString(taskId));
+            request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/fhir+json"));
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            status = (int)response.StatusCode;
+            body = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+            response.EnsureSuccessStatusCode();
+            var task = FhirSupport.Parse(body) as FhirTask ?? throw new FormatException("CareLoop did not return a FHIR Task.");
+            if (task.Id != taskId) throw new FormatException("CareLoop returned a Task whose id does not match the requested case.");
+            return task;
+        }
+        finally
+        {
+            _store.AppendLogEntry(new FhirMessageLogEntry(logId, FhirMessageDirection.Sent, _clock.UtcNow, "GET",
+                "Task", taskId, status, null, string.Empty, body));
+        }
+    }
+
+    private async Task<FhirSendResult> SendAsync(HttpMethod method, Resource resource, string? caseRef, CancellationToken ct)
+    {
+        if (resource.Meta?.Source != "his-simulator" || !resource.Meta.Tag.Any(t =>
+                t.System == FhirSupport.Base + "/CodeSystem/data-origin" && t.Code == "simulated"))
+            throw new ArgumentException("Outbound resources must carry the simulator's source and simulated-data marker.", nameof(resource));
+        var body = FhirSupport.Serialize(resource);
+        var logId = Guid.NewGuid();
+        int? status = null;
+        string? responseBody = null;
+        try
+        {
+            var path = resource.TypeName + (method == HttpMethod.Put ? "/" + Uri.EscapeDataString(resource.Id!) : "");
+            using var request = new HttpRequestMessage(method, path)
+            {
+                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/fhir+json"),
+            };
+            request.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/fhir+json"));
+            using var response = await _httpClient.SendAsync(request, ct);
+            status = (int)response.StatusCode;
+            responseBody = await response.Content.ReadAsStringAsync(ct);
+            return new FhirSendResult(method.Method, resource.TypeName, resource.Id, status.Value, logId);
+        }
+        finally
+        {
+            _store.AppendLogEntry(new FhirMessageLogEntry(logId, FhirMessageDirection.Sent, _clock.UtcNow, method.Method,
+                resource.TypeName, resource.Id, status, caseRef, body, responseBody));
+        }
     }
 }

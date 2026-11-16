@@ -274,7 +274,7 @@ Hessa's journey:
 ![Arabic, right to left](11-arabic.png)
 
 - Deferred: this is the target design. The prototype runs in English, and every template and screen is keyed by language from the start, as `AGENTS.md` requires, so Arabic needs no new code.
-- Arabic is added once a qualified bilingual reviewer approves the wording ([AI specification](../ai-spec.md), section 2.3). The wording shown is a draft.
+- Arabic is added once a qualified bilingual reviewer approves the wording ([AI specification](../ai-design/ai-spec.md), section 2.3). The wording shown is a draft.
 - The same screens and events as 9 and 10. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
 - An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 128 characters: two messages.
 
@@ -297,7 +297,7 @@ Hessa's journey:
 | Nothing to do | The worklist says what is on track and when the next deadline is. If cases fail to load, it says so instead. | FR-09 |
 | Patient not reached | A failed or unanswered contact becomes a task with an owner and a deadline. | FR-04, FR-07 |
 | Same result received twice | Results are matched on source and result number, so a resent result never opens a second case. | FR-01 |
-| No AI draft | If AI is off, slow or fails a check, screen 18 shows no draft at all. A person writes the summary, and every step still works ([AI specification](../ai-spec.md), section 5). | FR-11 |
+| No AI draft | If AI is off, slow or fails a check, screen 18 shows no draft at all. A person writes the summary, and every step still works ([AI specification](../ai-design/ai-spec.md), section 5). | FR-11 |
 | Closing blocked | The close button stays off until every step has evidence. | FR-08 |
 | No internet | The app keeps the last next step on the phone, with when it was updated, a warning that it may have changed and a number to call. Offline storage belongs to the health app, not to CareLoop or the simulators. | FR-04 |
 
@@ -331,7 +331,7 @@ Hessa's journey:
 ![Approve the handoff summary](18-handoff-summary.png)
 
 - In the CareLoop web app, opened from the case (decision 4, C9). `POST /cases/{caseId}/handoff-summary` drafts it, and `POST /cases/{caseId}/handoff-summary/{summaryId}/approval` approves it and records `HandoffSummaryApproved`.
-- Every line shows the facts it came from, and anything the facts do not cover is listed for the clinician to check. AI never writes the assessment part ([AI specification](../ai-spec.md), sections 2.1 and 7).
+- Every line shows the facts it came from, and anything the facts do not cover is listed for the clinician to check. AI never writes the assessment part ([AI specification](../ai-design/ai-spec.md), sections 2.1 and 7).
 - The clinician approves, edits or rejects the draft. Her edits go with the approval. Rejecting is `POST /cases/{caseId}/handoff-summary/{summaryId}/rejection`, added in #27; she then writes the summary herself. Her name, the time, the facts used, her changes and the AI version are kept with her decision.
 - Doctors also see the patient's other screening, for context: her other cases in CareLoop, with a pointer to her full history in the hospital record. Nurses do not see this card. It needs C19.
 - Approving sends nothing. She sends the referral from her hospital system (screen 6), with the approved summary attached.
@@ -461,7 +461,7 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Who approves the wording of the consent form for family members?
 - Which roles may record that a patient withdraws consent? This design lets anyone in her care team record it in the hospital system, at her request.
 - Who is the qualified bilingual reviewer for Arabic? The AI specification asks the same.
-- The [AI specification](../ai-spec.md) names the receiving or responsible clinician as the reviewer of a handoff summary. This design has the referring clinician approve it before sending (screen 18), and the receiving clinician can decline for missing information (screen 7). Confirm this with the AI workstream.
+- The [AI specification](../ai-design/ai-spec.md) names the receiving or responsible clinician as the reviewer of a handoff summary. This design has the referring clinician approve it before sending (screen 18), and the receiving clinician can decline for missing information (screen 7). Confirm this with the AI workstream.
 - The placeholder reply deadlines differ: screen 4 shows 4 working hours for referrals, 1 working day for questions between clinicians and 2 working hours for call-backs, while the programme file uses 1 day for each. Agree one set until a clinical adviser approves them.
 - The case closes when treatment starts, as in the solution design, and later care keeps a named owner. Confirm this with the clinical adviser.
 - A patient who cannot decide for themselves is represented by a legal guardian. That needs its own design and a legal review.

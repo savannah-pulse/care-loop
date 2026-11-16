@@ -1,42 +1,40 @@
 using HisSimulator.State;
-using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace HisSimulator.Inbound;
 
-/// <summary>
-/// Maps the read route for the FHIR message log shown by the ClientApp.
-/// </summary>
+/// <summary>Reads exact synthetic FHIR wire exchanges, including refusals.</summary>
 public static class FhirMessageLogEndpoints
 {
-    /// <summary>
-    /// Maps <c>GET /fhir-log</c>.
-    /// </summary>
-    /// <param name="app">The route builder to add the endpoint to.</param>
-    /// <returns>The same <paramref name="app"/> instance, for chaining.</returns>
+    /// <summary>Maps the filtered message-log read.</summary>
+    /// <param name="app">The route builder.</param>
+    /// <returns>The same route builder.</returns>
     public static IEndpointRouteBuilder MapFhirMessageLogEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/fhir-log", ListLog)
-            .WithName("ListFhirMessageLog")
-            .Produces<FhirMessageLogResponse>(StatusCodes.Status200OK)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status501NotImplemented);
-
+        app.MapGet("/fhir-log", IResult (string? direction, string? caseRef, string? since, string? limit, SimulatorStore store, CancellationToken ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            FhirMessageDirection? filter = direction?.ToLowerInvariant() switch
+            {
+                null => null, "sent" => FhirMessageDirection.Sent, "received" => FhirMessageDirection.Received,
+                _ => throw new ArgumentException("Direction must be sent or received."),
+            };
+            DateTimeOffset? after = since is null ? null
+                : DateTimeOffset.TryParse(since, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var instant) ? instant
+                : throw new ArgumentException("Since must be an ISO 8601 instant.");
+            int? take = limit is null ? null
+                : int.TryParse(limit, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var count) && count > 0 ? count
+                : throw new ArgumentException("Limit must be a positive integer.");
+            return TypedResults.Ok(new FhirMessageLogResponse(store.GetLogEntries(filter, caseRef, after, take)));
+        }).WithName("ListFhirMessageLog")
+            .WithSummary("Lists synthetic FHIR request and response bodies, newest first; 'since' (ISO 8601 instant) returns only newer entries and 'limit' caps the count.")
+            .Produces<FhirMessageLogResponse>().ProducesProblem(400);
+        app.MapGet("/fhir-log/{id:guid}", IResult (Guid id, SimulatorStore store, CancellationToken ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return store.GetLogEntry(id) is { } entry ? TypedResults.Ok(entry) : TypedResults.NotFound();
+        }).WithName("GetFhirMessageLogEntry").WithSummary("Reads one log entry; the log keeps only the newest entries, so an old id may be gone.")
+            .Produces<FhirMessageLogEntry>().Produces(404);
         return app;
-    }
-
-    /// <summary>
-    /// Will list logged FHIR messages, newest first.
-    /// </summary>
-    /// <param name="direction">
-    /// Optional filter (query string <c>direction</c>): <c>sent</c> or <c>received</c>, matched case-insensitively
-    /// against <see cref="FhirMessageDirection"/>. Bound as text so an unknown value yields a descriptive 400.
-    /// </param>
-    /// <param name="caseRef">Optional filter (query string <c>caseRef</c>): a simulator-side case handle.</param>
-    /// <returns>501 until implemented; then 200 with a <see cref="FhirMessageLogResponse"/>, or 400 for an unknown direction.</returns>
-    private static ProblemHttpResult ListLog(string? direction, string? caseRef)
-    {
-        // TODO(WS-7): parse direction (Enum.TryParse, ignoreCase) and return SimulatorStore.GetLogEntries(direction, caseRef)
-        // wrapped in FhirMessageLogResponse; answer 400 for an unknown direction.
-        return StubResults.NotImplemented("FhirMessageLogEndpoints.ListLog");
     }
 }

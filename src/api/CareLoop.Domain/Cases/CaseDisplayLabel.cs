@@ -84,36 +84,36 @@ public static class CaseDisplayLabels
         ArgumentNullException.ThrowIfNull(@case);
         ArgumentNullException.ThrowIfNull(pathway);
 
-        return @case.Stage switch
+        return From(@case.Stage, @case.NextAction is not null, @case.Notification?.Status,
+            @case.Consultation is not null, @case.Referral is not null, @case.Appointment is not null,
+            RequiredTracksComplete(@case, pathway));
+    }
+
+    /// <summary>Evaluates the same display rules for an immutable historical projection.</summary>
+    /// <param name="stage">The recorded stage.</param>
+    /// <param name="hasNextAction">Whether a next action was recorded.</param>
+    /// <param name="notificationStatus">The recorded notification status, if started.</param>
+    /// <param name="hasConsultation">Whether consultation had started.</param>
+    /// <param name="hasReferral">Whether referral had started.</param>
+    /// <param name="hasAppointment">Whether appointment follow-up had started.</param>
+    /// <param name="requiredTracksComplete">Whether every pathway-required track was complete in the projection.</param>
+    /// <returns>The display label actually reached at that instant.</returns>
+    /// <remarks>Historical metrics must not invent intermediate progress or disagree with current case reads.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="stage"/> is unknown.</exception>
+    public static CaseDisplayLabel From(CaseStage stage, bool hasNextAction, NotificationStatus? notificationStatus,
+        bool hasConsultation, bool hasReferral, bool hasAppointment, bool requiredTracksComplete) =>
+        stage switch
         {
-            CaseStage.Received => @case.NextAction is null ? CaseDisplayLabel.ResultReceived : CaseDisplayLabel.CaseOpened,
+            CaseStage.Received => hasNextAction ? CaseDisplayLabel.CaseOpened : CaseDisplayLabel.ResultReceived,
             CaseStage.ReviewPending => CaseDisplayLabel.OwnerAssigned,
-            CaseStage.FollowUpActive => FollowUpLabel(@case),
-            CaseStage.ClosureReview => RequiredTracksComplete(@case, pathway) ? CaseDisplayLabel.ClosureReview : CaseDisplayLabel.OutcomeRecorded,
+            CaseStage.FollowUpActive => hasReferral || hasAppointment ? CaseDisplayLabel.FollowUp
+                : hasConsultation ? CaseDisplayLabel.Consultation
+                : notificationStatus is NotificationStatus.Acknowledged or NotificationStatus.Understood
+                    ? CaseDisplayLabel.PatientAcknowledged : CaseDisplayLabel.PatientNotified,
+            CaseStage.ClosureReview => requiredTracksComplete ? CaseDisplayLabel.ClosureReview : CaseDisplayLabel.OutcomeRecorded,
             CaseStage.Closed => CaseDisplayLabel.Closed,
-            _ => throw new ArgumentOutOfRangeException(nameof(@case), @case.Stage, "Unknown case stage."),
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), stage, "Unknown case stage."),
         };
-    }
-
-    private static CaseDisplayLabel FollowUpLabel(Case @case)
-    {
-        if (@case.Referral is not null || @case.Appointment is not null)
-        {
-            return CaseDisplayLabel.FollowUp;
-        }
-
-        if (@case.Consultation is not null)
-        {
-            return CaseDisplayLabel.Consultation;
-        }
-
-        if (@case.Notification is { Status: NotificationStatus.Acknowledged or NotificationStatus.Understood })
-        {
-            return CaseDisplayLabel.PatientAcknowledged;
-        }
-
-        return CaseDisplayLabel.PatientNotified;
-    }
 
     private static bool RequiredTracksComplete(Case @case, PathwayDefinition pathway) =>
         pathway.Tracks.Where(t => t.RequiredForClosure).All(t => t.Kind switch

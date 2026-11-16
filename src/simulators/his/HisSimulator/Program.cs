@@ -8,8 +8,12 @@ using HisSimulator.Scenarios;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddHisSimulator(builder.Configuration);
+builder.Services.AddOpenApi();
 
 var app = builder.Build();
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+app.MapOpenApi();
 
 // Serves the built ClientApp from wwwroot. Both calls are harmless when wwwroot is absent
 // (local development before `yarn build`, or the test host).

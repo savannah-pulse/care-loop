@@ -12,6 +12,7 @@ namespace HisSimulator.State;
 /// <param name="StatusCode">HTTP status of the exchange; <see langword="null"/> if no response was received.</param>
 /// <param name="CaseRef">Simulator-side handle of the case the message belongs to, when it can be correlated.</param>
 /// <param name="Body">The FHIR JSON exactly as sent or received, so the log shows the real wire content.</param>
+/// <param name="ResponseBody">The returned wire body for an outbound exchange, including refusals.</param>
 public sealed record FhirMessageLogEntry(
     Guid Id,
     FhirMessageDirection Direction,
@@ -21,7 +22,8 @@ public sealed record FhirMessageLogEntry(
     string? ResourceId,
     int? StatusCode,
     string? CaseRef,
-    string Body)
+    string Body,
+    string? ResponseBody = null)
 {
     /// <summary>
     /// Always <see langword="true"/>: marks the entry as simulated wherever it is displayed or exported.

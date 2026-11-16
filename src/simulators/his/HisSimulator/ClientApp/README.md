@@ -1,21 +1,33 @@
 # HIS simulator ClientApp
 
-React, TypeScript and Vite UI for the HIS simulator. **Simulated data only**; a banner says so on
-every screen. Status: placeholder screens (WS7).
+React/TypeScript/Vite source-system UI, with a visible synthetic-data banner on every screen.
+The four features are scenario replay/progress, addressed staff inbox, exact FHIR request/response
+logs, and explicit clinician/source actions (review, consultation, referral, appointment, outcome,
+closure and caregiver consent).
 
-| Feature folder                   | Screen                                                         |
-| -------------------------------- | -------------------------------------------------------------- |
-| `src/features/scenario-runner`   | Scenario runner                                                |
-| `src/features/staff-inbox`       | Staff inbox                                                    |
-| `src/features/fhir-log`          | FHIR message log (sent and received)                           |
-| `src/features/clinician-actions` | Act as clinician (review, referral decision, outcome, closure) |
+All UI text uses `src/locales/en.json`; strict types, export/property TSDoc, logical CSS and hash
+routing are enforced. Each page accepts an optional simulator `apiBaseUrl`, never a CareLoop REST
+address. Reads poll without overlapping calls and abort on changed filters/navigation.
+Opening notices never accepts ownership. Clinical code inputs have no invented defaults.
 
-Rules: every export has a TSDoc comment (enforced by ESLint); all user-visible text comes from
-`src/locales/en.json` through i18next; CSS uses logical properties only; routing is hash-based so
-client routes never collide with the simulator's API paths.
+Node 24+, Yarn 4.18.1:
 
-```sh
-corepack yarn install
-corepack yarn dev          # http://localhost:5181, proxies API calls to http://localhost:5081
-corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build
+```powershell
+corepack yarn install --immutable
+corepack yarn dev
+corepack yarn test
+corepack yarn build
+corepack yarn format:check
 ```
+
+Use `npx --yes @yarnpkg/cli-dist@4.18.1` in place of `corepack yarn` when Corepack is unavailable;
+do not activate global tooling. Dev port 5181 proxies to the simulator on 5081. Build includes
+documentation lint and type-checking. `dist` is copied into `wwwroot` by Docker.
+
+The compatible ESLint 9/TypeScript 5.9 toolchain and transitive build tools are pinned in the
+manifest/lockfile. Yarn supplies the TSDoc plugin's missing TypeScript peer metadata in `.yarnrc.yml`.
+Unit tests use React DOM/Vitest/jsdom and synthetic fetch responses, not full E2E journeys.
+
+Cohorts are explicitly unavailable until WS10. A completed replay may include refused steps and
+does not assert completed care. Shared happy-path evidence still needs WS10 correction, and patient
+behaviour remains WS8. See the [host README](../../README.md) for HTTP/configuration and demo details.

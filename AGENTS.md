@@ -15,7 +15,7 @@ CareLoop is **not** a clinical system. Hospital systems (HIS/EMR) remain the sys
 1. **Real patient data never enters the repository.** Source, tests, samples, scenarios, simulators, fixtures and local or demo environments use synthetic data only. Never commit real patient data, credentials or live endpoint addresses. The API and the dashboard are built as for production: they do not know or care whether the systems they talk to are simulators, and carry no simulated-data flags, labels or branches. Labelling simulated records and messages as simulated is the simulators' job.
 2. **No clinical decisions.** CareLoop never diagnoses, never sets or changes urgency, and never creates a clinical outcome. Urgency always arrives clinician-reviewed from the HIS.
 3. **Closure needs a human.** A case closes only on an authorized human closure event carrying pathway-specific evidence or a documented exception. The API must reject anything else and audit the attempt.
-4. **AI output is a draft.** AI can draft a handoff summary from facts a person has finalized. A person approves or rejects it, and approval is an event. AI cannot set urgency, alter source data, close a case or send a message, because it is given no way to. Under the DoH standard (§3.8.1) the reporting physician informs the patient, so AI never discloses a result. [`docs/api-ai-workflow-handoff.md`](docs/api-ai-workflow-handoff.md) is the full boundary: what AI may do, what it is sent, and what happens when it fails.
+4. **AI output is a draft.** AI can draft a handoff summary from facts a person has finalized. A person approves or rejects it, and approval is an event. AI cannot set urgency, alter source data, close a case or send a message, because it is given no way to. Under the DoH standard (§3.8.1) the reporting physician informs the patient, so AI never discloses a result. [`docs/ai-design/integration.md`](docs/ai-design/integration.md) is the full boundary: what AI may do, what it is sent, and what happens when it fails.
 5. **Deadlines are configuration.** Never hard-code a clinical deadline. All deadlines come from the pathway definition and are placeholders until a clinical adviser approves them. CareLoop always runs on real time and never speeds up its clock: a live demo uses the demo pathway folder, whose deadlines are shortened, selected through `Pathways:Directory`.
 
 If a task appears to conflict with any of these, stop and ask.
@@ -27,7 +27,7 @@ These are deferred, not forbidden. Build the seams for them now and leave the im
 - **Real SMS and email delivery.** For now the simulator notification provider is the only one enabled. SMS and email providers come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
 - **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS, Malaffi or patient-channel integration.** The simulators stand in for these.
-- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-spec.md`](docs/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
+- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
 
 ## Before real patient data
 
@@ -55,9 +55,8 @@ care-loop/
 │
 ├── docs/
 │   ├── workstreams.md                  who owns which files (WS1 to WS10)
-│   ├── architecture.md, development.md, releasing.md, component-register.md
-│   ├── api-ai-workflow-handoff.md      what AI may do, and how the API and the Python service share the work
-│   ├── ai-spec.md                      the AI design proposal; the handoff doc above is the contract
+│   ├── ai-design/                      AI architecture, specification, integration contract and source Word spec
+│   ├── development.md, releasing.md, component-register.md
 │   └── ui-design/                      screen designs
 │
 ├── src/
@@ -338,7 +337,7 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. See [`docs/api-ai-workflow-handoff.md`](docs/api-ai-workflow-handoff.md) |
+| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |
@@ -453,7 +452,7 @@ Work in this order. Finish and test each step before starting the next.
 7. **Outbox and notifications.** Dispatcher, `FhirPublisher`, `NotificationRouter`, `NotificationSender`, simulator provider, templates.
 8. **Dashboard.** Exception queue, case timeline, metrics.
 9. **Simulators.** HIS first, then patient channel, each with its scenario runner; UIs last.
-10. **AI handoff summary.** Draft, approval and rejection behind `IAiProvider`; see [`docs/api-ai-workflow-handoff.md`](docs/api-ai-workflow-handoff.md).
+10. **AI handoff summary.** Draft, approval and rejection behind `IAiProvider`; see [`docs/ai-design/integration.md`](docs/ai-design/integration.md).
 11. **Scenarios and simulation.** Scenario scripts, cohort, the with-and-without-escalation comparison, end-to-end tests.
 
 ## Working agreements
