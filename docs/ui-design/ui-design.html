@@ -388,7 +388,41 @@ code.role{margin-top:6px}
 /* 18 Handoff summary: every line names its source, and gaps are listed for a person to check */
 .srcs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .srcs span{display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--ink2);background:var(--soft);border:1px solid var(--line);border-radius:999px;padding:0 8px}
-.srcs svg{width:13px;height:13px;color:var(--ink3)}</style></head><body>
+.srcs svg{width:13px;height:13px;color:var(--ink3)}
+
+/* 10 and 11 Patient email: a plain mail window, with no links and no buttons */
+.mail .mbar{height:24px;background:#EEF1F4;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 16px}
+.mail .mbar i{width:10px;height:10px;border-radius:50%;background:#D3D8DF;display:block}
+.mail .mbar span{margin-inline-start:8px;font-size:13px;font-weight:600;color:var(--ink2)}
+.mail .mb .ask{font-weight:600;color:var(--ink)}
+.emailrow{grid-template-columns:700px minmax(0,1fr);width:1258px;align-items:stretch}
+.emailrow .pcol{align-items:stretch}
+.emailrow .mail{width:700px;flex:1}
+.emailrow .pcap{max-width:none}
+.emailrules{grid-template-columns:repeat(4,minmax(0,1fr));width:1258px}
+.rmail{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rmail .rh{display:flex;flex-direction:column;gap:2px;padding:8px 12px;background:#FAFBFC;border-bottom:1px solid var(--line);font-size:14px;color:var(--ink2)}
+.rmail .rh b{color:var(--ink);font-weight:600}
+.rmail .rb{padding:12px;font-size:16px;font-weight:600}
+.callnote{font-size:15px;color:var(--ink2)}
+.result.todo{background:var(--soft)}
+.result.todo svg{color:var(--ink2);margin-top:2px}
+.arwin{width:520px;height:844px}
+.arwin .mb{font-size:18px;line-height:1.7}
+.arwin .subj{font-size:20px}
+/* 2 Case: what a nurse navigator records after a call with the patient */
+.callcard h3{margin-bottom:4px}
+.callcard .cur{font-size:14px;font-weight:600;margin-top:8px}
+.callform{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+.ck{display:flex;align-items:flex-start;gap:12px;font-size:15px}
+.ck .cbox{margin-top:1px}
+.cbox.off{background:var(--white);border:2px solid var(--field)}
+.rate b{display:block;font-size:15px;font-weight:600;margin-bottom:8px}
+.ropts{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:15px}
+.ropts>span{display:inline-flex;align-items:center;gap:8px}
+.ropts .radio{margin-top:0}
+.rate .note{margin-top:8px}
+.callform .btn{align-self:flex-start}</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
 <symbol id="logo" viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1D5FA8" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="50 13" transform="rotate(-60 14 14)"/><circle cx="19" cy="5.4" r="2.7" fill="#1D5FA8"/></symbol>
@@ -447,7 +481,7 @@ code.role{margin-top:6px}
 <div class="cell e"></div>
 <div class="cell e"></div>
 <div class="cell pt">A short text: "Please expect our call." Then a call from Huda in Arabic, at the time she chose.</div>
-<div class="cell pt">She says the next step back in her own words. She can ask for a call at any time.</div>
+<div class="cell pt">On a call with Huda, she says the next step back in her own words. She can reply 2 for a call at any time.</div>
 <div class="cell e"></div>
 <div class="cell pt">A text with the day and place. She replies 1 to say she will come. Saeed gets the day, time and place, as she asked.</div>
 <div class="cell pt">Told in person. A printed care plan in large type and a new named contact.</div>
@@ -494,8 +528,8 @@ code.role{margin-top:6px}
 <div class="refs"><span class="sim">15 First visit</span><span class="sim">16 Screening result</span><span>2 Case</span></div>
 <div class="refs"><span>1 Worklist</span></div>
 <div class="refs"><span>1 Worklist</span><span>2 Case</span></div>
-<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span><span class="sim">11 Arabic</span></div>
-<div class="refs"><span>9 Basic phone</span><span>10 Patient view</span></div>
+<div class="refs"><span>9 Basic phone</span><span>10 Patient email</span><span class="sim">11 Arabic</span></div>
+<div class="refs"><span>9 Basic phone</span><span>10 Patient email</span><span>2 Case</span></div>
 <div class="refs"><span class="sim">5 Consultation</span></div>
 <div class="refs"><span>17 Escalation</span><span>18 Handoff summary</span><span class="sim">6 Refer</span><span class="sim">7 Accept</span><span>12 Caregiver</span><span class="sim">19 Assessment</span></div>
 <div class="refs"><span class="sim">20 Lab result</span><span class="sim">21 Diagnosis and plan</span><span>2 Case</span></div>
@@ -559,7 +593,7 @@ code.role{margin-top:6px}
 <tbody>
 <tr><td><span class="name">Hessa Al Dhaheri</span><span class="l2">66 · MRN 100 245 891</span></td><td>Breast screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Send a new referral<span class="l2">Regional Hospital declined: no capacity</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td><span class="red" style="font-weight:600">18 hours late</span><span class="l2">Was due Wed, 15:00</span></td><td><span class="st red">Overdue</span><span class="l2">Escalated to Joy Bautista</span></td></tr>
 <tr><td><span class="name">Noura Al Shamsi</span><span class="l2">44 · MRN 100 318 402</span></td><td>Breast screening</td><td>Consultation<span class="l2">Stage 6 of 10</span></td><td>Agree the next step with her today<span class="l2">Result marked urgent by Dr. Rekha Varghese</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st red">Urgent</span><span class="l2">Shorter deadlines</span></td></tr>
-<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient acknowledged<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">From his health app</span></td></tr>
+<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient acknowledged<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">By text message</span></td></tr>
 <tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">57 · MRN 100 402 233</span></td><td>Bowel screening</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Choose a new owner<span class="l2">Aisha Al Nuaimi is on leave</span></td><td>Joy Bautista<span class="l2">Facility lead</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st amber">Needs a new owner</span><span class="l2">Joy covers until someone accepts</span></td></tr>
 <tr><td><span class="name">Maricel Reyes</span><span class="l2">46 · MRN 100 455 790</span></td><td>Cervical screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her between 13:00 and 14:00<span class="l2">Two calls not answered; this is her lunch break</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not reached</span><span class="l2">Tried twice</span></td></tr>
 <tr><td><span class="name">Nasreen Akhtar</span><span class="l2">52 · MRN 100 468 104</span></td><td>Breast screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her with an Urdu interpreter<span class="l2">No reply to the text for two working days</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not acknowledged</span><span class="l2">Text delivered Tue 10 Nov</span></td></tr>
@@ -574,7 +608,7 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b02" data-file="02-case">
-<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except the AI handoff summary, which a clinician checks and approves here (screen 18). Clinical actions happen in the hospital system.</p>
+<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except two things: a clinician approves the AI handoff summary (screen 18), and a nurse navigator records what a patient said on a call. Clinical actions happen in the hospital system.</p>
 <div class="meta"><span>For: care team and clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US01, US03, US08, US10, US13, US14, US16</span><span>Requirements: FR-02, FR-03, FR-06, FR-07</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -631,7 +665,7 @@ code.role{margin-top:6px}
 <ul class="check">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood the next step</b><span>Said it back on a call with Huda Saleh, Tue 10 Nov</span></div><span class="r">Done</span></li>
 <li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>A receiving clinician accepted the referral</b><span>Declined by Regional Hospital: no capacity</span></div><span class="r red">Missing</span></li>
-<li><span class="mk todo"></span><div><b>Appointment booked, and Hessa says she will come</b><span>Only Hessa can reply</span></div><span class="r">Waiting</span></li>
+<li><span class="mk todo"></span><div><b>Appointment booked, and Hessa says she will come</b><span>By her reply of 1, or on a call. Saeed cannot answer for her.</span></div><span class="r">Waiting</span></li>
 <li><span class="mk todo"></span><div><b>The clinic recorded that she attended</b><span>A booking or a reminder does not count</span></div><span class="r">Waiting</span></li>
 <li><span class="mk todo"></span><div><b>Outcome recorded by the responsible clinician</b><span>With a link to the clinical record</span></div><span class="r">Waiting</span></li>
 </ul>
@@ -644,8 +678,8 @@ code.role{margin-top:6px}
 <li><time>Wed 11 Nov, 11:00</time><div><b>Reminder sent to Dr. Rekha Varghese</b><span class="by">New referral due at 15:00</span></div><span class="src">CareLoop</span></li>
 <li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
 <li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 11:20</time><div><b>Next step understood</b><span class="by">Hessa said it back on a call with Huda Saleh</span></div><span class="src">Patient channel</span></li>
-<li><time>Tue 10 Nov, 11:15</time><div><b>Result explained by phone, in Arabic</b><span class="by">Huda Saleh</span></div><span class="src">Patient channel</span></li>
+<li><time>Tue 10 Nov, 11:20</time><div><b>On a call, Hessa said the next step back</b><span class="by">Recorded by Huda Saleh, with her confidence: 4 out of 5</span></div><span class="src">CareLoop</span></li>
+<li><time>Tue 10 Nov, 10:00</time><div><b>Text delivered: please expect our call</b><span class="by">To her basic phone</span></div><span class="src">Text message or email</span></li>
 </ul>
 <div class="linkrow">Show 6 earlier events</div>
 </div>
@@ -660,13 +694,27 @@ code.role{margin-top:6px}
 <li><div><b>Appointment</b><span>Not booked yet</span></div><span class="badge grey">Not started</span></li>
 </ul>
 </div>
+<div class="card callcard">
+<h3>After a call with the patient</h3>
+<p class="note">Record what the patient told you on the phone.</p>
+<p class="cur">Confidence on record: 4 out of 5.</p>
+<div class="callform">
+<div class="ck"><span class="cbox off"></span><span>The patient said they will come</span></div>
+<div class="ck"><span class="cbox off"></span><span>The patient said the next step back in their own words</span></div>
+<div class="rate"><b>How sure does the patient feel about what happens next?</b>
+<div class="ropts"><span><span class="radio on"></span>Not asked</span><span><span class="radio"></span>1</span><span><span class="radio"></span>2</span><span><span class="radio"></span>3</span><span><span class="radio"></span>4</span><span><span class="radio"></span>5</span></div>
+<p class="note">1 is not sure, 5 is very sure.</p></div>
+<span class="btn primary off" role="button" aria-disabled="true">Record call outcome</span>
+</div>
+<p class="note" style="margin-top:12px">Recording a call never changes who is responsible for the case.</p>
+</div>
 <div class="card">
 <h3>How to reach Hessa</h3>
 <ul class="reach">
 <li><svg class="i"><use href="#i-phone"/></svg><span>Phone call in Arabic, 10:00 to 12:00</span></li>
-<li><svg class="i"><use href="#i-msg"/></svg><span>Automated calls and short texts in Arabic</span></li>
+<li><svg class="i"><use href="#i-msg"/></svg><span>Text messages to her basic phone. She has no email.</span></li>
 <li><svg class="i"><use href="#i-user"/></svg><span>Saeed Al Dhaheri, her son, gets the day, time and place of appointments. Hessa signed for this on Mon 9 Nov.</span></li>
-<li><svg class="i"><use href="#i-lock"/></svg><span>Results are given by a person, never by text</span></li>
+<li><svg class="i"><use href="#i-lock"/></svg><span>Results are given by a person, never by text or email</span></li>
 </ul>
 </div>
 <div class="card">
@@ -1087,8 +1135,8 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b09" data-file="09-basic-phone">
-<div class="cap"><span class="n">9</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts only carry dates and places, and she replies 1 to say she will come. Automated calls are future work.</p>
-<div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
+<div class="cap"><span class="n">9</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts carry only dates and places. A reply of 1 means she will come; 2, or any other reply, asks for a call.</p>
+<div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
 <div class="cols3" style="grid-template-columns:minmax(0,1fr) 300px minmax(0,1fr)">
 <div class="card">
 <h3><svg class="i"><use href="#i-phone"/></svg>Call from her nurse<span class="r small muted">Tue 10 Nov, 11:15</span></h3>
@@ -1099,8 +1147,9 @@ code.role{margin-top:6px}
 <li><small>The news</small>Your mammogram needs a closer look, so Dr. Rekha would like you to have more tests. Most women who are asked back do not have cancer.</li>
 <li><small>Next step</small>We will send you the day and the place. As you asked, Saeed will get them too, but not your results.</li>
 <li><small>Teach-back</small>So I know I explained it well, can you tell me what happens next?</li>
+<li><small>How sure</small>And how sure do you feel about what happens next, from 1, not sure, to 5, very sure?</li>
 </ul>
-<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Understood.</b> Hessa said it back in her own words.</span></div>
+<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Said it back, 4 out of 5 sure.</b> Huda records both on the case after the call (screen 2).</span></div>
 <p class="note" style="margin-top:8px">Plain words drafted by AI and approved by Dr. Rekha Varghese.</p>
 </div>
 <div class="pcol">
@@ -1134,77 +1183,78 @@ code.role{margin-top:6px}
 <div class="rule"><svg class="i"><use href="#i-link"/></svg><span>No links: nothing to click and nothing to install</span></div>
 <div class="rule"><svg class="i"><use href="#i-tag"/></svg><span>Neutral place names, such as "Building 2", never the clinic's name</span></div>
 <div class="rule"><svg class="i"><use href="#i-lang"/></svg><span>In her language, at the time of day she chose</span></div>
-<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 to say you will come, and 2 to reach a person</span></div>
+<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 if you will come. 2, or any other reply, asks for a call.</span></div>
 </div>
 </section>
 
-<section class="board" id="b10" data-file="10-patient-view">
-<div class="cap"><span class="n">10</span><div><h2>Patient view</h2><p>For people with a smartphone, CareLoop appears inside the health app they already use. There is no new app to install. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
-<div class="meta"><span>For: patients with a smartphone</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
-<div class="phones">
+<section class="board" id="b10" data-file="10-patient-email">
+<div class="cap" style="max-width:1258px"><span class="n">10</span><div><h2>Patient email</h2><p>A patient with an email address on record gets the same message as screen 9 by email, with a subject. It carries the date, the place and how to ask for a call, with no links and no result: a person gives the result. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
+<div class="meta"><span>For: patients reached by email</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
+<div class="cols3 emailrow" style="min-height:816.86px">
 <div class="pcol">
-<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
-<div class="papp">
-<div class="apptop"><span>Your health app</span><span class="lang"><span class="on">English</span><span>العربية</span></span></div>
-<div class="hello">Hello, Amna</div>
-<div class="pcard key"><span class="lbl">Your next step</span><h4>More tests at the breast clinic</h4><p class="when">Friday 13 November, 9:00 am</p><p>General Hospital, Building 2, Clinic B</p><span class="pbtn primary">I will come</span><span class="plink">I need another time</span></div>
-<div class="pcard"><span class="lbl">Your nurse</span><div class="prow" style="margin-top:8px"><span class="av">LM</span><div style="flex:1"><b>Latifa Al Mazrouei</b><small>Family Health Centre</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
-<div class="pcard"><span class="lbl">Your steps</span><ul class="psteps">
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Screening, Fri 6 Nov</li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Result explained, Tue 10 Nov</li>
-<li class="now"><span class="nowdot"></span>More tests, Fri 13 Nov</li>
-<li><span class="mk todo"></span>Results, then next care</li>
-</ul></div>
-</div></div></div>
-<div class="pcap"><b>Home</b>One next step and one named person, always.</div>
+<div class="mail mwin">
+<div class="mbar"><i></i><i></i><i></i><span>Inbox</span></div>
+<div class="mh"><div><b>From</b>Family Health Centre</div><div><b>To</b>Amna Al Ameri</div><div><b>Sent</b>Wed 11 Nov 2026, 10:30</div></div>
+<div class="subj">Your appointment on Friday 13 November</div>
+<div class="mb">
+<p>Dear Amna,</p>
+<p>You have an appointment on Friday 13 November at 9:00 am at General Hospital, Building 2, Clinic B.</p>
+<p class="ask">Reply 1 if you will come, 2 if you would like a call.</p>
+<p>Your nurse is Latifa Al Mazrouei. You can also call her on 02 000 0003, Monday to Friday, 8:00 am to 4:00 pm.</p>
+<p>Family Health Centre<br>Reference: 5172</p>
+<p class="note">Any other reply also asks your nurse to call you. We never send results by email.</p>
 </div>
-<div class="pcol">
-<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
-<div class="papp">
-<div class="pback"><svg class="i"><use href="#i-left"/></svg>Home</div>
-<div class="ptitle">Your result</div>
-<div class="pcard"><span class="lbl">Breast screening, Fri 6 Nov 2026</span><h4>Your mammogram needs a closer look</h4><p>The doctors saw an area they want to check more closely. Most women who are asked back for more tests do not have cancer.</p><p class="pfine" style="margin-top:8px">Checked by Dr. Hind Al Mansoori, screening physician</p></div>
-<div class="pcard"><span class="lbl">What happens on Friday</span><p style="margin-top:8px">Another mammogram and an ultrasound scan, and sometimes a small needle test. A doctor gives you the results in person.</p></div>
-<div class="pcard"><span class="lbl">Questions?</span><p style="margin-top:8px">Latifa, your nurse, can explain anything again.</p><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>Call me back</span></div>
-</div></div></div>
-<div class="pcap"><b>Her result, in plain words</b>Drafted by AI from the report and checked by her doctor. Arabic follows later; see screen 11.</div>
 </div>
-<div class="pcol">
-<div class="phone"><div class="scr"><div class="notch"></div><div class="sb"><span>9:42</span><span class="bat"></span></div>
-<div class="papp">
-<div class="done-hero"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><h4>Thank you, Amna</h4><p>We have told the clinic you will come on Friday at 9:00 am.</p></div>
-<div class="pcard"><span class="lbl">One question, so we know we explained it well</span><h4 style="font-size:20px">What will you do next?</h4>
-<div class="choice sel"><span class="radio"></span>Go to General Hospital on Friday at 9:00 am for more tests</div>
-<div class="choice"><span class="radio"></span>Wait for the hospital to call me</div>
-<div class="choice"><span class="radio"></span>I am not sure</div>
+<p class="pcap">Email, in English in the prototype. Arabic follows once a qualified reviewer approves the wording (screen 11).</p>
 </div>
-<div class="pcard"><h4 style="font-size:18px;margin-top:0">How sure do you feel about what happens next?</h4><div class="scale"><span>1</span><span>2</span><span>3</span><span class="on">4</span><span>5</span></div><div class="scalelbl"><span>Not sure</span><span>Very sure</span></div></div>
-<span class="pbtn primary" style="margin-top:0">Send</span>
-</div></div></div>
-<div class="pcap"><b>Say she will come, then say it back</b>"I will come" is recorded as acknowledged, her answer as understood, and the 1 to 5 rating as her confidence. "I am not sure" sends her nurse a call-back task.</div>
+<div class="stack">
+<div class="card">
+<h3>Her reply<span class="r small muted">Wed 11 Nov, 10:52</span></h3>
+<div class="rmail"><div class="rh"><b>Amna Al Ameri</b><span>Re: Your appointment on Friday 13 November</span></div><div class="rb">1</div></div>
+<span class="lbl" style="display:block;margin-top:16px;margin-bottom:8px">What CareLoop records</span>
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Email delivered</b><span>To the address in her hospital record</span></div><span class="r">10:30</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Amna will come</b><span>Recorded as acknowledged, and nothing more</span></div><span class="r">10:52</span></li>
+</ul>
 </div>
+<div class="card">
+<h3>If she replies 2, or anything else</h3>
+<div class="rmail"><div class="rh"><b>Amna Al Ameri</b><span>Re: Your appointment on Friday 13 November</span></div><div class="rb">Can I come later in the day?</div></div>
+<div class="result todo"><svg class="i"><use href="#i-phone"/></svg><span><b>Asks for a call.</b> Latifa gets a task to call her back. Only a reply of 1 counts as "I will come".</span></div>
+</div>
+<div class="card">
+<h3><svg class="i"><use href="#i-phone"/></svg>Asked on a call, not by email</h3>
+<p class="callnote">Whether Amna can say the next step back, and how sure she feels from 1 to 5, are never asked by email. Latifa asks on a call and records both on the case (screen 2).</p>
+</div>
+</div>
+</div>
+<div class="rules emailrules">
+<div class="rule"><svg class="i"><use href="#i-lock"/></svg><span>No results, diagnoses or body parts: a person gives the result</span></div>
+<div class="rule"><svg class="i"><use href="#i-link"/></svg><span>No links: nothing to click and nothing to install</span></div>
+<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 if you will come; 2, or any other reply, asks for a call</span></div>
+<div class="rule"><svg class="i"><use href="#i-msg"/></svg><span>The same message as the text, with a subject and a named nurse</span></div>
 </div>
 </section>
 
 <section class="board" id="b11" data-file="11-arabic">
-<div class="cap"><span class="n">11</span><div><h2>Arabic, right to left</h2><p>The target design for Arabic, deferred: the prototype runs in English until a qualified reviewer approves the Arabic wording. The layout mirrors, so reading order, steps and buttons run right to left, while numbers stay as 0 to 9.</p>
-<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: patient-channel simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span><span>Hackathon: deferred</span></div></div></div>
+<div class="cap"><span class="n">11</span><div><h2>Arabic, right to left</h2><p>The target design for Arabic, deferred: the prototype runs in English until a qualified reviewer approves the Arabic wording. The email and the text message read right to left, while numbers stay as 0 to 9.</p>
+<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span><span>Hackathon: deferred</span></div></div></div>
 <div class="phones">
 <div class="pcol">
-<div class="phone"><div class="scr" dir="rtl" lang="ar"><div class="notch"></div><div class="sb"><span>9:41</span><span class="bat"></span></div>
-<div class="papp">
-<div class="apptop"><span>تطبيقك الصحي</span><span class="lang"><span class="on">العربية</span><span lang="en">English</span></span></div>
-<div class="hello">مرحباً، آمنة</div>
-<div class="pcard key"><span class="lbl">خطوتك التالية</span><h4>فحوصات إضافية في عيادة الثدي</h4><p class="when">الجمعة 13 نوفمبر، 9:00 صباحاً</p><p>المستشفى العام، المبنى 2، العيادة ب</p><span class="pbtn primary">سأحضر</span><span class="plink">أحتاج إلى موعد آخر</span></div>
-<div class="pcard"><span class="lbl">ممرضتك</span><div class="prow" style="margin-top:8px"><span class="av">لم</span><div style="flex:1"><b>لطيفة المزروعي</b><small>مركز صحة العائلة</small></div></div><span class="pbtn"><svg class="i"><use href="#i-phone"/></svg>اتصلوا بي</span></div>
-<div class="pcard"><span class="lbl">خطواتك</span><ul class="psteps">
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>الفحص، الجمعة 6 نوفمبر</li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>شرح النتيجة، الثلاثاء 10 نوفمبر</li>
-<li class="now"><span class="nowdot"></span>فحوصات إضافية، الجمعة 13 نوفمبر</li>
-<li><span class="mk todo"></span>النتائج، ثم الرعاية التالية</li>
-</ul></div>
-</div></div></div>
-<div class="pcap"><b>Patient view in Arabic</b>The home screen from screen 10, mirrored.</div>
+<div class="mail mwin arwin" dir="rtl" lang="ar">
+<div class="mbar"><i></i><i></i><i></i><span>البريد الوارد</span></div>
+<div class="mh"><div><b>من</b>مركز صحة العائلة</div><div><b>إلى</b>آمنة العامري</div><div><b>أُرسلت</b>الأربعاء 11 نوفمبر 2026، 10:30</div></div>
+<div class="subj">موعدكِ يوم الجمعة 13 نوفمبر</div>
+<div class="mb">
+<p>عزيزتي آمنة،</p>
+<p>لديكِ موعد يوم الجمعة 13 نوفمبر الساعة 9:00 صباحاً في المستشفى العام، المبنى 2، العيادة ب.</p>
+<p class="ask">ردّي 1 إذا كنتِ ستحضرين، أو 2 إذا كنتِ ترغبين في مكالمة.</p>
+<p>ممرضتكِ هي لطيفة المزروعي. يمكنكِ أيضاً الاتصال بها على <span dir="ltr" style="white-space:nowrap">02 000 0003</span>، من الاثنين إلى الجمعة، من 8:00 صباحاً إلى 4:00 مساءً.</p>
+<p>مركز صحة العائلة<br>الرقم المرجعي: 5172</p>
+<p class="note">أي ردّ آخر يطلب من ممرضتكِ الاتصال بكِ. لا نرسل النتائج بالبريد الإلكتروني أبداً.</p>
+</div>
+</div>
+<div class="pcap"><b>Patient email in Arabic</b>The email from screen 10, mirrored.</div>
 </div>
 <div class="pcol">
 <div class="fphone">
@@ -1218,9 +1268,9 @@ code.role{margin-top:6px}
 <div class="card" style="width:440px">
 <h3>Rules for Arabic</h3>
 <ul class="rules-ar">
-<li><svg class="i"><use href="#i-lang"/></svg><span>Each patient chooses a language once, and every call, text, letter and screen follows it.</span></li>
+<li><svg class="i"><use href="#i-lang"/></svg><span>Each patient chooses a language once, and every call, text message, email and letter follows it.</span></li>
 <li><svg class="i"><use href="#i-arrow"/></svg><span>Set the direction to right to left, and use start and end rather than left and right in every layout.</span></li>
-<li><svg class="i"><use href="#i-key"/></svg><span>Mirror arrows and steps. Never mirror logos, numbers, phone numbers or times.</span></li>
+<li><svg class="i"><use href="#i-key"/></svg><span>Text starts on the right. Never mirror logos, numbers, phone numbers or times.</span></li>
 <li><svg class="i"><use href="#i-msg"/></svg><span>An Arabic text holds 70 characters, so Arabic templates are shorter. This one drops the help number; replying 2 still reaches a person.</span></li>
 <li><svg class="i"><use href="#i-check"/></svg><span>A translator and a clinician approve every Arabic template before use. The wording shown here is a draft.</span></li>
 </ul>
@@ -1229,17 +1279,18 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b12" data-file="12-caregiver-and-email">
-<div class="cap"><span class="n">12</span><div><h2>Caregiver and email</h2><p>Hessa signed a form so that her son, Saeed, gets the day, time and place of her appointments. Only Hessa can reply to or change them, and Saeed never sees her results. In the prototype the email is shown here, not sent.</p>
-<div class="meta"><span>For: family members a patient has named, and anyone who prefers email</span><span>Built in: patient-channel simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
+<div class="cap"><span class="n">12</span><div><h2>Caregiver and email</h2><p>Hessa signed a form so that her son, Saeed, gets the day, time and place of her appointments. Only Hessa can reply to or change them, and Saeed never sees her results. In the prototype the email is shown in the SMS and email simulator, not sent.</p>
+<div class="meta"><span>For: family members a patient has named</span><span>Built in: SMS and email simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
 <div class="cols3" style="grid-template-columns:600px minmax(0,1fr);width:1200px">
 <div class="stack">
 <div class="mail">
+<div class="mbar"><i></i><i></i><i></i><span>Inbox</span></div>
 <div class="mh"><div><b>From</b>Appointments team, General Hospital</div><div><b>To</b>Saeed Al Dhaheri</div><div><b>Sent</b>Thu 12 Nov 2026, 10:32</div></div>
 <div class="subj">Appointment details for Hessa Al Dhaheri</div>
 <div class="mb">
 <p>Dear Saeed,</p>
 <p>Hessa asked us to send you her appointment details.</p>
-<p>Her appointment is on Monday 16 November at 10:30 am at General Hospital, Building 2, Clinic B. Please arrive 15 minutes early and bring her Emirates ID.</p>
+<p>Her appointment is on Monday 16 November at 10:30 am at General Hospital, Building 2, Clinic B. Please arrive 15 minutes early.</p>
 <p>Only Hessa can reply to the clinic or change this appointment. For help with transport, call 02 000 0001, Monday to Friday, 8:00 am to 4:00 pm.</p>
 <p>Appointments team, General Hospital<br>Reference: 4821</p>
 <p class="note">You get this email because Hessa asked for it. She can stop it at any time.</p>
@@ -1299,7 +1350,7 @@ code.role{margin-top:6px}
 <b style="font-size:16px">Handoff summary for Dr. Layla Haddad</b>
 <div class="notice"><svg class="i"><use href="#i-spark"/></svg><span>No AI draft: the service is off or did not answer. Write the summary yourself, then approve it.</span></div>
 <div class="textarea">Situation, background, assessment and request</div>
-<div class="btns"><span class="btn primary off">Approve summary</span></div>
+<div class="btns"><span class="btn primary off" role="button" aria-disabled="true">Approve summary</span></div>
 </div>
 <p class="when">If AI is off, slow or fails a check, CareLoop never shows a half-made draft. A person writes it, and every step still works.</p>
 </div>
@@ -1311,20 +1362,21 @@ code.role{margin-top:6px}
 <li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>Diagnosis recorded</b></div><span class="r red">Missing</span></li>
 <li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>Result explained in person</b></div><span class="r red">Missing</span></li>
 </ul>
-<div class="btns" style="align-items:center"><span class="btn primary off">Sign and close the case</span></div>
+<div class="btns" style="align-items:center"><span class="btn primary off" role="button" aria-disabled="true">Sign and close the case</span></div>
 <span class="note">Add evidence for two steps before closing.</span>
 </div>
 <p class="when">The close button stays off until every step has evidence. A timer, AI or message can never close a case.</p>
 </div>
 <div class="state">
-<div class="state-head"><b>No internet</b><span>10 Patient view</span></div>
+<div class="state-head"><b>No signal or internet</b><span>9 Basic phone</span></div>
 <div class="frag">
-<div class="offline"><svg class="i"><use href="#i-alert"/></svg>You are offline</div>
-<span style="font-size:16px"><b>Your next step:</b> Friday 13 November, 9:00 am, General Hospital, Building 2</span>
-<span style="font-size:16px">It may have changed. To check, call 02 000 0001.</span>
-<span class="pfine">Last updated Thursday 12 November, 8:15 am</span>
+<ul class="check">
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Text sent</b><span>Thu 12 Nov, 10:30</span></div><span class="r">Sent</span></li>
+<li><span class="mk todo"></span><div><b>Not delivered yet</b><span>The phone has no signal. The text arrives when it has.</span></div><span class="r">Waiting</span></li>
+</ul>
+<div class="notice"><svg class="i"><use href="#i-alert"/></svg><span>If it cannot be delivered, the patient shows as not reached, and her nurse gets a task to reach her another way.</span></div>
 </div>
-<p class="when">The app keeps the last next step on the phone, with a number to call, so the patient always knows where to go. Offline storage belongs to the health app, not to CareLoop.</p>
+<p class="when">There is no app to work offline. A text needs no internet, and an email waits until the patient is online. A message that is never delivered does not end silently: a person follows up.</p>
 </div>
 </div>
 </section>
@@ -1337,11 +1389,11 @@ code.role{margin-top:6px}
 <colgroup><col style="width:264px"><col><col><col></colgroup>
 <thead><tr><th>Person</th><th>Sees</th><th>Can do</th><th>Cannot</th></tr></thead>
 <tbody>
-<tr class="grp"><td colspan="4">The patient and her family</td></tr>
-<tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by basic phone. Amna uses her health app.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse. A person gives her the result.</td><td>Say she will come, ask for a call and say the next step back. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
+<tr class="grp"><td colspan="4">The patient and her family: text messages and email only. There is no patient app or portal.</td></tr>
+<tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by text message on a basic phone. Amna, by email.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse, by text message or email. A person gives her the result.</td><td>Reply 1 to say she will come, or 2 for a call. On a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
 <tr><td><b>Saeed Al Dhaheri</b><span class="l2">Her son, named by Hessa in writing</span><code class="role">recipient: caregiver</code></td><td>The day, time and place of her appointments, by email</td><td>Help her get there. Nothing in CareLoop.</td><td>See results or the reason for the visit. Reply for her or change anything.</td></tr>
-<tr class="grp"><td colspan="4">Care team</td></tr>
-<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved</td><td>Call patients, record what they understood, hand over tasks and ask a doctor to call a patient back</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
+<tr class="grp"><td colspan="4">Care team: notices about their cases come by email or text message, never with results</td></tr>
+<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved</td><td>Call patients and record what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
 <tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span><code class="role">clinician</code></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
 <tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span><code class="role">receiving-clinician</code></td><td>Referrals sent to her unit: the request, the approved summary, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
 <tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span><code class="role">lab</code></td><td>Test requests sent to them, and what each test needs</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
@@ -1495,7 +1547,7 @@ code.role{margin-top:6px}
 <li><time>Wed 11 Nov, 11:00</time><div><b>Reminder sent to Dr. Rekha Varghese</b><span class="by">New referral due at 15:00</span></div><span class="src">CareLoop</span></li>
 <li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
 <li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 11:15</time><div><b>Result explained by phone, in Arabic</b><span class="by">Huda Saleh. Hessa said the next step back.</span></div><span class="src">Patient channel</span></li>
+<li><time>Tue 10 Nov, 11:20</time><div><b>On a call, Hessa said the next step back</b><span class="by">Recorded by Huda Saleh</span></div><span class="src">CareLoop</span></li>
 </ul>
 </div>
 </div>
