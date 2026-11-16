@@ -144,7 +144,7 @@ Where each screen is built:
 | 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | SMS and email simulator | US02, US03 | FR-04 | Shown |
 | 10 | [Patient email](#10-patient-email) | Patients reached by email | SMS and email simulator | US02, US03, US05 | FR-04 | Shown |
 | 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | SMS and email simulator | US02, US03 | FR-04 | Deferred |
-| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named, and email users | SMS and email simulator | US04, US10 | FR-04, FR-10 | Shown |
+| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named | SMS and email simulator | US04, US10 | FR-04, FR-10 | Shown |
 | 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-11 | Reference |
 
 Hessa's journey:
@@ -291,6 +291,7 @@ Hessa's journey:
 
 - In scope (decision 7). Only the patient replies to the clinic or changes an appointment. A family member never does this for her, so the email asks for no reply and sends no event that changes the case.
 - Consent is a `Consent` on the case, recorded by `ConsentRecorded/Granted` with a reference to the signed form (C13). The family member is a recipient (`Caregiver`), not a user, and gets the day, time and place only, while consent is active: no results, no reason for the visit and no links (DoH Standard on Patient Healthcare Data Privacy, 4.2.3; Federal Law No. 2 of 2019, Article 16).
+- The email to Saeed carries the day, time and place, a number for help with transport, and why he gets it. Nothing in it is about her health.
 - Giving consent: the patient signs a form with her doctor, who records it in the hospital system (screen 15). CareLoop receives `ConsentRecorded/Granted` when her case opens; in the hackathon, the test scenario sends it.
 - Withdrawing consent: the patient tells anyone in her care team, who records it in the hospital system. That sends `ConsentRecorded/Withdrawn`, and the emails stop at once.
 - In the prototype, the email is shown in the SMS and email simulator, not sent. CareLoop records each email as a notification attempt.
