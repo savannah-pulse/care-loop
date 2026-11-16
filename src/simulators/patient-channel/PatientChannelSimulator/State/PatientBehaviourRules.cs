@@ -57,26 +57,11 @@ public static class PatientBehaviourRules
             return "RespondToNotification counts from 1.";
         }
 
-        if (behaviour.Confidence is < 1 or > 5)
-        {
-            return "A confidence rating must be a whole number from 1 to 5.";
-        }
-
-        if (behaviour.Response == PatientResponseBehaviour.RateConfidence && behaviour.Confidence is null)
-        {
-            return "A patient who rates their confidence needs a rating from 1 to 5.";
-        }
-
-        if (behaviour.Response == PatientResponseBehaviour.None && behaviour.Confidence is not null)
-        {
-            return "A patient who does not respond cannot give a confidence rating.";
-        }
-
         return null;
     }
 
     /// <summary>
-    /// Checks a patient identifier.
+    /// Checks a patient identifier or the address of a message.
     /// </summary>
     /// <param name="patientSyntheticId">The identifier to check.</param>
     /// <returns><see langword="true"/> when it is visibly synthetic (prefixed <c>SYN-</c>).</returns>

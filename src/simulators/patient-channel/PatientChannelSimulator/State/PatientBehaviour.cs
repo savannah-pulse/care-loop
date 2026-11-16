@@ -1,7 +1,7 @@
 namespace PatientChannelSimulator.State;
 
 /// <summary>
-/// How one simulated patient reacts when CareLoop notifies them.
+/// How one simulated patient reacts when CareLoop sends them a text message or an email.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -12,7 +12,9 @@ namespace PatientChannelSimulator.State;
 /// </para>
 /// <para>
 /// Behaviours come from the <c>behaviour</c> of a scenario patient, or are set by hand in the
-/// ClientApp. A patient with none gets the simulator's default behaviour.
+/// ClientApp. A patient with none gets the simulator's default behaviour. A behaviour is found by
+/// the address a message was sent to; until scenario files carry phone numbers and email addresses,
+/// the hospital system simulator sends a patient's synthetic identifier as that address.
 /// </para>
 /// </remarks>
 public sealed record PatientBehaviour
@@ -33,7 +35,6 @@ public sealed record PatientBehaviour
     /// <param name="respondAfter">How long after delivery the patient responds, in real time.</param>
     /// <param name="respondToNotification">Which notification the patient responds to, counting from 1.</param>
     /// <param name="simulated">Visible simulated-data marker.</param>
-    /// <param name="confidence">The 1 to 5 confidence rating the patient gives, if any.</param>
     [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
     public PatientBehaviour(
         DeliveryBehaviour delivery,
@@ -41,8 +42,7 @@ public sealed record PatientBehaviour
         string? failureReason = null,
         TimeSpan respondAfter = default,
         int respondToNotification = 1,
-        bool simulated = true,
-        int? confidence = null)
+        bool simulated = true)
     {
         Delivery = delivery;
         Response = response;
@@ -50,7 +50,6 @@ public sealed record PatientBehaviour
         RespondAfter = respondAfter;
         RespondToNotification = respondToNotification;
         Simulated = simulated;
-        Confidence = confidence;
     }
 
     /// <summary>What the channel reports for each notification the patient receives.</summary>
@@ -76,10 +75,4 @@ public sealed record PatientBehaviour
     /// <summary>Visible simulated-data marker; always <see langword="true"/>.</summary>
     public bool Simulated { get; init; } = true;
 
-    /// <summary>
-    /// The 1 to 5 confidence rating the patient gives (C10). Required when <see cref="Response"/>
-    /// is <see cref="PatientResponseBehaviour.RateConfidence"/>; with any other response the patient
-    /// rates straight after responding; must be <see langword="null"/> when the patient does not respond.
-    /// </summary>
-    public int? Confidence { get; init; }
 }

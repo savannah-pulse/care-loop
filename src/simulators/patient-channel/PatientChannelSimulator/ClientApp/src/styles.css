@@ -435,311 +435,6 @@ button:disabled {
   color: var(--ink3);
 }
 
-/* Smartphone (screen 10) */
-.phone {
-  flex: none;
-  inline-size: 390px;
-  max-inline-size: 100%;
-  min-block-size: 760px;
-  padding: 12px;
-  border-radius: 54px;
-  background-color: #10151b;
-  box-shadow: var(--shadow);
-}
-
-.phone-screen {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-block-size: 736px;
-  overflow: hidden;
-  border-radius: 43px;
-  background-color: var(--bg);
-}
-
-.phone-notch {
-  position: absolute;
-  inset-block-start: 10px;
-  inset-inline: 0;
-  inline-size: 112px;
-  block-size: 32px;
-  margin-inline: auto;
-  border-radius: 20px;
-  background-color: #10151b;
-}
-
-.phone-status {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  block-size: 48px;
-  padding-block-start: 8px;
-  padding-inline: 32px;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.phone-battery {
-  position: relative;
-  inline-size: 26px;
-  block-size: 12px;
-  border: 2px solid var(--ink);
-  border-radius: 4px;
-}
-
-.phone-battery::after {
-  content: '';
-  position: absolute;
-  inset-block: 1px;
-  inset-inline: 1px 5px;
-  border-radius: 1px;
-  background-color: var(--ink);
-}
-
-.phone-app {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 12px;
-  padding-block: 8px 24px;
-  padding-inline: 16px;
-  font-size: 16px;
-}
-
-.app-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--ink3);
-  font-size: 14px;
-}
-
-.app-language {
-  display: flex;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background-color: var(--white);
-}
-
-.app-language span {
-  padding-block: 4px;
-  padding-inline: 12px;
-  background-color: var(--ink);
-  color: var(--white);
-}
-
-.app-hello {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
-  overflow-wrap: anywhere;
-}
-
-.app-back {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  gap: 8px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.pcard {
-  min-inline-size: 0;
-  margin: 0;
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background-color: var(--white);
-}
-
-.pcard-key {
-  border: 2px solid var(--accent);
-}
-
-.pcard-locked {
-  background-color: var(--soft);
-}
-
-.label,
-.pcard legend.label {
-  padding: 0;
-  color: var(--ink3);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.pcard h4 {
-  margin-block: 4px 8px;
-  font-size: 20px;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-}
-
-.pcard p {
-  margin-block-start: 8px;
-  color: var(--ink2);
-  font-size: 16px;
-}
-
-.pcard-key .message-body {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.fine,
-.pcard p.fine {
-  color: var(--ink3);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.pbtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  inline-size: 100%;
-  block-size: 52px;
-  margin-block-start: 8px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background-color: var(--white);
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.pbtn-primary {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: var(--white);
-}
-
-.plink {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  inline-size: 100%;
-  block-size: 44px;
-  margin-block-start: 4px;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 16px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.done-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding-block: 8px 4px;
-  padding-inline: 8px;
-  text-align: center;
-}
-
-.done-mark {
-  display: grid;
-  place-items: center;
-  inline-size: 56px;
-  block-size: 56px;
-  border-radius: 50%;
-  background-color: var(--green-soft);
-  color: var(--green);
-}
-
-.done-mark .icon {
-  inline-size: 28px;
-  block-size: 28px;
-}
-
-.done-hero h4 {
-  font-size: 22px;
-  overflow-wrap: anywhere;
-}
-
-.done-hero p {
-  color: var(--ink2);
-  font-size: 16px;
-}
-
-.choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-block-start: 8px;
-  padding-block: 12px;
-  padding-inline: 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  font-size: 16px;
-  line-height: 1.35;
-  cursor: pointer;
-}
-
-.choice-on {
-  background-color: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.choice input {
-  flex: none;
-  inline-size: 20px;
-  block-size: 20px;
-  margin: 1px 0 0;
-  accent-color: var(--accent);
-}
-
-.rate-heading {
-  padding: 0;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-.scale {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  margin-block-start: 8px;
-}
-
-.phone .scale button {
-  min-block-size: 0;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  block-size: 48px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background-color: var(--white);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.phone .scale button[aria-pressed='true'] {
-  background-color: var(--accent);
-  border-color: var(--accent);
-  color: var(--white);
-}
-
-.scale-labels {
-  display: flex;
-  justify-content: space-between;
-  margin-block-start: 8px;
-  color: var(--ink3);
-  font-size: 14px;
-}
-
 /* Basic phone (screen 9) */
 .basic-phone {
   flex: none;
@@ -830,7 +525,7 @@ button:disabled {
   font-weight: 600;
 }
 
-/* Caregiver email (screen 12) */
+/* Email: the patient's, a caregiver's or a staff notice (screens 10 and 12) */
 .mail {
   overflow: hidden;
   inline-size: 100%;
@@ -874,6 +569,35 @@ button:disabled {
   padding-inline: 24px;
   font-size: 16px;
   line-height: 1.5;
+}
+
+.mail-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-block: 16px;
+  padding-inline: 24px;
+  border-block-start: 1px solid var(--line);
+  background-color: #fafbfc;
+}
+
+.mail-reply label {
+  color: var(--ink3);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mail-reply textarea {
+  inline-size: 100%;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+}
+
+.mail-reply button {
+  align-self: flex-start;
 }
 
 /* Forms */
@@ -1037,7 +761,7 @@ tr[aria-selected='true'] {
   background-color: var(--accent-soft);
 }
 
-.fhir-json {
+.exchange-json {
   max-block-size: 28rem;
   margin: 0;
   padding: 16px;

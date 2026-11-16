@@ -6,7 +6,6 @@ import { ROUTES } from '../routes';
 /** Navigation entries: route path and the i18n key of the link text, in display order. */
 const NAV_ITEMS = [
   { to: ROUTES.inbox, labelKey: 'nav.inbox' },
-  { to: ROUTES.caseStatus, labelKey: 'nav.caseStatus' },
   { to: ROUTES.patientBehaviours, labelKey: 'nav.patientBehaviours' },
   { to: ROUTES.scenarioRunner, labelKey: 'nav.scenarioRunner' },
   { to: ROUTES.messageLog, labelKey: 'nav.messageLog' },

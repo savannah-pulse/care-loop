@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { Route, Routes } from 'react-router-dom';
 
 import { NavBar, SimulatedBanner } from './components';
-import { CaseStatusPage } from './features/case-status';
 import { PatientBehavioursPage } from './features/patient-behaviours';
 import { InboxPage } from './features/inbox';
 import { MessageLogPage } from './features/message-log';
@@ -13,7 +12,7 @@ import { ROUTES } from './routes';
 const POLL_INTERVAL_MS = 2000;
 
 /**
- * The patient-channel simulator shell: simulated-data banner, navigation and one route per screen.
+ * The SMS and email simulator shell: simulated-data banner, navigation and one route per screen.
  *
  * @remarks
  * Must be rendered inside a router (`BrowserRouter` in `main.tsx`, `MemoryRouter` in tests).
@@ -32,7 +31,6 @@ export function App() {
       <main className="app-main">
         <Routes>
           <Route path={ROUTES.inbox} element={<InboxPage pollIntervalMs={POLL_INTERVAL_MS} />} />
-          <Route path={ROUTES.caseStatus} element={<CaseStatusPage />} />
           <Route path={ROUTES.patientBehaviours} element={<PatientBehavioursPage />} />
           <Route
             path={ROUTES.scenarioRunner}

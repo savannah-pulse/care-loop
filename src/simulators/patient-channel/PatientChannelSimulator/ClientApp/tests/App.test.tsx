@@ -15,7 +15,7 @@ describe('App shell', () => {
       'GET /api/patient-behaviours': [],
       'GET /api/patient-behaviours/default': behaviour(),
       'GET /scenarios': [],
-      'GET /api/fhir-log': [],
+      'GET /api/message-log': [],
     });
   });
 
@@ -32,7 +32,6 @@ describe('App shell', () => {
   });
 
   it.each([
-    [ROUTES.caseStatus, en.caseStatus.title],
     [ROUTES.patientBehaviours, en.patientBehaviours.title],
     [ROUTES.scenarioRunner, en.scenarioRunner.title],
     [ROUTES.messageLog, en.messageLog.title],
@@ -49,9 +48,11 @@ describe('App shell', () => {
   });
 
   it('keeps client routes clear of the paths served by the .NET host', () => {
-    const reserved = ['/api', '/fhir', '/scenarios', '/health'];
+    const reserved = ['/api', '/messages', '/scenarios', '/health'];
     for (const path of Object.values(ROUTES)) {
-      expect(reserved.some((prefix) => path.startsWith(prefix))).toBe(false);
+      expect(reserved.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))).toBe(
+        false,
+      );
     }
   });
 });

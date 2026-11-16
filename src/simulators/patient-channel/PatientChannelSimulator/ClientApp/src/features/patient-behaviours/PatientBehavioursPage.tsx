@@ -26,8 +26,8 @@ export interface PatientBehavioursPageProps {
  *
  * @remarks
  * A behaviour has two halves: what the channel reports (delivered, failed, or nothing) and what
- * the patient then does (nothing, acknowledge, confirm understanding, ask for a call, or rate
- * their confidence). It is a reaction, applied only when a notification actually arrives, so a
+ * the patient then does (nothing, reply 1 to say they will come, or reply 2 to ask for a call).
+ * It is a reaction, applied only when a notification actually arrives, so a
  * patient is never shown as acknowledging a message CareLoop did not send. Delivery alone is
  * never an acknowledgement. Scenario runs set these behaviours; this screen is for setting them
  * by hand, and for the default that every other patient gets. A change applies to notifications
@@ -39,12 +39,8 @@ export function PatientBehavioursPage({ onChanged }: PatientBehavioursPageProps)
   const fallback = useLoad(getDefaultPatientBehaviour);
   const [removeError, setRemoveError] = useState<string | null>(null);
 
-  const describeResponse = (behaviour: PatientBehaviour) => {
-    const response = t(`patientBehaviours.response.${behaviour.response}`);
-    return behaviour.confidence !== null && behaviour.response !== 'RateConfidence'
-      ? t('patientBehaviours.responseWithRating', { response, rating: behaviour.confidence })
-      : response;
-  };
+  const describeResponse = (behaviour: PatientBehaviour) =>
+    t(`patientBehaviours.response.${behaviour.response}`);
 
   const saveDefault = async (behaviour: PatientBehaviour) => {
     const stored = await setDefaultPatientBehaviour(behaviour);

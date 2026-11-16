@@ -1,4 +1,4 @@
-// Client for the patient-channel simulator's own .NET host (not for CareLoop: the simulator's
+// Client for the SMS and email simulator's own .NET host (not for CareLoop: the simulator's
 // UI never calls CareLoop directly). Hand-written because the simulator shares no code with api/.
 export * from './client';
 export type * from './types';

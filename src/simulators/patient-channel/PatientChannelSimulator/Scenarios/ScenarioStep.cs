@@ -6,7 +6,7 @@ namespace PatientChannelSimulator.Scenarios;
 /// One scripted event in a scenario (<c>$defs/step</c> in the schema).
 /// </summary>
 /// <remarks>
-/// Steps are hospital-system events and belong to the HIS simulator. The patient channel reads
+/// Steps are hospital-system events and belong to the HIS simulator. This simulator reads
 /// them only so the shared file parses; it never executes a step.
 /// </remarks>
 public sealed record ScenarioStep

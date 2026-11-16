@@ -56,7 +56,7 @@ public static class ScenarioEndpoints
                 }
                 catch (InvalidOperationException ex)
                 {
-                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "This scenario cannot be run by the patient channel.");
+                    return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest, title: "This scenario cannot be run by the SMS and email simulator.");
                 }
                 catch (Exception ex) when (ex is DirectoryNotFoundException or InvalidDataException)
                 {

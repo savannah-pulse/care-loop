@@ -4,10 +4,9 @@ namespace PatientChannelSimulator.Outbound;
 /// Where CareLoop can be reached, bound from the <c>CareLoop</c> configuration section.
 /// </summary>
 /// <remarks>
-/// The simulator reaches CareLoop in two ways. As a notification channel it calls CareLoop
-/// back on the simulator provider's callback address, the way an SMS or email gateway calls
-/// its customer back. To show a patient the status of their case it reads CareLoop's FHIR
-/// endpoints. It must never be pointed at a live endpoint.
+/// The simulator reaches CareLoop in one way only: it calls CareLoop back with delivery reports and
+/// replies, the way an SMS or email service calls its customer back. It reads nothing from
+/// CareLoop. It must never be pointed at a live endpoint.
 /// </remarks>
 public sealed class CareLoopOptions
 {
@@ -15,19 +14,15 @@ public sealed class CareLoopOptions
     public const string SectionName = "CareLoop";
 
     /// <summary>
-    /// Base URL of CareLoop's FHIR R4 endpoints, for example <c>http://localhost:5080/fhir</c>.
+    /// Address CareLoop exposes for provider callbacks, without the channel. Delivery reports and
+    /// replies about a text message are posted to <c>{CallbackBaseUrl}/sms</c> and about an email to
+    /// <c>{CallbackBaseUrl}/email</c>.
     /// </summary>
-    public string FhirBaseUrl { get; set; } = "http://localhost:5080/fhir";
-
-    /// <summary>
-    /// Address CareLoop exposes for the simulator notification provider's callbacks. Delivery
-    /// reports and patient responses are posted here, not to the FHIR endpoints.
-    /// </summary>
-    public string NotificationCallbackUrl { get; set; } = "http://localhost:5080/notifications/inbound/simulator";
+    public string CallbackBaseUrl { get; set; } = "http://localhost:5080/notifications/inbound";
 
     /// <summary>
     /// Shared secret every callback is signed with. It must equal CareLoop's
-    /// <c>Notifications:Simulator:InboundSecret</c>.
+    /// <c>Notifications:Sms:InboundSecret</c> and <c>Notifications:Email:InboundSecret</c>.
     /// </summary>
     /// <remarks>
     /// CareLoop refuses an unsigned callback, so that nobody who merely knows a case identifier
@@ -39,7 +34,7 @@ public sealed class CareLoopOptions
 
     /// <summary>
     /// How many times a callback is sent in total when CareLoop answers with a server error or
-    /// does not answer in time. A resend is safe because CareLoop deduplicates on the resource id and version.
+    /// does not answer in time. A resend is safe because CareLoop deduplicates callbacks.
     /// </summary>
     public int SendAttempts { get; set; } = 3;
 
@@ -51,7 +46,7 @@ public sealed class CareLoopOptions
     /// </summary>
     /// <remarks>
     /// A delivery report is sent while CareLoop is still waiting for the answer to the
-    /// <c>CommunicationRequest</c> it posted. All attempts together must therefore finish well
+    /// message it posted. All attempts together must therefore finish well
     /// inside CareLoop's own HTTP timeout, or CareLoop gives up on a request the simulator is
     /// still handling.
     /// </remarks>

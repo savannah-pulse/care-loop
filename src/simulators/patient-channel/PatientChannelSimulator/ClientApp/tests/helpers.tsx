@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import type {
-  FhirMessageLogEntry,
   InboxMessage,
+  MessageLogEntry,
   PatientBehaviour,
   PatientReactionRecord,
   ScenarioRunState,
@@ -84,28 +84,32 @@ export function renderAt(element: ReactElement, route = '/') {
 export function inboxMessage(overrides: Partial<InboxMessage> = {}): InboxMessage {
   return {
     messageId: 'message-1',
-    communicationRequestId: 'message-1',
-    caseTaskId: 'case-1',
-    patientSyntheticId: 'SYN-PT-0001',
-    patientDisplayName: 'Synthetic patient SYN-PT-0001',
-    channel: 'App',
+    caseId: 'case-1',
+    to: 'SYN-PT-0001',
+    displayName: 'Synthetic patient SYN-PT-0001',
+    channel: 'Sms',
+    subject: null,
     language: 'en',
-    body: 'SIMULATED: please contact the clinic about your follow-up.',
+    body: 'SIMULATED: a follow-up step is waiting. Reply 1 to say you will come. Reply 2 for a call.',
     receivedAt: '2026-03-02T09:30:00+00:00',
     delivery: 'Delivered',
     deliveryFailureReason: null,
-    response: 'None',
-    respondedAt: null,
-    simulated: true,
     recipientKind: 'Patient',
-    confidence: null,
-    confidenceRatedAt: null,
-    callRequestCount: 0,
-    confidenceRatingCount: 0,
-    acknowledgedAt: null,
-    understoodAt: null,
+    replies: [],
+    simulated: true,
     ...overrides,
   };
+}
+
+/** A patient's email, with a subject line. */
+export function emailMessage(overrides: Partial<InboxMessage> = {}): InboxMessage {
+  return inboxMessage({
+    channel: 'Email',
+    to: 'SYN-EMAIL-0001',
+    displayName: 'Synthetic patient SYN-EMAIL-0001',
+    subject: 'A follow-up step is waiting for you',
+    ...overrides,
+  });
 }
 
 export function behaviour(overrides: Partial<PatientBehaviour> = {}): PatientBehaviour {
@@ -116,7 +120,6 @@ export function behaviour(overrides: Partial<PatientBehaviour> = {}): PatientBeh
     respondAfter: '00:00:00',
     respondToNotification: 1,
     simulated: true,
-    confidence: null,
     ...overrides,
   };
 }
@@ -127,7 +130,7 @@ export function reaction(overrides: Partial<PatientReactionRecord> = {}): Patien
     patientSyntheticId: 'SYN-PT-0001',
     reaction: 'Delivered',
     automatic: true,
-    sourceEventId: 'Communication/message-1-delivery/_history/1',
+    sourceEventId: 'message-1/delivery/delivered',
     at: '2026-03-02T09:30:00+00:00',
     httpStatusCode: 200,
     succeeded: true,
@@ -150,17 +153,17 @@ export function scenarioRun(overrides: Partial<ScenarioRunState> = {}): Scenario
   };
 }
 
-export function logEntry(overrides: Partial<FhirMessageLogEntry> = {}): FhirMessageLogEntry {
+export function logEntry(overrides: Partial<MessageLogEntry> = {}): MessageLogEntry {
   return {
     entryId: 'entry-1',
     at: '2026-03-02T09:30:00+00:00',
     direction: 'Inbound',
     method: 'POST',
-    url: '/fhir/CommunicationRequest',
-    resourceType: 'CommunicationRequest',
-    resourceId: 'message-1',
+    url: '/messages',
+    kind: 'message',
+    messageId: 'message-1',
     statusCode: 201,
-    body: '{"resourceType":"CommunicationRequest","id":"message-1"}',
+    body: '{"messageId":"message-1","channel":"sms","to":"SYN-PT-0001","body":"SIMULATED"}',
     simulated: true,
     ...overrides,
   };

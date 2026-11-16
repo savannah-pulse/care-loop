@@ -83,15 +83,15 @@ public sealed class ScenarioRunnerTests : IDisposable
     [Fact]
     public async Task Run_state_lists_the_reactions_of_its_patients_only()
     {
-        await _simulator.NotifyAsync(requestId: "before-the-run");
+        await _simulator.NotifyAsync(messageId: "before-the-run");
         _simulator.Clock.Advance(TimeSpan.FromMinutes(1));
         var run = await RunAsync("happy-path", new { realSecondsPerScenarioHour = 0 });
-        await _simulator.NotifyAsync(requestId: "scenario-patient", patientId: "SYN-PT-0001");
-        await _simulator.NotifyAsync(requestId: "someone-else", patientId: "SYN-PT-0999");
+        await _simulator.NotifyAsync(messageId: "scenario-patient", to: "SYN-PT-0001");
+        await _simulator.NotifyAsync(messageId: "someone-else", to: "SYN-PT-0999");
 
         var state = await RunStateAsync(run.RunId);
 
-        Assert.Equal([PatientReactionKind.Delivered, PatientReactionKind.Acknowledged], state.Reactions.Select(r => r.Reaction));
+        Assert.Equal([PatientReactionKind.Delivered, PatientReactionKind.Replied], state.Reactions.Select(r => r.Reaction));
         Assert.All(state.Reactions, r => Assert.Equal("scenario-patient", r.MessageId));
         Assert.Equal(ScenarioRunStatus.Running, state.Status);
         Assert.Null(state.CompletedAt);
@@ -103,21 +103,21 @@ public sealed class ScenarioRunnerTests : IDisposable
         var run = await RunAsync("silent-patient");
         var patientId = Assert.Single(run.PatientSyntheticIds);
 
-        await _simulator.NotifyAsync(patientId: patientId);
+        await _simulator.NotifyAsync(to: patientId);
         _simulator.Clock.Advance(TimeSpan.FromDays(30));
         await _simulator.SendDueAsync();
 
         var state = await RunStateAsync(run.RunId);
         Assert.Equal([PatientReactionKind.Delivered, PatientReactionKind.NoResponse], state.Reactions.Select(r => r.Reaction));
-        Assert.Equal(["delivery-status"], _simulator.CareLoop.Categories);
-        Assert.Equal(ResponseState.None, (await _simulator.InboxMessageAsync()).Response);
+        Assert.Equal(["delivered"], _simulator.CareLoop.Kinds);
+        Assert.Empty((await _simulator.InboxMessageAsync()).Replies);
     }
 
     [Fact]
     public async Task Run_is_failed_when_CareLoop_rejects_a_reaction()
     {
         var run = await RunAsync("happy-path", new { realSecondsPerScenarioHour = 0 });
-        _simulator.CareLoop.Refuse("acknowledgement", HttpStatusCode.UnprocessableEntity);
+        _simulator.CareLoop.RefuseReplies(HttpStatusCode.UnprocessableEntity);
         _simulator.Clock.Advance(TimeSpan.FromSeconds(5));
 
         await _simulator.NotifyAsync();
@@ -125,7 +125,7 @@ public sealed class ScenarioRunnerTests : IDisposable
         var state = await RunStateAsync(run.RunId);
         Assert.Equal(ScenarioRunStatus.Failed, state.Status);
         Assert.Equal(_simulator.Clock.UtcNow, state.CompletedAt);
-        Assert.Contains(state.Reactions, r => r is { Reaction: PatientReactionKind.Acknowledged, Succeeded: false, HttpStatusCode: 422 });
+        Assert.Contains(state.Reactions, r => r is { Reaction: PatientReactionKind.Replied, Succeeded: false, HttpStatusCode: 422 });
     }
 
     [Fact]
@@ -174,29 +174,24 @@ public sealed class ScenarioRunnerTests : IDisposable
         Assert.Equal(1, scenarios!.Single(s => s.Name == "happy-path").PatientCount);
     }
 
-    [Fact]
-    public async Task Scenario_patient_who_rates_confidence_rates_without_acknowledging()
+    [Theory]
+    [InlineData("happy-path")]
+    [InlineData("silent-patient")]
+    [InlineData("rejected-referral")]
+    [InlineData("broken-handoff")]
+    public async Task Every_shipped_scenario_only_asks_for_what_a_patient_can_do_by_text_or_email(string scenario)
     {
-        using var files = new TempScenarios()
-            .AddScenario("rates-only", """{ "delivery": "deliver", "response": "rate-confidence", "confidence": 2 }""")
-            .AddScenario("acknowledges-and-rates", """{ "delivery": "deliver", "response": "acknowledge", "confidence": 5 }""", patientId: "SYN-PT-0002");
-        using var simulator = new SimulatorFactory(scenariosDirectory: files.Path);
-        await RunAsync("rates-only", simulator: simulator);
-        await RunAsync("acknowledges-and-rates", simulator: simulator);
+        var run = await RunAsync(scenario);
 
-        await simulator.NotifyAsync(requestId: "one", patientId: "SYN-PT-0001");
-        await simulator.NotifyAsync(requestId: "two", patientId: "SYN-PT-0002");
-
-        var one = await simulator.InboxMessageAsync("one");
-        var two = await simulator.InboxMessageAsync("two");
-        Assert.Equal((ResponseState.None, 2), (one.Response, one.Confidence));
-        Assert.Equal((ResponseState.Acknowledged, 5), (two.Response, two.Confidence));
+        Assert.NotEmpty(run.PatientSyntheticIds);
+        Assert.All(_simulator.Store.GetBehaviours(), a => Assert.True(Enum.IsDefined(a.Behaviour.Response)));
     }
 
     [Theory]
-    [InlineData("""{ "delivery": "deliver", "response": "rate-confidence" }""")]
+    [InlineData("""{ "delivery": "deliver", "response": "rate-confidence", "confidence": 2 }""")]
+    [InlineData("""{ "delivery": "deliver", "response": "understand" }""")]
     [InlineData("""{ "delivery": "deliver", "response": "none", "confidence": 3 }""")]
-    [InlineData("""{ "delivery": "deliver", "response": "acknowledge", "confidence": 9 }""")]
+    [InlineData("""{ "delivery": "deliver", "response": "acknowledge", "confidence": 5 }""")]
     [InlineData("""{ "delivery": "fail", "response": "none" }""")]
     [InlineData("""{ "delivery": "silent", "response": "acknowledge" }""")]
     [InlineData("""{ "delivery": "deliver", "response": "wave" }""")]

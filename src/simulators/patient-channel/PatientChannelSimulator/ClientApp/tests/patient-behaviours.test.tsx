@@ -15,7 +15,7 @@ const fields = en.patientBehaviours.fields;
 function assignment(patientSyntheticId: string, scenarioName: string | null = null) {
   return {
     patientSyntheticId,
-    behaviour: behaviour({ response: 'Acknowledge', respondAfter: '00:00:02', confidence: 4 }),
+    behaviour: behaviour({ response: 'Acknowledge', respondAfter: '00:00:02' }),
     scenarioName,
     simulated: true,
   };
@@ -42,7 +42,7 @@ describe('Patient behaviours', () => {
 
     const first = (await screen.findByRole('rowheader', { name: /SYN-PT-0001/ })).closest('tr');
     expect(first?.textContent).toContain('Delivered');
-    expect(first?.textContent).toContain('Acknowledges, then rates 4');
+    expect(first?.textContent).toContain(en.patientBehaviours.response.Acknowledge);
     expect(first?.textContent).toContain('After 2 s, on notification 1');
     expect(first?.textContent).toContain('Scenario happy-path');
     expect(
@@ -91,16 +91,14 @@ describe('Patient behaviours', () => {
     fireEvent.change(form.getByLabelText(en.patientBehaviours.patientIdLabel), {
       target: { value: 'SYN-PT-0007' },
     });
-    fireEvent.change(form.getByLabelText(fields.response), { target: { value: 'Understand' } });
-    fireEvent.change(form.getByLabelText(fields.confidence), { target: { value: '5' } });
+    fireEvent.change(form.getByLabelText(fields.response), { target: { value: 'CallMe' } });
     fireEvent.change(form.getByLabelText(fields.respondAfter), { target: { value: '90' } });
     fireEvent.change(form.getByLabelText(fields.respondToNotification), { target: { value: '2' } });
     fireEvent.click(form.getByRole('button', { name: en.patientBehaviours.save }));
 
     await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
     const sent = behaviour({
-      response: 'Understand',
-      confidence: 5,
+      response: 'CallMe',
       respondAfter: '00:01:30',
       respondToNotification: 2,
     });
@@ -160,14 +158,12 @@ describe('Patient behaviours', () => {
       target: { value: 'SYN-PT-0007' },
     });
     fireEvent.change(form.getByLabelText(fields.response), { target: { value: 'Acknowledge' } });
-    fireEvent.change(form.getByLabelText(fields.confidence), { target: { value: '3' } });
 
     fireEvent.change(form.getByLabelText(fields.delivery), { target: { value: 'StaySilent' } });
 
     const response = form.getByLabelText(fields.response) as HTMLSelectElement;
     expect(response.disabled).toBe(true);
     expect(response.value).toBe('None');
-    expect((form.getByLabelText(fields.confidence) as HTMLSelectElement).disabled).toBe(true);
     expect(form.getByText(en.patientBehaviours.responseNeedsDelivery)).toBeTruthy();
 
     fireEvent.click(form.getByRole('button', { name: en.patientBehaviours.save }));
@@ -178,7 +174,7 @@ describe('Patient behaviours', () => {
     );
   });
 
-  it('refuses a patient identifier that is not synthetic, and a rating-only patient without a rating', async () => {
+  it('refuses a patient identifier that is not synthetic, and offers no teach-back or rating response', async () => {
     const api = mockApi({
       'GET /api/patient-behaviours': [],
       'GET /api/patient-behaviours/default': behaviour(),
@@ -195,9 +191,11 @@ describe('Patient behaviours', () => {
     fireEvent.change(form.getByLabelText(en.patientBehaviours.patientIdLabel), {
       target: { value: 'SYN-PT-0007' },
     });
-    fireEvent.change(form.getByLabelText(fields.response), { target: { value: 'RateConfidence' } });
-    fireEvent.click(form.getByRole('button', { name: en.patientBehaviours.save }));
-    expect(form.getByRole('alert').textContent).toBe(en.patientBehaviours.validation.confidence);
+    const offered = Array.from(
+      (form.getByLabelText(fields.response) as HTMLSelectElement).options,
+    ).map((option) => option.value);
+    expect(offered).toEqual(['None', 'Acknowledge', 'CallMe']);
+    expect(form.queryByLabelText(/confidence/i)).toBeNull();
 
     expect(api.calls.some((call) => call.method === 'PUT')).toBe(false);
   });

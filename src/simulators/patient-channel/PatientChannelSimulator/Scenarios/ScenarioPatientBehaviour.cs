@@ -26,9 +26,8 @@ public sealed record ScenarioPatientBehaviour
     public int? RespondToNotification { get; init; }
 
     /// <summary>
-    /// The 1 to 5 confidence rating the patient gives (C10). Required when <see cref="Response"/> is
-    /// <see cref="ScenarioVocabulary.ResponseRateConfidence"/>; with another response the patient
-    /// rates straight after it; absent means the patient gives no rating.
+    /// A 1 to 5 confidence rating. The schema still allows it, and this simulator refuses a scenario
+    /// that sets it: a patient gives no rating by text message or email, a nurse records it after a call.
     /// </summary>
     public int? Confidence { get; init; }
 }

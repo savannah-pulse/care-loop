@@ -49,10 +49,20 @@ public sealed class ExternalSystemsConfigurationTests
 
         Assert.Equal("http://localhost:5082", Simulator(configuration, NotificationChannel.Sms).BaseUrl);
         Assert.Equal("http://localhost:5082", Simulator(configuration, NotificationChannel.Email).BaseUrl);
-        var contact = StaffContacts(configuration).For("facility-lead");
-        Assert.NotNull(contact);
-        Assert.Equal(NotificationChannel.Email, contact.Channel);
-        Assert.StartsWith("SYN-", contact.Address);
+        var contacts = StaffContacts(configuration);
+        var addresses = new List<string>();
+        foreach (var role in CareLoop.Api.Infrastructure.Auth.DemoRoles.HumanRoles)
+        {
+            var contact = contacts.For(role);
+            Assert.NotNull(contact);
+            Assert.Equal(NotificationChannel.Email, contact.Channel);
+            Assert.StartsWith("SYN-", contact.Address);
+            addresses.Add(contact.Address!);
+        }
+
+        // One address per role, and no catch-all: a role nobody listed is not silently sent somewhere else.
+        Assert.Equal(addresses.Count, addresses.Distinct().Count());
+        Assert.Null(contacts.For("no-such-role"));
     }
 
     [Fact]

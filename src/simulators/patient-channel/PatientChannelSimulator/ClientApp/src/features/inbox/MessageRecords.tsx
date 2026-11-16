@@ -42,17 +42,29 @@ function RecordRow({ mark, title, detail, time, testId }: RecordRowProps) {
 }
 
 /**
- * What CareLoop has been told about one message: its delivery, the patient's response and the
- * patient's confidence rating.
+ * Says which explanation a reply gets.
+ *
+ * @param text - The reply as typed.
+ * @returns `WillCome` for 1, `CallMe` for 2 and `Other` for anything else, ignoring surrounding spaces.
+ */
+function meaningOf(text: string): 'WillCome' | 'CallMe' | 'Other' {
+  const trimmed = text.trim();
+  return trimmed === '1' ? 'WillCome' : trimmed === '2' ? 'CallMe' : 'Other';
+}
+
+/**
+ * What CareLoop has been told about one message: its delivery, and each reply the patient sent.
  *
  * @remarks
- * The three are kept apart on purpose. Delivery is a transport fact and never an
- * acknowledgement; a call request and a rating are not acknowledgements either. A caregiver's
- * copy shows delivery only, because nothing a caregiver does is recorded as the patient's.
+ * The two are kept apart on purpose. Delivery is a transport fact and never an acknowledgement.
+ * A reply is shown as typed, with how CareLoop reads it: 1 is "I will come", and 2 or any other
+ * text asks for a call and is never an acknowledgement. Whether the patient understood, and how
+ * confident they feel, are not shown here: a nurse records those in CareLoop after a call. A
+ * caregiver's or a staff member's message shows delivery only, because only the patient replies.
  */
 export function MessageRecords({ message }: MessageRecordsProps) {
   const { t } = useTranslation();
-  const isCaregiverCopy = message.recipientKind === 'Caregiver';
+  const forPatient = message.recipientKind === 'Patient';
   const deliveryMark =
     message.delivery === 'Delivered' ? 'ok' : message.delivery === 'Failed' ? 'no' : 'todo';
 
@@ -72,42 +84,40 @@ export function MessageRecords({ message }: MessageRecordsProps) {
           time={deliveryMark === 'todo' ? '' : formatTime(message.receivedAt)}
           testId="delivery-state"
         />
-        {isCaregiverCopy ? (
+        {!forPatient && (
           <RecordRow
             mark="todo"
-            title={t('inbox.records.caregiver')}
-            detail={t('inbox.records.caregiverDetail')}
-            testId="caregiver-note"
+            title={t('inbox.records.onlyPatient')}
+            detail={t(`inbox.records.onlyPatientDetail.${message.recipientKind}`)}
+            testId="read-only-note"
           />
-        ) : (
-          <>
+        )}
+        {forPatient && message.replies.length === 0 && (
+          <RecordRow
+            mark="todo"
+            title={t('inbox.records.noReply')}
+            detail={t('inbox.records.noReplyDetail')}
+            testId="reply-state"
+          />
+        )}
+        {forPatient &&
+          message.replies.map((reply) => (
             <RecordRow
-              mark={message.response === 'None' ? 'todo' : 'ok'}
-              title={t(`inbox.records.response.${message.response}`)}
-              detail={t(`inbox.records.responseDetail.${message.response}`)}
-              time={formatTime(message.respondedAt)}
-              testId="response-state"
+              key={reply.replyId}
+              mark="ok"
+              title={t('inbox.records.replied', { text: reply.text })}
+              detail={t(`inbox.records.meaning.${meaningOf(reply.text)}`)}
+              time={formatTime(reply.sentAt)}
+              testId="reply-state"
             />
-            {message.callRequestCount > 0 && message.response !== 'CallRequested' && (
-              <RecordRow
-                mark="ok"
-                title={t('inbox.records.response.CallRequested')}
-                detail={t('inbox.records.responseDetail.CallRequested')}
-                testId="call-state"
-              />
-            )}
-            <RecordRow
-              mark={message.confidence === null ? 'todo' : 'ok'}
-              title={
-                message.confidence === null
-                  ? t('inbox.records.confidenceNone')
-                  : t('inbox.records.confidence', { rating: message.confidence })
-              }
-              detail={t('inbox.records.confidenceDetail')}
-              time={formatTime(message.confidenceRatedAt)}
-              testId="confidence-state"
-            />
-          </>
+          ))}
+        {forPatient && (
+          <RecordRow
+            mark="todo"
+            title={t('inbox.records.byNurse')}
+            detail={t('inbox.records.byNurseDetail')}
+            testId="nurse-note"
+          />
         )}
       </ul>
     </aside>

@@ -1,31 +1,22 @@
 namespace PatientChannelSimulator.State;
 
 /// <summary>
-/// One thing the simulator did in reaction to a notification.
+/// What the simulator did, or deliberately did not do, in reaction to one notification.
 /// </summary>
 public enum PatientReactionKind
 {
-    /// <summary>A delivered report was sent to CareLoop.</summary>
+    /// <summary>A delivery report was sent: the message reached the recipient.</summary>
     Delivered,
 
-    /// <summary>A delivery-failed report was sent to CareLoop.</summary>
+    /// <summary>A failed-delivery report was sent, with its reason.</summary>
     DeliveryFailed,
 
-    /// <summary>The message was accepted and, by design, nothing was reported.</summary>
+    /// <summary>Nothing was reported about delivery, on purpose: the channel stayed silent.</summary>
     NoDeliveryReport,
 
-    /// <summary>The patient's acknowledgement was sent to CareLoop.</summary>
-    Acknowledged,
+    /// <summary>A reply was sent, as typed. What it means is CareLoop's decision.</summary>
+    Replied,
 
-    /// <summary>The patient's teach-back confirmation was sent to CareLoop.</summary>
-    Understood,
-
-    /// <summary>The patient's request for a call was sent to CareLoop.</summary>
-    CallRequested,
-
-    /// <summary>The patient's behaviour is to stay silent, so no response was sent.</summary>
+    /// <summary>The patient did not reply to this notification, on purpose.</summary>
     NoResponse,
-
-    /// <summary>The patient's 1 to 5 confidence rating was sent to CareLoop (C10). A rating is not an acknowledgement.</summary>
-    ConfidenceRated,
 }

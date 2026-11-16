@@ -1,4 +1,3 @@
-using Hl7.Fhir.Model;
 using PatientChannelSimulator.Outbound;
 using PatientChannelSimulator.Scenarios;
 using PatientChannelSimulator.State;
@@ -6,11 +5,11 @@ using PatientChannelSimulator.State;
 namespace PatientChannelSimulator.Inbound;
 
 /// <summary>
-/// Applies the receiving patient's <see cref="DeliveryBehaviour"/> to a newly received inbox message.
+/// Applies the recipient's <see cref="DeliveryBehaviour"/> to a newly received inbox message.
 /// </summary>
 /// <remarks>
 /// Looks up the behaviour in force for whoever the message is for, then reports delivered,
-/// reports failed, or deliberately reports nothing. It never produces a patient response
+/// reports failed, or deliberately reports nothing. It never produces a patient reply
 /// itself: a delivered message stays unacknowledged until the patient acts, by hand or through
 /// <see cref="AutomaticResponder"/>, which is what lets CareLoop's acknowledgement deadline be
 /// demonstrated. Every outcome, including a report CareLoop refused, is recorded as a reaction.
@@ -20,29 +19,18 @@ public sealed class DeliverySimulator
     /// <summary>Reason reported when a behaviour says delivery fails but gives no reason.</summary>
     public const string DefaultFailureReason = "SIMULATED: the message could not be delivered.";
 
-    private readonly DeliveredCommunicationBuilder _delivered;
-    private readonly DeliveryFailedCommunicationBuilder _failed;
-    private readonly CareLoopFhirClient _careLoop;
+    private readonly CareLoopCallbackClient _careLoop;
     private readonly SimulatorStore _store;
     private readonly ISimulatorClock _clock;
 
     /// <summary>
     /// Creates the delivery simulator.
     /// </summary>
-    /// <param name="delivered">Builds the delivered report.</param>
-    /// <param name="failed">Builds the failed report.</param>
     /// <param name="careLoop">Sends the report to CareLoop.</param>
     /// <param name="store">Supplies the patient's behaviour and stores the updated message and the reaction.</param>
     /// <param name="clock">Source of the report time.</param>
-    public DeliverySimulator(
-        DeliveredCommunicationBuilder delivered,
-        DeliveryFailedCommunicationBuilder failed,
-        CareLoopFhirClient careLoop,
-        SimulatorStore store,
-        ISimulatorClock clock)
+    public DeliverySimulator(CareLoopCallbackClient careLoop, SimulatorStore store, ISimulatorClock clock)
     {
-        _delivered = delivered;
-        _failed = failed;
         _careLoop = careLoop;
         _store = store;
         _clock = clock;
@@ -73,14 +61,14 @@ public sealed class DeliverySimulator
 
         var fails = behaviour.Delivery == DeliveryBehaviour.Fail;
         var reason = string.IsNullOrWhiteSpace(behaviour.FailureReason) ? DefaultFailureReason : behaviour.FailureReason;
-        Communication report = fails ? _failed.Build(message, now, reason) : _delivered.Build(message, now);
+        var report = fails ? SimulatorCallback.Failed(message, now, reason) : SimulatorCallback.Delivered(message, now);
         var reaction = fails ? PatientReactionKind.DeliveryFailed : PatientReactionKind.Delivered;
-        var sourceEventId = CommunicationFactory.SourceEventId(report);
+        var sourceEventId = report.SourceEventId();
 
-        FhirSendResult send;
+        CallbackSendResult send;
         try
         {
-            send = await _careLoop.SendCommunicationAsync(report, ct);
+            send = await _careLoop.SendAsync(message.Channel, report, ct);
         }
         catch (Exception ex) when (ex is HttpRequestException or CareLoopNotConfiguredException)
         {
@@ -106,14 +94,14 @@ public sealed class DeliverySimulator
             : m with { Delivery = DeliveryState.Delivered });
     }
 
-    // The default behaviour describes patients. A caregiver's copy follows it only when a behaviour
-    // was set for that caregiver's own inbox address; otherwise it is simply delivered, so testing
-    // unreachable patients does not also make every caregiver unreachable.
+    // The default behaviour describes patients. A caregiver's or a staff member's message follows a
+    // behaviour only when one was set for that very address; otherwise it is simply delivered, so
+    // testing unreachable patients does not also make every caregiver and nurse unreachable.
     private PatientBehaviour BehaviourFor(InboxMessage message) =>
-        message.RecipientKind == RecipientKind.Caregiver
-            ? _store.FindOwnBehaviour(message.PatientSyntheticId) ?? new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None)
-            : _store.GetBehaviour(message.PatientSyntheticId);
+        message.RecipientKind == RecipientKind.Patient
+            ? _store.GetBehaviour(message.To)
+            : _store.FindOwnBehaviour(message.To) ?? new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.None);
 
     private void Record(InboxMessage message, PatientReactionKind reaction, string? sourceEventId, DateTimeOffset at, int? statusCode, bool succeeded, string? error) =>
-        _store.AppendReaction(new PatientReactionRecord(message.MessageId, message.PatientSyntheticId, reaction, true, sourceEventId, at, statusCode, succeeded, error));
+        _store.AppendReaction(new PatientReactionRecord(message.MessageId, message.To, reaction, true, sourceEventId, at, statusCode, succeeded, error));
 }
