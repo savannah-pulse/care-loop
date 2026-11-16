@@ -1,0 +1,137 @@
+@baseUrl = http://localhost:5081
+@caseRef = replace-with-caseRef-from-cases
+@inboxId = 00000000-0000-0000-0000-000000000000
+@logEntryId = 00000000-0000-0000-0000-000000000000
+@runId = 00000000-0000-0000-0000-000000000000
+@reviewedUrgency = replace-with-clinician-reviewed-pathway-code
+@caseTaskId = replace-with-actual-careloop-task-id
+@reportId = replace-with-report-id-from-cases
+
+### Liveness
+GET {{baseUrl}}/health
+
+### Contract
+GET {{baseUrl}}/openapi/v1.json
+
+### Scenarios (cohort is listed but unsupported)
+GET {{baseUrl}}/scenarios
+
+### Headless replay: patient behaviour is not replayed here
+POST {{baseUrl}}/scenarios/silent-patient/run
+Content-Type: application/json
+
+{"runKey":"team-demo"}
+
+### Progress: replace runId with the returned run id
+GET {{baseUrl}}/scenarios/runs/{{runId}}
+
+### Source cases: copy a caseRef, diagnosticReportId and actual careLoopTaskId if known
+GET {{baseUrl}}/cases
+
+### Inbox; opening does not accept a handoff
+GET {{baseUrl}}/staff-inbox?recipient=SYN-STAFF-DEMO
+
+### Detail / unknown-id refusal
+GET {{baseUrl}}/staff-inbox/{{inboxId}}
+
+### Exact sent and received FHIR; caseRef, since (ISO 8601 instant, only newer entries) and limit (newest N) are optional
+GET {{baseUrl}}/fhir-log?direction=sent&caseRef={{caseRef}}&limit=50
+
+### One log entry by id
+GET {{baseUrl}}/fhir-log/{{logEntryId}}
+
+### Receive an actual case Task: copy real Task/report IDs, never invent CareLoop's id
+POST {{baseUrl}}/fhir/Task
+Content-Type: application/fhir+json
+
+{
+  "resourceType":"Task","id":"{{caseTaskId}}","status":"requested","intent":"order",
+  "code":{"coding":[{"system":"https://careloop.invalid/fhir/CodeSystem/task-code","code":"case"}]},
+  "basedOn":[{"reference":"DiagnosticReport/{{reportId}}"}],
+  "owner":{"reference":"Practitioner/SYN-STAFF-DEMO"},
+  "description":"SIMULATED a case needs your action"
+}
+
+### Staff notice PUT (the case is resolved through FHIR GET, best effort; the notice is filed either way)
+PUT {{baseUrl}}/fhir/Task/staff-notice-demo
+Content-Type: application/fhir+json
+
+{
+  "resourceType":"Task","id":"staff-notice-demo","status":"requested","intent":"order",
+  "code":{"coding":[{"system":"https://careloop.invalid/fhir/CodeSystem/task-code","code":"staff-notice"}]},
+  "owner":{"identifier":{"value":"SYN-STAFF-DEMO"}},
+  "focus":{"reference":"Task/{{caseTaskId}}"},
+  "description":"SIMULATED a case needs your action"
+}
+
+### Explicit human-reviewed urgency: choose the source-reviewed code from the pathway
+POST {{baseUrl}}/actions/clinical-review
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"urgency":"{{reviewedUrgency}}"}
+
+### Propose ownership; previous owner remains accountable until acceptance. Without proposedOwner (and its facility) it only requests the consultation
+POST {{baseUrl}}/actions/consultation-request
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"proposedOwner":{"syntheticId":"SYN-RECEIVING-DEMO","role":"receiving-clinician","facility":"SYN-FAC-B"},"receivingFacility":"SYN-FAC-B"}
+
+### Source human answers the consultation
+POST {{baseUrl}}/actions/consultation-answer
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-RECEIVING-DEMO","role":"receiving-clinician","facility":"SYN-FAC-B"},"status":"accepted"}
+
+### Source referral state (requested, accepted or rejected; never completed). An answer is sent alone, without a made-up request
+POST {{baseUrl}}/actions/referral
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"status":"requested","receivingFacility":"SYN-FAC-B"}
+
+### Receiving clinician decides: accepted is required (true or false); a body without it is refused with 400
+POST {{baseUrl}}/actions/referral-decision
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-RECEIVING-DEMO","role":"receiving-clinician","facility":"SYN-FAC-B"},"accepted":false,"reason":"SIMULATED receiving facility declined"}
+
+### Explicit source appointment facts; dates are examples, not clinical deadlines
+POST {{baseUrl}}/actions/appointment
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"status":"booked","scheduledFor":"2026-11-20T09:00:00Z","location":"SYN Breast Imaging Clinic"}
+
+### Finalized outcome: diagnosis is a configured placeholder evidence kind
+POST {{baseUrl}}/actions/outcome
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"evidenceKind":"diagnosis","asFollowUpReport":false}
+
+### Human closure request; CareLoop's gate may refuse and that refusal is shown explicitly
+POST {{baseUrl}}/actions/closure
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"closureReason":"treated","evidenceResourceKey":"outcome"}
+
+### Closure on surveillance: the date is yyyy-MM-dd; closureReason is one of treated, on-surveillance, negative-on-confirmation, declined, transferred-and-accepted, untraceable
+POST {{baseUrl}}/actions/closure
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"closureReason":"on-surveillance","nextSurveillanceDate":"2027-03-04","evidenceResourceKey":"outcome"}
+
+### Source consent grant; use inactive/rejected without contact for withdrawal
+POST {{baseUrl}}/actions/consent
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"status":"active","caregiverContact":"SYN-CAREGIVER-DEMO"}
+
+### Malformed FHIR is refused with 400 and logged
+POST {{baseUrl}}/fhir/Task
+Content-Type: application/fhir+json
+
+{"resourceType":
+
+### Unsupported cohort returns 422 without starting background work
+POST {{baseUrl}}/scenarios/cohort/run
+Content-Type: application/json
+
+{}

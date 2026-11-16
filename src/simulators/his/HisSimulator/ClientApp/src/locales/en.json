@@ -20,41 +20,135 @@
   "scenarioRunner": {
     "title": "Scenario runner",
     "description": "Replays the HIS steps of a scripted, simulated scenario against CareLoop.",
-    "planned": {
-      "list": "List the scenarios found in the scenarios directory",
-      "run": "Start a run of a chosen scenario",
-      "progress": "Show the progress and result of each step in a run",
-      "expect": "Show what the scenario is expected to demonstrate"
-    }
+    "boundary": "Only HIS events are replayed here. Finished replay is not proof of completed care; patient behaviour and full journey assertions belong to WS8/WS10. Shared happy-path evidence still includes a placeholder.",
+    "steps": "{{count}} HIS steps",
+    "expectations": "Declared expectations (not verified by this runner)",
+    "cohortDeferred": "Cohort expansion is deferred to WS10 and cannot be started.",
+    "pacing": "Real seconds per scenario hour (blank uses configuration)",
+    "runKey": "Stable replay key (optional; reuse deduplicates source events)",
+    "start": "Start HIS replay",
+    "progress": "Run progress"
   },
   "staffInbox": {
     "title": "Staff inbox",
     "description": "Simulated messages CareLoop has sent to hospital staff. Receiving a message is not an acknowledgement.",
-    "planned": {
-      "list": "List escalations, handoff proposals, call requests, handoff summaries and staff notifications",
-      "filter": "Filter the inbox by the member of staff it is addressed to",
-      "detail": "Open an item to see its FHIR message"
-    }
+    "recipient": "Recipient identifier or queue (blank shows all)"
   },
   "fhirLog": {
     "title": "FHIR message log",
     "description": "Every simulated FHIR message this simulator has sent to CareLoop or received from it.",
-    "planned": {
-      "sent": "List the messages sent to CareLoop with their HTTP status",
-      "received": "List the messages received from CareLoop",
-      "filter": "Filter by direction and by case",
-      "body": "Show the FHIR JSON of a message"
-    }
+    "direction": "Direction",
+    "caseRef": "Source case reference",
+    "requestBody": "Exact request / received FHIR body",
+    "responseBody": "Exact CareLoop response",
+    "noResponse": "No response received"
   },
   "clinicianActions": {
     "title": "Act as clinician",
     "description": "Manually perform the actions a person would take in the hospital system. The simulator never decides urgency or closure itself.",
-    "planned": {
-      "cases": "Choose one of the simulated cases",
-      "review": "Record a clinical review with the reviewed urgency",
-      "referral": "Accept or reject a referral",
-      "outcome": "Record an outcome",
-      "closure": "Authorize closure with evidence or a documented exception"
+    "codes": "Enter clinical codes from the configured pathway, without inventing values. Each submission represents an explicit human action in the synthetic HIS.",
+    "noCases": "No source cases yet. Start a scenario to send a screening result first.",
+    "sourceActor": "Source case and acting staff",
+    "case": "Source case",
+    "caseOption": "{{name}} (MRN {{mrn}}) — {{caseRef}}",
+    "patientLine": "Patient {{name}}, MRN {{mrn}}, case {{caseRef}}",
+    "handoffSummary": "Approved handoff summary",
+    "handoffSummaryNote": "Read-only: exactly the text a person approved in CareLoop and CareLoop sent to this HIS.",
+    "action": "Source action",
+    "performer": "Synthetic staff identifier",
+    "role": "Acting role",
+    "facility": "Synthetic acting facility",
+    "status": "Source status / decision",
+    "urgency": "Clinician-reviewed urgency code",
+    "evidenceKind": "Pathway evidence-kind code",
+    "followUpReport": "Send as a follow-up DiagnosticReport instead of Procedure",
+    "proposedOwner": "Proposed owner identifier (optional)",
+    "proposedRole": "Proposed owner's role (required with a proposed owner)",
+    "receivingFacility": "Synthetic receiving or proposed owner's facility (required with a proposed owner)",
+    "reason": "Reason (required on rejection)",
+    "declineReasons": {
+      "noCapacity": "No capacity",
+      "wrongService": "Wrong service",
+      "missingInformation": "Missing information"
+    },
+    "location": "Visibly synthetic appointment location",
+    "scheduledFor": "Source scheduled time",
+    "caregiver": "Synthetic caregiver contact (required for active consent)",
+    "closureReason": "Closure reason",
+    "closureReasons": {
+      "treated": "Treated",
+      "on-surveillance": "On surveillance (needs a next surveillance date)",
+      "negative-on-confirmation": "Negative on confirmation",
+      "declined": "Declined",
+      "transferred-and-accepted": "Transferred and accepted elsewhere",
+      "untraceable": "Untraceable after documented attempts"
+    },
+    "evidence": "Previously sent outcome evidence",
+    "exception": "Documented exception (optional)",
+    "surveillance": "Human-supplied next surveillance date (optional)",
+    "attempts": "Documented attempt references (one per line)",
+    "evidenceChecked": "I have checked the evidence above",
+    "taskUnknown": "CareLoop's actual case Task has not arrived through FHIR yet. Closure will be refused until it is known.",
+    "submit": "Send human source action",
+    "lastResult": "Last submission result",
+    "accepted": "Accepted by CareLoop",
+    "refused": "Refused by CareLoop",
+    "inspectLog": "Inspect the FHIR message log for exact request and response bodies.",
+    "actions": {
+      "clinical-review": "Record clinical review",
+      "consultation-request": "Propose consultation ownership",
+      "consultation-answer": "Answer / complete consultation",
+      "referral": "Record referral state",
+      "referral-decision": "Accept / reject referral",
+      "appointment": "Record appointment state",
+      "outcome": "Record finalized outcome",
+      "closure": "Authorize closure",
+      "consent": "Record caregiver consent"
+    },
+    "roles": {
+      "clinician": "Clinician",
+      "receiving-clinician": "Receiving clinician",
+      "facility-lead": "Facility lead",
+      "nurse-navigator": "Nurse navigator",
+      "coordinator": "Coordinator",
+      "lab": "Lab"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "httpError": "Simulator request failed (HTTP {{status}}). Inspect the server log and retry.",
+    "networkError": "The simulator request could not be completed. Check connectivity and retry.",
+    "empty": "No matching messages.",
+    "choose": "Choose...",
+    "all": "All",
+    "none": "No evidence supplied",
+    "open": "Open",
+    "close": "Close",
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Replay finished / source completed",
+      "failed": "Failed",
+      "sent": "Sent",
+      "received": "Received",
+      "rejected": "Rejected",
+      "skipped": "Skipped",
+      "accepted": "Accepted",
+      "requested": "Requested",
+      "booked": "Booked",
+      "fulfilled": "Attended",
+      "noshow": "Missed",
+      "active": "Active consent",
+      "inactive": "Withdrawn consent"
+    },
+    "kind": {
+      "escalation": "Escalation",
+      "handoff-proposed": "Handoff proposed",
+      "handoff-rejected": "Handoff rejected",
+      "referral-rejected": "Referral rejected",
+      "call-requested": "Call requested",
+      "handoff-summary": "Approved handoff summary",
+      "staff-notification": "Staff notification"
     }
   }
 }

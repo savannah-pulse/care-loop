@@ -20,6 +20,10 @@ namespace HisSimulator.State;
 /// <param name="CareLoopTaskId">Logical id of the CareLoop case <c>Task</c> the item refers to, when known.</param>
 /// <param name="FhirResourceType">Resource type that carried the item, or <see langword="null"/> for a direct notification.</param>
 /// <param name="LogEntryId">The <see cref="FhirMessageLogEntry"/> holding the raw message, when it arrived as FHIR.</param>
+/// <param name="Content">
+/// Full text the message carried when that text is the point of the message: the approved handoff summary of a
+/// <c>DocumentReference</c>, exactly as CareLoop sent it. <see langword="null"/> for every other kind.
+/// </param>
 public sealed record StaffInboxItem(
     Guid Id,
     StaffInboxItemKind Kind,
@@ -30,7 +34,8 @@ public sealed record StaffInboxItem(
     string? Link,
     string? CareLoopTaskId,
     string? FhirResourceType,
-    Guid? LogEntryId)
+    Guid? LogEntryId,
+    string? Content = null)
 {
     /// <summary>
     /// Always <see langword="true"/>: marks the item as a simulated message.

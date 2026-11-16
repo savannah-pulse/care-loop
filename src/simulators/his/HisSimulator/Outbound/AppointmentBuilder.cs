@@ -25,7 +25,44 @@ public sealed class AppointmentBuilder
     /// <exception cref="ArgumentException">The status is missing or not one of the supported values.</exception>
     public Appointment Build(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the Appointment for the requested state.
-        throw new NotImplementedException("WS7: AppointmentBuilder.Build");
+        var status = request.Status switch
+        {
+            "booked" => Appointment.AppointmentStatus.Booked, "fulfilled" => Appointment.AppointmentStatus.Fulfilled,
+            "noshow" => Appointment.AppointmentStatus.Noshow,
+            _ => throw new ArgumentException("Appointment status must be booked, fulfilled or noshow."),
+        };
+        var appointment = FhirSupport.Stamp(new Appointment
+        {
+            Status = status, Start = request.OccurredAt,
+            Participant = [new Appointment.ParticipantComponent
+            {
+                Actor = new ResourceReference("Patient/" + @case.Patient.SyntheticId), Status = ParticipationStatus.Accepted,
+            }],
+        }, request, FhirSupport.Id(@case.CaseRef + "/appointment"));
+        FhirSupport.Result(appointment, @case);
+        if (request.Performer is not null) appointment.Participant.Add(new Appointment.ParticipantComponent
+        {
+            Actor = FhirSupport.Actor(request.Performer), Status = ParticipationStatus.Accepted,
+        });
+        var scheduledFor = FhirSupport.OptionalText(request, "scheduledFor");
+        if (scheduledFor is not null)
+        {
+            if (!DateTimeOffset.TryParse(scheduledFor, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var time)) throw new ArgumentException("The scheduled time is invalid.");
+            appointment.Start = time;
+        }
+        if (@case.ResourceIds.TryGetValue("referral-service-request", out var referral))
+            appointment.BasedOn.Add(new ResourceReference("ServiceRequest/" + referral));
+        var location = FhirSupport.OptionalText(request, "location");
+        if (location is not null)
+        {
+            if (!location.StartsWith("SYN", StringComparison.Ordinal)) throw new ArgumentException("The appointment location must be visibly synthetic.");
+            appointment.Participant.Add(new Appointment.ParticipantComponent
+            {
+                Actor = new ResourceReference("Location/" + FhirSupport.Id(location)) { Display = location },
+                Status = ParticipationStatus.Accepted,
+            });
+        }
+        return appointment;
     }
 }

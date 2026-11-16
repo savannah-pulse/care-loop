@@ -26,12 +26,12 @@ independently against common contracts. The rules every contributor follows are 
 - Only an authorized human can close a case, with pathway evidence or a documented exception.
 - AI output is a reviewable draft. It cannot change source facts, set urgency, close cases, or send messages.
 
-## Status: scaffold
+## Implementation status
 
-The API and both simulators are scaffolded so ten workstreams can build in parallel. Contracts, signatures and
-documentation are in place; behaviour is stubbed. Every stub is tagged `TODO(WS-n)` and its planned behaviour exists
-as a named, skipped test. Search for `TODO(WS-` to find your work and read [`docs/workstreams.md`](docs/workstreams.md)
-for ownership.
+WS1 to WS6 implement Domain rules, persistence/intake, FHIR, outbox/notifications, deadlines and the staff read
+APIs/dashboard. Simulator, AI-summary and end-to-end workstreams still have assigned stubs. Remaining stubs are tagged
+`TODO(WS-n)` with named skipped tests. Search for `TODO(WS-` and read [`docs/workstreams.md`](docs/workstreams.md)
+for ownership and validation. The dashboard reports unavailable capabilities explicitly.
 
 ## Repository map
 
@@ -45,7 +45,7 @@ infra/local/                Local environment notes
 src/
   api/                      The CareLoop engine (.NET 10): CareLoop.Domain, CareLoop.Api and its Dockerfile
   ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
-  web/                      React + TypeScript + Vite dashboard starter and Dockerfile
+  web/                      React + TypeScript + Vite staff dashboard and Dockerfile
   simulators/
     scenarios/              Scripted synthetic journeys shared by both simulators (scenario.schema.json)
     his/                    Stand-in for a hospital information system: HisSimulator (.NET) with a React ClientApp
@@ -106,7 +106,7 @@ live runs, and applies database migrations at startup.
 
 ## Work on one part
 
-Prerequisites: .NET 10 SDK, Node.js 24 with npm for the dashboard, Node.js 22 with Corepack for the simulator
+Prerequisites: .NET 10 SDK, Node.js 24 with npm for the dashboard and Corepack/Yarn for the simulator
 ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for the AI workflow.
 
 | Part | Build and test |
@@ -118,6 +118,10 @@ ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for
 | Simulator ClientApps | in each `ClientApp/`: `corepack yarn install && corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build` |
 | Dashboard | `cd src/web && npm ci && npm run dev` |
 | AI workflow | see [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
+
+The HIS simulator now supports headless HIS replay, source clinician actions, a staff inbox and exact FHIR logs.
+See its [demo and test guide](src/simulators/his/README.md). Replay completion does not assert completed care:
+patient behaviour, cohort expansion and full screening-to-care E2E assertions remain WS8/WS10.
 
 When the API's routes or contracts change, rebuild the API: the build rewrites `contracts/openapi/careloop.json`, and
 CI fails if the committed document is out of date.

@@ -26,4 +26,6 @@ public enum ScenarioAction
 
     /// <summary>An authorized closure decision (case <c>Task</c> completed plus <c>Provenance</c>).</summary>
     Closure,
+    /// <summary>A source-recorded caregiver consent grant or withdrawal; shared schema support belongs to WS10.</summary>
+    ConsentRecorded,
 }

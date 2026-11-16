@@ -7,7 +7,7 @@
 #   docker build -f src/simulators/his/Dockerfile -t careloop-his-simulator .
 
 # ---- Stage 1: build the React ClientApp --------------------------------------------------
-FROM node:22-alpine AS client
+FROM node:24-alpine AS client
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /client
 

@@ -96,7 +96,7 @@ internal static class HandlerSupport
     /// <exception cref="KeyNotFoundException">The pathway defines no deadline for <paramref name="nextAction"/>.</exception>
     public static void SetNextAction(Case @case, string nextAction, PathwayDefinition pathway, IClock clock)
     {
-        var dueAt = clock.UtcNow.Add(FindDeadline(nextAction, @case.Urgency, pathway).Duration);
+        var dueAt = DeadlinePolicy.ComputeDueAt(nextAction, @case.Urgency, pathway, clock);
         @case.SetNextAction(nextAction, dueAt, clock.UtcNow);
     }
 
@@ -108,26 +108,11 @@ internal static class HandlerSupport
     /// <param name="pathway">The pathway definition supplying the deadlines.</param>
     /// <returns>The matching definition.</returns>
     /// <remarks>
-    /// This is the same lookup <see cref="DeadlinePolicy.ComputeDueAt"/> is specified to perform. It lives
-    /// here until that WS5 method is implemented, at which point <see cref="SetNextAction"/> should delegate
-    /// to it and this helper can go. Keys are compared ignoring case.
+    /// Delegates to the Domain policy so deadline validation and monitoring use identical rules.
     /// </remarks>
     /// <exception cref="KeyNotFoundException">The pathway defines no deadline for <paramref name="nextAction"/>.</exception>
     public static DeadlineDefinition FindDeadline(string nextAction, string? urgencyCode, PathwayDefinition pathway)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(nextAction);
-        ArgumentNullException.ThrowIfNull(pathway);
-
-        var candidates = pathway.Deadlines
-            .Where(d => string.Equals(d.NextAction, nextAction, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var match = candidates.FirstOrDefault(d => urgencyCode is not null && string.Equals(d.UrgencyCode, urgencyCode, StringComparison.OrdinalIgnoreCase))
-            ?? candidates.FirstOrDefault(d => d.UrgencyCode is null);
-
-        return match ?? throw new KeyNotFoundException(
-            $"Pathway '{pathway.Id}' defines no deadline for next action '{nextAction}'.");
-    }
+        => DeadlinePolicy.FindDeadline(nextAction, urgencyCode, pathway);
 
     /// <summary>
     /// Finds the next action the pathway prescribes when a track hits an exception.

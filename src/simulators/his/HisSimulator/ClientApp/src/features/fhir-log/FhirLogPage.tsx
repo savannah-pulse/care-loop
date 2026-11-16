@@ -1,35 +1,89 @@
-import { PlaceholderPanel } from '../../components';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { LogEntry } from '../../api/simulator';
+import { useSimulatorRead } from '../../api/useSimulatorRead';
+import { ApiStatus } from '../../components/ApiStatus';
 
-/** Props for {@link FhirLogPage}. */
+/** Props for viewing exact FHIR exchanges. */
 export interface FhirLogPageProps {
-  /**
-   * Base URL of the HIS simulator API. Omit it to call the same origin that serves the ClientApp
-   * (the Vite dev server proxies those calls to the simulator).
-   */
+  /** Optional simulator API base URL; omission uses the current origin. */
   apiBaseUrl?: string;
 }
-
-/** Translation keys of the behaviours planned for this screen. */
-const PLANNED_KEYS = [
-  'fhirLog.planned.sent',
-  'fhirLog.planned.received',
-  'fhirLog.planned.filter',
-  'fhirLog.planned.body',
-] as const;
-
-/**
- * The FHIR message log screen: every FHIR message sent to or received from CareLoop.
- *
- * @remarks
- * The log shows the exact wire content, which is how the demo proves that the simulator and CareLoop talk only through FHIR. Every entry is a simulated message.
- */
-export function FhirLogPage(_props: FhirLogPageProps) {
-  // TODO(WS-7): load GET /fhir-log with direction and caseRef filters and show each entry's FHIR JSON.
+/** How many of the newest log entries the polled list asks for; the server keeps a bounded log too. */
+const listLimit = 200;
+/** Polls sent/received wire logs and makes refused responses inspectable without changing case state. */
+export function FhirLogPage({ apiBaseUrl }: FhirLogPageProps) {
+  const { t } = useTranslation();
+  const [direction, setDirection] = useState('');
+  const [caseRef, setCaseRef] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
+  const params = new URLSearchParams();
+  if (direction) params.set('direction', direction);
+  if (caseRef) params.set('caseRef', caseRef);
+  params.set('limit', String(listLimit));
+  const list = useSimulatorRead<{ entries: LogEntry[] }>(
+    apiBaseUrl,
+    '/fhir-log?' + params.toString(),
+    true,
+  );
+  const detail = list.data?.entries.find((entry) => entry.id === selected);
   return (
-    <PlaceholderPanel
-      titleKey="fhirLog.title"
-      descriptionKey="fhirLog.description"
-      plannedKeys={PLANNED_KEYS}
-    />
+    <section>
+      <h2>{t('fhirLog.title')}</h2>
+      <p>{t('fhirLog.description')}</p>
+      <div className="form-grid">
+        <label>
+          {t('fhirLog.direction')}
+          <select
+            name="direction"
+            value={direction}
+            onChange={(event) => {
+              setDirection(event.target.value);
+              setSelected(null);
+            }}
+          >
+            <option value="">{t('common.all')}</option>
+            <option value="sent">{t('common.status.sent')}</option>
+            <option value="received">{t('common.status.received')}</option>
+          </select>
+        </label>
+        <label>
+          {t('fhirLog.caseRef')}
+          <input
+            name="caseRef"
+            value={caseRef}
+            onChange={(event) => {
+              setCaseRef(event.target.value);
+              setSelected(null);
+            }}
+          />
+        </label>
+      </div>
+      <ApiStatus error={list.error} pending={list.pending} />
+      {list.data?.entries.length === 0 && <p>{t('common.empty')}</p>}
+      <ul className="cards">
+        {list.data?.entries.map((entry) => (
+          <li key={entry.id}>
+            <strong>
+              {entry.method} {entry.resourceType}
+            </strong>{' '}
+            — {t('common.status.' + entry.direction)} —{' '}
+            {entry.statusCode ?? t('fhirLog.noResponse')}
+            <p>{entry.caseRef}</p>
+            <time>{entry.at}</time>
+            <button onClick={() => setSelected(entry.id)}>{t('common.open')}</button>
+          </li>
+        ))}
+      </ul>
+      {detail !== undefined && (
+        <aside>
+          <h3>{t('fhirLog.requestBody')}</h3>
+          <pre>{detail.body}</pre>
+          <h3>{t('fhirLog.responseBody')}</h3>
+          <pre>{detail.responseBody ?? t('fhirLog.noResponse')}</pre>
+          <button onClick={() => setSelected(null)}>{t('common.close')}</button>
+        </aside>
+      )}
+    </section>
   );
 }

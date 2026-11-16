@@ -26,8 +26,14 @@ public sealed class OutcomeBuilder
     /// <exception cref="ArgumentException">The evidence kind is missing.</exception>
     public Procedure BuildProcedure(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the outcome Procedure.
-        throw new NotImplementedException("WS7: OutcomeBuilder.BuildProcedure");
+        var procedure = FhirSupport.Stamp(new Procedure
+        {
+            Status = EventStatus.Completed, Code = FhirSupport.Concept("evidence-kind", FhirSupport.Text(request, "evidenceKind")),
+            Subject = new ResourceReference("Patient/" + @case.Patient.SyntheticId), Performed = new FhirDateTime(request.OccurredAt),
+            ReasonReference = [new ResourceReference("DiagnosticReport/" + @case.DiagnosticReportId)],
+        }, request);
+        if (request.Performer is not null) procedure.Performer.Add(new Procedure.PerformerComponent { Actor = FhirSupport.Actor(request.Performer) });
+        return procedure;
     }
 
     /// <summary>
@@ -42,7 +48,14 @@ public sealed class OutcomeBuilder
     /// <exception cref="ArgumentException">The evidence kind is missing.</exception>
     public DiagnosticReport BuildFollowUpReport(SimulatedCase @case, OutboundEventRequest request)
     {
-        // TODO(WS-7): build the follow-up DiagnosticReport; agree with WS6 how it is told apart from a screening result.
-        throw new NotImplementedException("WS7: OutcomeBuilder.BuildFollowUpReport");
+        var report = FhirSupport.Stamp(new DiagnosticReport
+        {
+            Status = DiagnosticReport.DiagnosticReportStatus.Final,
+            Code = FhirSupport.Concept("evidence-kind", FhirSupport.Text(request, "evidenceKind")),
+            Subject = new ResourceReference("Patient/" + @case.Patient.SyntheticId), Issued = request.OccurredAt,
+        }, request);
+        FhirSupport.Result(report, @case);
+        if (request.Performer is not null) report.ResultsInterpreter.Add(FhirSupport.Actor(request.Performer));
+        return report;
     }
 }

@@ -15,8 +15,14 @@ public enum StaffInboxItemKind
     /// <summary>An ownership handoff proposed to a member of staff (<c>Task</c>), awaiting accept or reject.</summary>
     HandoffProposed,
 
-    /// <summary>A handoff or referral rejection returned to the current owner (<c>Task</c> update).</summary>
+    /// <summary>An ownership handoff proposal was rejected and the case returns to its current owner (<c>Task</c> with status <c>rejected</c>).</summary>
     HandoffRejected,
+
+    /// <summary>
+    /// A referral was rejected and its next action returns to the current owner (case <c>Task</c> still in progress,
+    /// with a <c>rejected</c> status reason).
+    /// </summary>
+    ReferralRejected,
 
     /// <summary>A patient asked to be called (<c>Task</c>) and the current owner must act.</summary>
     CallRequested,

@@ -28,9 +28,42 @@ public sealed class ScreeningResultBuilder
     /// <exception cref="ArgumentException">A required value (patient, result category or facility) is missing.</exception>
     public DiagnosticReport Build(OutboundEventRequest request)
     {
-        // TODO(WS-7): build the DiagnosticReport and contained Observations with Firely model classes.
-        // Confirm with WS6 whether Observations travel contained (assumed) or as separate POSTs.
-        throw new NotImplementedException("WS7: ScreeningResultBuilder.Build");
+        var source = request.Patient;
+        var facility = FhirSupport.Text(request, "facility");
+        var category = FhirSupport.Text(request, "resultCategory");
+        if (source is null || !FhirSupport.SyntheticId(source.SyntheticId)
+            || !source.DisplayName.StartsWith("Synthetic", StringComparison.Ordinal)
+            || !FhirSupport.SyntheticId(facility) || string.IsNullOrWhiteSpace(request.PathwayId)
+            || !System.Text.RegularExpressions.Regex.IsMatch(source.Language, "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$")
+            || source.SecondaryIdentifier is not null && !FhirSupport.SyntheticId(source.SecondaryIdentifier)
+            || source.ContactAddress is not null && !FhirSupport.SyntheticId(source.ContactAddress))
+            throw new ArgumentException("A synthetic patient, facility, MRN/contact and valid pathway/language are required.");
+        var patient = new Patient
+        {
+            Id = source.SyntheticId, Name = [new HumanName { Text = source.DisplayName }],
+            Identifier = [new Identifier(FhirSupport.Base + "/sid/mrn", source.Mrn)],
+            Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Other, Value = source.ContactAddress ?? source.SyntheticId }],
+            Communication = [new Patient.CommunicationComponent
+            {
+                Language = new CodeableConcept("urn:ietf:bcp:47", source.Language), Preferred = true,
+            }],
+        };
+        var observation = new Observation
+        {
+            Id = FhirSupport.Id(request.SourceEventKey + "/observation"), Status = ObservationStatus.Final,
+            Code = FhirSupport.Concept("result-category", category),
+            Value = FhirSupport.Concept("result-category", category), Subject = new ResourceReference("#" + patient.Id),
+        };
+        var report = FhirSupport.Stamp(new DiagnosticReport
+        {
+            Status = DiagnosticReport.DiagnosticReportStatus.Final,
+            Category = [FhirSupport.Concept("pathway", request.PathwayId)],
+            Code = FhirSupport.Concept("result-category", category), ConclusionCode = [FhirSupport.Concept("result-category", category)],
+            Subject = new ResourceReference("#" + patient.Id), Performer = [new ResourceReference("Organization/" + facility)],
+            Issued = request.OccurredAt, Contained = [patient, observation], Result = [new ResourceReference("#" + observation.Id)],
+        }, request);
+        if (request.Performer is not null) report.ResultsInterpreter.Add(FhirSupport.Actor(request.Performer));
+        return report;
     }
 
     /// <summary>
@@ -39,9 +72,11 @@ public sealed class ScreeningResultBuilder
     /// <param name="request">The screening-result event.</param>
     /// <param name="report">The report built for it by <see cref="Build"/>.</param>
     /// <returns>A <see cref="SimulatedCase"/> holding the patient, facility, pathway and report id for later events.</returns>
+    /// <exception cref="ArgumentException">Patient, pathway, facility or report id is missing.</exception>
     public SimulatedCase CreateCase(OutboundEventRequest request, DiagnosticReport report)
     {
-        // TODO(WS-7): map request and report.Id into a SimulatedCase with an empty ResourceIds map.
-        throw new NotImplementedException("WS7: ScreeningResultBuilder.CreateCase");
+        return new SimulatedCase(request.CaseRef, request.Patient ?? throw new ArgumentException("Patient is required."),
+            FhirSupport.Text(request, "facility"), request.PathwayId ?? throw new ArgumentException("Pathway is required."),
+            report.Id ?? throw new ArgumentException("The report must have a logical id."), null, new Dictionary<string, string>(), null);
     }
 }
