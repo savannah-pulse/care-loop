@@ -1,32 +1,30 @@
-using CareLoop.Api.Features.Notifications;
 using CareLoop.Domain.Recipients;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Infrastructure.Notifications;
 
 /// <summary>
-/// Production SMS provider. Deliberately not built yet.
+/// Sends text messages to the simulator configured in <c>Notifications:Sms</c>.
 /// </summary>
 /// <remarks>
-/// Real SMS delivery is not built yet; the prototype sends through the simulator provider
-/// only. This class exists so the seam is in place: it can be implemented later and
-/// switched on through <see cref="NotificationOptions.EnabledProviders"/> without touching the
-/// sender or the router. Until then it must stay out of the enabled providers; using it throws.
+/// A text message must not carry sensitive content, so the sender gives this provider the SMS template
+/// (<c>{key}.sms.txt</c>). It has no subject line.
 /// </remarks>
-public sealed class SmsNotificationProvider : INotificationProvider
+public sealed class SmsNotificationProvider : SimulatorNotificationProvider
 {
-    /// <inheritdoc/>
-    public NotificationChannel Channel => NotificationChannel.Sms;
+    /// <summary>
+    /// Creates the provider.
+    /// </summary>
+    /// <param name="http">The HTTP client supplied by the HTTP client factory.</param>
+    /// <param name="options">The simulator settings, one named set per channel.</param>
+    public SmsNotificationProvider(HttpClient http, IOptionsMonitor<SimulatorNotificationOptions> options)
+        : base(http, options)
+    {
+    }
 
     /// <inheritdoc/>
-    public bool AllowsSensitiveContent => false;
+    public override NotificationChannel Channel => NotificationChannel.Sms;
 
     /// <inheritdoc/>
-    /// <exception cref="NotSupportedException">Always: the provider is not built yet.</exception>
-    public bool CanReach(Recipient recipient) =>
-        throw new NotSupportedException("SmsNotificationProvider is not built yet; only the Simulator provider may be enabled.");
-
-    /// <inheritdoc/>
-    /// <exception cref="NotSupportedException">Always: the provider is not built yet.</exception>
-    public Task<SendResult> SendAsync(NotificationMessage message, CancellationToken ct) =>
-        throw new NotSupportedException("SmsNotificationProvider is not built yet; only the Simulator provider may be enabled.");
+    public override bool AllowsSensitiveContent => false;
 }

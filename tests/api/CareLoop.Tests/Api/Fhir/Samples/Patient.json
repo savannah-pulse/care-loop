@@ -4,6 +4,6 @@
   "meta": { "versionId": "1", "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
   "identifier": [ { "system": "https://careloop.invalid/fhir/sid/mrn", "value": "SYN-MRN-0001" } ],
   "name": [ { "use": "official", "given": [ "SYNTHETIC" ], "family": "Patient-One" } ],
-  "telecom": [ { "system": "other", "value": "SYN-INBOX-0001" } ],
+  "telecom": [ { "system": "sms", "value": "SYN-TEL-0001" } ],
   "communication": [ { "language": { "coding": [ { "system": "urn:ietf:bcp:47", "code": "en" } ] }, "preferred": true } ]
 }

@@ -6,13 +6,13 @@ namespace CareLoop.Domain.Recipients;
 /// <remarks>
 /// A contact point is personal data. It is resolved when a notification is sent and is not
 /// copied into case state. While only the simulators are connected, every address is a
-/// simulator inbox identifier.
+/// synthetic one.
 /// </remarks>
 public sealed record ContactPoint
 {
     /// <summary>The channel this contact point belongs to.</summary>
     public required NotificationChannel Channel { get; init; }
 
-    /// <summary>The channel-specific address, for example a phone number, an email address or a simulator inbox identifier.</summary>
+    /// <summary>The channel-specific address, a phone number or an email address.</summary>
     public required string Address { get; init; }
 }

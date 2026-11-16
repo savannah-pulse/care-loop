@@ -15,6 +15,12 @@ public static class Envelopes
     /// <summary>The source result every builder refers to unless told otherwise.</summary>
     public const string ResultId = "SYN-RESULT-0001";
 
+    /// <summary>The synthetic phone number every screening result gives for the patient.</summary>
+    public const string PatientPhone = "SYN-TEL-0001";
+
+    /// <summary>The synthetic email address every screening result gives for the patient.</summary>
+    public const string PatientEmail = "SYN-EMAIL-0001";
+
     private static int _counter;
 
     /// <summary>A synthetic clinician actor.</summary>
@@ -44,7 +50,11 @@ public static class Envelopes
                 ResultReference = $"DiagnosticReport/{resultId}",
                 NamedOwner = namedOwner,
                 PatientLanguage = "en",
-                PatientContactPoints = [new ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-INBOX-0001" }],
+                PatientContactPoints =
+                [
+                    new ContactPoint { Channel = NotificationChannel.Sms, Address = PatientPhone },
+                    new ContactPoint { Channel = NotificationChannel.Email, Address = PatientEmail },
+                ],
             },
         };
 
@@ -69,7 +79,7 @@ public static class Envelopes
     /// find the case. An inbound notification handler must therefore stamp the result's source system,
     /// not the channel's, when it translates a report.
     /// </remarks>
-    public static EventEnvelope Notification(DateTimeOffset at, NotificationUpdateKind kind, NotificationChannel channel = NotificationChannel.Simulator, Guid? attemptId = null, string resultId = ResultId, int? confidence = null) =>
+    public static EventEnvelope Notification(DateTimeOffset at, NotificationUpdateKind kind, NotificationChannel channel = NotificationChannel.Sms, Guid? attemptId = null, string resultId = ResultId, int? confidence = null) =>
         new()
         {
             SourceSystem = TestData.SourceSystem,

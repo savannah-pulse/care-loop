@@ -217,7 +217,8 @@ public sealed class NotificationRouter : IDomainEventSubscriber
         var failures = attempts.Where(a => a.Status == NotificationAttemptStatus.Failed).ToList();
         if (attempts.Count == 0)
         {
-            var channel = patient.ContactPoints.Select(c => c.Channel).DefaultIfEmpty(NotificationChannel.Simulator).First();
+            // An attempt needs a channel. With no contact point at all, the text message is the one that was missed.
+            var channel = patient.ContactPoints.Select(c => c.Channel).DefaultIfEmpty(NotificationChannel.Sms).First();
             failures.Add(new NotificationAttempt
             {
                 Id = NotificationSender.AttemptIdFor(requested.EventId, patient.Reference, channel),

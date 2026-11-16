@@ -16,6 +16,7 @@ using CareLoop.Api.Infrastructure.Time;
 using CareLoop.Api.Worker;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Time;
 using Microsoft.EntityFrameworkCore;
 
@@ -104,15 +105,25 @@ public static class DependencyInjection
     /// <param name="configuration">Application configuration; supplies the <c>Outbox</c> and <c>Notifications</c> sections.</param>
     /// <returns>The same service collection, for chaining.</returns>
     /// <remarks>
-    /// All three notification providers are registered so the seam exists, but only those named in
-    /// <see cref="NotificationOptions.EnabledProviders"/> are used. The dispatcher only runs as a
+    /// The text-message and email providers are both registered, each with its inbound handler, but only those
+    /// named in <see cref="NotificationOptions.EnabledProviders"/> are used. A provider name that is not a
+    /// notification channel stops the host at start-up, rather than being ignored. The dispatcher only runs as a
     /// hosted service when <c>Outbox:Enabled</c> is <see langword="true"/>, so a test host or a tool can run without it.
     /// </remarks>
     public static IServiceCollection AddOutboxAndNotifications(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
-        services.Configure<NotificationOptions>(configuration.GetSection(NotificationOptions.SectionName));
-        services.Configure<SimulatorNotificationOptions>(configuration.GetSection(SimulatorNotificationOptions.SectionName));
+        services.AddOptions<NotificationOptions>()
+            .Bind(configuration.GetSection(NotificationOptions.SectionName))
+            .Validate(NotificationOptions.NamesOnlyKnownProviders,
+                "Notifications:EnabledProviders and Notifications:PerEventOverrides may only name Sms and Email.")
+            .ValidateOnStart();
+        foreach (var channel in Enum.GetValues<NotificationChannel>())
+        {
+            services.Configure<SimulatorNotificationOptions>(channel.ToString(), configuration.GetSection(SimulatorNotificationOptions.SectionFor(channel)));
+        }
+
+        services.Configure<StaffContactOptions>(o => configuration.GetSection(StaffContactOptions.SectionName).Bind(o.ByRole));
 
         services.AddScoped<IDomainEventSubscriber, FhirPublisher>();
         services.AddScoped<IDomainEventSubscriber, NotificationRouter>();
@@ -122,14 +133,14 @@ public static class DependencyInjection
         services.AddSingleton<TemplateRenderer>();
         services.AddSingleton<NotificationSendLog>();
 
-        services.AddHttpClient<SimulatorNotificationProvider>();
-        services.AddTransient<INotificationProvider>(sp => sp.GetRequiredService<SimulatorNotificationProvider>());
-        services.AddTransient<INotificationProvider, SmsNotificationProvider>();
-        services.AddTransient<INotificationProvider, EmailNotificationProvider>();
+        services.AddHttpClient<SmsNotificationProvider>();
+        services.AddHttpClient<EmailNotificationProvider>();
+        services.AddTransient<INotificationProvider>(sp => sp.GetRequiredService<SmsNotificationProvider>());
+        services.AddTransient<INotificationProvider>(sp => sp.GetRequiredService<EmailNotificationProvider>());
 
-        // The inbound half of a provider. SMS and email get theirs when those providers are built.
-        // Scoped: the simulator handler reads the case a reply is about.
-        services.AddScoped<IInboundNotificationHandler, SimulatorInboundNotificationHandler>();
+        // The inbound half of each provider. Scoped: a handler reads the case a callback is about.
+        services.AddScoped<IInboundNotificationHandler, SmsInboundNotificationHandler>();
+        services.AddScoped<IInboundNotificationHandler, EmailInboundNotificationHandler>();
 
         services.AddSingleton<OutboxDispatcher>();
         if (configuration.GetValue<bool>($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.Enabled)}"))

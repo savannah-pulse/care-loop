@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
@@ -7,6 +8,7 @@ using CareLoop.Domain.Events;
 using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Domain.Recipients;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Features.Notifications;
 
@@ -21,7 +23,8 @@ namespace CareLoop.Api.Features.Notifications;
 /// lead, then the coordinator); <see cref="AppointmentScheduled"/> to the caregiver while the case's caregiver
 /// consent is active, and to nobody else; <see cref="CaseClosed"/> and <see cref="HandoffSummaryApproved"/> to nobody.
 /// The Domain holds no contact data, so patient contact points are read from the stored screening-result
-/// event, the caregiver's from the case's <see cref="Consent"/>, and staff are addressed through their simulator inbox.
+/// event, the caregiver's from the case's <see cref="Consent"/>, and a staff role's from configuration
+/// (<see cref="StaffContactOptions"/>). Everyone is reached by text message or email.
 /// Consent is read when the message is about to be sent, not when the event was raised, because the outbox
 /// may deliver after a withdrawal.
 /// </remarks>
@@ -33,14 +36,17 @@ public sealed class RecipientResolver
     private static readonly JsonSerializerOptions PayloadSerializerOptions = CreatePayloadSerializerOptions();
 
     private readonly CareLoopDbContext _db;
+    private readonly IOptions<StaffContactOptions> _staffContacts;
 
     /// <summary>
     /// Creates the resolver.
     /// </summary>
     /// <param name="db">Read access to stored source events, used to find patient contact points.</param>
-    public RecipientResolver(CareLoopDbContext db)
+    /// <param name="staffContacts">How each staff role is reached.</param>
+    public RecipientResolver(CareLoopDbContext db, IOptions<StaffContactOptions> staffContacts)
     {
         _db = db;
+        _staffContacts = staffContacts;
     }
 
     /// <summary>
@@ -71,18 +77,33 @@ public sealed class RecipientResolver
     /// Builds the staff recipient for a case owner.
     /// </summary>
     /// <param name="owner">The owner, role or queue to address.</param>
-    /// <returns>A staff recipient reachable through the HIS simulator's staff inbox.</returns>
+    /// <returns>
+    /// A staff recipient reached at the phone number or email address configured for the owner's role. With no
+    /// contact configured for the role, and no default, the recipient has no contact point and cannot be reached.
+    /// </returns>
     public Recipient ForOwner(CaseOwner owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        var contact = _staffContacts.Value.For(owner.Role);
         return new Recipient
         {
             Reference = owner.Reference,
             Kind = RecipientKind.Staff,
             Language = StaffLanguage,
-            ContactPoints = [new ContactPoint { Channel = NotificationChannel.Simulator, Address = owner.Reference }],
+            ContactPoints = contact is { Channel: { } channel, Address: { } address }
+                ? [new ContactPoint { Channel = channel, Address = address.Trim() }]
+                : [],
         };
     }
+
+    /// <summary>
+    /// Reads the patient's contact points for a case.
+    /// </summary>
+    /// <param name="caseId">The case.</param>
+    /// <param name="ct">Cancels the operation.</param>
+    /// <returns>The contact points of the latest applied screening result; empty when the case has none stored.</returns>
+    public async Task<IReadOnlyList<ContactPoint>> PatientContactPointsAsync(Guid caseId, CancellationToken ct) =>
+        (await ScreeningResultAsync(caseId, ct))?.PatientContactPoints ?? [];
 
     private async Task<Recipient> PatientAsync(NotificationRequested requested, CancellationToken ct)
     {

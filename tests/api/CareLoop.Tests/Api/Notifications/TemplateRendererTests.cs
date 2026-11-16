@@ -30,11 +30,43 @@ public sealed class TemplateRendererTests
 
         Assert.True(sms.IsSmsSafe);
         Assert.Null(sms.Subject);
-        Assert.Contains("open the patient channel", sms.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("AB12CD34", sms.Body);
+        Assert.StartsWith("[PLACEHOLDER] ", sms.Body);
+        Assert.Contains("Reference: AB12CD34", sms.Body);
         Assert.Equal("A follow-up step is waiting for you", standard.Subject);
         Assert.Contains("Reference: AB12CD34", standard.Body);
         Assert.Contains("[PLACEHOLDER WORDING, NOT APPROVED]", standard.Body);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Patient_message_asks_for_a_reply_and_points_at_no_app_portal_or_link(bool smsSafe)
+    {
+        var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
+
+        Assert.Contains("Reply 1 to say you will come", body);
+        Assert.Contains("Reply 2 if you would like your care team to call you", body);
+        foreach (var notThere in new[] { "patient channel", "health app", "the app", "your app", "portal", "http", "www.", "log in", "open " })
+        {
+            Assert.DoesNotContain(notThere, body, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Theory]
+    [InlineData("caregiver-appointment", "Place: SYN Clinic")]
+    [InlineData("caregiver-appointment-place-tbc", "Place: to be confirmed")]
+    public void Caregiver_text_message_says_the_same_as_the_email(string templateKey, string place)
+    {
+        var values = new Dictionary<string, string> { ["appointmentDate"] = "2026-11-17", ["appointmentTime"] = "09:30", ["place"] = "SYN Clinic" };
+
+        foreach (var smsSafe in new[] { false, true })
+        {
+            var body = ShippedTemplates().Render(templateKey, "en", smsSafe, values).Body;
+            Assert.Contains("2026-11-17", body);
+            Assert.Contains("09:30", body);
+            Assert.Contains(place, body);
+            Assert.Contains("agreed that you may be told", body);
+        }
     }
 
     [Fact]

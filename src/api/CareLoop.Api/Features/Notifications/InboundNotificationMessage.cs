@@ -4,8 +4,7 @@ namespace CareLoop.Api.Features.Notifications;
 /// One message a notification provider delivered to CareLoop, exactly as it arrived.
 /// </summary>
 /// <remarks>
-/// The content is provider-specific: an SMS gateway's delivery receipt, an email reply, a
-/// simulator callback. CareLoop does not interpret it here; the provider's
+/// The content is provider-specific: an SMS service's delivery receipt, an email reply. CareLoop does not interpret it here; the provider's
 /// <see cref="IInboundNotificationHandler"/> does.
 /// </remarks>
 public sealed record InboundNotificationMessage

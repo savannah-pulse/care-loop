@@ -1,25 +1,29 @@
 using CareLoop.Api.Infrastructure.Fhir;
 using CareLoop.Api.Infrastructure.Notifications;
+using CareLoop.Domain.Recipients;
 using Microsoft.Extensions.Configuration;
 
 namespace CareLoop.Tests.Api;
 
 /// <summary>
-/// External systems bind as a named collection, and the simulator provider carries its own
-/// addresses, in both the settings-file shape and the environment-variable shape Docker Compose uses.
+/// External systems bind as a named collection, and each channel's simulator and the staff contacts carry their
+/// own settings, in both the settings-file shape and the environment-variable shape Docker Compose uses.
 /// </summary>
 public sealed class ExternalSystemsConfigurationTests
 {
     [Fact]
-    public void Base_settings_configure_no_external_system_and_no_simulator_address()
+    public void Base_settings_configure_no_external_system_no_simulator_address_and_no_staff_contact()
     {
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"))
             .Build();
 
         Assert.Empty(Systems(configuration).Systems);
-        Assert.True(string.IsNullOrEmpty(Simulator(configuration).PatientChannelBaseUrl));
-        Assert.True(string.IsNullOrEmpty(Simulator(configuration).StaffInboxBaseUrl));
+        Assert.True(string.IsNullOrEmpty(Simulator(configuration, NotificationChannel.Sms).BaseUrl));
+        Assert.True(string.IsNullOrEmpty(Simulator(configuration, NotificationChannel.Email).BaseUrl));
+        Assert.True(string.IsNullOrEmpty(Simulator(configuration, NotificationChannel.Sms).InboundSecret));
+        Assert.Null(StaffContacts(configuration).For("nurse-navigator"));
+        Assert.Equal(["Sms", "Email"], configuration.GetSection("Notifications:EnabledProviders").Get<string[]>() ?? []);
     }
 
     [Fact]
@@ -36,15 +40,19 @@ public sealed class ExternalSystemsConfigurationTests
     }
 
     [Fact]
-    public void Development_settings_point_the_simulator_provider_at_both_simulators()
+    public void Development_settings_point_both_channels_at_the_sms_and_email_simulator_and_give_staff_a_contact()
     {
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"))
             .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json"))
             .Build();
 
-        Assert.Equal("http://localhost:5082", Simulator(configuration).PatientChannelBaseUrl);
-        Assert.Equal("http://localhost:5081", Simulator(configuration).StaffInboxBaseUrl);
+        Assert.Equal("http://localhost:5082", Simulator(configuration, NotificationChannel.Sms).BaseUrl);
+        Assert.Equal("http://localhost:5082", Simulator(configuration, NotificationChannel.Email).BaseUrl);
+        var contact = StaffContacts(configuration).For("facility-lead");
+        Assert.NotNull(contact);
+        Assert.Equal(NotificationChannel.Email, contact.Channel);
+        Assert.StartsWith("SYN-", contact.Address);
     }
 
     [Fact]
@@ -56,7 +64,13 @@ public sealed class ExternalSystemsConfigurationTests
                 ["ExternalSystems:Systems:SYN-HIS-A:BaseUrl"] = "http://his-a.test",
                 ["ExternalSystems:Systems:SYN-EMR-B:BaseUrl"] = "http://emr-b.test",
                 ["ExternalSystems:Systems:SYN-LAB-C:BaseUrl"] = "http://lab-c.test",
-                ["Notifications:Simulator:PatientChannelBaseUrl"] = "http://pch.test",
+                ["Notifications:Sms:BaseUrl"] = "http://sms.test",
+                ["Notifications:Email:InboundSecret"] = "SYN-SECRET",
+                ["Notifications:StaffContacts:nurse-navigator:Channel"] = "Sms",
+                ["Notifications:StaffContacts:nurse-navigator:Address"] = "SYN-TEL-NURSES",
+                ["Notifications:StaffContacts:default:Channel"] = "Email",
+                ["Notifications:StaffContacts:default:Address"] = "SYN-STAFF-TEAM",
+                ["Notifications:StaffContacts:lab:Channel"] = "Email",
             })
             .Build();
 
@@ -64,7 +78,13 @@ public sealed class ExternalSystemsConfigurationTests
 
         Assert.Equal(3, options.Systems.Count);
         Assert.Equal("http://lab-c.test", options.Systems["syn-lab-c"].BaseUrl);
-        Assert.Equal("http://pch.test", Simulator(configuration).PatientChannelBaseUrl);
+        Assert.Equal("http://sms.test", Simulator(configuration, NotificationChannel.Sms).BaseUrl);
+        Assert.Equal("SYN-SECRET", Simulator(configuration, NotificationChannel.Email).InboundSecret);
+        var contacts = StaffContacts(configuration);
+        Assert.Equal("SYN-TEL-NURSES", contacts.For("Nurse-Navigator")!.Address);
+        Assert.Equal(NotificationChannel.Sms, contacts.For("nurse-navigator")!.Channel);
+        Assert.Equal("SYN-STAFF-TEAM", contacts.For("coordinator")!.Address);
+        Assert.Equal("SYN-STAFF-TEAM", contacts.For("lab")!.Address);
     }
 
     [Fact]
@@ -89,10 +109,17 @@ public sealed class ExternalSystemsConfigurationTests
         return options;
     }
 
-    private static SimulatorNotificationOptions Simulator(IConfiguration configuration)
+    private static SimulatorNotificationOptions Simulator(IConfiguration configuration, NotificationChannel channel)
     {
         var options = new SimulatorNotificationOptions();
-        configuration.GetSection(SimulatorNotificationOptions.SectionName).Bind(options);
+        configuration.GetSection(SimulatorNotificationOptions.SectionFor(channel)).Bind(options);
+        return options;
+    }
+
+    private static StaffContactOptions StaffContacts(IConfiguration configuration)
+    {
+        var options = new StaffContactOptions();
+        configuration.GetSection(StaffContactOptions.SectionName).Bind(options.ByRole);
         return options;
     }
 }

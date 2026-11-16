@@ -13,10 +13,13 @@ public sealed record NotificationUpdatePayload : EventPayload
     /// <summary>Whether this is a delivery, a failure, an acknowledgement, a teach-back, a call-me request or a confidence rating.</summary>
     public required NotificationUpdateKind Kind { get; init; }
 
-    /// <summary>The channel the report or response came from.</summary>
-    public required NotificationChannel Channel { get; init; }
+    /// <summary>
+    /// The channel the report or response came from, or <see langword="null"/> when a member of staff recorded
+    /// what the patient said on a call. A delivery report always names its channel.
+    /// </summary>
+    public NotificationChannel? Channel { get; init; }
 
-    /// <summary>Reference to the source <c>Communication</c>.</summary>
+    /// <summary>Reference to what reported it: the provider's message, or the record of the call.</summary>
     public required string CommunicationReference { get; init; }
 
     /// <summary>The notification attempt the report refers to, when the source identified it.</summary>

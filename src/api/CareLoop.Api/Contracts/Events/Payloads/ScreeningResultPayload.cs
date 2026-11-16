@@ -42,6 +42,6 @@ public sealed record ScreeningResultPayload : EventPayload
     /// <summary>The language used for patient messages, as a BCP 47 tag.</summary>
     public required string PatientLanguage { get; init; }
 
-    /// <summary>The ways the patient can be reached, as supplied by the source system. Simulator inbox identifiers while only the simulators are connected.</summary>
+    /// <summary>The ways the patient can be reached, as supplied by the source system. Phone numbers for text messages and email addresses; synthetic ones while only the simulators are connected.</summary>
     public IReadOnlyList<ContactPoint> PatientContactPoints { get; init; } = [];
 }

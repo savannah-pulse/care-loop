@@ -92,16 +92,21 @@ public sealed class NotificationUpdateHandler : IEventHandler
             return HandlerSupport.Refused(@case, missing!);
         }
 
+        if (payload.Channel is not { } channel)
+        {
+            return HandlerSupport.Refused(@case, "A delivery report must name the channel it came from.");
+        }
+
         var existingAttempt = payload.AttemptId is { } id ? track.Attempts.FirstOrDefault(a => a.Id == id) : null;
         var attempt = existingAttempt is not null
             ? existingAttempt with { Status = outcome, FailureReason = payload.FailureReason ?? existingAttempt.FailureReason }
             : new NotificationAttempt
             {
                 Id = payload.AttemptId ?? Guid.NewGuid(),
-                Channel = payload.Channel,
+                Channel = channel,
                 AttemptedAt = envelope.OccurredAt,
                 Status = outcome,
-                UsedSmsSafeTemplate = payload.Channel == NotificationChannel.Sms,
+                UsedSmsSafeTemplate = channel == NotificationChannel.Sms,
                 FailureReason = payload.FailureReason,
             };
 

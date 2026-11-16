@@ -1,18 +1,14 @@
 using System.Net;
-using CareLoop.Api.Features.Fhir;
+using System.Text.Json;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Domain.Recipients;
-using Hl7.Fhir.Model;
-using Microsoft.Extensions.Options;
 using static CareLoop.Tests.Api.Fhir.FhirTestSupport;
-using ContactPoint = CareLoop.Domain.Recipients.ContactPoint;
-using FhirTask = Hl7.Fhir.Model.Task;
 
 namespace CareLoop.Tests.Api.Notifications;
 
 /// <summary>
-/// The simulator provider delivers patient messages to the patient-channel simulator and staff messages to the HIS simulator.
+/// The text-message and email providers post plain JSON to the SMS and email simulator: no FHIR travels on the notification path.
 /// </summary>
 public sealed class SimulatorNotificationProviderTests
 {
@@ -21,115 +17,118 @@ public sealed class SimulatorNotificationProviderTests
     private readonly RecordingHandler _http = new();
 
     [Fact]
-    public async System.Threading.Tasks.Task Patient_message_goes_to_the_patient_channel_simulator()
+    public async Task Text_message_is_posted_to_the_simulator_as_json()
     {
-        var result = await Provider().SendAsync(Message(RecipientKind.Patient), CancellationToken.None);
+        var message = Message(RecipientKind.Patient, NotificationChannel.Sms);
+
+        var result = await Sms().SendAsync(message, CancellationToken.None);
 
         Assert.True(result.Accepted);
+        Assert.Equal($"sms/{message.AttemptId:D}", result.ProviderMessageId);
         var request = Assert.Single(_http.Requests);
         Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.Equal("http://patient-channel.invalid/fhir/CommunicationRequest", request.Uri.ToString());
-        Assert.Equal(FhirEndpoints.FhirJson, request.ContentType);
+        Assert.Equal("http://simulator.invalid/messages", request.Uri.ToString());
+        Assert.Equal("application/json", request.ContentType);
+        var sent = JsonDocument.Parse(request.Body).RootElement;
+        Assert.Equal(message.AttemptId.ToString("D"), sent.GetProperty("messageId").GetString());
+        Assert.Equal("sms", sent.GetProperty("channel").GetString());
+        Assert.Equal("SYN-TEL-0001", sent.GetProperty("to").GetString());
+        Assert.Equal(message.Body, sent.GetProperty("body").GetString());
+        Assert.Equal("en", sent.GetProperty("language").GetString());
+        Assert.Equal(CaseId.ToString("D"), sent.GetProperty("metadata").GetProperty("caseId").GetString());
+        Assert.Equal("patient", sent.GetProperty("metadata").GetProperty("audience").GetString());
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Staff_message_goes_to_the_his_simulator_staff_inbox()
+    public async Task Message_carries_no_fhir_and_no_patient_identity()
     {
-        var message = Message(RecipientKind.Staff, address: "SYN-QUEUE-FAC-A", body: "A case needs your action. Open it in the HIS: Task/x");
+        await Sms().SendAsync(Message(RecipientKind.Patient, NotificationChannel.Sms), CancellationToken.None);
 
-        var result = await Provider().SendAsync(message, CancellationToken.None);
-
-        Assert.True(result.Accepted);
-        var request = Assert.Single(_http.Requests);
-        Assert.Equal(HttpMethod.Put, request.Method);
-        Assert.Equal($"http://his.invalid/fhir/Task/staff-notice-{message.AttemptId:N}", request.Uri.ToString());
-        var task = Assert.IsType<FhirTask>(FhirJsonCodec.Deserialize(request.Body));
-        Assert.Equal(SimulatorNotificationProvider.StaffNoticeTaskCode, StatusMap.CodeIn(task.Code, StatusMap.TaskCodeSystem));
-        Assert.Equal($"Task/{CaseId:D}", task.Focus!.Reference);
-        Assert.Equal("SYN-QUEUE-FAC-A", task.Owner!.Identifier!.Value);
-        Assert.Contains("A case needs your action", task.Description);
-        Assert.Equal($"Task/staff-notice-{message.AttemptId:N}", result.ProviderMessageId);
+        var body = Assert.Single(_http.Requests).Body;
+        Assert.DoesNotContain("resourceType", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("SYN-PT-0001", body, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Patient_message_is_sent_as_a_CommunicationRequest_with_the_attempt_id()
+    public void Only_email_carries_a_subject()
     {
-        var message = Message(RecipientKind.Patient);
+        var withSubject = Message(RecipientKind.Patient, NotificationChannel.Email) with { Subject = "A follow-up step is waiting for you" };
 
-        await Provider().SendAsync(message, CancellationToken.None);
-
-        var request = Assert.IsType<CommunicationRequest>(FhirJsonCodec.Deserialize(Assert.Single(_http.Requests).Body));
-        Assert.Equal(message.AttemptId.ToString("D"), request.Id);
-        Assert.Equal(message.AttemptId.ToString("D"), Assert.Single(request.Identifier, i => i.System == SimulatorNotificationProvider.AttemptIdentifierSystem).Value);
-        Assert.Equal("patient", StatusMap.CodeIn(Assert.Single(request.Category), SimulatorNotificationProvider.RecipientKindSystem));
-        Assert.Equal("Patient/SYN-PT-0001", request.Subject!.Reference);
-        Assert.Equal("SYN-INBOX-0001", Assert.Single(request.Recipient).Identifier!.Value);
-        Assert.Equal($"Task/{CaseId:D}", Assert.Single(request.About).Reference);
-        Assert.Equal(message.Body, Assert.IsType<FhirString>(Assert.Single(request.Payload).Content).Value);
-        Assert.Equal("en", request.Language);
+        Assert.Equal("A follow-up step is waiting for you", Email().SimulatorMessageFor(withSubject).Subject);
+        Assert.Null(Sms().SimulatorMessageFor(withSubject with { ContactPoint = Contact(NotificationChannel.Sms) }).Subject);
     }
 
-    [Fact]
-    public void Caregiver_message_id_is_marked_as_a_caregiver_message()
+    [Theory]
+    [InlineData(RecipientKind.Patient, "patient")]
+    [InlineData(RecipientKind.Caregiver, "caregiver")]
+    [InlineData(RecipientKind.Staff, "staff")]
+    public void Metadata_says_who_the_message_was_for(RecipientKind kind, string audience)
     {
-        var caregiver = Message(RecipientKind.Caregiver);
-
-        var request = SimulatorNotificationProvider.CommunicationRequestFor(caregiver);
-
-        Assert.Equal(SimulatorNotificationProvider.CaregiverIdPrefix + caregiver.AttemptId.ToString("D"), request.Id);
-        Assert.Equal(caregiver.AttemptId.ToString("D"), Assert.Single(request.Identifier).Value);
-        Assert.Equal("caregiver", StatusMap.CodeIn(Assert.Single(request.Category), SimulatorNotificationProvider.RecipientKindSystem));
-        Assert.Null(request.Subject);
+        Assert.Equal(audience, Email().SimulatorMessageFor(Message(kind, NotificationChannel.Email)).Metadata.Audience);
     }
 
     [Fact]
-    public void Cannot_reach_a_recipient_without_a_simulator_contact_point()
+    public void Text_messages_get_the_sms_template_and_email_the_standard_one()
     {
-        var provider = Provider();
-        var smsOnly = Message(RecipientKind.Patient).Recipient with
-        {
-            ContactPoints = [new ContactPoint { Channel = NotificationChannel.Sms, Address = "SYN-SMS-0001" }],
-        };
-
-        Assert.False(provider.CanReach(smsOnly));
-        Assert.False(provider.CanReach(smsOnly with { ContactPoints = [] }));
-        Assert.True(provider.CanReach(Message(RecipientKind.Patient).Recipient));
+        Assert.False(Sms().AllowsSensitiveContent);
+        Assert.True(Email().AllowsSensitiveContent);
+        Assert.Equal(NotificationChannel.Sms, Sms().Channel);
+        Assert.Equal(NotificationChannel.Email, Email().Channel);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Refused_or_unconfigured_send_is_reported_not_thrown()
+    public void Cannot_reach_a_recipient_without_a_contact_point_on_its_channel()
+    {
+        var emailOnly = Message(RecipientKind.Patient, NotificationChannel.Email).Recipient;
+
+        Assert.False(Sms().CanReach(emailOnly));
+        Assert.False(Sms().CanReach(emailOnly with { ContactPoints = [] }));
+        Assert.False(Email().CanReach(emailOnly with { ContactPoints = [new ContactPoint { Channel = NotificationChannel.Email, Address = " " }] }));
+        Assert.True(Email().CanReach(emailOnly));
+    }
+
+    [Fact]
+    public async Task Refused_or_unconfigured_send_is_reported_not_thrown()
     {
         var refusing = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
-        var refused = await Provider(refusing).SendAsync(Message(RecipientKind.Patient), CancellationToken.None);
-        var unconfigured = await new SimulatorNotificationProvider(new HttpClient(_http), Options.Create(new SimulatorNotificationOptions()))
-            .SendAsync(Message(RecipientKind.Staff), CancellationToken.None);
+        var failing = new RecordingHandler(_ => throw new HttpRequestException("connection refused"));
+        var message = Message(RecipientKind.Patient, NotificationChannel.Sms);
+
+        var refused = await Sms(refusing).SendAsync(message, CancellationToken.None);
+        var unreachable = await Sms(failing).SendAsync(message, CancellationToken.None);
+        var unconfigured = await new SmsNotificationProvider(new HttpClient(_http), NotificationTestSupport.Simulator())
+            .SendAsync(message, CancellationToken.None);
 
         Assert.False(refused.Accepted);
         Assert.Contains("503", refused.FailureReason);
+        Assert.False(unreachable.Accepted);
+        Assert.Contains("could not be reached", unreachable.FailureReason);
         Assert.False(unconfigured.Accepted);
-        Assert.Contains("StaffInboxBaseUrl", unconfigured.FailureReason);
+        Assert.Contains("Notifications:Sms:BaseUrl", unconfigured.FailureReason);
         Assert.Empty(_http.Requests);
     }
 
-    private SimulatorNotificationProvider Provider(RecordingHandler? handler = null) =>
-        new(new HttpClient(handler ?? _http), Options.Create(new SimulatorNotificationOptions
-        {
-            PatientChannelBaseUrl = "http://patient-channel.invalid/",
-            StaffInboxBaseUrl = "http://his.invalid",
-        }));
+    private SmsNotificationProvider Sms(RecordingHandler? handler = null) =>
+        new(new HttpClient(handler ?? _http), NotificationTestSupport.Simulator("http://simulator.invalid/"));
 
-    private static NotificationMessage Message(RecipientKind kind, string address = "SYN-INBOX-0001", string body = "[PLACEHOLDER] Reference: AB12CD34")
+    private EmailNotificationProvider Email() =>
+        new(new HttpClient(_http), NotificationTestSupport.Simulator("http://simulator.invalid"));
+
+    private static ContactPoint Contact(NotificationChannel channel) =>
+        new() { Channel = channel, Address = channel == NotificationChannel.Sms ? "SYN-TEL-0001" : "SYN-EMAIL-0001" };
+
+    private static NotificationMessage Message(RecipientKind kind, NotificationChannel channel)
     {
-        var contactPoint = new ContactPoint { Channel = NotificationChannel.Simulator, Address = address };
+        var contactPoint = Contact(channel);
         return new NotificationMessage
         {
             AttemptId = Guid.NewGuid(),
             CaseId = CaseId,
-            Recipient = new Recipient { Reference = kind == RecipientKind.Patient ? "SYN-PT-0001" : address, Kind = kind, Language = "en", ContactPoints = [contactPoint] },
+            Recipient = new Recipient { Reference = kind == RecipientKind.Patient ? "SYN-PT-0001" : "SYN-OTHER-0001", Kind = kind, Language = "en", ContactPoints = [contactPoint] },
             ContactPoint = contactPoint,
             TemplateKey = "patient-follow-up",
-            Body = body,
-            IsSmsSafe = false,
+            Body = "[PLACEHOLDER] Reference: AB12CD34",
+            IsSmsSafe = channel == NotificationChannel.Sms,
         };
     }
 }
