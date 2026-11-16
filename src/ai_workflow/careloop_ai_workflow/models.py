@@ -11,7 +11,6 @@ class WorkflowContext(BaseModel):
     case_reference: str = Field(min_length=1)
     source_event_reference: str = Field(min_length=1)
     stage: WorkflowStage
-    synthetic: Literal[True]
 
 
 class AgentProposal(BaseModel):
