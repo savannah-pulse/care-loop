@@ -22,7 +22,7 @@ Use a Microsoft Foundry-deployed large language model (LLM) to make already-reco
 | AG5 reply triage (proposed extension) | Deterministic reply checks first; AI may add classifications or flags | Never answer the patient or remove a deterministic flag; a nurse confirms routing |
 | AG6 periodic stage insights (extension) | Backend computes measures; Python AI drafts a narrative | Describe pre-aggregated patterns and limitations; no causal claims or individual scoring |
 
-AG1 is the core FR-11 deliverable. The other agents are extensions and must not delay it. AG3 may draft patient messages, but only the approved patient-channel provider dispatches text after a human approval event. AG5 is proposed and requires team agreement before implementation.
+AG1 is the core FR-11 deliverable. The other agents are extensions and must not delay it. AG3 may draft patient messages, but only the approved patient-channel provider dispatches text after a human approval event. The team approved AG5 for implementation; its deterministic clinical checks remain API-owned and must run before the AI service is called.
 
 ## 2. Intended users and outputs
 
@@ -162,19 +162,20 @@ Use the current Foundry SDK/endpoint path supported by the selected model deploy
 
 **Authentication:** Microsoft Entra ID. Use `DefaultAzureCredential` locally with the developer's approved identity and a managed identity in the hosted runtime, with the narrowest inference permissions supported by the selected deployment. Do not store Foundry API keys, tokens, patient data, or model credentials in the repository or container image.
 
-Initial configuration contract:
+Implemented configuration contract:
 
 | Setting | Purpose |
 |---|---|
+| `CARELOOP_AI_PROVIDER` | `disabled` by default; `foundry` enables the Microsoft Foundry adapter |
 | `AZURE_AI_PROJECT_ENDPOINT` | Foundry project endpoint supplied by the deployed environment |
-| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | Exact Foundry deployment name |
-| `AZURE_AI_API_MODE` | Adapter mode selected for the deployment (for example, Foundry Responses API or supported OpenAI-compatible API) |
-| `CARELOOP_AI_ENABLED` | Explicit enable/disable flag; disabled mode returns a clear unavailable status, not a fabricated summary |
-| `CARELOOP_AI_MAX_INPUT_BYTES` | Request-size guardrail set during implementation |
-| `CARELOOP_AI_TIMEOUT_SECONDS` | Bounded inference timeout set during implementation |
-| `CARELOOP_AI_SERVICE_URL` | API-to-Python service address; proposed configuration |
-| `CARELOOP_APPROVAL_TTL` | Message approval validity window; proposed, adviser-configured |
-| `CARELOOP_CLOCK_CONFIG_PATH` | Versioned pathway clock configuration location; proposed |
+| `AZURE_AI_MODEL_DEPLOYMENT_NAME` | Exact Foundry model deployment name |
+| `CARELOOP_AZURE_HOSTED` and `AZURE_CLIENT_ID` | Select managed identity in a hosted runtime and optionally identify a user-assigned identity; local development uses `DefaultAzureCredential` |
+| `CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED` | Must be `true` before Foundry mode starts; operator attestation that document-attack blocking is assigned to the deployment, not remote verification |
+| `CARELOOP_AI_MAX_INPUT_BYTES` | Request body limit for `/ai/v1/*` |
+| `CARELOOP_AI_TIMEOUT_SECONDS` | Bounded inference timeout |
+| `CARELOOP_AI_PROMPT_VERSION` | Prompt version recorded with each returned draft |
+
+The Foundry model deployment must have a guardrail assigned with Prompt Shields for user prompt attacks and indirect/document attacks at the user-input intervention point, using a blocking action. Verify the configuration in the Foundry guardrail playground before setting the attestation. The Python service fails closed when it is absent; the repository does not provision or remotely inspect the Foundry resource.
 
 Do not commit live endpoint values. Keep them in the hosting environment's secret/configuration service even when the endpoint URL itself is not confidential. Confirm the Foundry region, model availability, data-residency requirements, retention behavior, network path, and provider approval before any non-synthetic data is sent.
 
@@ -215,9 +216,9 @@ The API constructs a purpose-specific request. The model never queries the event
 
 | Method and path | Purpose |
 |---|---|
-| `POST /ai/v1/drafts` | AG1–AG5 purpose-specific draft request; idempotent on `request_id` |
-| `POST /ai/v1/insights` | AG6 narrative over precomputed aggregates only |
-| `GET /ai/v1/health` | Report enabled mode, configured provider/deployment, and service status without exposing secrets |
+| `POST /ai/v1/drafts` | AG1–AG5 typed request; returns a draft with required human review |
+| `POST /ai/v1/insights` | AG6 narrative over privacy-reviewed, precomputed aggregates only |
+| `GET /ai/v1/health` | Reports provider/deployment configuration and enabled status without exposing secrets |
 
 The backend-facing draft lifecycle is proposed as `POST /cases/{id}/drafts` (returns `202` and a draft ID), `GET /drafts/{id}`, `GET /cases/{id}/drafts`, and `POST /drafts/{id}/review`. Other proposed additions are `GET /templates`, `GET /templates/{id}`, `POST /templates/{id}/approve`, `GET /clock-config`, `POST /clock-config/approve`, service-authenticated `GET /channel/outbox`, `POST /metrics/snapshots`, and `GET /metrics/snapshots/{id}/narrative`; none is an existing contract. AI-generated internal events such as `AiDraftCreated`, `DraftReviewed`, and `MessageApproved` are produced by the API, not accepted from simulators through event intake. The v0.3 engineering document mentions `POST /events`; that conflicts with this repository's FHIR-only intake rule and must not be added as a public event endpoint. External HIS/EMR events continue through the approved `/fhir/...` boundary.
 

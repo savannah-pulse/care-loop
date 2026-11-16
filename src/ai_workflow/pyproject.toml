@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "careloop-ai-workflow"
-version = "0.1.0"
-description = "Python workflow and agent interfaces for the CareLoop synthetic prototype"
+version = "0.2.0"
+description = "Stateless, purpose-specific AI drafting service for CareLoop"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+  "azure-ai-projects>=2.11.0,<3",
+  "azure-identity>=1.19,<2",
   "fastapi>=0.115,<1",
+  "openai>=3,<4",
   "pydantic>=2.10,<3",
   "uvicorn[standard]>=0.34,<1",
 ]

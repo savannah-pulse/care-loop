@@ -276,10 +276,10 @@ Because the contracts already exist, every workstream can start now against the 
 - `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
 - `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
 - `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `POST /summaries/handoff` in `src/ai_workflow/`: owns the prompt, the response schema and the Foundry call. Specified in [`ai-design/integration.md`](ai-design/integration.md); not built
+- `src/ai_workflow/`: the stateless FastAPI service now exposes typed draft endpoints for AG1–AG5 and aggregate insights for AG6, with a Foundry provider and post-generation safety checks. The .NET API provider bridge and `POST /summaries/handoff` integration described in [`ai-design/integration.md`](ai-design/integration.md) remain unbuilt.
 - `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
-Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. Neither route has an API key: both authenticate with Entra ID.
+The Python service uses the requested `azure-identity` and Foundry SDK dependencies and authenticates with Entra ID; Foundry inference remains disabled by default. The API-side provider bridge and direct Foundry route are not part of this implementation.
 
 The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
 
