@@ -11,13 +11,13 @@ The orchestration API is the authority for case state. It accepts events, valida
 ```mermaid
 flowchart LR
     HIS[HIS simulator]
-    CHANNEL[Patient-channel simulator]
+    CHANNEL[SMS and email simulator]
     HISADAPTER[Mock HIS adapter]
     CHANNELADAPTER[Mock channel adapter]
     API[Orchestration API<br/>validate · correlate · authorize · audit]
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
-    UI[Demo UI<br/>exception dashboard · patient view · impact view]
+    UI[Demo UI<br/>exception dashboard · call outcomes · impact view]
     AIWORKFLOW[Python AI service<br/>on-demand summaries and stage insights]
     AIPROVIDER[Optional AI provider interface<br/>reviewable drafts]
     HUMAN[Authorized staff]
@@ -71,7 +71,7 @@ sequenceDiagram
     participant API as Orchestration API
     participant Store as Coordination store
     participant AI as Python AI service
-    participant Channel as Patient-channel simulator
+    participant Channel as SMS and email simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
 
@@ -82,8 +82,8 @@ sequenceDiagram
     AI-->>API: Source-linked clinician handoff summary draft
     Staff->>API: Review, edit, approve, or reject draft
     API->>Store: Audit review decision
-    API-->>Channel: Approved simulated communication request
-    Channel->>API: Delivery / failure / acknowledgement / call request
+    API-->>Channel: Approved text message or email (JSON)
+    Channel->>API: Delivery / failure / reply (1 = will come, anything else = call request)
     API->>Store: Append attributed event; update coordination projection
     HIS->>API: Consultation, referral, appointment, outcome events
     API->>Store: Validate evidence and append correlated events

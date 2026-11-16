@@ -49,7 +49,7 @@ src/
   simulators/
     scenarios/              Scripted synthetic journeys shared by both simulators (scenario.schema.json)
     his/                    Stand-in for a hospital information system: HisSimulator (.NET) with a React ClientApp
-    patient-channel/        Stand-in for the patient-facing channel: PatientChannelSimulator (.NET) with a React ClientApp
+    patient-channel/        SMS and email simulator: PatientChannelSimulator (.NET) with a React ClientApp
   worker/                   Deadline and escalation notes; the worker runs inside CareLoop.Api/Worker
 tests/
   api/CareLoop.Tests/       xUnit tests, fakes and synthetic FHIR samples for the API and Domain
@@ -65,18 +65,19 @@ tests/
 | Dashboard | [`src/web/README.md`](src/web/README.md) |
 | AI workflow | [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 | HIS simulator | [`src/simulators/his/README.md`](src/simulators/his/README.md) |
-| Patient-channel simulator | [`src/simulators/patient-channel/README.md`](src/simulators/patient-channel/README.md) |
+| SMS and email simulator | [`src/simulators/patient-channel/README.md`](src/simulators/patient-channel/README.md) |
 
 ```text
 HIS simulator ──FHIR R4──▶ ┌──────────────┐ ◀──REST── dashboard (src/web/)
                            │ CareLoop API │ ◀──proposals── AI workflow (src/ai_workflow/)
-patient-channel ◀─notify─▶ └──────┬───────┘
+SMS and email  ◀─JSON──▶  └──────┬───────┘
 simulator                         │
                               PostgreSQL
 ```
 
-The HIS simulator talks to CareLoop only through `/fhir/...`. The patient-channel simulator is reached through
-CareLoop's simulator notification provider and calls back on `/notifications/inbound/simulator`. Neither shares code
+The HIS simulator talks to CareLoop only through `/fhir/...`. CareLoop reaches patients, caregivers and staff by text
+message and email only (there is no patient app or portal): its `Sms` and `Email` providers post plain JSON to the SMS
+and email simulator, which calls back on `/notifications/inbound/sms` and `/email`. Neither simulator shares code
 with CareLoop. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit; the
 Python workflow proposes actions for the API and authorized people to review.
 
@@ -98,7 +99,7 @@ docker compose up --build
 | Dashboard | http://localhost:4173 | |
 | AI workflow | http://localhost:8081 | `/health` |
 | HIS simulator | http://localhost:5081 | `/health` |
-| Patient-channel simulator | http://localhost:5082 | `/health` |
+| SMS and email simulator | http://localhost:5082 | `/health` |
 | PostgreSQL | localhost:5432 | |
 
 Ports are set in `.env`. The compose stack points the API at the demo pathway folder, whose deadlines are shortened for
@@ -114,12 +115,12 @@ ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for
 | API, Domain and both simulators | `dotnet build CareLoop.sln && dotnet test CareLoop.sln` |
 | API only | `dotnet run --project src/api/CareLoop.Api` (http://localhost:5080) |
 | HIS simulator | `dotnet run --project src/simulators/his/HisSimulator` (http://localhost:5081) |
-| Patient-channel simulator | `dotnet run --project src/simulators/patient-channel/PatientChannelSimulator` (http://localhost:5082) |
+| SMS and email simulator | `dotnet run --project src/simulators/patient-channel/PatientChannelSimulator` (http://localhost:5082) |
 | Simulator ClientApps | in each `ClientApp/`: `corepack yarn install && corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build` |
 | Dashboard | `cd src/web && npm ci && npm run dev` |
 | AI workflow | see [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 
-The HIS simulator now supports headless HIS replay, source clinician actions, a staff inbox and exact FHIR logs.
+The HIS simulator supports headless HIS replay, source clinician actions, a staff inbox for what CareLoop sends it as FHIR, and exact FHIR logs. Staff notices go by email and show in the SMS and email simulator.
 See its [demo and test guide](src/simulators/his/README.md). Replay completion does not assert completed care:
 patient behaviour, cohort expansion and full screening-to-care E2E assertions remain WS8/WS10.
 

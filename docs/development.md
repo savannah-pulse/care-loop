@@ -9,7 +9,7 @@
 
 Run `dotnet build CareLoop.sln` and `dotnet test CareLoop.sln` for the API, the Domain and both simulators; the build fails on any warning, including a missing XML documentation comment. Run `dotnet run --project src/api/CareLoop.Api` to start the API on `http://localhost:5080`; its routes and configuration are in `src/api/README.md`, and each simulator's README covers its own host and ClientApp. In `src/web`, run `npm ci`, then `npm run dev`. The staff dashboard proxies `/api` to the API; it is not a patient-facing product. Run `npm run test` and `npm run build` for unit tests, documentation lint, strict type-checking and the production build. Regenerate API types with `npm run generate:api` after building the API.
 
-`docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the dashboard on port 4173, the Python workflow service on port 8081, the HIS simulator on 5081 and the patient-channel simulator on 5082 (ports come from `.env`, template in `.env.example`). nginx proxies the dashboard's `/api/` requests to the API. No production deployment environment is configured.
+`docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the dashboard on port 4173, the Python workflow service on port 8081, the HIS simulator on 5081 and the SMS and email simulator on 5082 (ports come from `.env`, template in `.env.example`). nginx proxies the dashboard's `/api/` requests to the API. No production deployment environment is configured.
 
 The Python workflow package is under `src/ai_workflow`. Create and activate a virtual environment there, install `python -m pip install --editable ".[dev]"`, then run `uvicorn careloop_ai_workflow.main:app --reload --port 8081`. Run `ruff check .` and `pytest` from that directory.
 
@@ -41,7 +41,7 @@ Use the contract guidance in `contracts/README.md`. API validation, authorizatio
 ## Local safety and configuration
 
 - Never commit real patient data, credentials, connection strings, access tokens, or production endpoints. Use synthetic fixtures and local environment variables; commit only placeholders such as `.env.example` if needed.
-- Do not put sensitive clinical details in SMS/email simulator payloads. Treat all generated patient-facing content as a draft until approved.
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. Do not put sensitive clinical details in SMS or email content: neither carries a result, and a person gives it. Treat all generated patient-facing content as a draft until approved.
 - Enforce demo roles at the API boundary, not just by hiding UI controls.
 - Simulators label their synthetic records and messages. The API and staff dashboard carry no simulated-data flags or labels. Keep real-world impact claims out of demo results.
 - Database and hosting choices are not set by this bootstrap. Record the team's decision and a reproducible local setup before adding environment-specific files.

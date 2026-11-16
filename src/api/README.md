@@ -61,8 +61,8 @@ Migrations are applied at startup only when `Database:MigrateOnStartup` is `true
 ## Configuration
 
 The base `appsettings.json` configures no external system and no simulator address. `appsettings.Development.json`,
-used by `dotnet run`, adds the HIS simulator as the one external system and points the simulator notification provider
-at both simulators; Docker Compose sets the same through environment variables. Production supplies its own entries.
+used by `dotnet run`, adds the HIS simulator as the one external system, points the `Sms` and `Email` providers at the
+SMS and email simulator and gives each staff role a synthetic address; Docker Compose sets the same through environment variables. Production supplies its own entries.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -70,10 +70,10 @@ at both simulators; Docker Compose sets the same through environment variables. 
 | `Database:MigrateOnStartup` | `false` | Apply migrations when the API starts. |
 | `Pathways:Directory` | `Infrastructure/Pathways` | Folder the pathway definitions are loaded from. Development and Docker Compose use `Infrastructure/Pathways/demo`, which has the same rules with deadlines shortened for live demos. |
 | `ExternalSystems:Systems:{systemId}:BaseUrl` | none | Address of one system of record (HIS, EMR, lab system). Any number may be configured. The key must equal the source system identifier that system sends; messages about a case go back to the system the case came from. |
-| `Notifications:Simulator:PatientChannelBaseUrl` | none | Where the simulator provider sends patient messages (the patient-channel simulator). |
-| `Notifications:Simulator:StaffInboxBaseUrl` | none | Where the simulator provider sends staff messages (the HIS simulator's staff inbox). |
-| `Notifications:Simulator:InboundSecret` | none | Secret shared with the patient-channel simulator. Every message to `POST /notifications/inbound/simulator` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
-| `Notifications:EnabledProviders` | `[ "Simulator" ]` | Enabled notification providers. SMS and email are stubs and must stay off. |
+| `Notifications:Sms:BaseUrl`, `Notifications:Email:BaseUrl` | none | Where each provider posts its messages, as JSON to `{BaseUrl}/messages`. In the prototype both are the SMS and email simulator. CareLoop reaches patients, caregivers and staff by text message and email only. |
+| `Notifications:Sms:InboundSecret`, `Notifications:Email:InboundSecret` | none | Secret each channel's callbacks are signed with. Every message to `POST /notifications/inbound/sms` or `/email` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
+| `Notifications:StaffContacts:{role}:Channel`, `…:Address` | none | How each staff role is notified: `Sms` or `Email`, and its address. An optional `default` entry covers roles with none. A role with neither cannot be reached, and its notices are retried. |
+| `Notifications:EnabledProviders` | `[ "Sms", "Email" ]` | Enabled notification providers. Only `Sms` and `Email` are accepted; any other name stops the host at start-up. |
 | `Notifications:PerEventOverrides` | `{ }` | Optional provider list per domain event name. |
 | `Outbox:Enabled` | `false` (on in `appsettings.json`) | Run the outbox dispatcher. Test hosts leave it off. |
 | `Outbox:PollInterval` | `00:00:02` | How often the dispatcher looks for due deliveries. |
@@ -127,6 +127,7 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | GET | `/cases/{caseId}` | WS6 |
 | GET | `/cases/{caseId}/timeline` | WS6 |
 | POST | `/cases/{caseId}/escalations/{escalationId}/acknowledgement` | WS6 |
+| POST | `/cases/{caseId}/call-outcome` | WS6 |
 | GET | `/exceptions` | WS6 |
 | GET | `/metrics` | WS6 |
 | GET | `/programmes` | WS6 |
@@ -136,7 +137,9 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/approval` | WS9 |
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/rejection` | WS9 |
 
-External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard.
+External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard. Delivery reports and
+replies to text messages and emails arrive at `POST /notifications/inbound/sms` and `/notifications/inbound/email`,
+signed by the service that sent them.
 
 ### Read access and acknowledgement (WS6)
 
@@ -178,7 +181,8 @@ Measures use applied audit snapshots only, including source-received progress ra
 - Treatment timeliness uses cases with `treatment-plan` as denominator and subsequent `treatment-started` at or
   before that plan's captured `start-treatment` deadline as numerator. A referral is not completed care.
 - Current and historically reached display-label counts, closure reasons and open exception counts remain distinct.
-- `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
+- A confidence rating is recorded by a nurse navigator after a call (`POST /cases/{caseId}/call-outcome`), never by a
+  text or email reply. `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
   separately averages each case's latest 1-5 rating.
 
 Empty populations have null rates/medians, not zero success. The API does not add simulation labels, a working-hours
