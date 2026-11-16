@@ -3,7 +3,7 @@
 One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 - Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the SMS and email simulator, and 13 across all of them.
-- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 30 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is now the patient's email. The image `10-patient-view.png` and `ui-design.html` still show the earlier app design and are to be redrawn (P20).
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 30 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email.
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
@@ -264,12 +264,13 @@ Hessa's journey:
 
 ### 10. Patient email
 
-![Patient view, the earlier app design, to be redrawn as an email](10-patient-view.png)
+![Patient email](10-patient-email.png)
 
 - There is no patient app or portal (decision 21). A patient with an email address on record gets the same message as screen 9 by email: a subject, the dates and places, and how to reply. No links, and no result: a person gives it.
-- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (decision 2), and 2 or any other reply sends `/CallRequested`.
+- Shown with Amna Al Ameri in a plain mail window. The email from the Family Health Centre has the subject "Your appointment on Friday 13 November", the date, time and place, "Reply 1 if you will come, 2 if you would like a call", and her named nurse with a number to call. There are no buttons, links, questions or ratings.
+- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (decision 2), and 2 or any other reply sends `/CallRequested` (decision 29). The screen shows both: her reply of 1, and a reply such as "Can I come later in the day?", which gives her nurse a call-back task.
 - Saying the next step back (`/Understood`) and the confidence rating (`/ConfidenceRated`, 1 to 5) are not asked by email. The nurse records them on screen 2 after a call (decision 30). Acknowledgement and understanding are still recorded separately.
-- The image shows the earlier app design (P20).
+- In the prototype, the email is shown in the SMS and email simulator, not sent, and it is in English (screen 11).
 
 ### 11. Arabic, right to left
 
@@ -277,7 +278,7 @@ Hessa's journey:
 
 - Deferred: this is the target design. The prototype runs in English, and every template and screen is keyed by language from the start, as `AGENTS.md` requires, so Arabic needs no new code.
 - Arabic is added once a qualified bilingual reviewer approves the wording ([AI specification](../ai-design/ai-spec.md), section 2.3). The wording shown is a draft.
-- The same messages and events as 9 and 10. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
+- The same messages and events as 9 and 10: the screen shows the email from screen 10 and the text from screen 9 in Arabic. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
 - An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 128 characters: two messages.
 
 ### 12. Caregiver and email
@@ -400,13 +401,11 @@ Withdrawn after the 13 November call: C14, C17 and C18 served hospital-system sc
 | Size | Used for |
 |---|---|
 | 13 px | Captions and labels on staff screens |
-| 14 px | Controls, secondary text and patient fine print |
+| 14 px | Controls, secondary text and the small print in emails |
 | 15 px | Body text on staff screens |
-| 16 px | Body text on patient screens; card titles on staff screens |
-| 18 px | Patient buttons and names |
-| 20 px | Section titles on staff screens; questions on patient screens |
-| 22 px | Card titles on patient screens |
-| 24 px | Page titles on patient screens |
+| 16 px | Text messages and emails to patients; card titles on staff screens |
+| 18 px | Email subjects, patient names on small banners, and Arabic email text |
+| 20 px | Section titles and patient names on staff screens |
 | 28 px | Page titles |
 | 40 px | Headline numbers |
 
@@ -438,7 +437,7 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Staff screens show two patient identifiers (name with date of birth or MRN), and the Emirates ID is always masked.
 - Texts, automated calls and emails never contain results, diagnoses, body parts or links.
 - AI output is labelled "AI draft" and needs a named person's approval. AI never sets urgency, sends messages or closes cases.
-- Patient screens use 16 px text or larger and buttons at least 44 px tall, and are ready for right-to-left languages.
+- Patients get text messages and emails, never a screen. The simulator shows them at 16 px or larger, and every template is ready for right-to-left languages.
 - Names from the code (stages, events and roles) appear only on the flow and on who sees what, in a monospace font. Product screens use plain words.
 - Text meets WCAG 2.2 AA contrast (4.5:1), and field borders meet 3:1. Every text element was checked automatically.
 
