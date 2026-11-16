@@ -306,7 +306,7 @@ Hessa's journey:
 | Same result received twice | Results are matched on source and result number, so a resent result never opens a second case. | FR-01 |
 | No AI draft | If AI is off, slow or fails a check, screen 18 shows no draft at all. A person writes the summary, and every step still works ([AI specification](../ai-design/ai-spec.md), section 5). | FR-11 |
 | Closing blocked | The close button stays off until every step has evidence. | FR-08 |
-| No internet | There is no app to work offline. A text message arrives when the phone has signal; a message that cannot be delivered raises `Unreachable` and a person follows up (P16). | FR-04 |
+| No signal or internet | There is no app to work offline. A text needs no internet and arrives when the phone has signal; an email arrives when the patient is next online. A message that cannot be delivered raises `Unreachable`, shown as not reached, and her nurse gets a task to reach her another way (P16). | FR-04 |
 
 ### 15. First visit
 
