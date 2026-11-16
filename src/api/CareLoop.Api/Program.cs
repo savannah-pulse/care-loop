@@ -24,7 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 // The OpenAPI document includes the XML documentation comments of endpoints and contracts.
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer<OpenApiLineEndingTransformer>());
 
 builder.Services
     .AddCoreAndPersistence(builder.Configuration)
