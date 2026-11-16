@@ -36,6 +36,7 @@ export type Answer = Response | ((request: SentRequest) => Response | Promise<Re
 const answers = new Map<string, Answer>()
 const received: SentRequest[] = []
 const unanswered: string[] = []
+let generation = 0
 
 /**
  * Sets how the fake API answers a route from now on, replacing any earlier answer for it.
@@ -93,26 +94,41 @@ export function takeUnanswered(): string[] {
   return unanswered.splice(0)
 }
 
-/** Forgets every answer and every request, ready for the next test. */
+/**
+ * Forgets every answer and every request, ready for the next test.
+ *
+ * @remarks
+ * A request still on its way from the test that ended is dropped, so it can never be counted, or
+ * reported as unanswered, in the next test.
+ */
 export function resetFakeApi(): void {
+  generation += 1
   answers.clear()
   received.length = 0
   unanswered.length = 0
 }
 
+function cancelled(): DOMException {
+  return new DOMException('The request was cancelled.', 'AbortError')
+}
+
 async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const request = input instanceof Request ? input : new Request(input, init)
+  if (request.signal.aborted) {
+    // As in a browser, a request cancelled before it was sent never reaches the API.
+    throw cancelled()
+  }
+  const sentIn = generation
   const url = new URL(request.url)
   const path = url.pathname.startsWith(API_PREFIX) ? url.pathname.slice(API_PREFIX.length) : url.pathname
-  const sent: SentRequest = {
-    route: `${request.method} ${path}`,
-    query: url.searchParams,
-    headers: request.headers,
-    body: await request.text(),
+  const body = await request.text()
+  if (sentIn !== generation) {
+    throw cancelled()
   }
+  const sent: SentRequest = { route: `${request.method} ${path}`, query: url.searchParams, headers: request.headers, body }
   received.push(sent)
   if (request.signal.aborted) {
-    throw new DOMException('The request was cancelled.', 'AbortError')
+    throw cancelled()
   }
   const reply = answers.get(sent.route)
   if (reply === undefined) {
