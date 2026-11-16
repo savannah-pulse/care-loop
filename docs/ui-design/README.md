@@ -259,10 +259,11 @@ Hessa's journey:
 
 ![Basic phone, no internet](09-basic-phone.png)
 
-- Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`. On a call, the nurse records on screen 2 that she will come (`/Acknowledged`), that she said the next step back (`/Understood`) and how sure she feels (`/ConfidenceRated`).
+- Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`.
+- Huda's call ends with two questions: can Hessa say the next step back, and how sure does she feel, from 1 to 5. After the call, Huda records on screen 2 that she said it back (`/Understood`) and how sure she feels (`/ConfidenceRated`), and that she will come (`/Acknowledged`) when she says so on a call.
 - Replying 1 sends `/Acknowledged` (she will come), and 2 sends `/CallRequested`. Any other reply also sends `/CallRequested`: someone should call her (decision 29). Replies need two-way texts: C7 and C22 in the simulator, and an agreement with the text provider in production.
 - A person gives results. Texts carry only dates and places, with no links, and come from a number the patient can reply to.
-- Automated calls are future work: there is no voice channel in `NotificationChannel`. The screen shows how they would work.
+- Automated calls are future work: there is no voice channel in `NotificationChannel`. The screen marks the call "Future" and shows how it would work.
 - Texts are in English in the prototype (screen 11).
 
 ### 10. Patient email
