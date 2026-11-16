@@ -103,7 +103,9 @@ public sealed class OutboundEventSender
                         resources.Add((_consultations.BuildServiceRequest(@case, request), "consultation-service-request"));
                     resources.Add((_consultations.BuildTask(@case, request), "consultation-task")); break;
                 case HisEventKind.ReferralUpdate:
-                    if (!@case.ResourceIds.ContainsKey("referral-service-request"))
+                    // An answer is sent alone: CareLoop starts the referral track itself, and a request authored by the
+                    // answering clinician would be a referral that person never made.
+                    if (request.Status == "requested" && !@case.ResourceIds.ContainsKey("referral-service-request"))
                         resources.Add((_referrals.BuildServiceRequest(@case, request), "referral-service-request"));
                     resources.Add((_referrals.BuildTask(@case, request), "referral-task")); break;
                 case HisEventKind.AppointmentUpdate: resources.Add((_appointments.Build(@case, request), "appointment")); break;

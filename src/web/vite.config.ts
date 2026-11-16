@@ -1,8 +1,12 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig, loadEnv, type PluginOption, type ProxyOptions } from 'vite'
+import { loadEnv, type PluginOption, type ProxyOptions } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 /** Where `/api` is forwarded when `CARELOOP_API_URL` is not set: the API started with `dotnet run`. */
 const DEFAULT_API_URL = 'http://localhost:5080'
+
+/** Vitest runs every test in jsdom, so screen tests can render components; `setup.ts` adds the DOM matchers. */
+const test = { environment: 'jsdom', setupFiles: ['./src/testing/setup.ts'] }
 
 /**
  * Vite configuration for the CareLoop dashboard.
@@ -21,7 +25,7 @@ export default defineConfig(async ({ mode }) => {
   if (env.CARELOOP_MOCK_API === '1') {
     const { careLoopMockApi } = await import('./mock/plugin.ts')
     plugins.push(careLoopMockApi({ now: env.CARELOOP_MOCK_NOW }))
-    return { plugins }
+    return { plugins, test }
   }
   const proxy: Record<string, ProxyOptions> = {
     '/api': {
@@ -30,5 +34,5 @@ export default defineConfig(async ({ mode }) => {
       rewrite: (path) => path.replace(/^\/api/, ''),
     },
   }
-  return { plugins, server: { proxy }, preview: { proxy } }
+  return { plugins, server: { proxy }, preview: { proxy }, test }
 })

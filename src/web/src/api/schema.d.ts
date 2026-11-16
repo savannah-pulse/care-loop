@@ -111,7 +111,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Computes current counts and actual applied-event history within an audited scope. */
+        /**
+         * Computes current counts and actual applied-event history within an audited scope.
+         * @description A case whose history cannot support a measure (a source timestamp earlier than the screening result, or a
+         *     treatment plan without its deadline) is left out of that measure's numerator and denominator and logged,
+         *     so one inconsistent case never stops the Impact screen for every reader.
+         */
         get: operations["GetMetrics"];
         put?: never;
         post?: never;
@@ -604,15 +609,15 @@ export interface components {
             stage: components["schemas"]["CaseStage"];
             /** @description The clinician-reviewed urgency code; `null` until the review arrives. */
             urgency?: null | string;
-            /** @description Key of the single next action. */
-            nextAction: string;
+            /** @description Key of the single next action; `null` when the case has none, which should not happen on an open exception and is shown rather than hidden. */
+            nextAction?: null | string;
             /** @description The owner accountable for the next action. */
             owner: components["schemas"]["OwnerResponse"];
             /**
              * Format: date-time
-             * @description When the next action is due.
+             * @description When the next action is due; `null` when the case has no deadline.
              */
-            dueAt: string;
+            dueAt?: null | string;
             /** @description How long the next action is overdue; `null` when it is not overdue. */
             overdueBy?: null | string;
             /** @description `true` while the case has an open escalation. */
@@ -1304,6 +1309,10 @@ export interface operations {
                 ownerReference?: string;
                 /** @description Reason required outside the reader's facility. */
                 reason?: string;
+                /** @description Nonnegative offset; default zero. */
+                skip?: number | string;
+                /** @description Page size from 1 to 200; default 200. */
+                take?: number | string;
             };
             header?: never;
             path?: never;

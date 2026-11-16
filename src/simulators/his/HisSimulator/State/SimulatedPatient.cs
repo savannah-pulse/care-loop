@@ -12,6 +12,12 @@ public sealed record SimulatedPatient(string SyntheticId, string DisplayName, st
     string? SecondaryIdentifier = null, string? ContactAddress = null)
 {
     /// <summary>
+    /// The synthetic MRN shown next to the patient: <see cref="SecondaryIdentifier"/> when supplied, otherwise one
+    /// derived deterministically from <see cref="SyntheticId"/>.
+    /// </summary>
+    public string Mrn => SecondaryIdentifier ?? "SYN-MRN-" + SyntheticId[4..];
+
+    /// <summary>
     /// Always <see langword="true"/>: no real patient is ever represented.
     /// </summary>
     public bool Synthetic => true;

@@ -54,8 +54,9 @@ Invoke-RestMethod ("http://localhost:5081/scenarios/runs/" + $run.runId)
   deduplicates in CareLoop; simultaneous runs of the same key are refused with 409.
 - Steps use real send timestamps. Offsets are paced by real seconds per scenario hour; CareLoop's
   clock is never accelerated. Zero pacing is supported for tests or runs that do not measure deadlines.
-- Each 4xx is recorded as `rejected`; replay can finish with rejections. Transport/server errors stop
-  the run as `failed`. Host shutdown cancels pending work and records failure.
+- Each 4xx is recorded as `rejected`; replay can finish with rejections. Transport/server errors and
+  any unexpected exception stop the run as `failed`, with the step marked failed and its message kept.
+  Host shutdown cancels pending work and records failure.
 - `completed` means the HIS replay finished, **not** that expected clinical/coordination outcomes occurred.
 - Cohorts return 422 before starting work; expansion belongs to WS10.
 - Shared scenarios are unchanged. `happy-path.json` still has an unsupported evidence placeholder.
@@ -83,9 +84,36 @@ resend its accepted dependency. Closure sends one carrier: `relevantHistory` ref
 Provenance, whose target is `#`. It includes only evidence/exception/date/attempt references explicitly
 supplied by the human or scenario.
 
-CareLoop's actual case Task ID is learned from inbound FHIR, including GET `/fhir/Task/{id}` when a
-notice focuses the case. Early delivery before initial screening storage is retained. No REST lookup
-or guessed case ID is used; closure fails explicitly until the real Task ID is known.
+CareLoop's actual case Task ID is learned from inbound FHIR: a case Task delivered to the inbox, or the
+case Task that a notice focuses, read back with GET `/fhir/Task/{id}`. Early delivery before initial
+screening storage is retained. A notice is filed in the inbox **first** and the read-back is best
+effort: if CareLoop answers 404, 5xx or cannot be reached, the notice is still accepted (201/200) and
+only the case Task ID stays unknown. No REST search or guessed case ID is used, so closure keeps
+failing explicitly (409) until the real Task ID is known from a later notice or case Task. Closure
+needs that ID because it must target CareLoop's actual case Task.
+
+Closure sends the kebab-case wire code in `Task.statusReason`. `closureReason` accepts the six reasons
+by name (`Treated`, `OnSurveillance`, `NegativeOnConfirmation`, `Declined`, `TransferredAndAccepted`,
+`Untraceable`; any case) or by code (`treated`, `on-surveillance`, `negative-on-confirmation`,
+`declined`, `transferred-and-accepted`, `untraceable`); anything else is refused with 400. A next
+surveillance date is exactly `yyyy-MM-dd`. `evidenceResourceKey` must name an outcome resource
+(a `Procedure` or follow-up `DiagnosticReport` the simulator sent), else 400.
+
+Consultation requests name a `Task.owner` only when a `proposedOwner` (with a facility) is supplied,
+because CareLoop reads a requested consultation Task with an owner as a handoff proposal to that
+person. A referral is never `completed` (CareLoop ignores it): only `requested`, `accepted` and
+`rejected` are sent. A referral answer is sent alone, never preceded by a made-up request; only a
+`requested` referral sends its `ServiceRequest` first. `POST /actions/referral-decision` requires
+`accepted` (400 if absent), so the simulator never sends a decision nobody stated.
+
+Inbox items: a case Task with status `requested` is a handoff proposal, with status `rejected` a
+handoff rejection, and an in-progress one carrying a `rejected` status reason a referral rejection.
+
+Memory is bounded: the FHIR log, the staff inbox and the scenario runs each keep the newest 1000
+entries (`SimulatorStore.DefaultCapacity`; the oldest are dropped, and a run still in progress is
+never dropped). `GET /fhir-log` accepts `limit` (newest N) and `since` (ISO 8601 instant; only newer
+entries) so a poller need not read everything; `GET /fhir-log/{id}` reads one entry. The UI asks
+for `limit=200`.
 
 Inbox resource replay replaces one deterministic inbox item; every exchange remains in the wire log.
 Staff notifications arrive as `staff-notice` Tasks via id-bearing PUT, with `owner`, `focus` and
@@ -101,8 +129,8 @@ Receipt and opening an item never accept ownership or acknowledge a notification
 | POST | `/fhir/{resourceType}` | 201 raw FHIR and Location |
 | PUT | `/fhir/{resourceType}/{id}` | 200 raw FHIR; URL/body IDs must match |
 | GET | `/staff-inbox?recipient=...`, `/staff-inbox/{id}` | Filtered inbox or detail |
-| GET | `/fhir-log?direction=sent\|received&caseRef=...` | Exact request/response bodies, including refusals |
-| GET | `/cases` | Source-local cases and successfully sent references |
+| GET | `/fhir-log?direction=sent\|received&caseRef=...&since=...&limit=...`, `/fhir-log/{id}` | Exact request/response bodies, including refusals; newest first |
+| GET | `/cases` | Source-local cases (with patient name and MRN), successfully sent references and the approved handoff summary once received |
 | GET | `/scenarios`, `/scenarios/runs/{runId}` | Summaries and progress |
 | POST | `/scenarios/{name}/run` | 202 supervised replay |
 | POST | `/actions/clinical-review` | Source urgency |

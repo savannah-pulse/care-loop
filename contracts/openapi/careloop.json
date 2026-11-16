@@ -405,6 +405,32 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Nonnegative offset; default zero.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "description": "Page size from 1 to 200; default 200.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -460,6 +486,7 @@
           "Metrics"
         ],
         "summary": "Computes current counts and actual applied-event history within an audited scope.",
+        "description": "A case whose history cannot support a measure (a source timestamp earlier than the screening result, or a\ntreatment plan without its deadline) is left out of that measure's numerator and denominator and logged,\nso one inconsistent case never stops the Impact screen for every reader.",
         "operationId": "GetMetrics",
         "parameters": [
           {
@@ -1048,7 +1075,7 @@
           "FHIR"
         ],
         "summary": "Describes what the CareLoop FHIR boundary supports.",
-        "description": "Lists one entry per registered IFhirInboundMapper (create and update) plus read on\r\n`Task`, so the statement can never drift from what the endpoints accept.",
+        "description": "Lists one entry per registered IFhirInboundMapper (create and update) plus read on\n`Task`, so the statement can never drift from what the endpoints accept.",
         "operationId": "GetFhirCapabilityStatement",
         "responses": {
           "200": {
@@ -1070,7 +1097,7 @@
           "FHIR"
         ],
         "summary": "Returns the current status of a case as a FHIR `Task`; also feeds the patient view.",
-        "description": "Field mapping: handoff status to `Task.status`; stage to `Task.businessStatus`; owner to\r\n`Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`;\r\npatient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to\r\n`Task.statusReason`.",
+        "description": "Field mapping: handoff status to `Task.status`; stage to `Task.businessStatus`; owner to\n`Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`;\npatient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to\n`Task.statusReason`.",
         "operationId": "GetFhirTask",
         "parameters": [
           {
@@ -1509,7 +1536,7 @@
           "ClosureReview",
           "Closed"
         ],
-        "description": "The ten labels the screen designs show for where a case is, computed from the five\r\nCaseStage values plus the track statuses (decisions 1 and 19)."
+        "description": "The ten labels the screen designs show for where a case is, computed from the five\nCaseStage values plus the track statuses (decisions 1 and 19)."
       },
       "CaseEventType": {
         "enum": [
@@ -1762,7 +1789,7 @@
               "null",
               "string"
             ],
-            "description": "Role key of the person expected to own the case while this next action is open, for example\r\n`nurse-navigator` for acknowledging a notification, or `null` when the\r\npathway does not say."
+            "description": "Role key of the person expected to own the case while this next action is open, for example\n`nurse-navigator` for acknowledging a notification, or `null` when the\npathway does not say."
           },
           "citation": {
             "type": [
@@ -1931,7 +1958,7 @@
               "null",
               "string"
             ],
-            "description": "Key of the next action to set when an outcome of this kind is recorded, or `null`\r\nto keep whatever next action the stage rules give the case."
+            "description": "Key of the next action to set when an outcome of this kind is recorded, or `null`\nto keep whatever next action the stage rules give the case."
           }
         },
         "description": "One kind of outcome evidence the pathway recognises, and what recording it means for the case."
@@ -1945,9 +1972,7 @@
           "displayLabel",
           "exceptions",
           "stage",
-          "nextAction",
           "owner",
-          "dueAt",
           "isEscalated",
           "escalationLevel"
         ],
@@ -2007,16 +2032,22 @@
             "description": "The clinician-reviewed urgency code; `null` until the review arrives."
           },
           "nextAction": {
-            "type": "string",
-            "description": "Key of the single next action."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the single next action; `null` when the case has none, which should not happen on an open exception and is shown rather than hidden."
           },
           "owner": {
             "description": "The owner accountable for the next action.",
             "$ref": "#/components/schemas/OwnerResponse"
           },
           "dueAt": {
-            "type": "string",
-            "description": "When the next action is due.",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the next action is due; `null` when the case has no deadline.",
             "format": "date-time"
           },
           "overdueBy": {

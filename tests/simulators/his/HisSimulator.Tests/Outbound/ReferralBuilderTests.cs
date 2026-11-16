@@ -14,9 +14,15 @@ public sealed class ReferralBuilderTests
         Assert.Equal("Organization/SYN-FAC-B", Assert.Single(resource.Performer).Reference);
     }
     [Theory] [InlineData("requested", FhirTask.TaskStatus.Requested)] [InlineData("accepted", FhirTask.TaskStatus.Accepted)]
-    [InlineData("rejected", FhirTask.TaskStatus.Rejected)] [InlineData("completed", FhirTask.TaskStatus.Completed)]
-    public void BuildTask_maps_requested_accepted_rejected_and_completed_statuses(string status, FhirTask.TaskStatus expected) =>
+    [InlineData("rejected", FhirTask.TaskStatus.Rejected)]
+    public void BuildTask_maps_requested_accepted_and_rejected_statuses(string status, FhirTask.TaskStatus expected) =>
         Assert.Equal(expected, _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.With(SimulatorTestData.Request(status: status), "reason", "SIMULATED rejection")).Status);
+    [Fact] public void BuildTask_refuses_completed_because_a_referral_is_never_completed_care() =>
+        Assert.Throws<ArgumentException>(() => _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request(status: "completed")));
+    [Theory] [InlineData("requested")] [InlineData("accepted")] [InlineData("rejected")]
+    public void BuildTask_names_the_acting_member_of_staff_as_owner(string status) =>
+        Assert.Equal("Practitioner/SYN-STAFF-1", _builder.BuildTask(SimulatorTestData.Case,
+            SimulatorTestData.With(SimulatorTestData.Request(status: status), "reason", "SIMULATED")).Owner!.Reference);
     [Fact] public void BuildTask_keeps_one_id_and_changes_version_per_state()
     {
         var one = _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request());

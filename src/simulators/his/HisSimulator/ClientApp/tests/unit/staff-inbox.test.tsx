@@ -25,8 +25,8 @@ describe('StaffInboxPage', () => {
         async (url) =>
           new Response(
             JSON.stringify(
-              String(url).includes('/fhir-log')
-                ? { entries: [{ id: 'log-1', body: '{"resourceType":"Task"}' }] }
+              String(url).includes('/fhir-log/log-1')
+                ? { id: 'log-1', body: '{"resourceType":"Task"}' }
                 : String(url).endsWith('/item-1')
                   ? item
                   : { items: [item] },

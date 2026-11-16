@@ -31,6 +31,8 @@ public sealed class DeadlineWorkerTests : IDisposable
     private readonly DeadlineWorker _worker;
     private readonly TestLogger _logger = new();
     private Func<Task>? _beforeDeadlineSave;
+    private int _loads;
+    private readonly TaskCompletionSource _deadlineSaved = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Converters = { new JsonStringEnumConverter() },
@@ -283,6 +285,20 @@ public sealed class DeadlineWorkerTests : IDisposable
     }
 
     [Fact]
+    public async Task Sweep_loads_only_cases_inside_the_largest_warning_window()
+    {
+        var @case = await SeedAsync();
+        var largestWarning = DomainTestData.Pathway.Deadlines.Max(d => d.WarnBefore);
+        _clock.Set(@case.DueAt!.Value - largestWarning - TimeSpan.FromMinutes(1));
+        Assert.Equal(0, await SweepAsync());
+        Assert.Equal(0, _loads);
+
+        _clock.Set(@case.DueAt!.Value - largestWarning);
+        await SweepAsync();
+        Assert.Equal(1, _loads);
+    }
+
+    [Fact]
     public async Task Cancellation_propagates_from_an_explicit_sweep()
     {
         await SeedAsync();
@@ -299,11 +315,9 @@ public sealed class DeadlineWorkerTests : IDisposable
         await _worker.StartAsync(CancellationToken.None);
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            while ((await DeadlineEventsAsync()).Count == 0)
-            {
-                await Task.Delay(10, timeout.Token);
-            }
+            // The in-memory SQLite connection is shared and not safe for concurrent use, so the test
+            // waits on a signal from the repository and reads only after the worker has stopped.
+            await _deadlineSaved.Task.WaitAsync(TimeSpan.FromSeconds(10));
         }
         finally
         {
@@ -376,7 +390,11 @@ public sealed class DeadlineWorkerTests : IDisposable
 
     private sealed class InterceptingRepository(EfCaseRepository inner, DeadlineWorkerTests tests) : ICaseRepository
     {
-        public Task<Case?> GetAsync(Guid caseId, CancellationToken ct) => inner.GetAsync(caseId, ct);
+        public Task<Case?> GetAsync(Guid caseId, CancellationToken ct)
+        {
+            tests._loads++;
+            return inner.GetAsync(caseId, ct);
+        }
         public Task<Case?> FindBySourceAsync(string sourceSystem, string sourceResultId, CancellationToken ct) =>
             inner.FindBySourceAsync(sourceSystem, sourceResultId, ct);
         public Task<bool> EventExistsAsync(string sourceSystem, string sourceEventId, CancellationToken ct) =>
@@ -391,6 +409,10 @@ public sealed class DeadlineWorkerTests : IDisposable
             }
 
             await inner.SaveAsync(@case, appliedEvent, ct);
+            if (appliedEvent.Type == CaseEventType.DeadlineElapsed)
+            {
+                tests._deadlineSaved.TrySetResult();
+            }
         }
     }
 

@@ -10,7 +10,26 @@ public sealed class ClosureBuilderTests
     [Fact] public void BuildTask_returns_completed_case_task_with_typed_closure_reason()
     {
         var task = _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.Request());
-        Assert.Equal(FhirTask.TaskStatus.Completed, task.Status); Assert.Equal("Treated", task.StatusReason!.Coding[0].Code);
+        Assert.Equal(FhirTask.TaskStatus.Completed, task.Status); Assert.Equal("treated", task.StatusReason!.Coding[0].Code);
+    }
+    [Theory] [InlineData("Treated", "treated")] [InlineData("OnSurveillance", "on-surveillance")]
+    [InlineData("NegativeOnConfirmation", "negative-on-confirmation")] [InlineData("Declined", "declined")]
+    [InlineData("TransferredAndAccepted", "transferred-and-accepted")] [InlineData("Untraceable", "untraceable")]
+    [InlineData("on-surveillance", "on-surveillance")] [InlineData("TREATED", "treated")] [InlineData("transferred-and-accepted", "transferred-and-accepted")]
+    public void BuildTask_sends_the_kebab_case_wire_code_for_each_closure_reason(string reason, string code) =>
+        Assert.Equal(code, _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.With(SimulatorTestData.Request(), "closureReason", reason)).StatusReason!.Coding[0].Code);
+    [Theory] [InlineData("Cured")] [InlineData("on surveillance")] [InlineData("")]
+    public void BuildTask_refuses_an_unknown_closure_reason(string reason) =>
+        Assert.Throws<ArgumentException>(() => _builder.BuildTask(SimulatorTestData.Case, SimulatorTestData.With(SimulatorTestData.Request(), "closureReason", reason)));
+    [Fact] public void BuildTask_refuses_a_missing_closure_reason() =>
+        Assert.Throws<ArgumentException>(() => _builder.BuildTask(SimulatorTestData.Case,
+            SimulatorTestData.Request() with { Params = new Dictionary<string, System.Text.Json.JsonElement>() }));
+    [Fact] public void BuildTask_refuses_evidence_that_is_not_an_outcome_resource()
+    {
+        var @case = SimulatorTestData.Case with { ResourceIds = new Dictionary<string, string> { ["referral-task"] = "SYN-TASK-9", ["outcome"] = "Procedure/SYN-OUTCOME-1" } };
+        Assert.Throws<ArgumentException>(() => _builder.BuildTask(@case, SimulatorTestData.With(SimulatorTestData.Request(), "evidenceResourceKey", "referral-task")));
+        Assert.Equal("Procedure/SYN-OUTCOME-1", Assert.IsType<ResourceReference>(Assert.Single(
+            _builder.BuildTask(@case, SimulatorTestData.With(SimulatorTestData.Request(), "evidenceResourceKey", "outcome")).Output).Value).Reference);
     }
     [Fact] public void BuildTask_cites_the_outcome_resource_named_by_evidenceFromStep()
     {

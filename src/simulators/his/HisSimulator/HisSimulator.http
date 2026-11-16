@@ -1,6 +1,7 @@
 @baseUrl = http://localhost:5081
 @caseRef = replace-with-caseRef-from-cases
 @inboxId = 00000000-0000-0000-0000-000000000000
+@logEntryId = 00000000-0000-0000-0000-000000000000
 @runId = 00000000-0000-0000-0000-000000000000
 @reviewedUrgency = replace-with-clinician-reviewed-pathway-code
 @caseTaskId = replace-with-actual-careloop-task-id
@@ -33,8 +34,11 @@ GET {{baseUrl}}/staff-inbox?recipient=SYN-STAFF-DEMO
 ### Detail / unknown-id refusal
 GET {{baseUrl}}/staff-inbox/{{inboxId}}
 
-### Exact sent and received FHIR; caseRef is optional
-GET {{baseUrl}}/fhir-log?direction=sent&caseRef={{caseRef}}
+### Exact sent and received FHIR; caseRef, since (ISO 8601 instant, only newer entries) and limit (newest N) are optional
+GET {{baseUrl}}/fhir-log?direction=sent&caseRef={{caseRef}}&limit=50
+
+### One log entry by id
+GET {{baseUrl}}/fhir-log/{{logEntryId}}
 
 ### Receive an actual case Task: copy real Task/report IDs, never invent CareLoop's id
 POST {{baseUrl}}/fhir/Task
@@ -48,7 +52,7 @@ Content-Type: application/fhir+json
   "description":"SIMULATED a case needs your action"
 }
 
-### Staff notice PUT (resolves the actual case through FHIR GET)
+### Staff notice PUT (the case is resolved through FHIR GET, best effort; the notice is filed either way)
 PUT {{baseUrl}}/fhir/Task/staff-notice-demo
 Content-Type: application/fhir+json
 
@@ -66,7 +70,7 @@ Content-Type: application/json
 
 {"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"urgency":"{{reviewedUrgency}}"}
 
-### Propose ownership; previous owner remains accountable until acceptance
+### Propose ownership; previous owner remains accountable until acceptance. Without proposedOwner (and its facility) it only requests the consultation
 POST {{baseUrl}}/actions/consultation-request
 Content-Type: application/json
 
@@ -78,13 +82,13 @@ Content-Type: application/json
 
 {"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-RECEIVING-DEMO","role":"receiving-clinician","facility":"SYN-FAC-B"},"status":"accepted"}
 
-### Source referral state (not completed care)
+### Source referral state (requested, accepted or rejected; never completed). An answer is sent alone, without a made-up request
 POST {{baseUrl}}/actions/referral
 Content-Type: application/json
 
 {"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"status":"requested","receivingFacility":"SYN-FAC-B"}
 
-### Receiving clinician rejects with a source reason
+### Receiving clinician decides: accepted is required (true or false); a body without it is refused with 400
 POST {{baseUrl}}/actions/referral-decision
 Content-Type: application/json
 
@@ -106,7 +110,13 @@ Content-Type: application/json
 POST {{baseUrl}}/actions/closure
 Content-Type: application/json
 
-{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"closureReason":"Treated","evidenceResourceKey":"outcome"}
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"closureReason":"treated","evidenceResourceKey":"outcome"}
+
+### Closure on surveillance: the date is yyyy-MM-dd; closureReason is one of treated, on-surveillance, negative-on-confirmation, declined, transferred-and-accepted, untraceable
+POST {{baseUrl}}/actions/closure
+Content-Type: application/json
+
+{"caseRef":"{{caseRef}}","performer":{"syntheticId":"SYN-STAFF-DEMO","role":"clinician","facility":"SYN-FAC-A"},"closureReason":"on-surveillance","nextSurveillanceDate":"2027-03-04","evidenceResourceKey":"outcome"}
 
 ### Source consent grant; use inactive/rejected without contact for withdrawal
 POST {{baseUrl}}/actions/consent

@@ -31,6 +31,16 @@ public sealed class ScenarioLoaderTests
         var loader = new ScenarioLoader(Options.Create(new ScenarioOptions { Directory = TestPaths.ScenariosDirectory }), new HostEnvironment());
         await Assert.ThrowsAsync<ArgumentException>(() => loader.LoadAsync(name, default));
     }
+    [Theory] [InlineData("step", "P99999999999999999999D")] [InlineData("delay", "P99999999999999999999D")]
+    public async Task An_absurd_duration_is_a_validation_error_not_an_overflow(string where, string duration)
+    {
+        using var folder = new ScenarioFolder();
+        if (where == "step") folder.Scenario["steps"]![1]!["at"] = duration;
+        else folder.Scenario["patients"]![0]!["behaviour"]!["respondAfter"] = duration;
+        folder.Save();
+        var loader = new ScenarioLoader(Options.Create(new ScenarioOptions { Directory = folder.Path }), new HostEnvironment());
+        await Assert.ThrowsAsync<InvalidDataException>(() => loader.LoadAsync("test", default));
+    }
     [Theory] [InlineData("flag")] [InlineData("name")] [InlineData("patient")] [InlineData("both")] [InlineData("index")]
     [InlineData("offset")] [InlineData("actor")] [InlineData("evidence")]
     public async Task Invalid_shape_identifiers_behaviour_offsets_and_evidence_are_refused(string error)

@@ -80,7 +80,7 @@ at both simulators; Docker Compose sets the same through environment variables. 
 | `Outbox:MaxAttempts` | `10` | Attempts per subscriber before a delivery is parked for a person to look at. |
 | `Outbox:LeaseDuration` | `00:05:00` | How long one instance's claim on a delivery lasts. Several API instances may share the database; a claim left by a stopped instance lapses after this and the delivery is picked up again. |
 | `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
-| `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. |
+| `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. Development settings and Docker Compose use `00:00:01` because the demo pathway's deadlines last seconds. |
 | `Ai:Provider` | `NoOp` | `NoOp` (AI off) or `AzureOpenAi`. Azure settings come from environment variables only. |
 
 Clinical deadlines are **not** configuration keys here. They live in
@@ -154,7 +154,8 @@ Read audits do not change case state and are not timeline events.
 `GET /cases` supports `stage`, `ownerReference`, `escalated`, `facilityId`, `patientReference`, `skip` and `take`.
 Patient searches are restricted to `clinician` and `receiving-clinician`. Paging defaults to 50, is capped at 200,
 and uses newest-updated order with a case-ID tie-break. `GET /exceptions` returns open flagged cases in deadline
-order. Timelines include applied and rejected events in received-time/projection-version order, joined to their
+order, pageable with `skip` and `take` (default and maximum 200); a row with no deadline or next action carries
+nulls instead of failing the list. Timelines include applied and rejected events in received-time/projection-version order, joined to their
 source event for source attribution. Display labels come from the Domain rule, never the dashboard.
 Programmes describe current definitions; historic pathway-version retention is not implied.
 

@@ -144,23 +144,33 @@ internal static class FhirSupport
     /// <param name="request">The source event.</param>
     /// <param name="kind">Consultation or referral.</param>
     /// <returns>The new Task state.</returns>
+    /// <remarks>
+    /// A referral is never completed care, so a <c>completed</c> referral Task is refused (CareLoop would ignore it).
+    /// A consultation request names an owner only when a proposed owner is supplied, because CareLoop reads any
+    /// requested consultation Task with an owner as a handoff proposal to that person. Every other Task names the
+    /// acting member of staff as owner, which is how CareLoop learns who answered or sent it.
+    /// </remarks>
     /// <exception cref="ArgumentException">The status or actor is invalid.</exception>
     internal static FhirTask TrackTask(SimulatedCase @case, OutboundEventRequest request, string kind)
     {
         var status = request.Status switch
         {
             "requested" => FhirTask.TaskStatus.Requested, "accepted" => FhirTask.TaskStatus.Accepted,
-            "rejected" => FhirTask.TaskStatus.Rejected, "completed" => FhirTask.TaskStatus.Completed,
-            _ => throw new ArgumentException("Status must be requested, accepted, rejected or completed."),
+            "rejected" => FhirTask.TaskStatus.Rejected,
+            "completed" when kind != "referral" => FhirTask.TaskStatus.Completed,
+            _ => throw new ArgumentException(kind == "referral"
+                ? "Status must be requested, accepted or rejected."
+                : "Status must be requested, accepted, rejected or completed."),
         };
         var actor = Actor(Staff(request.Performer));
-        var owner = actor;
+        ResourceReference? owner = kind == "consultation" && status == FhirTask.TaskStatus.Requested ? null : actor;
         if (request.Params.TryGetValue("proposedOwner", out var proposed))
         {
             ActingStaff? staff;
             try { staff = proposed.Deserialize<ActingStaff>(new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
             catch (JsonException ex) { throw new ArgumentException("The proposed owner is malformed.", ex); }
             owner = Actor(Staff(staff));
+            if (staff!.Facility is null) throw new ArgumentException("A proposed owner needs a facility; CareLoop cannot assign an owner without one.");
         }
         var task = Stamp(new FhirTask
         {

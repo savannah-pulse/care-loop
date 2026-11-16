@@ -60,6 +60,22 @@ public sealed class OutboundEventSenderTests
         await Assert.ThrowsAsync<ArgumentException>(() => host.Sender.SendAsync(SimulatorTestData.Request(HisEventKind.ReferralUpdate, status: "invalid"), default));
         Assert.Empty(host.Handler.Requests);
     }
+    [Theory] [InlineData("accepted")] [InlineData("rejected")]
+    public async Task Answering_a_referral_with_no_request_sends_the_answer_alone(string status)
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case);
+        var result = await host.Sender.SendAsync(SimulatorTestData.With(SimulatorTestData.Request(HisEventKind.ReferralUpdate, "answer", status), "reason", "SIMULATED"), default);
+        Assert.True(result.Accepted);
+        var task = Assert.IsType<FhirTask>(Assert.Single(host.Handler.Resources));
+        Assert.Equal("referral", task.Code!.Coding[0].Code); Assert.StartsWith("ServiceRequest/SYN-", task.Focus!.Reference, StringComparison.Ordinal);
+        Assert.DoesNotContain("referral-service-request", host.Store.GetCase("case-1")!.ResourceIds.Keys);
+    }
+    [Fact] public async Task A_referral_request_still_sends_its_service_request_first()
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case);
+        await host.Sender.SendAsync(SimulatorTestData.Request(HisEventKind.ReferralUpdate), default);
+        Assert.Equal(["ServiceRequest", "Task"], host.Handler.Resources.Select(r => r.TypeName));
+    }
     [Fact] public async Task Concurrent_track_requests_share_one_dependency()
     {
         await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case);

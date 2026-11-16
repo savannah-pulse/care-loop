@@ -56,6 +56,12 @@ public static class AcknowledgeEscalation
             status = 403;
             rejection = "Only the role addressed by this escalation may acknowledge it.";
         }
+        else if (target is not null && actor.Role != DemoRoles.Coordinator && target.EscalatedTo.FacilityId is { } addressed
+            && !string.Equals(addressed, actor.FacilityId, StringComparison.Ordinal))
+        {
+            status = 403;
+            rejection = "Only the addressed facility's role may acknowledge this escalation.";
+        }
         else
         {
             try { @case.AcknowledgeEscalation(escalationId, actor, clock.UtcNow); }

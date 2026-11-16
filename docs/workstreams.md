@@ -184,6 +184,11 @@ Because the contracts already exist, every workstream can start now against the 
   with audit and outbox deliveries in the single transaction. It never changes owner, stage, urgency or deadline.
 - Checks use isolated scopes. Errors are logged and retried on the next sweep; optimistic concurrency rolls back
   stale checks. The polling interval is validated at startup. No schema or clinical configuration changes were needed.
+- The sweep reads only each open case's id and due time and loads full cases only inside the largest pathway
+  warning window. The "acknowledge notification" action key is a named constant, and a test fails if a shipped
+  pathway does not define a deadline for it.
+- Production keeps the 30-second sweep. The Development settings and Docker Compose set `DeadlineWorker:Interval`
+  to one second, because the demo pathway's deadlines last seconds and a 30-second sweep skips warnings.
 - All WS5 skipped tests are implemented. Tests cover boundary instants, configurable durations, repeat sweeps,
   restarts, new deadlines, late sweeps, acknowledgement propagation, audit/outbox persistence, cancellation,
   the background loop, error isolation and a concurrent case update.
@@ -219,7 +224,7 @@ Because the contracts already exist, every workstream can start now against the 
 - C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the handoff summary screen drafts, edits on approval and rejects (decisions 4 and 10); the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
 - C10: `confidenceRate` on `MetricsResponse`.
 - C11: add `nurse-navigator`, `receiving-clinician` and `lab` to `DemoRoles.HumanRoles` (shared file; agree first).
-- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it); acknowledging never clears an exception, changes the owner or stops the clock.
+- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it), and a non-coordinator must also act in the facility it was escalated to: the endpoint refuses another facility's lead with 403 even when a cross-facility reason is given. (The Domain does not repeat the facility check because coordinators act without a facility; moving it into `Case` needs a rule for them first.) Acknowledging never clears an exception, changes the owner or stops the clock.
 - C19: `patientReference` filter on `GET /cases`, allowed for `clinician` and `receiving-clinician` only, refused for other roles, audited as a read under C4 (`View` `case-list`, `Query` naming the filter).
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `CaseSummaryResponse`, `CaseDetailResponse` and `ExceptionItemResponse` for staff roles only; null for `coordinator`, whose screens show no names.
 - Decision 19: `DisplayLabel` on `CaseSummaryResponse` and `CaseDetailResponse`, from `CaseDisplayLabels.From`.
@@ -228,14 +233,20 @@ Because the contracts already exist, every workstream can start now against the 
 
 All WS6 portions of C1, C3, C4, C5, C9, C10, C11, C15, C19, C20 and decision 19 are **Done**.
 Facility is the current team boundary; cross-facility reads require a recorded reason. Coordinators have global
-aggregate measures but case reads only for open coordinator escalations, with names/MRNs redacted.
+aggregate measures but case reads only for open coordinator escalations, with names/MRNs redacted. This follows the
+design's "Who sees what" table (a coordinator sees one case only when it is escalated to them) and is a requirement
+of this workstream, not only a completion note; the review's request to confirm it is recorded as a decision for the
+product owner.
+Read lists are resilient to inconsistent data: an exception row with no deadline or next action is returned with
+those fields null, and a metric leaves out (and logs) a case whose history cannot support it, instead of failing the
+whole read. `GET /exceptions` accepts `skip` and `take` (default and maximum 200).
+Known design question for WS1: once a level 2 escalation exists, level 1 can no longer be acknowledged (superseded).
 Confidence is rating participation with the latest-rating average separately reported; all durations are clock time.
 Historical metrics use applied snapshots and the shared Domain display-label rule.
 
-Validation: 98 focused API/Domain/deadline tests passed. The dashboard is the designed one from PR #29 (the web app was
-given to Birir at the 13 November sync), connected to these endpoints by merging this branch into
-`feature/web-careloop-screens`; the first dashboard's 25 tests were ported to its Vitest suite, and lint, type-check,
-unit tests and build pass.
+Validation: 560 API tests (34 skipped, all WS9/WS10) passed. The dashboard is the designed one from PR #29 (the web app
+was given to Birir at the 13 November sync), connected to these endpoints; it replaces the first dashboard, whose original
+25 tests were ported to its Vitest suite. Lint, type-check, unit tests and build run in CI.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/
@@ -266,7 +277,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 
 **Validation and remaining boundaries**
 
-- 146 HIS backend tests and 26 UI tests pass with no skips/todos; 161 existing CareLoop FHIR/provider regression tests pass. Frontend lint, type-check, production build and formatting pass.
+- 189 HIS backend tests and 36 UI tests pass with no skips/todos; 161 existing CareLoop FHIR/provider regression tests passed earlier. Frontend lint, type-check, production build and formatting pass.
 - Real-host/browser checks cover replay, manual actions, refused outcomes, evidence-backed closure, inbox/log views and mobile layout against a local synthetic fake CareLoop upstream. This is not a real API/database patient journey; Docker was not built.
 - Cohort starts are explicitly unsupported pending WS10. Patient-channel behaviour is WS8; shared scenario corrections (including the happy-path evidence placeholder) and full end-to-end journeys remain WS10. See the [HIS guide](../src/simulators/his/README.md) and [manual HTTP harness](../src/simulators/his/HisSimulator/HisSimulator.http).
 
@@ -311,10 +322,10 @@ documentation-tool dependency findings remain; production dependency audit has z
 - `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
 - `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
 - `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `POST /summaries/handoff` in `src/ai_workflow/`: owns the prompt, the response schema and the Foundry call. Specified in [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md); not built
+- `src/ai_workflow/`: the stateless FastAPI service now exposes typed draft endpoints for AG1–AG5 and aggregate insights for AG6, with a Foundry provider and post-generation safety checks. The .NET API provider bridge and `POST /summaries/handoff` integration described in [`ai-design/integration.md`](ai-design/integration.md) remain unbuilt.
 - `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
-Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. Neither route has an API key: both authenticate with Entra ID.
+The Python service uses the requested `azure-identity` and Foundry SDK dependencies and authenticates with Entra ID; Foundry inference remains disabled by default. The API-side provider bridge and direct Foundry route are not part of this implementation.
 
 The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
 
@@ -322,7 +333,7 @@ Since decision 15 (C20), the case holds `PatientDisplayName` and `PatientSeconda
 
 Two contract points are still open for WS9 (see the table below): summary approver roles, and the removed `Ai:AzureOpenAi` section and API key setting that `appsettings.json` and `docker-compose.yml` still carry.
 
-**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`api-ai-workflow-handoff.md`](api-ai-workflow-handoff.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-spec.md`](ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
+**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`ai-design/integration.md`](ai-design/integration.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-design/ai-spec.md`](ai-design/ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
 
 ## WS10 Scenarios and end-to-end tests
 

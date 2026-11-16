@@ -206,8 +206,7 @@ public sealed class ScenarioRunner : IHostedService
                 _store.SaveRun(run with { Steps = steps.ToArray(), Status = ScenarioRunStatus.Failed, CompletedAt = _clock.UtcNow });
                 return;
             }
-            catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException
-                or KeyNotFoundException or HttpRequestException or NotSupportedException or TaskCanceledException)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 steps[i] = steps[i] with { Status = ScenarioStepStatus.Failed, Error = ex.Message };
                 _logger.LogWarning(ex, "Scenario run {RunId}, step {StepId} failed.", run.RunId, step.Id);

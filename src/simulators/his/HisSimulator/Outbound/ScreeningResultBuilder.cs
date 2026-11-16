@@ -41,7 +41,7 @@ public sealed class ScreeningResultBuilder
         var patient = new Patient
         {
             Id = source.SyntheticId, Name = [new HumanName { Text = source.DisplayName }],
-            Identifier = [new Identifier(FhirSupport.Base + "/sid/mrn", source.SecondaryIdentifier ?? "SYN-MRN-" + source.SyntheticId[4..])],
+            Identifier = [new Identifier(FhirSupport.Base + "/sid/mrn", source.Mrn)],
             Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Other, Value = source.ContactAddress ?? source.SyntheticId }],
             Communication = [new Patient.CommunicationComponent
             {

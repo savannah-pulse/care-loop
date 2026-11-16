@@ -29,6 +29,15 @@ const roles = [
   'coordinator',
   'lab',
 ] as const;
+const closureReasons = [
+  'treated',
+  'on-surveillance',
+  'negative-on-confirmation',
+  'declined',
+  'transferred-and-accepted',
+  'untraceable',
+] as const;
+const declineReasons = ['noCapacity', 'wrongService', 'missingInformation'] as const;
 function text(form: FormData, name: string) {
   return String(form.get(name) ?? '').trim();
 }
@@ -39,6 +48,8 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
   const [caseRef, setCaseRef] = useState('');
   const [kind, setKind] = useState<(typeof actions)[number]>('clinical-review');
   const [status, setStatus] = useState('');
+  const [proposedOwner, setProposedOwner] = useState('');
+  const [evidenceChecked, setEvidenceChecked] = useState(false);
   const action = useSimulatorAction<ActionResult>(apiBaseUrl);
   const cases = useSimulatorRead<{ cases: SimulatedCase[] }>(apiBaseUrl, '/cases', true);
   const current = cases.data?.cases.find((item) => item.caseRef === caseRef);
@@ -50,7 +61,7 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
         : kind === 'referral-decision'
           ? ['accepted', 'rejected']
           : kind === 'referral'
-            ? ['requested', 'accepted', 'rejected', 'completed']
+            ? ['requested', 'accepted', 'rejected']
             : kind === 'consultation-answer'
               ? ['accepted', 'rejected', 'completed']
               : [];
@@ -61,9 +72,26 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
       <p>{t('clinicianActions.codes')}</p>
       <ApiStatus error={cases.error} pending={cases.pending} />
       {cases.data?.cases.length === 0 && <p>{t('clinicianActions.noCases')}</p>}
+      {current !== undefined && (
+        <p>
+          {t('clinicianActions.patientLine', {
+            name: current.patient.displayName,
+            mrn: current.patient.mrn,
+            caseRef: current.caseRef,
+          })}
+        </p>
+      )}
+      {typeof current?.approvedHandoffSummary === 'string' && (
+        <section data-testid="handoff-summary">
+          <h3>{t('clinicianActions.handoffSummary')}</h3>
+          <p>{t('clinicianActions.handoffSummaryNote')}</p>
+          <pre>{current.approvedHandoffSummary}</pre>
+        </section>
+      )}
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          if (kind === 'closure' && !evidenceChecked) return;
           const values = new FormData(event.currentTarget);
           const body: Record<string, unknown> = {
             caseRef,
@@ -106,9 +134,7 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
               body.evidenceResourceKey = text(values, 'evidenceResourceKey');
             if (text(values, 'exceptionNote')) body.exceptionNote = text(values, 'exceptionNote');
             if (text(values, 'nextSurveillanceDate'))
-              body.nextSurveillanceDate = new Date(
-                text(values, 'nextSurveillanceDate'),
-              ).toISOString();
+              body.nextSurveillanceDate = text(values, 'nextSurveillanceDate');
             if (text(values, 'attempts'))
               body.documentedAttemptReferences = text(values, 'attempts')
                 .split(/\r?\n/)
@@ -131,7 +157,11 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
                 <option value="">{t('common.choose')}</option>
                 {cases.data?.cases.map((item) => (
                   <option key={item.caseRef} value={item.caseRef}>
-                    {item.patient.displayName} — {item.caseRef}
+                    {t('clinicianActions.caseOption', {
+                      name: item.patient.displayName,
+                      mrn: item.patient.mrn,
+                      caseRef: item.caseRef,
+                    })}
                   </option>
                 ))}
               </select>
@@ -146,6 +176,8 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
                   if (selected !== undefined) {
                     setKind(selected);
                     setStatus('');
+                    setProposedOwner('');
+                    setEvidenceChecked(false);
                   }
                 }}
               >
@@ -217,11 +249,16 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
               <>
                 <label>
                   {t('clinicianActions.proposedOwner')}
-                  <input name="proposedOwner" pattern="SYN-.+" />
+                  <input
+                    name="proposedOwner"
+                    pattern="SYN-.+"
+                    value={proposedOwner}
+                    onChange={(event) => setProposedOwner(event.target.value)}
+                  />
                 </label>
                 <label>
                   {t('clinicianActions.proposedRole')}
-                  <select name="proposedRole">
+                  <select name="proposedRole" required={proposedOwner !== ''}>
                     <option value="">{t('common.choose')}</option>
                     {roles.map((role) => (
                       <option key={role} value={role}>
@@ -232,14 +269,25 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
                 </label>
                 <label>
                   {t('clinicianActions.receivingFacility')}
-                  <input name="receivingFacility" pattern="SYN-.+" />
+                  <input
+                    name="receivingFacility"
+                    pattern="SYN-.+"
+                    required={proposedOwner !== ''}
+                  />
                 </label>
               </>
             )}
             {['referral', 'referral-decision', 'consultation-answer'].includes(kind) && (
               <label>
                 {t('clinicianActions.reason')}
-                <textarea name="reason" required={status === 'rejected'} />
+                <select name="reason" required={status === 'rejected'}>
+                  <option value="">{t('common.choose')}</option>
+                  {declineReasons.map((reason) => (
+                    <option key={reason} value={t('clinicianActions.declineReasons.' + reason)}>
+                      {t('clinicianActions.declineReasons.' + reason)}
+                    </option>
+                  ))}
+                </select>
               </label>
             )}
             {kind === 'appointment' && (
@@ -262,10 +310,15 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
             )}
             {kind === 'closure' && (
               <>
-                <label>
-                  {t('clinicianActions.closureReason')}
-                  <input name="closureReason" required />
-                </label>
+                <fieldset>
+                  <legend>{t('clinicianActions.closureReason')}</legend>
+                  {closureReasons.map((reason) => (
+                    <label key={reason} className="checkbox">
+                      <input type="radio" name="closureReason" value={reason} required />
+                      {t('clinicianActions.closureReasons.' + reason)}
+                    </label>
+                  ))}
+                </fieldset>
                 <label>
                   {t('clinicianActions.evidence')}
                   <select name="evidenceResourceKey">
@@ -288,11 +341,20 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
                 </label>
                 <label>
                   {t('clinicianActions.surveillance')}
-                  <input name="nextSurveillanceDate" type="datetime-local" />
+                  <input name="nextSurveillanceDate" type="date" />
                 </label>
                 <label>
                   {t('clinicianActions.attempts')}
                   <textarea name="attempts" />
+                </label>
+                <label className="checkbox">
+                  <input
+                    name="evidenceChecked"
+                    type="checkbox"
+                    checked={evidenceChecked}
+                    onChange={(event) => setEvidenceChecked(event.target.checked)}
+                  />
+                  {t('clinicianActions.evidenceChecked')}
                 </label>
               </>
             )}
@@ -300,7 +362,9 @@ export function ClinicianActionsPage({ apiBaseUrl }: ClinicianActionsPageProps) 
           {kind === 'closure' && current?.careLoopTaskId === null && (
             <p>{t('clinicianActions.taskUnknown')}</p>
           )}
-          <button disabled={!current || cases.error !== null}>
+          <button
+            disabled={!current || cases.error !== null || (kind === 'closure' && !evidenceChecked)}
+          >
             {t('clinicianActions.submit')}
           </button>
         </fieldset>

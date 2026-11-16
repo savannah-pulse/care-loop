@@ -61,11 +61,11 @@ The dashboard shows what the API sends and makes nothing up: display labels as g
 ```powershell
 npm run lint        # oxlint (react, jsx-a11y, typescript; warnings fail), then ESLint with eslint-plugin-tsdoc and eslint-plugin-jsdoc
 npm run typecheck   # tsc -b, strict, for the app and for vite.config.ts and mock/
-npm test            # Vitest unit tests
+npm test            # Vitest, in jsdom
 npm run build       # lint, typecheck, then the production bundle in dist/
 ```
 
-The unit tests (`src/**/*.test.ts`, node environment, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting. Every exported component, hook, function, type, interface and constant has TSDoc; ESLint fails the build when one is missing or malformed. End-to-end tests (Playwright) belong to WS10.
+The unit tests (`src/**/*.test.ts`, run in jsdom with `src/testing/setup.ts`, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting. Every exported component, hook, function, type, interface and constant has TSDoc; ESLint fails the build when one is missing or malformed. End-to-end tests (Playwright) belong to WS10.
 
 ## API types
 
@@ -87,6 +87,6 @@ npm run generate:api
 | `src/features/` | One folder per screen |
 | `src/components/`, `src/hooks/` | Header, icons, status pills, dialog, toast, states (loading placeholders, not ready yet, not open to you, error, empty), the reason form, shared hooks |
 | `src/i18n/`, `src/locales/`, `src/format/`, `src/routing/`, `src/identity/` | Text, dates, durations and numbers, readable names, the hash router, sign-in and reasons for other teams |
-| `src/testing/` | Builders of synthetic API responses for the unit tests |
+| `src/testing/` | Test setup (DOM matchers from Testing Library) and builders of synthetic API responses |
 | `mock/` | The local mock API (dev and preview only) |
 | `scripts/` | `generate-api.mjs`, which regenerates `src/api/schema.d.ts` |

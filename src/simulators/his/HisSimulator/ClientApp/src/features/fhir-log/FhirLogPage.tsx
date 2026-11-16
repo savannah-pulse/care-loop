@@ -9,6 +9,8 @@ export interface FhirLogPageProps {
   /** Optional simulator API base URL; omission uses the current origin. */
   apiBaseUrl?: string;
 }
+/** How many of the newest log entries the polled list asks for; the server keeps a bounded log too. */
+const listLimit = 200;
 /** Polls sent/received wire logs and makes refused responses inspectable without changing case state. */
 export function FhirLogPage({ apiBaseUrl }: FhirLogPageProps) {
   const { t } = useTranslation();
@@ -18,6 +20,7 @@ export function FhirLogPage({ apiBaseUrl }: FhirLogPageProps) {
   const params = new URLSearchParams();
   if (direction) params.set('direction', direction);
   if (caseRef) params.set('caseRef', caseRef);
+  params.set('limit', String(listLimit));
   const list = useSimulatorRead<{ entries: LogEntry[] }>(
     apiBaseUrl,
     '/fhir-log?' + params.toString(),

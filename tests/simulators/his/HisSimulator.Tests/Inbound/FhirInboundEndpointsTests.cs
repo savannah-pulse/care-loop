@@ -46,6 +46,51 @@ public sealed class FhirInboundEndpointsTests
         Assert.Equal(StaffInboxItemKind.StaffNotification, Assert.Single(host.Store.GetInboxItems()).Kind);
         Assert.Empty(host.Handler.Requests);
     }
+    [Fact] public async Task A_referral_rejection_is_not_filed_as_a_handoff_rejection_and_a_later_proposal_is_not_labelled_rejected()
+    {
+        await using var host = await SimulatorHost.StartAsync(); var task = SimulatorTestData.CaseTask;
+        async Task<StaffInboxItemKind> Put()
+        {
+            await host.Http.PutAsync("/fhir/Task/" + task.Id, FhirContent(SimulatorTestData.Json(task)));
+            return Assert.Single(host.Store.GetInboxItems()).Kind;
+        }
+        task.Status = FhirTask.TaskStatus.InProgress;
+        task.StatusReason = new CodeableConcept(SimulatorTestData.Base + "/CodeSystem/status-reason", "rejected") { Text = "SIMULATED no capacity" };
+        Assert.Equal(StaffInboxItemKind.ReferralRejected, await Put());
+        task.Status = FhirTask.TaskStatus.Requested;
+        Assert.Equal(StaffInboxItemKind.HandoffProposed, await Put());
+        task.Status = FhirTask.TaskStatus.Rejected;
+        Assert.Equal(StaffInboxItemKind.HandoffRejected, await Put());
+    }
+    [Theory] [InlineData(HttpStatusCode.NotFound)] [InlineData(HttpStatusCode.BadGateway)]
+    public async Task A_notice_is_stored_even_when_CareLoop_cannot_supply_its_case_task(HttpStatusCode answer)
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Handler.Reply = _ => new HttpResponseMessage(answer);
+        host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        var response = await host.Http.PostAsync("/fhir/Task", FhirContent(SimulatorTestData.Json(Notice("escalation"))));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var item = Assert.Single(host.Store.GetInboxItems()); Assert.Equal("SYN-CASE-1", item.CareLoopTaskId);
+        Assert.Null(host.Store.GetCase("case-1")!.CareLoopTaskId);
+        Assert.Equal(201, Assert.Single(host.Store.GetLogEntries(FhirMessageDirection.Received)).StatusCode);
+    }
+    [Fact] public async Task A_notice_is_stored_when_the_callback_cannot_reach_CareLoop()
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Handler.Reply = _ => throw new HttpRequestException("Test transport failure");
+        var response = await host.Http.PostAsync("/fhir/Task", FhirContent(SimulatorTestData.Json(Notice("call-request"))));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode); Assert.Equal(StaffInboxItemKind.CallRequested, Assert.Single(host.Store.GetInboxItems()).Kind);
+    }
+    [Fact] public async Task A_message_naming_no_task_is_not_attributed_to_a_case_whose_task_is_unknown()
+    {
+        await using var host = await SimulatorHost.StartAsync(); host.Store.UpsertCase(SimulatorTestData.Case with { CareLoopTaskId = null });
+        var document = new DocumentReference
+        {
+            Id = "SYN-DOC-2", Status = DocumentReferenceStatus.Current, Description = "SIMULATED text",
+            Content = [new DocumentReference.ContentComponent { Attachment = new Attachment { ContentType = "text/plain", Data = System.Text.Encoding.UTF8.GetBytes("SIMULATED text") } }],
+        };
+        await host.Http.PostAsync("/fhir/DocumentReference", FhirContent(SimulatorTestData.Json(document)));
+        Assert.Null(Assert.Single(host.Store.GetLogEntries(FhirMessageDirection.Received)).CaseRef);
+        Assert.Empty(host.Store.GetLogEntries(caseRef: "case-1"));
+    }
     [Fact] public async Task Approved_document_reference_is_received_as_handoff_summary()
     {
         await using var host = await SimulatorHost.StartAsync();

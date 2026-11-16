@@ -34,6 +34,8 @@ services:
       ConnectionStrings__CareLoop: Host=db;Port=5432;Database=${POSTGRES_DB:-careloop};Username=${POSTGRES_USER:-careloop};Password=${POSTGRES_PASSWORD:-change-me-local-only}
       Database__MigrateOnStartup: "true"
       Pathways__Directory: Infrastructure/Pathways/demo
+      # The demo pathway's deadlines last seconds, so the sweep must run about once a second.
+      DeadlineWorker__Interval: "00:00:01"
       ExternalSystems__Systems__his-simulator__BaseUrl: http://his-simulator:8080
       Notifications__Simulator__PatientChannelBaseUrl: http://patient-channel-simulator:8080
       Notifications__Simulator__StaffInboxBaseUrl: http://his-simulator:8080
@@ -63,6 +65,16 @@ services:
     build:
       context: src/ai_workflow
       dockerfile: Dockerfile
+    environment:
+      CARELOOP_AI_PROVIDER: ${CARELOOP_AI_PROVIDER:-disabled}
+      AZURE_AI_PROJECT_ENDPOINT: ${AZURE_AI_PROJECT_ENDPOINT:-}
+      AZURE_AI_MODEL_DEPLOYMENT_NAME: ${AZURE_AI_MODEL_DEPLOYMENT_NAME:-}
+      CARELOOP_AZURE_HOSTED: ${CARELOOP_AZURE_HOSTED:-false}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED: ${CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED:-false}
+      CARELOOP_AI_MAX_INPUT_BYTES: ${CARELOOP_AI_MAX_INPUT_BYTES:-262144}
+      CARELOOP_AI_TIMEOUT_SECONDS: ${CARELOOP_AI_TIMEOUT_SECONDS:-45}
+      CARELOOP_AI_PROMPT_VERSION: ${CARELOOP_AI_PROMPT_VERSION:-careloop-ai-v1}
     ports:
       - "${AI_WORKFLOW_PORT:-8081}:8080"
 

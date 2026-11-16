@@ -32,6 +32,28 @@ public sealed class SimulatorStoreTests
         Assert.Equal("r1", stored.ResourceIds["review"]); Assert.Equal("r2", stored.ResourceIds["outcome"]);
         Assert.Equal("SYN-CASE-1", stored.CareLoopTaskId); Assert.Null(store.GetCase("missing"));
     }
+    [Fact] public void Log_runs_and_inbox_keep_only_the_newest_entries_up_to_the_capacity()
+    {
+        var store = new SimulatorStore(3);
+        for (var i = 0; i < 5; i++)
+        {
+            store.AppendLogEntry(SimulatorTestData.Log(FhirMessageDirection.Sent, "c" + i, SimulatorTestData.At.AddSeconds(i)));
+            store.AddInboxItem(SimulatorTestData.Inbox("SYN-" + i, SimulatorTestData.At.AddSeconds(i)));
+            store.SaveRun(SimulatorTestData.Run with { Status = ScenarioRunStatus.Completed, StartedAt = SimulatorTestData.At.AddSeconds(i) });
+        }
+        Assert.Equal(["c4", "c3", "c2"], store.GetLogEntries().Select(e => e.CaseRef));
+        Assert.Equal(["SYN-4", "SYN-3", "SYN-2"], store.GetInboxItems().Select(i => i.RecipientSyntheticId));
+        var running = SimulatorTestData.Run with { Status = ScenarioRunStatus.Running, StartedAt = SimulatorTestData.At.AddSeconds(-1) };
+        store.SaveRun(running); store.SaveRun(SimulatorTestData.Run with { Status = ScenarioRunStatus.Completed });
+        Assert.NotNull(store.GetRun(running.RunId));
+    }
+    [Fact] public void Log_reads_can_be_limited_and_resumed_after_an_instant()
+    {
+        var store = new SimulatorStore();
+        for (var i = 0; i < 5; i++) store.AppendLogEntry(SimulatorTestData.Log(FhirMessageDirection.Sent, "c" + i, SimulatorTestData.At.AddSeconds(i)));
+        Assert.Equal(["c4", "c3"], store.GetLogEntries(limit: 2).Select(e => e.CaseRef));
+        Assert.Equal(["c4", "c3"], store.GetLogEntries(since: SimulatorTestData.At.AddSeconds(2)).Select(e => e.CaseRef));
+    }
     [Fact] public void Run_replacement_and_reset_clear_all_collections()
     {
         var store = new SimulatorStore(); var run = SimulatorTestData.Run;
