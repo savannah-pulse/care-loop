@@ -1,5 +1,7 @@
 # AI specification: summaries and stage insights
 
+This specification is part of the [AI design set](README.md).
+
 **Status:** Design proposal for team and clinical review
 **Primary requirement:** FR-11, human-reviewed AI coordination summary at handoff
 **Related work:** FR-04 (patient-channel simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)

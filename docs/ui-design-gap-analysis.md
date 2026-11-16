@@ -37,7 +37,7 @@ The comparison is against contracts and stubs, not running behaviour. Every API 
 | `GET /programmes` | No endpoint; the pathway file is read internally by `JsonPathwayProvider` | Codebase, WS6 |
 | Eight personas: patient, family member, nurse navigator, screening doctor, receiving doctor, lab team, facility lead, programme coordinator | Three human roles in `DemoRoles`: `clinician`, `coordinator`, `facility-lead`, plus `system` | Codebase, C11: add `nurse-navigator`, `receiving-clinician`, `lab` |
 
-The design README cites [architecture.md](architecture.md) as the source of the ten stages, and [contracts/README.md](../contracts/README.md) names the same stage-entry events. Both documents therefore disagree with the Domain as built in WS1. Each now carries a note recording decision 1.
+The design README cites [architecture.md](ai-design/architecture.md) as the source of the ten stages, and [contracts/README.md](../contracts/README.md) names the same stage-entry events. Both documents therefore disagree with the Domain as built in WS1. Each now carries a note recording decision 1.
 
 ## Section 3: Codebase updates
 
@@ -102,7 +102,7 @@ Taken by the product owner on 13 November 2026 after the engineering recommendat
 
 | # | Decision | Outcome | Consequence |
 |---|---|---|---|
-| 1 | Stage model | Five stages in code; the ten in the design are display labels derived from stage plus track statuses. | Label map in the web app (C9). PM updates the flow table (P1). `architecture.md` and `contracts/README.md` keep their ten-stage text as the display vocabulary. |
+| 1 | Stage model | Five stages in code; the ten in the design are display labels derived from stage plus track statuses. | Label map in the web app (C9). PM updates the flow table (P1). `ai-design/architecture.md` and `contracts/README.md` keep their ten-stage text as the display vocabulary. |
 | 2 | Patient confirms an appointment | Dropped. "I will come" is an acknowledgement. | No code change. PM rewords screen 10 (P13). |
 | 3 | Confidence rating | Build it. | C10, across WS1, WS2, WS3, WS4, WS6, WS8 and WS10. Recommendation was to descope; the owner confirmed it is a measure the demo must report. |
 | 4 | Where the AI summary is approved | CareLoop web app. | The case screen gets draft and approve controls (C9). HIS simulator stays FHIR-only. PM updates screen 6 (P9). |
@@ -132,11 +132,11 @@ Decisions 12 to 20 were taken on 13 November 2026 on the proposals in pull reque
 
 | Document | Change |
 |---|---|
-| [architecture.md](architecture.md) | The ten-stage table is now the display vocabulary over the five Domain stages (decision 1). A note says so. |
+| [architecture.md](ai-design/architecture.md) | The ten-stage table is now the display vocabulary over the five Domain stages (decision 1). A note says so. |
 | [contracts/README.md](../contracts/README.md) | The stage-entry event names are display labels; the nine `CaseEventType` values are the contract (decision 1). A note says so. |
 | [workstreams.md](workstreams.md) | Items C1 to C21 are listed under their workstreams, and decisions 1 to 7 and 12 to 20 are in the contract points table as settled. |
-| [api-ai-workflow-handoff.md](api-ai-workflow-handoff.md) | New. The contract for the AI handoff summary: the boundary, which component calls the model, what is sent, how a draft is validated and what happens when it fails (decisions 8 to 11). |
-| [ai-spec.md](ai-spec.md) | No change; it stays as its author wrote it. It is the design proposal, and decisions 8 to 11 supersede it where the two differ. Its patient-facing drafts, Arabic translation and periodic insight narrative are deferred, as `AGENTS.md` records under "Not in scope yet". |
+| [AI integration contract](ai-design/integration.md) | The contract for the AI handoff summary: the boundary, which component calls the model, what is sent, how a draft is validated and what happens when it fails (decisions 8 to 11). |
+| [AI specification](ai-design/ai-spec.md) | The design proposal; decisions 8 to 11 supersede it where the two differ. Its patient-facing drafts, Arabic translation and periodic insight narrative are deferred, as `AGENTS.md` records under "Not in scope yet". |
 | [component-register.md](component-register.md) | Its ten-stage and caregiver wording now matches decisions 1 and 7. A note points here. |
 | `src/web/README.md` | Says the dashboard is read-only. Add that the case screen drafts and approves the AI summary (decision 4). |
 | [AGENTS.md](../AGENTS.md) | "Not in scope yet" keeps real email out. Add a line that caregiver messages are simulated in the prototype (decision 7). The "Case" paragraph under "Domain model" says a case holds references, not clinical data: add that it also holds the patient's display name and MRN (demographic, decision 15), and name them under "Security and data protection" in "Before real patient data". Shared file; agree first. |

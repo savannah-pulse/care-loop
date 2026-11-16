@@ -1,6 +1,6 @@
 # CareLoop Python AI service
 
-Python service scaffold for on-demand AI summaries and narratives described in [`docs/ai-spec.md`](../../docs/ai-spec.md). It currently exposes a health endpoint and a draft stage map; it does not call an LLM, store workflow state, or write cases.
+Python service scaffold for on-demand AI summaries and narratives described in [`docs/ai-design/ai-spec.md`](../../docs/ai-design/ai-spec.md). It currently exposes a health endpoint and a draft stage map; it does not call an LLM, store workflow state, or write cases.
 
 **Scope boundary:** the backend coordinates the ten-stage care journey and computes all workflow state, deadlines, escalations, and metrics. Python must not duplicate those functions or propose case mutations. The current stage-oriented proposal coordinator is exploratory scaffold code only; before Foundry integration, align it with the FR-11 specification's purpose-specific summary and aggregate-narrative requests. All model outputs are drafts and require human review. Case closure, clinical interpretation, urgency, treatment decisions, consent, referral acceptance, and patient-message sending are never agent actions.
 
