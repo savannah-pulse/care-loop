@@ -54,6 +54,7 @@ app.MapGetExceptions();
 app.MapGetMetrics();
 app.MapGetProgrammes();
 app.MapAcknowledgeEscalation();
+app.MapRecordCallOutcome();
 app.MapRunSimulation();
 app.MapDraftHandoffSummary();
 app.MapApproveSummary();

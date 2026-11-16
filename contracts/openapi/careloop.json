@@ -763,6 +763,101 @@
         }
       }
     },
+    "/cases/{caseId}/call-outcome": {
+      "post": {
+        "tags": [
+          "Cases"
+        ],
+        "summary": "Records the outcome of a call through the one intake pipeline.",
+        "operationId": "RecordCallOutcome",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Access reason required outside the nurse's facility.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/metrics/simulation": {
       "post": {
         "tags": [
@@ -1345,6 +1440,30 @@
           }
         },
         "description": "Body of the request approving a drafted handoff summary."
+      },
+      "CallOutcomeRequest": {
+        "type": "object",
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "description": "`true` when the patient said she will come: an acknowledgement."
+          },
+          "understood": {
+            "type": "boolean",
+            "description": "`true` when the patient said the next step back in her own words (teach-back)."
+          },
+          "confidence": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "How confident the patient said she feels about what happens next, from 1 to 5; `null` when she was not asked or gave no rating.",
+            "format": "int32"
+          }
+        },
+        "description": "What a nurse records after speaking to the patient on the phone\n(`POST /cases/{caseId}/call-outcome`)."
       },
       "CaseDetailResponse": {
         "required": [
