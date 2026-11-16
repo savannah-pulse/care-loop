@@ -120,7 +120,7 @@ public sealed class ScenarioLoader
                 throw new InvalidDataException("A step needs a stable id, case reference and known actor/action.");
             TimeSpan offset;
             try { offset = XmlConvert.ToTimeSpan(step.At); }
-            catch (Exception ex) when (ex is FormatException or ArgumentException)
+            catch (Exception ex) when (ex is FormatException or ArgumentException or OverflowException)
             { throw new InvalidDataException("The step offset must be an ISO 8601 duration.", ex); }
             if (offset < previousOffset) throw new InvalidDataException("Steps must have nonnegative, nondecreasing offsets.");
             previousOffset = offset;
@@ -170,7 +170,8 @@ public sealed class ScenarioLoader
                 if (delay.ValueKind != JsonValueKind.String || XmlConvert.ToTimeSpan(delay.GetString()!) < TimeSpan.Zero)
                     throw new InvalidDataException("The patient response delay must be nonnegative.");
             }
-            catch (FormatException ex) { throw new InvalidDataException("The patient response delay is invalid.", ex); }
+            catch (Exception ex) when (ex is FormatException or OverflowException)
+            { throw new InvalidDataException("The patient response delay is invalid.", ex); }
         }
     }
 }

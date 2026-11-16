@@ -13,9 +13,11 @@ namespace HisSimulator.Inbound;
 /// <remarks>
 /// <para>Expected resources and what they become:</para>
 /// <list type="bullet">
-/// <item><description><c>Task</c>: escalation notice, proposed handoff, handoff or referral rejection, or call request
-/// (<see cref="StaffInboxItemKind"/> is chosen from the task code); addressed to <c>Task.owner</c>.</description></item>
-/// <item><description><c>DocumentReference</c>: a handoff summary accompanying a proposed handoff.</description></item>
+/// <item><description><c>Task</c>: escalation notice, proposed handoff, handoff rejection, referral rejection or call request
+/// (<see cref="StaffInboxItemKind"/> is chosen from the task code, status and status reason); addressed to <c>Task.owner</c>.
+/// A notice is filed first and CareLoop's case <c>Task</c> is then read best-effort to learn its id: a failed read never
+/// refuses the notice.</description></item>
+/// <item><description><c>DocumentReference</c>: the approved handoff summary; its text is kept with the inbox item.</description></item>
 /// <item><description><c>CommunicationRequest</c>: a staff notification, if CareLoop sends those as FHIR.</description></item>
 /// </list>
 /// <para>
@@ -82,6 +84,8 @@ public sealed class InboundFhirReceiver
                 throw new ArgumentException("A CareLoop case Task must carry its actual logical id.");
             resource.Id ??= FhirSupport.Id(logId.ToString("N"));
             string? taskId = null;
+            string? resolveTaskId = null;
+            string? content = null;
             string? recipient = null;
             string? role = null;
             string? subject = null;
@@ -94,9 +98,12 @@ public sealed class InboundFhirReceiver
                 {
                     "escalation" => StaffInboxItemKind.Escalation,
                     "call-request" => StaffInboxItemKind.CallRequested,
-                    "case" when task.Status == FhirTask.TaskStatus.Rejected
-                        || task.StatusReason?.Coding.Any(c => c.Code == "rejected") == true => StaffInboxItemKind.HandoffRejected,
+                    // CareLoop publishes a handoff as status requested, a rejected handoff as status rejected, and a
+                    // rejected referral as an in-progress Task with a rejected status reason. A requested Task is a
+                    // proposal whatever reason it still carries, so it is tested before the reason.
                     "case" when task.Status == FhirTask.TaskStatus.Requested => StaffInboxItemKind.HandoffProposed,
+                    "case" when task.Status == FhirTask.TaskStatus.Rejected => StaffInboxItemKind.HandoffRejected,
+                    "case" when task.StatusReason?.Coding.Any(c => c.Code == "rejected") == true => StaffInboxItemKind.ReferralRejected,
                     _ => StaffInboxItemKind.StaffNotification,
                 };
                 recipient = task.Owner?.Identifier?.Value ?? ReferenceId(task.Owner);
@@ -105,23 +112,16 @@ public sealed class InboundFhirReceiver
                 role = (task.Owner?.Extension.FirstOrDefault(e => e.Url == FhirSupport.Base + "/StructureDefinition/actor-role")?.Value as Code)?.Value;
                 subject = task.Description ?? task.Code?.Text ?? code ?? task.TypeName;
                 taskId = code == "case" ? task.Id : ReferenceId(task.Focus, "Task");
-                FhirTask? caseTask = code == "case" ? task : null;
-                if (caseTask is null && taskId is not null)
-                    caseTask = await _client.GetTaskAsync(taskId, cancellationToken)
-                        ?? throw new InvalidOperationException("The notice refers to a case Task that CareLoop cannot supply.");
-                var reportId = caseTask?.BasedOn.Prepend(caseTask.Focus)
-                    .Select(r => ReferenceId(r, "DiagnosticReport")).FirstOrDefault(id => id is not null);
-                if (reportId is not null && taskId is not null)
-                {
-                    _store.RecordCaseTask(reportId, taskId);
-                    localCaseRef = _store.GetCases().FirstOrDefault(c => c.DiagnosticReportId == reportId)?.CaseRef;
-                }
+                if (code == "case") localCaseRef = Correlate(task, taskId);
+                else resolveTaskId = taskId;
             }
             else if (resource is DocumentReference document)
             {
                 kind = StaffInboxItemKind.HandoffSummary;
                 subject = document.Description ?? document.TypeName;
                 taskId = document.Context?.Related.Select(r => ReferenceId(r, "Task")).FirstOrDefault(id => id is not null);
+                var data = document.Content.Select(c => c.Attachment?.Data).FirstOrDefault(d => d is not null);
+                content = data is null ? null : System.Text.Encoding.UTF8.GetString(data);
             }
             else if (resource is CommunicationRequest communication)
             {
@@ -132,10 +132,13 @@ public sealed class InboundFhirReceiver
             }
             var suppliedLink = System.Text.RegularExpressions.Regex.Match(subject ?? "", @"https?://[^\s]+");
             if (suppliedLink.Success) link = suppliedLink.Value;
-            localCaseRef ??= _store.GetCases().FirstOrDefault(c => c.CareLoopTaskId == taskId)?.CaseRef;
+            if (taskId is not null) localCaseRef ??= _store.GetCases().FirstOrDefault(c => c.CareLoopTaskId == taskId)?.CaseRef;
             var item = new StaffInboxItem(FhirSupport.InboxId(resource.TypeName + "/" + resource.Id), kind, _clock.UtcNow,
-                recipient, role, subject ?? resource.TypeName, link, taskId, resource.TypeName, logId);
+                recipient, role, subject ?? resource.TypeName, link, taskId, resource.TypeName, logId, content);
+
+            // Filed before the callback: a notice is valid whether or not CareLoop can supply the case Task now.
             _store.UpsertInboxItem(item);
+            if (resolveTaskId is not null) localCaseRef = await ResolveCaseAsync(resolveTaskId, cancellationToken) ?? localCaseRef;
             status = method == "POST" ? 201 : 200;
             return new InboundReceiveResult(resource.TypeName, resource.Id, logId, item, FhirSupport.Serialize(resource));
         }
@@ -149,6 +152,30 @@ public sealed class InboundFhirReceiver
         {
             _store.AppendLogEntry(new FhirMessageLogEntry(logId, FhirMessageDirection.Received, _clock.UtcNow, method,
                 resourceType, resource?.Id ?? resourceId, status, localCaseRef, json));
+        }
+    }
+
+    private string? Correlate(FhirTask caseTask, string? taskId)
+    {
+        var reportId = caseTask.BasedOn.Prepend(caseTask.Focus)
+            .Select(r => ReferenceId(r, "DiagnosticReport")).FirstOrDefault(id => id is not null);
+        if (reportId is null || taskId is null) return null;
+        _store.RecordCaseTask(reportId, taskId);
+        return _store.GetCases().FirstOrDefault(c => c.DiagnosticReportId == reportId)?.CaseRef;
+    }
+
+    // Best effort: when CareLoop cannot supply the Task the notice stays filed and the case Task id stays unknown,
+    // so closure keeps refusing rather than guessing an id.
+    private async Task<string?> ResolveCaseAsync(string taskId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _client.GetTaskAsync(taskId, cancellationToken) is { } caseTask ? Correlate(caseTask, taskId) : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or FormatException
+            || ex is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            return null;
         }
     }
 

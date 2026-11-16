@@ -17,6 +17,8 @@ export interface SimulatedCase {
     syntheticId: string;
     /** Clearly synthetic patient display name. */
     displayName: string;
+    /** Synthetic medical record number shown to staff next to the case reference. */
+    mrn: string;
   };
   /** Configured pathway. */
   pathwayId: string;
@@ -24,6 +26,8 @@ export interface SimulatedCase {
   careLoopTaskId: string | null;
   /** Successfully sent resource references available as evidence. */
   resourceIds: Record<string, string>;
+  /** Approved handoff summary exactly as CareLoop sent it, or null when none has been received for the case. */
+  approvedHandoffSummary: string | null;
 }
 /** A validated scenario and its declared, not verified, expectations. */
 export interface Scenario {

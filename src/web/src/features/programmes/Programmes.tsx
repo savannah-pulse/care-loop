@@ -18,21 +18,21 @@ export function Programmes({ api, identityKey }: ProgrammesProps) {
   const [selected, setSelected] = useState('')
   const [refresh, setRefresh] = useState(0)
   const load = useCallback((signal: AbortSignal) => api.programmes(signal), [api])
-  const resource = useResource(`${identityKey}/programmes/${refresh}`, load)
+  const resource = useResource(`${identityKey}/programmes/${refresh}`, load, `${identityKey}/programmes`)
   const id = selected || resource.data?.[0]?.pathwayId
   return <section><div className="page-heading"><div><h1>{t('programmes.title')}</h1><p>{t('programmes.description')}</p></div>
     <button onClick={() => setRefresh((n) => n + 1)}>{t('common.refresh')}</button></div>
     <ResourceStatus loading={resource.loading} error={resource.error} />
     {resource.data && <div className="chips">{resource.data.map((programme) =>
-      <button className={programme.pathwayId === id ? 'active' : ''} key={programme.pathwayId}
+      <button className={programme.pathwayId === id ? 'active' : ''} aria-pressed={programme.pathwayId === id} key={programme.pathwayId}
         onClick={() => setSelected(programme.pathwayId)}>{programme.displayName}</button>)}</div>}
-    {id && <ProgrammeDetails key={id} api={api} identityKey={`${identityKey}/${refresh}`} id={id} />}
+    {id && <ProgrammeDetails key={id} api={api} identityKey={identityKey} refresh={refresh} id={id} />}
   </section>
 }
 
-function ProgrammeDetails({ api, identityKey, id }: { api: CareLoopApi; identityKey: string; id: string }) {
+function ProgrammeDetails({ api, identityKey, refresh, id }: { api: CareLoopApi; identityKey: string; refresh: number; id: string }) {
   const load = useCallback((signal: AbortSignal) => api.programme(id, signal), [api, id])
-  const resource = useResource(`${identityKey}/programme/${id}`, load)
+  const resource = useResource(`${identityKey}/programme/${id}/${refresh}`, load, `${identityKey}/programme/${id}`)
   const programme = resource.data
   return <><ResourceStatus loading={resource.loading} error={resource.error} />{programme && <>
     <div className="card"><h2>{programme.displayName}</h2><p>{t('programmes.version')}: {programme.version}</p>

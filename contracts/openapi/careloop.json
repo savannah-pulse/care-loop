@@ -405,6 +405,32 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "description": "Nonnegative offset; default zero.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "description": "Page size from 1 to 200; default 200.",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -460,6 +486,7 @@
           "Metrics"
         ],
         "summary": "Computes current counts and actual applied-event history within an audited scope.",
+        "description": "A case whose history cannot support a measure (a source timestamp earlier than the screening result, or a\ntreatment plan without its deadline) is left out of that measure's numerator and denominator and logged,\nso one inconsistent case never stops the Impact screen for every reader.",
         "operationId": "GetMetrics",
         "parameters": [
           {
@@ -1945,9 +1972,7 @@
           "displayLabel",
           "exceptions",
           "stage",
-          "nextAction",
           "owner",
-          "dueAt",
           "isEscalated",
           "escalationLevel"
         ],
@@ -2007,16 +2032,22 @@
             "description": "The clinician-reviewed urgency code; `null` until the review arrives."
           },
           "nextAction": {
-            "type": "string",
-            "description": "Key of the single next action."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Key of the single next action; `null` when the case has none, which should not happen on an open exception and is shown rather than hidden."
           },
           "owner": {
             "description": "The owner accountable for the next action.",
             "$ref": "#/components/schemas/OwnerResponse"
           },
           "dueAt": {
-            "type": "string",
-            "description": "When the next action is due.",
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the next action is due; `null` when the case has no deadline.",
             "format": "date-time"
           },
           "overdueBy": {

@@ -61,6 +61,17 @@ export function queryString(query: Query): string {
   return values.size ? `?${values}` : ''
 }
 
+/**
+ * Tells whether a value can be sent as an HTTP header value.
+ * @param value - Text destined for a request header.
+ * @returns `false` for control characters and anything above U+00FF, which `fetch` refuses to send.
+ * @remarks The API reads the identity headers as plain text and does not decode percent-encoding, so a value that
+ * cannot be carried is refused rather than silently encoded into a different identity.
+ */
+export function isHeaderSafe(value: string): boolean {
+  return /^[\u0020-\u007e\u00a0-\u00ff]*$/.test(value)
+}
+
 /** Typed operations at the CareLoop REST boundary. */
 export interface CareLoopApi {
   /** Reads a case page with staff identity and optional access reason. */
@@ -94,6 +105,7 @@ export interface CareLoopApi {
  */
 export function createApi(identity: StaffIdentity): CareLoopApi {
   async function request<T>(path: string, signal?: AbortSignal, body?: object): Promise<T> {
+    if (![identity.user, identity.role, identity.facility].every(isHeaderSafe)) throw new Error(t('error.identityHeader'))
     let response: Response
     try {
       response = await fetch(`/api${path}`, {
@@ -112,7 +124,12 @@ export function createApi(identity: StaffIdentity): CareLoopApi {
       throw new Error(t('error.network'), { cause: error })
     }
     if (!response.ok) throw new ApiError(response.status)
-    return response.json() as Promise<T>
+    try {
+      return await response.json() as T
+    } catch (error) {
+      if (signal?.aborted) throw error
+      throw new Error(t('error.invalidResponse'), { cause: error })
+    }
   }
   const casePath = (id: string) => `/cases/${encodeURIComponent(id)}`
   return {

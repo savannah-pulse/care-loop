@@ -9,6 +9,7 @@
 .identity summary { cursor: pointer; color: #3f526d; overflow-wrap: anywhere; }
 .identity form { position: absolute; z-index: 5; inset-inline-end: 0; inset-block-start: 2rem; width: min(25rem, 90vw); padding: 1.5rem; background: white; border: 1px solid #d8e0eb; border-radius: .75rem; box-shadow: 0 10px 30px #16283a22; }
 .identity form p { font-size: .85rem; }
+.identity .field-error { display: block; margin-block: -.5rem .8rem; color: #962721; font-size: .82rem; }
 main { width: min(100% - 5rem, 90rem); margin-inline: auto; padding-block: 2.5rem; }
 h1 { font-size: 2rem; margin-block: 0 .6rem; letter-spacing: -.035em; }
 h2 { font-size: 1.2rem; margin-block: 0 1rem; }

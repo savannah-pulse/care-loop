@@ -34,8 +34,8 @@ public static class GetProgrammes
     public static IResult Get(string pathwayId, HttpContext context, IPathwayProvider pathways)
     {
         if (ReadAccess.Identity(context, out _) is { } error) return error;
-        var definition = pathways.GetAll().FirstOrDefault(p => p.Id == pathwayId);
-        return definition is null ? Results.NotFound() : Results.Ok(Map(pathways.Get(pathwayId)));
+        var definition = pathways.GetAll().FirstOrDefault(p => string.Equals(p.Id, pathwayId, StringComparison.OrdinalIgnoreCase));
+        return definition is null ? Results.NotFound() : Results.Ok(Map(definition));
     }
 
     private static ProgrammeResponse Map(PathwayDefinition p) => new()

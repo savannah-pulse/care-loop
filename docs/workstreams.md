@@ -184,6 +184,11 @@ Because the contracts already exist, every workstream can start now against the 
   with audit and outbox deliveries in the single transaction. It never changes owner, stage, urgency or deadline.
 - Checks use isolated scopes. Errors are logged and retried on the next sweep; optimistic concurrency rolls back
   stale checks. The polling interval is validated at startup. No schema or clinical configuration changes were needed.
+- The sweep reads only each open case's id and due time and loads full cases only inside the largest pathway
+  warning window. The "acknowledge notification" action key is a named constant, and a test fails if a shipped
+  pathway does not define a deadline for it.
+- Production keeps the 30-second sweep. The Development settings and Docker Compose set `DeadlineWorker:Interval`
+  to one second, because the demo pathway's deadlines last seconds and a 30-second sweep skips warnings.
 - All WS5 skipped tests are implemented. Tests cover boundary instants, configurable durations, repeat sweeps,
   restarts, new deadlines, late sweeps, acknowledgement propagation, audit/outbox persistence, cancellation,
   the background loop, error isolation and a concurrent case update.
@@ -219,7 +224,7 @@ Because the contracts already exist, every workstream can start now against the 
 - C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the handoff summary screen drafts, edits on approval and rejects (decisions 4 and 10); the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
 - C10: `confidenceRate` on `MetricsResponse`.
 - C11: add `nurse-navigator`, `receiving-clinician` and `lab` to `DemoRoles.HumanRoles` (shared file; agree first).
-- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it); acknowledging never clears an exception, changes the owner or stops the clock.
+- C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it), and a non-coordinator must also act in the facility it was escalated to: the endpoint refuses another facility's lead with 403 even when a cross-facility reason is given. (The Domain does not repeat the facility check because coordinators act without a facility; moving it into `Case` needs a rule for them first.) Acknowledging never clears an exception, changes the owner or stops the clock.
 - C19: `patientReference` filter on `GET /cases`, allowed for `clinician` and `receiving-clinician` only, refused for other roles, audited as a read under C4 (`View` `case-list`, `Query` naming the filter).
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `CaseSummaryResponse`, `CaseDetailResponse` and `ExceptionItemResponse` for staff roles only; null for `coordinator`, whose screens show no names.
 - Decision 19: `DisplayLabel` on `CaseSummaryResponse` and `CaseDetailResponse`, from `CaseDisplayLabels.From`.
@@ -228,11 +233,18 @@ Because the contracts already exist, every workstream can start now against the 
 
 All WS6 portions of C1, C3, C4, C5, C9, C10, C11, C15, C19, C20 and decision 19 are **Done**.
 Facility is the current team boundary; cross-facility reads require a recorded reason. Coordinators have global
-aggregate measures but case reads only for open coordinator escalations, with names/MRNs redacted.
+aggregate measures but case reads only for open coordinator escalations, with names/MRNs redacted. This follows the
+design's "Who sees what" table (a coordinator sees one case only when it is escalated to them) and is a requirement
+of this workstream, not only a completion note; the review's request to confirm it is recorded as a decision for the
+product owner.
+Read lists are resilient to inconsistent data: an exception row with no deadline or next action is returned with
+those fields null, and a metric leaves out (and logs) a case whose history cannot support it, instead of failing the
+whole read. `GET /exceptions` accepts `skip` and `take` (default and maximum 200).
+Known design question for WS1: once a level 2 escalation exists, level 1 can no longer be acknowledged (superseded).
 Confidence is rating participation with the latest-rating average separately reported; all durations are clock time.
 Historical metrics use applied snapshots and the shared Domain display-label rule.
 
-Validation: 98 focused API/Domain/deadline tests and 25 dashboard tests passed; dashboard lint/type-check/build passed.
+Validation: 560 API tests (34 skipped, all WS9/WS10) and 59 dashboard tests (jsdom interaction tests, run by CI) passed; dashboard lint/type-check/build passed.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/
@@ -263,7 +275,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 
 **Validation and remaining boundaries**
 
-- 146 HIS backend tests and 26 UI tests pass with no skips/todos; 161 existing CareLoop FHIR/provider regression tests pass. Frontend lint, type-check, production build and formatting pass.
+- 189 HIS backend tests and 36 UI tests pass with no skips/todos; 161 existing CareLoop FHIR/provider regression tests passed earlier. Frontend lint, type-check, production build and formatting pass.
 - Real-host/browser checks cover replay, manual actions, refused outcomes, evidence-backed closure, inbox/log views and mobile layout against a local synthetic fake CareLoop upstream. This is not a real API/database patient journey; Docker was not built.
 - Cohort starts are explicitly unsupported pending WS10. Patient-channel behaviour is WS8; shared scenario corrections (including the happy-path evidence placeholder) and full end-to-end journeys remain WS10. See the [HIS guide](../src/simulators/his/README.md) and [manual HTTP harness](../src/simulators/his/HisSimulator/HisSimulator.http).
 

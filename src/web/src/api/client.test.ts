@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, createApi, queryString } from './client'
+import { ApiError, createApi, isHeaderSafe, queryString } from './client'
 
 afterEach(() => vi.unstubAllGlobals())
 const identity = { user: 'SYN-STAFF-1', role: 'clinician', facility: 'SYN-FACILITY-1' }
@@ -19,6 +19,32 @@ describe('dashboard REST boundary', () => {
       signal: controller.signal, method: 'GET',
       headers: { 'X-Demo-User': identity.user, 'X-Demo-Role': identity.role, 'X-Demo-Facility': identity.facility },
     }))
+  })
+
+  it('reads exactly the case page it was asked for from a successful JSON body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[{"caseId":"case-1"}]')))
+    await expect(createApi(identity).cases({})).resolves.toEqual([{ caseId: 'case-1' }])
+  })
+
+  it('reports a 200 response that is not JSON as a localized error, not a raw syntax error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>gateway</html>')))
+    await expect(createApi(identity).metrics()).rejects.toThrow('The API returned a response that could not be read')
+  })
+
+  it('refuses an identity a header cannot carry before sending, without calling it a network failure', async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    const api = createApi({ ...identity, user: 'سارة' })
+    await expect(api.cases({})).rejects.toThrow('characters that a request cannot carry')
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('detects characters above Latin-1 and control characters in header values', () => {
+    expect(isHeaderSafe('SYN-STAFF-1 (Zoë)')).toBe(true)
+    expect(isHeaderSafe('سارة')).toBe(false)
+    expect(isHeaderSafe('line\nbreak')).toBe(false)
+    expect(isHeaderSafe('tab\there')).toBe(false)
+    expect(isHeaderSafe('\u0085')).toBe(false)
   })
 
   it('approves exactly the edited text, including whitespace', async () => {

@@ -35,6 +35,7 @@ describe('FhirLogPage', () => {
     vi.stubGlobal('fetch', fetchMock);
     rendered = renderAt(<FhirLogPage />);
     await flush();
+    expect(fetchMock.mock.calls.every(([url]) => String(url).includes('limit=200'))).toBe(true);
     act(() => {
       get<HTMLButtonElement>(rendered.container, 'button').click();
     });

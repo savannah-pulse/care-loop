@@ -28,6 +28,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CareLoop.Tests.Api;
 
@@ -138,6 +139,25 @@ public sealed class ReadEndpointsTests : IDisposable
         var closed = ClosedCase("SYN-CLOSED");
         await SeedAsync(closed);
         Assert.Equal(flagged.Id, Assert.Single(Rows<ExceptionItemResponse>(await ExceptionsAsync())).CaseId);
+    }
+
+    [Fact]
+    public async Task Exceptions_still_lists_a_flagged_case_that_has_no_deadline_or_next_action()
+    {
+        var healthy = NewCase("SYN-RESULT-2", "SYN-FAC-A");
+        healthy.FlagException(CaseExceptions.Rejected, _clock.UtcNow);
+        await SeedAsync(healthy);
+        var incomplete = new Case(Guid.NewGuid(), "SYN-HIS", "SYN-RESULT-3", "SYN-PT-0002", "breast-screening", "SYN-FAC-A",
+            TestData.Clinician() with { FacilityId = "SYN-FAC-A" }, _clock.UtcNow);
+        incomplete.FlagException(CaseExceptions.Unassigned, _clock.UtcNow);
+        await SeedAsync(incomplete);
+
+        var rows = Rows<ExceptionItemResponse>(await ExceptionsAsync());
+        Assert.Equal(2, rows.Count);
+        var row = rows.Single(r => r.CaseId == incomplete.Id);
+        Assert.Null(row.NextAction);
+        Assert.Null(row.DueAt);
+        Assert.Null(row.OverdueBy);
     }
 
     [Fact]
@@ -329,6 +349,21 @@ public sealed class ReadEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_lead_of_another_facility_cannot_acknowledge_an_escalation_even_with_a_reason()
+    {
+        var @case = await SeedAsync();
+        await SaveChangeAsync(@case.Id, c => { c.FlagException(CaseExceptions.Overdue, _clock.UtcNow); c.Escalate(Escalation(1)); });
+        var id = (await ReadCaseAsync(@case.Id)).Escalations.Single().Id;
+
+        var refused = await AcknowledgeAsync(@case.Id, id, Identity("facility-lead", "SYN-FAC-B"), "SYN documented cross-facility reason");
+        Assert.Equal(403, Status(refused));
+        Assert.False((await ReadCaseAsync(@case.Id)).Escalations.Single().IsAcknowledged);
+
+        var accepted = Value<CaseDetailResponse>(await AcknowledgeAsync(@case.Id, id, Identity("facility-lead", "SYN-FAC-A")));
+        Assert.Equal("facility-lead", accepted.Escalations.Single().AcknowledgedByRole);
+    }
+
+    [Fact]
     public async Task Historical_measures_use_actual_events_and_treatment_plan_deadlines()
     {
         var @case = await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
@@ -361,6 +396,18 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(0, metrics.CasesReachingDisplayLabel["Consultation"].Numerator);
         Assert.Equal(1, metrics.CasesByDisplayLabel["Closed"]);
         Assert.Equal(@case.Id, Assert.Single(Rows<CaseSummaryResponse>(await ListAsync())).CaseId);
+    }
+
+    [Fact]
+    public async Task A_step_dated_before_its_screening_result_is_left_out_of_that_measure_not_fatal()
+    {
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow.AddHours(1), namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+
+        var metrics = Value<MetricsResponse>(await MetricsAsync());
+        Assert.Equal(1, metrics.TotalCases);
+        Assert.Equal(0, metrics.TimeToStep["acknowledgement"].Denominator);
     }
 
     [Fact]
@@ -410,19 +457,20 @@ public sealed class ReadEndpointsTests : IDisposable
     private async Task<IResult> ExceptionsAsync()
     {
         using var scope = _services.CreateScope();
-        return await GetExceptions.Handle(null, null, null, Identity(), Db(scope), _pathways, _clock, CancellationToken.None);
+        return await GetExceptions.Handle(null, null, null, null, null, Identity(), Db(scope), _pathways, _clock, CancellationToken.None);
     }
 
     private async Task<IResult> MetricsAsync(HttpContext? context = null)
     {
         using var scope = _services.CreateScope();
-        return await GetMetrics.Handle(null, null, context ?? Identity(), Db(scope), _pathways, _clock, CancellationToken.None);
+        return await GetMetrics.Handle(null, null, context ?? Identity(), Db(scope), _pathways, _clock,
+            NullLoggerFactory.Instance, CancellationToken.None);
     }
 
-    private async Task<IResult> AcknowledgeAsync(Guid caseId, Guid escalationId, HttpContext context)
+    private async Task<IResult> AcknowledgeAsync(Guid caseId, Guid escalationId, HttpContext context, string? reason = null)
     {
         using var scope = _services.CreateScope();
-        return await AcknowledgeEscalation.Handle(caseId, escalationId, null, context,
+        return await AcknowledgeEscalation.Handle(caseId, escalationId, reason, context,
             scope.ServiceProvider.GetRequiredService<ICaseRepository>(), _pathways, _clock, CancellationToken.None);
     }
 

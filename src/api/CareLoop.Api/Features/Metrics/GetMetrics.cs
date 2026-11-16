@@ -33,10 +33,17 @@ public static class GetMetrics
     /// <param name="db">The no-tracking read context.</param>
     /// <param name="pathways">The configured display-label and closure rules.</param>
     /// <param name="clock">The measurement clock.</param>
+    /// <param name="loggerFactory">Records cases left out of a measure because their history is inconsistent.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>Counts, rates with denominators and elapsed clock-time medians, or an access refusal.</returns>
+    /// <remarks>
+    /// A case whose history cannot support a measure (a source timestamp earlier than the screening result, or a
+    /// treatment plan without its deadline) is left out of that measure's numerator and denominator and logged,
+    /// so one inconsistent case never stops the Impact screen for every reader.
+    /// </remarks>
     public static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason,
-        HttpContext context, CareLoopDbContext db, IPathwayProvider pathways, IClock clock, CancellationToken ct)
+        HttpContext context, CareLoopDbContext db, IPathwayProvider pathways, IClock clock, ILoggerFactory loggerFactory,
+        CancellationToken ct)
     {
         if (ReadAccess.Identity(context, out var actor) is { } error) return error;
         if (ReadAccess.ValidateReason(reason) is { } invalid) return invalid;
@@ -61,13 +68,15 @@ public static class GetMetrics
         var history = auditRows.GroupBy(a => a.CaseId).ToDictionary(g => g.Key, g => g
             .Select(a => new HistoryEntry(a.EventType, a.SourceTimestamp, a.ReceivedTimestamp, CaseProjection.FromJson(a.NewProjectionJson)))
             .OrderBy(e => e.ReceivedAt).ThenBy(e => e.Projection.Version).ToList());
-        var response = Compute(cases, history, pathways, clock.UtcNow);
+        var logger = loggerFactory.CreateLogger(typeof(GetMetrics));
+        var response = Compute(cases, history, pathways, clock.UtcNow,
+            (caseId, problem) => logger.LogWarning("Case {CaseId} left out of a metric: {Problem}", caseId, problem));
         await ReadAccess.AuditAsync(db, actor, clock, "metrics", null, outside, reason, queryText, ct);
         return Results.Ok(response);
     }
 
     private static MetricsResponse Compute(List<Case> cases, Dictionary<Guid, List<HistoryEntry>> history,
-        IPathwayProvider pathways, DateTimeOffset now)
+        IPathwayProvider pathways, DateTimeOffset now, Action<Guid, string> exclude)
     {
         var open = cases.Where(c => !c.IsClosed).ToList();
         var closed = cases.Where(c => c.IsClosed).ToList();
@@ -90,12 +99,12 @@ public static class GetMetrics
             var events = history.GetValueOrDefault(@case.Id) ?? [];
             var pathway = pathways.Get(@case.PathwayId);
             var start = events.FirstOrDefault(e => e.Type == CaseEventType.ScreeningResultReceived)?.At ?? @case.CreatedAt;
-            AddDuration(steps["acknowledgement"], events.FirstOrDefault(e => e.Projection.Notification?.IsComplete == true)?.At, start);
-            AddDuration(steps["consultation"], events.FirstOrDefault(e => e.Projection.Consultation?.Status == nameof(ConsultationStatus.OutcomeRecorded))?.At, start);
-            AddDuration(steps["appointment"], events.FirstOrDefault(e => e.Projection.Appointment?.Status == nameof(AppointmentStatus.Attended))?.At, start);
+            AddDuration(steps["acknowledgement"], events.FirstOrDefault(e => e.Projection.Notification?.IsComplete == true)?.At, start, @case.Id, exclude);
+            AddDuration(steps["consultation"], events.FirstOrDefault(e => e.Projection.Consultation?.Status == nameof(ConsultationStatus.OutcomeRecorded))?.At, start, @case.Id, exclude);
+            AddDuration(steps["appointment"], events.FirstOrDefault(e => e.Projection.Appointment?.Status == nameof(AppointmentStatus.Attended))?.At, start, @case.Id, exclude);
             AddDuration(steps["careStarted"], events.FirstOrDefault(e => e.Type == CaseEventType.OutcomeRecorded
-                && e.Projection.OutcomeEvidenceKind is "treatment-started" or "surveillance-started")?.At, start);
-            AddDuration(steps["closure"], @case.Closure?.DecidedAt, start);
+                && e.Projection.OutcomeEvidenceKind is "treatment-started" or "surveillance-started")?.At, start, @case.Id, exclude);
+            AddDuration(steps["closure"], @case.Closure?.DecidedAt, start, @case.Id, exclude);
             var reached = events.Select(e => Label(e.Projection, pathway))
                 .Append(CaseDisplayLabels.From(@case, pathway)).Distinct();
             foreach (var label in reached) labelsReached[label.ToString()]++;
@@ -111,9 +120,13 @@ public static class GetMetrics
             var plan = events.FirstOrDefault(e => e.Type == CaseEventType.OutcomeRecorded && e.Projection.OutcomeEvidenceKind == "treatment-plan");
             if (plan is not null)
             {
-                treatmentPlans++;
                 if (plan.Projection.NextAction != "start-treatment" || plan.Projection.DueAt is null)
-                    throw new InvalidOperationException($"Treatment-plan audit for case {@case.Id} has no treatment deadline.");
+                {
+                    exclude(@case.Id, "its treatment-plan audit has no treatment deadline");
+                    continue;
+                }
+
+                treatmentPlans++;
                 var started = events.FirstOrDefault(e => e.Type == CaseEventType.OutcomeRecorded
                     && e.Projection.OutcomeEvidenceKind == "treatment-started" && e.At >= plan.At);
                 if (started is not null && started.At <= plan.Projection.DueAt) treatmentOnTime++;
@@ -182,10 +195,16 @@ public static class GetMetrics
         return episodes;
     }
 
-    private static void AddDuration(List<TimeSpan> values, DateTimeOffset? at, DateTimeOffset start)
+    private static void AddDuration(List<TimeSpan> values, DateTimeOffset? at, DateTimeOffset start, Guid caseId,
+        Action<Guid, string> exclude)
     {
         if (at is null) return;
-        if (at < start) throw new InvalidOperationException("A measured step precedes its source screening result.");
+        if (at < start)
+        {
+            exclude(caseId, "a measured step precedes its source screening result");
+            return;
+        }
+
         values.Add(at.Value - start);
     }
 

@@ -10,6 +10,12 @@ namespace HisSimulator.State;
 /// </remarks>
 public sealed class SimulatorStore
 {
+    /// <summary>
+    /// How many FHIR log entries, staff inbox items and scenario runs are kept when no capacity is supplied.
+    /// </summary>
+    public const int DefaultCapacity = 1000;
+
+    private readonly int _capacity;
     private readonly object _sync = new();
     private readonly Dictionary<Guid, StaffInboxItem> _inbox = [];
     private readonly List<FhirMessageLogEntry> _log = [];
@@ -19,6 +25,20 @@ public sealed class SimulatorStore
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _gates = new();
 
     /// <summary>
+    /// Creates an empty store.
+    /// </summary>
+    /// <param name="capacity">
+    /// The most FHIR log entries, staff inbox items and scenario runs kept; when exceeded the oldest are dropped, so a
+    /// long session cannot grow without limit. Runs that have not finished are never dropped.
+    /// </param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="capacity"/> is less than one.</exception>
+    public SimulatorStore(int capacity = DefaultCapacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 1);
+        _capacity = capacity;
+    }
+
+    /// <summary>
     /// Adds an item to the staff inbox.
     /// </summary>
     /// <param name="item">The item to add; its <see cref="StaffInboxItem.Id"/> must be unique.</param>
@@ -26,7 +46,10 @@ public sealed class SimulatorStore
     public void AddInboxItem(StaffInboxItem item)
     {
         lock (_sync)
+        {
             if (!_inbox.TryAdd(item.Id, item)) throw new ArgumentException("An inbox item with this id already exists.", nameof(item));
+            TrimInbox();
+        }
     }
 
     /// <summary>
@@ -58,7 +81,11 @@ public sealed class SimulatorStore
     /// <param name="entry">The sent or received message to record.</param>
     public void AppendLogEntry(FhirMessageLogEntry entry)
     {
-        lock (_sync) _log.Add(entry);
+        lock (_sync)
+        {
+            _log.Add(entry);
+            if (_log.Count > _capacity) _log.RemoveRange(0, _log.Count - _capacity);
+        }
     }
 
     /// <summary>
@@ -66,11 +93,28 @@ public sealed class SimulatorStore
     /// </summary>
     /// <param name="direction">When supplied, only entries travelling in this direction are returned.</param>
     /// <param name="caseRef">When supplied, only entries correlated to this simulator-side case handle are returned.</param>
+    /// <param name="since">When supplied, only entries recorded after this instant are returned, so a poller can ask for what is new.</param>
+    /// <param name="limit">When supplied, at most this many of the newest matching entries are returned.</param>
     /// <returns>A snapshot of the matching entries ordered by <see cref="FhirMessageLogEntry.At"/> descending.</returns>
-    public IReadOnlyList<FhirMessageLogEntry> GetLogEntries(FhirMessageDirection? direction = null, string? caseRef = null)
+    public IReadOnlyList<FhirMessageLogEntry> GetLogEntries(FhirMessageDirection? direction = null, string? caseRef = null,
+        DateTimeOffset? since = null, int? limit = null)
     {
-        lock (_sync) return _log.Where(e => (direction is null || e.Direction == direction) && (caseRef is null || e.CaseRef == caseRef))
-            .OrderByDescending(e => e.At).ToArray();
+        lock (_sync)
+        {
+            var matches = _log.Where(e => (direction is null || e.Direction == direction) && (caseRef is null || e.CaseRef == caseRef)
+                && (since is null || e.At > since)).OrderByDescending(e => e.At);
+            return (limit is null ? matches : matches.Take(limit.Value)).ToArray();
+        }
+    }
+
+    /// <summary>
+    /// Finds one FHIR message log entry.
+    /// </summary>
+    /// <param name="id">Identifier of the entry.</param>
+    /// <returns>The entry, or <see langword="null"/> if none has that identifier (it may have been dropped as the oldest).</returns>
+    public FhirMessageLogEntry? GetLogEntry(Guid id)
+    {
+        lock (_sync) return _log.FirstOrDefault(e => e.Id == id);
     }
 
     /// <summary>
@@ -117,7 +161,14 @@ public sealed class SimulatorStore
     /// <param name="run">The run state to store, keyed by <see cref="ScenarioRun.RunId"/>.</param>
     public void SaveRun(ScenarioRun run)
     {
-        lock (_sync) _runs[run.RunId] = run with { Steps = run.Steps.ToArray() };
+        lock (_sync)
+        {
+            _runs[run.RunId] = run with { Steps = run.Steps.ToArray() };
+            while (_runs.Count > _capacity
+                && _runs.Values.Where(r => r.Status is ScenarioRunStatus.Completed or ScenarioRunStatus.Failed && r.RunId != run.RunId)
+                    .OrderBy(r => r.StartedAt).FirstOrDefault() is { } oldest)
+                _runs.Remove(oldest.RunId);
+        }
     }
 
     /// <summary>
@@ -143,7 +194,16 @@ public sealed class SimulatorStore
 
     /// <summary>Replaces the current inbox state on replay of the same FHIR resource.</summary>
     /// <param name="item">The deterministic inbox item.</param>
-    internal void UpsertInboxItem(StaffInboxItem item) { lock (_sync) _inbox[item.Id] = item; }
+    internal void UpsertInboxItem(StaffInboxItem item)
+    {
+        lock (_sync) { _inbox[item.Id] = item; TrimInbox(); }
+    }
+
+    private void TrimInbox()
+    {
+        while (_inbox.Count > _capacity)
+            _inbox.Remove(_inbox.Values.OrderBy(i => i.ReceivedAt).First().Id);
+    }
 
     /// <summary>Correlates the API case Task with the source report, including delivery before the initial send finishes.</summary>
     /// <param name="reportId">The source screening report id.</param>

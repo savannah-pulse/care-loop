@@ -62,25 +62,24 @@ internal static class CaseReadMapping
         ],
     };
 
-    /// <summary>Projects an actionable exception row, refusing incomplete coordination state.</summary>
+    /// <summary>Projects an actionable exception row; a missing next action or deadline stays visible as null.</summary>
     /// <param name="case">The no-tracking case.</param>
     /// <param name="actor">The reader.</param>
     /// <param name="pathways">The configured pathways.</param>
     /// <param name="now">The read time.</param>
     /// <returns>The exception.</returns>
-    /// <exception cref="InvalidOperationException">An open exception has no next action or deadline.</exception>
     public static ExceptionItemResponse Exception(Case @case, Actor actor, IPathwayProvider pathways, DateTimeOffset now)
     {
         var summary = Summary(@case, actor, pathways);
-        var due = @case.DueAt ?? throw new InvalidOperationException($"Exception case {@case.Id} has no deadline.");
+       var due = @case.DueAt;
         return new ExceptionItemResponse
         {
             CaseId = summary.CaseId, PatientReference = summary.PatientReference,
             PatientDisplayName = summary.PatientDisplayName, PatientSecondaryIdentifier = summary.PatientSecondaryIdentifier,
             FacilityId = summary.FacilityId, PathwayId = summary.PathwayId, DisplayLabel = summary.DisplayLabel,
             Stage = summary.Stage, Urgency = summary.Urgency, Owner = summary.Owner, Exceptions = summary.Exceptions,
-            NextAction = summary.NextAction ?? throw new InvalidOperationException($"Exception case {@case.Id} has no next action."),
-            DueAt = due, OverdueBy = now > due ? now - due : null, IsEscalated = summary.IsEscalated,
+           NextAction = summary.NextAction,
+           DueAt = due, OverdueBy = due is { } dueAt && now > dueAt ? now - dueAt : null, IsEscalated = summary.IsEscalated,
             EscalationLevel = @case.Escalations.Where(e => e.IsOpen).Select(e => e.Level).DefaultIfEmpty().Max(),
         };
     }

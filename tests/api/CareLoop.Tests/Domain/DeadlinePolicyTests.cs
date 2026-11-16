@@ -19,6 +19,16 @@ public sealed class DeadlinePolicyTests
             DeadlinePolicy.ComputeDueAt(deadline.NextAction, null, Pathway, _clock));
     }
 
+    [Theory]
+    [InlineData("Infrastructure/Pathways")]
+    [InlineData("Infrastructure/Pathways/demo")]
+    public void Every_shipped_pathway_defines_the_acknowledgement_deadline_the_worker_flags(string directory)
+    {
+        var pathway = DomainTestData.Provider(directory).Get("breast-screening");
+        Assert.Contains(pathway.Deadlines, d => string.Equals(d.NextAction, DeadlinePolicy.AcknowledgeNotificationAction,
+            StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void Urgency_specific_deadline_is_preferred_over_the_general_one()
     {

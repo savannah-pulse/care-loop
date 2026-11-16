@@ -99,10 +99,16 @@ public sealed class DeadlineWorker : BackgroundService
     {
         using var scope = _scopes.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CareLoopDbContext>();
-        var caseIds = await db.Cases.AsNoTracking()
+        var pathways = scope.ServiceProvider.GetRequiredService<IPathwayProvider>().GetAll();
+        var horizon = _clock.UtcNow + pathways.SelectMany(p => p.Deadlines).Select(d => d.WarnBefore)
+            .DefaultIfEmpty(TimeSpan.Zero).Max();
+
+        // Only the id and due time are read here; a full aggregate is loaded just for cases that can need work.
+        var candidates = await db.Cases.AsNoTracking()
             .Where(c => c.Stage != CaseStage.Closed && c.DueAt != null)
-            .Select(c => c.Id)
+            .Select(c => new { c.Id, c.DueAt })
             .ToListAsync(ct);
+        var caseIds = candidates.Where(c => c.DueAt <= horizon).Select(c => c.Id).ToList();
 
         var changed = 0;
         foreach (var caseId in caseIds)
@@ -167,7 +173,7 @@ public sealed class DeadlineWorker : BackgroundService
         else if (status == DeadlineStatus.Overdue)
         {
             flags = CaseExceptions.Overdue;
-            if (string.Equals(@case.NextAction, "acknowledge-notification", StringComparison.OrdinalIgnoreCase)
+            if (string.Equals(@case.NextAction, DeadlinePolicy.AcknowledgeNotificationAction, StringComparison.OrdinalIgnoreCase)
                 && @case.Notification is { } notification && !notification.IsComplete())
             {
                 flags |= CaseExceptions.Unacknowledged;

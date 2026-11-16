@@ -28,6 +28,16 @@ describe('coordination worklist', () => {
     expect(html).toContain('Overdue')
     expect(html).not.toContain('Patient/SYN-1')
   })
+  it('orders rows without a deadline after dated rows, then by case id', () => {
+    const rows = [row('b-none', ['Unassigned'], null), row('a-none', ['Unassigned'], null), row('dated', ['Unassigned'], '2026-01-05T00:00:00Z')]
+    expect(sortCases(rows).map((item) => item.caseId)).toEqual(['dated', 'a-none', 'b-none'])
+  })
+  it('says so when a row has no deadline or next action', () => {
+    const item = { ...row('case-1', ['Unassigned'], null), nextAction: null }
+    const html = renderToStaticMarkup(<CaseTable rows={[item]} onOpen={() => {}} />)
+    expect(html).toContain('No deadline set')
+    expect(html).toContain('No next action')
+  })
   it('renders staff demographics and an explicit empty state', () => {
     const item = { ...row('case-1', [], null), patientDisplayName: 'Synthetic Patient', patientSecondaryIdentifier: 'SYN-MRN-1' }
     const html = renderToStaticMarkup(<CaseTable rows={[item]} onOpen={() => {}} />)

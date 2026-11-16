@@ -51,13 +51,24 @@ npm run build
 
 Never edit `src/api/schema.d.ts` manually. `src/api/client.ts` is the handwritten identity/error-handling wrapper.
 TypeScript 5.9.x is retained for compatibility with OpenAPI generation and the ESLint parser. `npm run build` runs
-oxlint, required-export JSDoc/TSDoc linting, type-checking and the production Vite build. Vitest covers request
-headers/errors, exact approval payloads, acknowledgement, redacted rows, attention ordering and measure formatting.
+oxlint, required-export JSDoc/TSDoc linting, type-checking and the production Vite build. `npm run test` runs Vitest in
+jsdom with Testing Library against a mocked API client and synthetic data. It covers:
 
-Validation for WS6: 25 unit tests passed and the production build passed. Integrated-browser checks used synthetic
-API interception, covering case/escalation navigation and acknowledgement, role redaction, a 375px viewport,
-programmes/impact, summary unavailability and exact-text approval. This is not a real API/database end-to-end journey;
-those journeys belong to WS10.
+- the REST boundary (request headers, identity header validation, error mapping, non-JSON replies, exact approval payloads);
+- `useResource` (abort on key change, stale-while-revalidate within a scope, no data shown across scopes);
+- the worklist (paging at exactly one page, queue chips, coordinator search, rows without a deadline);
+- the case screen (acknowledgement for the addressed role only, no names for a coordinator, programme-read failure
+  degrading only the parts that need it, error cleared on Refresh, handoff draft kept across tabs and Refresh, approval
+  sending the textarea text exactly and gated by the confirmation);
+- the identity form, sorting and measure/locale formatting.
+
+Not covered by automated tests: `Impact`, `Programmes` rendering, and any real API, browser or end-to-end journey
+(Playwright journeys belong to WS10).
+
+Validation for WS6 was done in an integrated browser against synthetic API interception, covering case/escalation
+navigation and acknowledgement, role redaction, a 375px viewport, programmes/impact, summary unavailability and
+exact-text approval. This is not a real API/database end-to-end journey; those journeys belong to WS10. CI runs lint,
+type-checking, the Vitest suite and the production build for this folder.
 
 `npm audit --omit=dev` reports zero findings. The installed documentation/parser tooling still reports eight moderate
 development-only findings through `minimatch`; the suggested forced downgrade conflicts with TypeScript compatibility.

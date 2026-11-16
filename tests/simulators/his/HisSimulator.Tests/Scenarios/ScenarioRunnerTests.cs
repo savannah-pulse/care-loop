@@ -62,6 +62,14 @@ public sealed class ScenarioRunnerTests
         Assert.Equal(ScenarioRunStatus.Failed, final.Status); Assert.Equal(ScenarioStepStatus.Failed, final.Steps[0].Status);
         Assert.Equal(ScenarioStepStatus.Pending, final.Steps[1].Status); Assert.Single(handler.Requests);
     }
+    [Fact] public async Task An_unexpected_exception_marks_the_step_and_run_failed_with_its_message()
+    {
+        using var folder = new ScenarioFolder(); var handler = new CaptureHandler { Reply = _ => throw new InvalidCastException("Test unexpected failure") };
+        await using var host = await SimulatorHost.StartAsync(folder.Path, handler);
+        var run = await host.Runner.StartAsync("test", new(0, null), default); var final = await FinishedAsync(host.Runner, run.RunId);
+        Assert.Equal(ScenarioRunStatus.Failed, final.Status); Assert.Equal(ScenarioStepStatus.Failed, final.Steps[0].Status);
+        Assert.Contains("Test unexpected failure", final.Steps[0].Error); Assert.NotNull(final.CompletedAt);
+    }
     [Fact] public async Task Cohort_is_refused_before_background_work()
     {
         await using var host = await SimulatorHost.StartAsync();

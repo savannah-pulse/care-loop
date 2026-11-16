@@ -46,14 +46,15 @@ public static class GetTimeline
             where audit.CaseId == caseId
             orderby audit.ReceivedTimestamp, audit.Id
             select new { Audit = audit, source.SourceSystem }).ToListAsync(ct);
-        return Results.Ok(entries.OrderBy(e => e.Audit.ReceivedTimestamp)
-            .ThenBy(e => CaseProjection.FromJson(e.Audit.NewProjectionJson).Version).Select(e => new TimelineEntryResponse
+        var parsed = entries.Select(e => new { e.Audit, e.SourceSystem, New = CaseProjection.FromJson(e.Audit.NewProjectionJson) }).ToList();
+        return Results.Ok(parsed.OrderBy(e => e.Audit.ReceivedTimestamp)
+            .ThenBy(e => e.New.Version).Select(e => new TimelineEntryResponse
         {
             AuditEventId = e.Audit.Id, SourceSystem = e.SourceSystem, EventType = e.Audit.EventType,
             Disposition = e.Audit.Disposition, ActorReference = e.Audit.ActorReference, ActorRole = e.Audit.ActorRole,
             SourceTimestamp = e.Audit.SourceTimestamp, ReceivedTimestamp = e.Audit.ReceivedTimestamp,
             PriorStage = e.Audit.PriorProjectionJson is { } prior ? CaseProjection.FromJson(prior).Stage : null,
-            NewStage = CaseProjection.FromJson(e.Audit.NewProjectionJson).Stage,
+            NewStage = e.New.Stage,
             Reason = e.Audit.Reason, EvidenceReference = e.Audit.EvidenceReference,
         }).ToList());
     }

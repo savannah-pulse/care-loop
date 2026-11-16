@@ -17,6 +17,16 @@ namespace CareLoop.Domain.Rules;
 public static class DeadlinePolicy
 {
     /// <summary>
+    /// Key of the next action that waits for the patient to acknowledge the notification.
+    /// </summary>
+    /// <remarks>
+    /// An overdue case on this action is also flagged as unacknowledged. The key is named here, once, and
+    /// a test fails if a pathway file does not define a deadline for it, so a renamed action can never
+    /// silently stop the flag.
+    /// </remarks>
+    public const string AcknowledgeNotificationAction = "acknowledge-notification";
+
+    /// <summary>
     /// Computes when a next action is due.
     /// </summary>
     /// <param name="nextAction">Key of the next action being set.</param>

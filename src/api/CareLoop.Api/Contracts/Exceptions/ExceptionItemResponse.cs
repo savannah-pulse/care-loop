@@ -38,14 +38,14 @@ public sealed record ExceptionItemResponse
     /// <summary>The clinician-reviewed urgency code; <see langword="null"/> until the review arrives.</summary>
     public string? Urgency { get; init; }
 
-    /// <summary>Key of the single next action.</summary>
-    public required string NextAction { get; init; }
+    /// <summary>Key of the single next action; <see langword="null"/> when the case has none, which should not happen on an open exception and is shown rather than hidden.</summary>
+    public string? NextAction { get; init; }
 
     /// <summary>The owner accountable for the next action.</summary>
     public required OwnerResponse Owner { get; init; }
 
-    /// <summary>When the next action is due.</summary>
-    public required DateTimeOffset DueAt { get; init; }
+    /// <summary>When the next action is due; <see langword="null"/> when the case has no deadline.</summary>
+    public DateTimeOffset? DueAt { get; init; }
 
     /// <summary>How long the next action is overdue; <see langword="null"/> when it is not overdue.</summary>
     public TimeSpan? OverdueBy { get; init; }

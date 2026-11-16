@@ -3,7 +3,7 @@ import type { CareLoopApi } from '../../api/client'
 import { useResource } from '../../api/useResource'
 import { ResourceStatus } from '../../components/ResourceStatus'
 import { codeText, t } from '../../i18n'
-import { dateText, durationText, numeric, rateText } from '../../format'
+import { dateText, durationText, numberText, numeric, rateText } from '../../format'
 
 /** Props for the coordination impact screen. */
 export interface ImpactProps {
@@ -17,7 +17,7 @@ export interface ImpactProps {
 export function Impact({ api, identityKey }: ImpactProps) {
   const [refresh, setRefresh] = useState(0)
   const load = useCallback((signal: AbortSignal) => api.metrics(signal), [api])
-  const resource = useResource(`${identityKey}/metrics/${refresh}`, load)
+  const resource = useResource(`${identityKey}/metrics/${refresh}`, load, `${identityKey}/metrics`)
   const metrics = resource.data
   return <section><div className="page-heading"><div><h1>{t('impact.title')}</h1><p>{t('impact.description')}</p></div>
     <button onClick={() => setRefresh((n) => n + 1)}>{t('common.refresh')}</button></div>
@@ -44,7 +44,7 @@ export function Impact({ api, identityKey }: ImpactProps) {
         <div className="card"><h2>{t('impact.closures')}</h2>{Object.entries(metrics.closuresByReason).map(([key, count]) =>
           <div className="detail-row" key={key}><span>{codeText('closure', key)}</span><strong>{count}</strong></div>)}</div>
         <div className="card stat"><small>{t('impact.confidence')}</small><strong>{metrics.averageConfidence == null
-          ? t('common.notMeasured') : new Intl.NumberFormat('en', { maximumFractionDigits: 2 }).format(numeric(metrics.averageConfidence))}</strong>
+          ? t('common.notMeasured') : numberText(numeric(metrics.averageConfidence))}</strong>
           <p>{t('impact.confidenceParticipation')}: {rateText(metrics.confidenceRate)}</p>
           <p>{t('common.count', { numerator: metrics.confidenceResponses, denominator: metrics.confidenceDenominator })}</p></div></div>
     </>}

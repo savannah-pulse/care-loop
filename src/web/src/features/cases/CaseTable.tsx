@@ -24,13 +24,13 @@ export function CaseTable({ rows, onOpen }: CaseTableProps) {
   return <div className="table-scroll"><table>
     <thead><tr>{headings.map((key) => <th key={key}>{t(key)}</th>)}</tr></thead>
     <tbody>{sortCases(rows).map((row) => <tr key={row.caseId}>
-      <td><button className="link" onClick={() => onOpen(row.caseId)} aria-label={t('common.open')}>
+      <td><button className="link" onClick={() => onOpen(row.caseId)}>
         {row.patientDisplayName ?? row.caseId}</button><small>{row.patientSecondaryIdentifier
           ?? (row.patientDisplayName != null ? row.patientReference : null)}</small></td>
       <td>{row.pathwayId}</td><td>{codeText('label', row.displayLabel)}</td>
-      <td>{codeText('action', row.nextAction)}<small>{row.urgency ?? t('common.none')}</small></td>
+      <td>{row.nextAction == null ? t('common.noNextAction') : codeText('action', row.nextAction)}<small>{row.urgency ?? t('common.none')}</small></td>
       <td>{row.owner.reference}<small>{codeText('role', row.owner.role)}</small></td>
-      <td><time dateTime={row.dueAt ?? undefined}>{dateText(row.dueAt)}</time></td>
+      <td>{row.dueAt == null ? t('common.noDeadline') : <time dateTime={row.dueAt}>{dateText(row.dueAt)}</time>}</td>
       <td>{row.exceptions.length ? row.exceptions.map((flag) =>
         <span className={`badge ${flag === 'Overdue' ? 'danger' : 'warning'}`} key={flag}>{codeText('exception', flag)}</span>)
         : <span className="badge success">{t('common.onTrack')}</span>}</td>

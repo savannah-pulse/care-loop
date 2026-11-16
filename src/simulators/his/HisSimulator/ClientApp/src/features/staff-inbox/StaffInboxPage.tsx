@@ -24,12 +24,9 @@ export function StaffInboxPage({ apiBaseUrl }: StaffInboxPageProps) {
     selected === null ? null : '/staff-inbox/' + selected,
     selected !== null,
   );
-  const logs = useSimulatorRead<{ entries: LogEntry[] }>(
-    apiBaseUrl,
-    selected === null ? null : '/fhir-log',
-    true,
-  );
-  const body = logs.data?.entries.find((entry) => entry.id === detail.data?.logEntryId)?.body;
+  const logId = detail.data?.logEntryId ?? null;
+  const log = useSimulatorRead<LogEntry>(apiBaseUrl, logId === null ? null : '/fhir-log/' + logId);
+  const body = log.data?.body;
   return (
     <section>
       <h2>{t('staffInbox.title')}</h2>
@@ -60,7 +57,7 @@ export function StaffInboxPage({ apiBaseUrl }: StaffInboxPageProps) {
       {selected !== null && (
         <aside>
           <ApiStatus error={detail.error} pending={detail.pending} />
-          <ApiStatus error={logs.error} pending={logs.pending} />
+          <ApiStatus error={log.error} pending={log.pending} />
           <h3>{detail.data?.subject}</h3>
           {body !== undefined && <pre>{body}</pre>}
           <button onClick={() => setSelected(null)}>{t('common.close')}</button>

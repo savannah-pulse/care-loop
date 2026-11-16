@@ -15,15 +15,19 @@ public static class ClinicianActionEndpoints
         app.MapGet("/cases", (SimulatorStore store, CancellationToken ct) =>
         {
             ct.ThrowIfCancellationRequested();
-            return TypedResults.Ok(new SimulatedCaseListResponse(store.GetCases()));
-        }).WithName("ListSimulatedCases");
+            var summaries = store.GetInboxItems().Where(i => i.Kind == State.StaffInboxItemKind.HandoffSummary && i.Content is not null).ToArray();
+            return TypedResults.Ok(new SimulatedCaseListResponse(store.GetCases().Select(c => SimulatedCaseItem.From(c,
+                c.CareLoopTaskId is null ? null : summaries.FirstOrDefault(i => i.CareLoopTaskId == c.CareLoopTaskId)?.Content)).ToArray()));
+        }).WithName("ListSimulatedCases").Produces<SimulatedCaseListResponse>();
         var actions = app.MapGroup("/actions").WithTags("Source actions");
         actions.MapPost("/clinical-review", async (ClinicalReviewActionRequest request, OutboundEventSender sender, ISimulatorClock clock, CancellationToken ct) =>
             TypedResults.Ok(await sender.SendAsync(Event(HisEventKind.ClinicalReview, request.CaseRef, request.Performer, "completed", clock,
                 new() { ["urgency"] = request.Urgency }), ct))).WithName("RecordClinicalReview").ProducesProblem(400).ProducesProblem(404);
         actions.MapPost("/referral-decision", async (ReferralDecisionActionRequest request, OutboundEventSender sender, ISimulatorClock clock, CancellationToken ct) =>
             TypedResults.Ok(await sender.SendAsync(Event(HisEventKind.ReferralUpdate, request.CaseRef, request.Performer,
-                request.Accepted ? "accepted" : "rejected", clock, new() { ["reason"] = request.Reason }), ct))).WithName("DecideReferral");
+                (request.Accepted ?? throw new ArgumentException("The accepted field is required: state whether the referral is accepted or rejected."))
+                    ? "accepted" : "rejected", clock, new() { ["reason"] = request.Reason }), ct)))
+            .WithName("DecideReferral").ProducesProblem(400).ProducesProblem(404);
         actions.MapPost("/outcome", async (RecordOutcomeActionRequest request, OutboundEventSender sender, ISimulatorClock clock, CancellationToken ct) =>
             TypedResults.Ok(await sender.SendAsync(Event(HisEventKind.Outcome, request.CaseRef, request.Performer, "completed", clock,
                 new() { ["evidenceKind"] = request.EvidenceKind, ["asFollowUpReport"] = request.AsFollowUpReport }), ct))).WithName("RecordOutcome");
@@ -34,7 +38,7 @@ public static class ClinicianActionEndpoints
                     ["closureReason"] = request.ClosureReason, ["evidenceResourceKey"] = request.EvidenceResourceKey,
                     ["exceptionNote"] = request.ExceptionNote, ["nextSurveillanceDate"] = request.NextSurveillanceDate,
                     ["documentedAttemptReferences"] = request.DocumentedAttemptReferences,
-                }), ct))).WithName("AuthorizeClosure");
+                }), ct))).WithName("AuthorizeClosure").ProducesProblem(400).ProducesProblem(404).ProducesProblem(409);
         MapTrack(actions, "/consultation-request", HisEventKind.ConsultationUpdate, true);
         MapTrack(actions, "/consultation-answer", HisEventKind.ConsultationUpdate);
         MapTrack(actions, "/referral", HisEventKind.ReferralUpdate);

@@ -1,4 +1,13 @@
-import { t } from './i18n'
+import { language, t } from './i18n'
+
+/**
+ * Formats a plain number in the active language, for example an average rating.
+ * @param value - A finite number.
+ * @returns The number with at most two fraction digits.
+ */
+export function numberText(value: number): string {
+  return new Intl.NumberFormat(language, { maximumFractionDigits: 2 }).format(value)
+}
 
 /**
  * Formats a source timestamp, showing the user's time zone explicitly.
@@ -10,7 +19,7 @@ export function dateText(value: string | null | undefined): string {
   if (value == null) return t('common.none')
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) throw new Error(t('error.invalidDate'))
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat(language, {
     year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
   }).format(date)
 }
@@ -28,7 +37,7 @@ export function durationText(value: string | null | undefined): string {
     throw new Error(t('error.invalidDuration'))
   const hours = Number(match[1] ?? 0) * 24 + Number(match[2]) + Number(match[3]) / 60
     + (Number(match[4]) + Number(`0.${match[5] ?? 0}`)) / 3600
-  const format = new Intl.NumberFormat('en', { maximumFractionDigits: 2 })
+  const format = new Intl.NumberFormat(language, { maximumFractionDigits: 2 })
   return hours >= 1 ? t('common.hours', { hours: format.format(hours) })
     : hours >= 1 / 60 ? t('common.minutes', { minutes: format.format(hours * 60) })
       : t('common.seconds', { seconds: format.format(hours * 3600) })
@@ -41,7 +50,7 @@ export function durationText(value: string | null | undefined): string {
  * @throws Error - The API supplied a malformed numeric rate.
  */
 export function rateText(value: number | string | null | undefined): string {
-  return value == null ? t('common.notMeasured') : new Intl.NumberFormat('en', { style: 'percent', maximumFractionDigits: 1 }).format(numeric(value))
+  return value == null ? t('common.notMeasured') : new Intl.NumberFormat(language, { style: 'percent', maximumFractionDigits: 1 }).format(numeric(value))
 }
 
 /**

@@ -1,5 +1,8 @@
 import en from './locales/en.json'
 
+/** The active UI language tag; the single source for `Intl` formatting so it follows the catalogue in use. */
+export const language = 'en'
+
 /** All UI text keys in the current English catalogue. */
 export type TextKey = keyof typeof en
 
