@@ -3,7 +3,7 @@
 One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 - Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the SMS and email simulator, and 13 across all of them.
-- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 30 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email.
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 30 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email, and a nurse navigator records what a patient says on a call on screen 2.
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
@@ -173,10 +173,12 @@ Hessa's journey:
 
 ![Case](02-case.png)
 
-- Read-only, except the AI handoff summary, which a clinician checks and approves from here (screen 18, C9). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
+- Read-only, except two things: a clinician checks and approves the AI handoff summary from here (screen 18, C9), and a nurse navigator records what a patient said on a call (decision 30). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
 - The next action shows its escalation ladder and who has acknowledged it (C15).
 - The checklist shows what must happen before the next stage. Missing evidence blocks progress.
-- The four tracks (notification, consultation, referral and appointment) each show their own status. Each timeline entry names its source system, which needs C3.
+- The four tracks (notification, consultation, referral and appointment) each show their own status. Each timeline entry names where it came from: CareLoop, the hospital system, or a text message or email (C3). What a nurse records after a call shows as CareLoop, with her name.
+- "After a call with the patient" is shown to nurse navigators only. After a call, the nurse ticks that the patient said they will come (`NotificationUpdated/Acknowledged`) and that they said the next step back in their own words (`/Understood`), and chooses how sure the patient feels, from 1 (not sure) to 5 (very sure), or "Not asked" (`/ConfidenceRated`). "Record call outcome" sends `POST /cases/{caseId}/call-outcome` and stays off until she ticks something or chooses a rating. The card shows the confidence on record, and recording never changes who is responsible.
+- This card is the only way understanding and the rating reach CareLoop: a reply by text or email can only say "I will come" or ask for a call (decisions 23 and 24).
 
 ### 3. Impact
 
