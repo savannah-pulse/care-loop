@@ -118,16 +118,17 @@ describe('escalation', () => {
     expect(sentRequests(ACK_ROUTE).map((request) => request.body)).toEqual([''])
   })
 
-  it('reads a 409 calmly, and closing it clears the message and reads the case again (D3)', async () => {
+  it.each([
+    [409, 'This escalation was already acknowledged, or a newer one replaced it. Close this message to see the latest.'],
+    [403, 'Only the facility lead at Family Health Centre can acknowledge this escalation. Close this message to see the latest.'],
+  ])('reads a %i calmly, and closing it clears the message and reads the case again (D3)', async (status, message) => {
     const { user } = await openEscalation(ESCALATED, 'joy-bautista')
-    answer(ACK_ROUTE, problem(409, 'The escalation was superseded.'))
+    answer(ACK_ROUTE, problem(status, 'The acknowledgement was refused.'))
     await user.click(within(acknowledgementCard()).getByRole('button', { name: 'Acknowledge' }))
     const dialog = screen.getByRole('dialog', { name: 'Acknowledge this escalation?' })
     await user.click(within(dialog).getByRole('button', { name: 'Acknowledge' }))
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'This escalation was already acknowledged, or a newer one replaced it. Close this message to see the latest.',
-    )
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
     expect(within(dialog).queryByRole('button', { name: 'Acknowledge' })).not.toBeInTheDocument()
 
     answer(CASE_ROUTE, json(WITH_COORDINATOR))

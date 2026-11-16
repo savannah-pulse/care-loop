@@ -72,9 +72,10 @@ function EscalationView({ detail, timeline, reason, now, onChanged, onStale }: E
   const mayAcknowledge = canAcknowledge(detail, me)
   const entries = timeline.state.status === 'ready' ? timeline.state.data : undefined
   const addressedRole = current ? (roleLabel(current.escalatedTo.role) ?? current.escalatedTo.role) : undefined
+  // A 409 or 403 means what the screen shows is out of date for this person: read the case again.
+  const stale = failure === 'conflict' || failure === 'forbidden'
 
   const close = (): void => {
-    const stale = failure === 'conflict'
     setConfirming(false)
     setFailure(undefined)
     if (stale) {
@@ -98,7 +99,7 @@ function EscalationView({ detail, timeline, reason, now, onChanged, onStale }: E
       return
     }
     setFailure(outcome.failure.kind)
-    if (outcome.failure.kind === 'conflict') {
+    if (outcome.failure.kind === 'conflict' || outcome.failure.kind === 'forbidden') {
       escalationsChanged()
     }
   }
@@ -209,14 +210,16 @@ function EscalationView({ detail, timeline, reason, now, onChanged, onStale }: E
         <p>{t('escalation.confirmBody', { owner: owner.subject })}</p>
         {failure ? (
           <p className="field-error" role="alert">
-            {t(ACK_FAILURES[failure] ?? 'escalation.ackFailed.error', { role: addressedRole ?? '' })}
+            {t(ACK_FAILURES[failure] ?? 'escalation.ackFailed.error', {
+              role: current ? escalationTarget(current.escalatedTo).inSentence : '',
+            })}
           </p>
         ) : null}
         <div className="dialog-actions">
           <button type="button" className="btn" onClick={close}>
-            {failure === 'conflict' ? t('escalation.close') : t('escalation.cancel')}
+            {stale ? t('escalation.close') : t('escalation.cancel')}
           </button>
-          {failure === 'conflict' || failure === 'forbidden' ? null : (
+          {stale ? null : (
             <button type="button" className="btn primary" disabled={busy} onClick={() => void acknowledge()}>
               {busy ? t('escalation.acknowledging') : t('escalation.acknowledge')}
             </button>

@@ -777,7 +777,7 @@
     "acknowledgedToast": "Escalation acknowledged.",
     "ackFailed": {
       "conflict": "This escalation was already acknowledged, or a newer one replaced it. Close this message to see the latest.",
-      "forbidden": "Only the {role} can acknowledge this escalation.",
+      "forbidden": "Only {role} can acknowledge this escalation. Close this message to see the latest.",
       "notAvailable": "Acknowledging is not available yet.",
       "notFound": "This case or escalation no longer exists.",
       "error": "Your acknowledgement could not be saved. Try again."
