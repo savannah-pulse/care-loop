@@ -1,4 +1,5 @@
-import { Icon, OutsideTeamCard, ReadView } from '../../components'
+import { useCallback, useState } from 'react'
+import { Icon, OutsideTeamCard, ReadView, Toast } from '../../components'
 import { useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
 import { describePatient, openEscalations, programmeName } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
@@ -7,6 +8,8 @@ import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaf
 import { t } from '../../i18n'
 import { navigate, routeHref } from '../../routing'
 import { EscalationLadder } from '../escalations'
+import { CallOutcomeCard } from './CallOutcomeCard'
+import { callOutcomeOffer } from './callOutcome'
 import { NextActionCard } from './NextActionCard'
 import { OtherScreeningCard } from './OtherScreeningCard'
 import { StageStepper } from './StageStepper'
@@ -67,11 +70,13 @@ interface CaseViewProps {
   readonly timeline: Read<TimelineEntry[]>
   readonly reason?: string
   readonly now: Date
+  readonly onCallRecorded: (detail: CaseDetail) => void
 }
 
-function CaseView({ detail, timeline, reason, now }: CaseViewProps) {
+function CaseView({ detail, timeline, reason, now, onCallRecorded }: CaseViewProps) {
   const me = useSignedInStaff()
   const escalated = openEscalations(detail.escalations).length > 0
+  const callOffer = callOutcomeOffer(detail, me.role)
   return (
     <>
       <PatientHeader detail={detail} />
@@ -88,6 +93,9 @@ function CaseView({ detail, timeline, reason, now }: CaseViewProps) {
         </NextActionCard>
         <div className="side">
           <TracksCard tracks={detail.tracks} />
+          {callOffer === 'hidden' ? null : (
+            <CallOutcomeCard detail={detail} offer={callOffer} reason={reason} onRecorded={onCallRecorded} />
+          )}
           {isClinicianRole(me.role) ? <OtherScreeningCard detail={detail} reason={reason} /> : null}
         </div>
         <TimelineCard read={timeline} />
@@ -102,7 +110,9 @@ function CaseView({ detail, timeline, reason, now }: CaseViewProps) {
  * other screening for clinicians, and what has happened.
  *
  * @remarks
- * Read-only; reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. Staff see the patient's
+ * Reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. The one thing recorded here is
+ * what a patient said on a call, by a nurse navigator (`POST /cases/{caseId}/call-outcome`), after
+ * which the case shows as the API returned it and the timeline is read again. Staff see the patient's
  * name and MRN; the programme coordinator sees a case number and a note that names are hidden for
  * their role. A case at another facility opens only after the person says why (board 14): the API
  * refuses the read without a reason, the screen asks for one, and the reason then goes with every
@@ -115,6 +125,18 @@ export function CasePage({ caseId }: CasePageProps) {
   const read = useCase(caseId, reason)
   const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
+  const [recorded, setRecorded] = useState<CaseDetail>()
+  const [toast, setToast] = useState<string>()
+  const dismissToast = useCallback(() => setToast(undefined), [])
+  const retryTimeline = timeline.retry
+  const onCallRecorded = useCallback(
+    (detail: CaseDetail) => {
+      setRecorded(detail)
+      setToast(t('callOutcome.recordedToast'))
+      retryTimeline()
+    },
+    [retryTimeline],
+  )
   const ready = read.state.status === 'ready'
   useDocumentTitle(
     read.state.status === 'ready' ? describePatient(read.state.data, me.role).name : t('case.titleFallback'),
@@ -146,10 +168,19 @@ export function CasePage({ caseId }: CasePageProps) {
             body: me.role === 'coordinator' ? t('case.forbiddenCoordinator') : t('case.forbiddenBody'),
           }}
         >
-          {(detail) => <CaseView detail={detail} timeline={timeline} reason={reason} now={now} />}
+          {(detail) => (
+            <CaseView
+              detail={recorded?.caseId === detail.caseId ? recorded : detail}
+              timeline={timeline}
+              reason={reason}
+              now={now}
+              onCallRecorded={onCallRecorded}
+            />
+          )}
         </ReadView>
       )}
       <p className="note">{t('case.note')}</p>
+      <Toast message={toast} onDismiss={dismissToast} />
     </div>
   )
 }

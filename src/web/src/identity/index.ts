@@ -21,6 +21,7 @@ export {
   ESCALATION_ROLES,
   NAMES_HIDDEN_ROLES,
   ROLE_KEYS,
+  isCallOutcomeRole,
   isClinicianRole,
   isEscalationRole,
   namesHiddenFor,

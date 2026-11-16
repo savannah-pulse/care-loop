@@ -52,8 +52,28 @@ describe('display stages (decision 19)', () => {
 describe('timeline (C3)', () => {
   it('names where each entry came from in plain words', () => {
     expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'careloop' })))).toBe('CareLoop')
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'patient-channel' })))).toBe('Patient channel')
+    expect(
+      sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'fhc-his', eventType: 'NotificationUpdated', actorRole: 'system' }))),
+    ).toBe('Text message or email')
     expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'his-simulator' })))).toBe('Hospital system')
+  })
+
+  it('shows what a nurse recorded after a call as recorded in CareLoop, not as a message from the patient', () => {
+    const recorded = timelineEntry({
+      sourceSystem: 'fhc-his',
+      eventType: 'NotificationUpdated',
+      actorReference: 'huda-saleh',
+      actorRole: 'nurse-navigator',
+    })
+    expect(sourceLabel(timelineSource(recorded))).toBe('CareLoop')
+  })
+
+  it('names no patient app, portal or channel as a source', () => {
+    for (const system of ['patient-channel', 'health-app', 'portal']) {
+      expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: system, eventType: 'ClinicalReviewCompleted' })))).toBe(
+        'Hospital system',
+      )
+    }
   })
 
   it('never shows a refused acknowledgement as an acknowledgement', () => {

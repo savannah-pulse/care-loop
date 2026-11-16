@@ -41,6 +41,27 @@ export function isClinicianRole(role: string): boolean {
 }
 
 /**
+ * Roles that record what a patient said on a call: that they will come, that they said the next
+ * step back, and how confident they feel.
+ *
+ * @remarks
+ * Patients are reached by text message and email only, which cannot carry teach-back or a rating,
+ * so a nurse navigator records them after a call. The API allows this role only and answers 403 to
+ * anyone else; the screen shows the card to the same role.
+ */
+export const CALL_OUTCOME_ROLES: readonly RoleKey[] = ['nurse-navigator']
+
+/**
+ * Tells whether a role records the outcome of a call with a patient.
+ *
+ * @param role - A role key.
+ * @returns `true` for the roles in {@link CALL_OUTCOME_ROLES}.
+ */
+export function isCallOutcomeRole(role: string): boolean {
+  return (CALL_OUTCOME_ROLES as readonly string[]).includes(role)
+}
+
+/**
  * Roles on the escalation ladder: they are told when a step is late, and acknowledge it.
  *
  * @remarks

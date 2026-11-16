@@ -26,8 +26,11 @@ export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)
 }
 
-/** Where a timeline entry came from: CareLoop itself, a hospital system or the patient channel. */
-export type TimelineSource = 'careLoop' | 'hospital' | 'patientChannel'
+/** Where a timeline entry came from: CareLoop itself, a hospital system, or a text message or email. */
+export type TimelineSource = 'careLoop' | 'hospital' | 'message'
+
+/** The role the API reports when no person acted: a system did. */
+export const SYSTEM_ROLE = 'system'
 
 /**
  * Source systems the dashboard names, by the key the API reports in `sourceSystem`.
@@ -35,21 +38,29 @@ export type TimelineSource = 'careLoop' | 'hospital' | 'patientChannel'
  * @remarks
  * CareLoop records its own events (deadlines, escalations, acknowledgements and approved summaries)
  * as `careloop`. Every other system that reaches CareLoop is a hospital system, through its FHIR
- * boundary, unless it is listed here as the patient channel.
+ * boundary.
  */
 export const SOURCE_SYSTEMS: Readonly<Record<string, TimelineSource>> = {
   careloop: 'careLoop',
-  'patient-channel': 'patientChannel',
 }
 
 /**
  * Works out where a timeline entry came from (C3).
  *
  * @param entry - The entry, with the source system the API joined from the stored event.
- * @returns `careLoop` for CareLoop's own events, `patientChannel` for the patient channel and
- * `hospital` for any other system.
+ * @returns `careLoop` for CareLoop's own events, `message` for what came back by text message or
+ * email, and `hospital` for any other system.
+ *
+ * @remarks
+ * Patients are reached by text message and email only. The API files what comes back (a delivery
+ * report or a reply) as `NotificationUpdated` under the case's own source system with no person as
+ * the actor, so that is how such an entry is recognised. The same kind of entry with a person as
+ * the actor is what a nurse navigator recorded in CareLoop after a call with the patient.
  */
-export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem'>): TimelineSource {
+export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem' | 'eventType' | 'actorRole'>): TimelineSource {
+  if (entry.eventType === 'NotificationUpdated') {
+    return entry.actorRole.trim().toLowerCase() === SYSTEM_ROLE ? 'message' : 'careLoop'
+  }
   return SOURCE_SYSTEMS[entry.sourceSystem.trim().toLowerCase()] ?? 'hospital'
 }
 
@@ -57,7 +68,7 @@ export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem'>): Time
  * Names where a timeline entry came from, in plain words.
  *
  * @param source - Where the entry came from.
- * @returns `CareLoop`, `Hospital system` or `Patient channel`.
+ * @returns `CareLoop`, `Hospital system` or `Text message or email`.
  */
 export function sourceLabel(source: TimelineSource): string {
   return t(`timeline.sources.${source}`)
