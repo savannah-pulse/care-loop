@@ -4,7 +4,7 @@ import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type Ti
 import { describePatient, openEscalations, programmeName, resultSourceText } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
-import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
+import { isClinicianRole, isMessagePreviewRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { navigate, routeHref } from '../../routing'
 import { EscalationLadder } from '../escalations'
@@ -12,6 +12,7 @@ import { CallOutcomeCard } from './CallOutcomeCard'
 import { callOutcomeOffer } from './callOutcome'
 import { NextActionCard } from './NextActionCard'
 import { OtherScreeningCard } from './OtherScreeningCard'
+import { PatientMessageCard } from './PatientMessageCard'
 import { StageStepper } from './StageStepper'
 import { TimelineCard } from './TimelineCard'
 import { TracksCard } from './TracksCard'
@@ -95,6 +96,9 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
         </NextActionCard>
         <div className="side">
           <TracksCard tracks={detail.tracks} />
+          {isMessagePreviewRole(me.role) && detail.stage !== 'Closed' ? (
+            <PatientMessageCard caseId={detail.caseId} reason={reason} />
+          ) : null}
           {callOffer === 'hidden' ? null : (
             <CallOutcomeCard
               detail={detail}
@@ -129,6 +133,8 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
  * (board 14): the API refuses the read without a reason, the screen asks for one, and the reason
  * then goes with every read of the case. Any other refusal says calmly that the case is not open to
  * the person. Clinicians reach the AI handoff summary from the next action when a referral is due.
+ * The nurse navigator and the clinician can preview how AI would word a message to the patient about
+ * the next step (`POST /cases/{caseId}/patient-message-draft`); the preview is never sent.
  */
 export function CasePage({ caseId }: CasePageProps) {
   const me = useSignedInStaff()

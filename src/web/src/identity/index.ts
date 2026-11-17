@@ -19,11 +19,13 @@ export {
 export {
   CLINICIAN_ROLES,
   ESCALATION_ROLES,
+  MESSAGE_PREVIEW_ROLES,
   NAMES_HIDDEN_ROLES,
   ROLE_KEYS,
   isCallOutcomeRole,
   isClinicianRole,
   isEscalationRole,
+  isMessagePreviewRole,
   namesHiddenFor,
   roleLabel,
 } from './roles'

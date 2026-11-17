@@ -3,7 +3,8 @@
  * display stages, the single next action with its owner, due time and escalation ladder, the four
  * tracks, the timeline with each entry's source and, for clinicians, the patient's other screening
  * and the way into the AI handoff summary. A nurse navigator records what the patient said on a
- * call. A case at another facility asks why first.
+ * call, and the nurse navigator and the clinician can preview, never send, a message to the patient
+ * worded by AI. A case at another facility asks why first.
  */
 
 export { CallOutcomeCard } from './CallOutcomeCard'
@@ -25,6 +26,8 @@ export { NextActionCard } from './NextActionCard'
 export type { NextActionCardProps } from './NextActionCard'
 export { OtherScreeningCard } from './OtherScreeningCard'
 export type { OtherScreeningCardProps } from './OtherScreeningCard'
+export { PatientMessageCard } from './PatientMessageCard'
+export type { PatientMessageCardProps } from './PatientMessageCard'
 export { StageStepper } from './StageStepper'
 export type { StageStepperProps } from './StageStepper'
 export { TIMELINE_PAGE, TimelineCard } from './TimelineCard'

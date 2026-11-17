@@ -62,6 +62,27 @@ export function isCallOutcomeRole(role: string): boolean {
 }
 
 /**
+ * Roles that may preview how AI would word a message to a case's patient.
+ *
+ * @remarks
+ * The nurse navigator and the clinician are the people who talk to the patient about the next
+ * step. The preview is never sent: patient messages go out from approved templates. The API
+ * allows these roles only and answers 403 to anyone else; the case screen offers the preview to
+ * the same roles.
+ */
+export const MESSAGE_PREVIEW_ROLES: readonly RoleKey[] = ['nurse-navigator', 'clinician']
+
+/**
+ * Tells whether a role may preview a message to a case's patient.
+ *
+ * @param role - A role key.
+ * @returns `true` for the roles in {@link MESSAGE_PREVIEW_ROLES}.
+ */
+export function isMessagePreviewRole(role: string): boolean {
+  return (MESSAGE_PREVIEW_ROLES as readonly string[]).includes(role)
+}
+
+/**
  * Roles on the escalation ladder: they are told when a step is late, and acknowledge it.
  *
  * @remarks

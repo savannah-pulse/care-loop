@@ -345,7 +345,26 @@
     "openEscalation": "Open the escalation",
     "forbiddenTitle": "This case is not open to you",
     "forbiddenBody": "Your role or team can't open this case. If you need it, ask the person responsible for it.",
-    "forbiddenCoordinator": "A case opens for the programme coordinator only while it is escalated to them."
+    "forbiddenCoordinator": "A case opens for the programme coordinator only while it is escalated to them.",
+    "message": {
+      "title": "Message to the patient",
+      "intro": "Messages to patients go out from approved templates. You can preview how AI would word one about the next step.",
+      "preview": "Preview a message to the patient",
+      "dialogTitle": "Preview a message to the patient",
+      "channelLegend": "Write it as",
+      "channels": {
+        "Sms": "Text message",
+        "Email": "Email"
+      },
+      "loading": "Writing a preview",
+      "caption": "Draft written by AI. Not sent: messages go out from approved templates.",
+      "notReady": "Not ready yet. Previews will show here once AI is switched on.",
+      "failed": "AI could not write a preview this time. Nothing has been sent.",
+      "forbidden": "Previews are not open to your role.",
+      "error": "We couldn't get a preview. Try again.",
+      "again": "Write it again",
+      "close": "Close"
+    }
   },
   "closureReasons": {
     "Treated": "Treated",
