@@ -2,8 +2,8 @@
 
 One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
-- Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the SMS and email simulator, and 13 across all of them.
-- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email, and a nurse navigator records what a patient says on a call on screen 2.
+- Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the messaging simulator, and 13 across all of them.
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email, and a nurse navigator records what a patient says on a call on screen 2. A reply of 1 means "I got this message" (decision 31).
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
@@ -19,7 +19,7 @@ The design follows the seven decisions in the [UI design gap analysis](../ui-des
 | # | Decision | What changed in the design |
 |---|---|---|
 | 1 | Five stages in code; the ten on screen are display labels | The flow table maps each label to its stage and track status. The flow has a row "In code". |
-| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Screens 9, 10, 12 and 14 say "she will come": a reply of 1, which sends `NotificationUpdated/Acknowledged` only. Since decision 31, reply 1 means "I got this message"; the screens are to be reworded (P22). |
+| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Since decision 31, a reply of 1 means "I got this message" and sends `NotificationUpdated/Acknowledged` only; screens 9, 10, 12 and 14 say so (P22). Whether she will come is asked on a call, and the nurse records it on screen 2. |
 | 3 | Build the confidence rating | A nurse navigator records it after a call, on screen 2 (decision 30), as `NotificationUpdated/ConfidenceRated` from 1 to 5. Screen 3 reports it. |
 | 4 | The AI handoff summary is approved in the CareLoop web app | New screen 18. Screen 6 shows the approved summary, read-only. |
 | 5 | Add the roles `nurse-navigator`, `receiving-clinician` and `lab` | Who sees what gives each person their role in CareLoop. |
@@ -36,7 +36,7 @@ The team agreed on 13 November to keep the focus on the loop that CareLoop close
 | Hackathon | Screens |
 |---|---|
 | Shown: CareLoop web app | 1 Worklist, 2 Case, 3 Impact, 4 Programmes, 17 Escalation, 18 Handoff summary |
-| Shown: the patient's text messages and email, in the SMS and email simulator | 9 Basic phone, 10 Patient email, 12 Caregiver and email |
+| Shown: the patient's text messages and email, in the messaging simulator | 9 Basic phone, 10 Patient email, 12 Caregiver and email |
 | Simulated: a test scenario sends their events | 5 Consultation, 6 Refer, 7 Accept or decline, 8 Close, 15 First visit, 16 Screening result, 19 Assessment, 20 Lab result, 21 Diagnosis and plan |
 | Later | 11 Arabic (deferred), 22 Treatment and 23 All clear (target design) |
 | Reference for everyone | Flow, 13 Empty and error states, 14 Who sees what |
@@ -129,7 +129,7 @@ Where each screen is built:
 
 - CareLoop web app: `src/web`
 - HIS simulator: `src/simulators/his/HisSimulator/ClientApp`
-- SMS and email simulator: `src/simulators/patient-channel/PatientChannelSimulator/ClientApp`
+- Messaging simulator: `src/simulators/patient-channel/PatientChannelSimulator/ClientApp`
 
 | # | Screen | Used by | Built in | Stories | Requirements | Hackathon |
 |---|---|---|---|---|---|---|
@@ -141,10 +141,10 @@ Where each screen is built:
 | 6 | [Refer to a unit](#6-refer-to-a-unit) | Referring clinicians | HIS simulator | US06, US07 | FR-05, FR-11 | Simulated |
 | 7 | [Accept or decline a referral](#7-accept-or-decline-a-referral) | Receiving clinicians, labs and appointment teams | HIS simulator | US08, US09, US10 | FR-05, FR-06 | Simulated |
 | 8 | [Close the case](#8-close-the-case) | Authorised clinicians | HIS simulator | US11, US12, US14, US15 | FR-08 | Simulated |
-| 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | SMS and email simulator | US02, US03 | FR-04 | Shown |
-| 10 | [Patient email](#10-patient-email) | Patients reached by email | SMS and email simulator | US02, US03, US05 | FR-04 | Shown |
-| 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | SMS and email simulator | US02, US03 | FR-04 | Deferred |
-| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named | SMS and email simulator | US04, US10 | FR-04, FR-10 | Shown |
+| 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | Messaging simulator | US02, US03 | FR-04 | Shown |
+| 10 | [Patient email](#10-patient-email) | Patients reached by email | Messaging simulator | US02, US03, US05 | FR-04 | Shown |
+| 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | Messaging simulator | US02, US03 | FR-04 | Deferred |
+| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named | Messaging simulator | US04, US10 | FR-04, FR-10 | Shown |
 | 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-11 | Reference |
 
 Hessa's journey:
@@ -260,6 +260,7 @@ Hessa's journey:
 ![Basic phone, no internet](09-basic-phone.png)
 
 - Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`.
+- The text on screen is the appointment message, sent when the appointment is booked (decision 33). It asks her to reply 1 when she gets it, not whether she will come (decision 31).
 - Huda's call ends with two questions: can Hessa say the next step back, and how sure does she feel, from 1 to 5. After the call, Huda records on screen 2 that she said it back (`/Understood`) and how sure she feels (`/ConfidenceRated`), and that she will come (`/Acknowledged`) when she says so on a call.
 - Replying 1 sends `/Acknowledged` (she got the message, decision 31), and 2 sends `/CallRequested`. Any other reply also sends `/CallRequested`: someone should call her (decision 29). Replies need two-way texts: C7 and C22 in the simulator, and an agreement with the text provider in production.
 - A person gives results. Texts carry only dates and places, with no links, and come from a number the patient can reply to.
@@ -271,10 +272,10 @@ Hessa's journey:
 ![Patient email](10-patient-email.png)
 
 - There is no patient app or portal (decision 21). A patient with an email address on record gets the same message as screen 9 by email: a subject, the dates and places, and how to reply. No links, and no result: a person gives it.
-- Shown with Amna Al Ameri in a plain mail window. The email from the Family Health Centre has the subject "Your appointment on Friday 13 November", the date, time and place, "Reply 1 if you will come, 2 if you would like a call", and her named nurse with a number to call. There are no buttons, links, questions or ratings.
-- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (decision 2), and 2 or any other reply sends `/CallRequested` (decision 29). The screen shows both: her reply of 1, and a reply such as "Can I come later in the day?", which gives her nurse a call-back task.
-- Saying the next step back (`/Understood`) and the confidence rating (`/ConfidenceRated`, 1 to 5) are not asked by email. The nurse records them on screen 2 after a call (decision 30). Acknowledgement and understanding are still recorded separately.
-- In the prototype, the email is shown in the SMS and email simulator, not sent, and it is in English (screen 11).
+- Shown with Amna Al Ameri in a plain mail window. The email from the Family Health Centre has the subject "Your appointment on Friday 13 November", the date, time and place, "Reply 1 when you get this message, 2 if you would like a call", and her named nurse with a number to call. There are no buttons, links, questions or ratings.
+- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (she got the message, decision 31), and 2 or any other reply sends `/CallRequested` (decision 29). The screen shows both: her reply of 1, and a reply such as "Can I come later in the day?", which gives her nurse a call-back task.
+- Whether she will come, saying the next step back (`/Understood`) and the confidence rating (`/ConfidenceRated`, 1 to 5) are not asked by email. The nurse records them on screen 2 after a call (decision 30). Acknowledgement and understanding are still recorded separately.
+- In the prototype, the email is shown in the messaging simulator, not sent, and it is in English (screen 11).
 
 ### 11. Arabic, right to left
 
@@ -283,7 +284,7 @@ Hessa's journey:
 - Deferred: this is the target design. The prototype runs in English, and every template and screen is keyed by language from the start, as `AGENTS.md` requires, so Arabic needs no new code.
 - Arabic is added once a qualified bilingual reviewer approves the wording ([AI specification](../ai-design/ai-spec.md), section 2.3). The wording shown is a draft.
 - The same messages and events as 9 and 10: the screen shows the email from screen 10 and the text from screen 9 in Arabic. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
-- An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 128 characters: two messages.
+- An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 130 characters: two messages.
 
 ### 12. Caregiver and email
 
@@ -294,7 +295,7 @@ Hessa's journey:
 - The email to Saeed carries the day, time and place, a number for help with transport, and why he gets it. Nothing in it is about her health.
 - Giving consent: the patient signs a form with her doctor, who records it in the hospital system (screen 15). CareLoop receives `ConsentRecorded/Granted` when her case opens; in the hackathon, the test scenario sends it.
 - Withdrawing consent: the patient tells anyone in her care team, who records it in the hospital system. That sends `ConsentRecorded/Withdrawn`, and the emails stop at once.
-- In the prototype, the email is shown in the SMS and email simulator, not sent. CareLoop records each email as a notification attempt.
+- In the prototype, the email is shown in the messaging simulator, not sent. CareLoop records each email as a notification attempt.
 
 ### 13. Empty and error states
 
@@ -451,7 +452,7 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Every person, number, facility and result is synthetic. No real patient data, systems or credentials are used.
 - The hospital system and the text message and email services are simulated. No live link to Malaffi, a hospital system, SMS or email is claimed.
 - Steps in the hospital system are simulated by a test scenario, as agreed on 13 November. Only CareLoop's screens and the patient's phone are shown.
-- Text messages and emails, to patients, family members and staff, are shown in the SMS and email simulator, not sent. Automated calls are future work.
+- Text messages and emails, to patients, family members and staff, are shown in the messaging simulator, not sent. Automated calls are future work.
 - The prototype runs in English. Arabic is added once a qualified bilingual reviewer approves the wording.
 - Screens 22 and 23 show care after the screening case closes. They are the target design, not part of the hackathon build.
 - Breast screening deadlines come from the DoH 2025 standard. All other deadlines are placeholders until a clinical adviser approves them.
