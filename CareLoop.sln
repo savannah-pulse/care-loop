@@ -21,13 +21,13 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "simulators", "simulators", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HisSimulator", "src\simulators\his\HisSimulator\HisSimulator.csproj", "{8BD39A62-808C-4366-B89F-10BFF0598291}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PatientChannelSimulator", "src\simulators\patient-channel\PatientChannelSimulator\PatientChannelSimulator.csproj", "{D0E2B81E-4521-40AB-9C4E-3106C5F9833F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessagingSimulator", "src\simulators\messaging\MessagingSimulator\MessagingSimulator.csproj", "{D0E2B81E-4521-40AB-9C4E-3106C5F9833F}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "simulators", "simulators", "{38E94F11-2859-B805-A689-6935D62BE924}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HisSimulator.Tests", "tests\simulators\his\HisSimulator.Tests\HisSimulator.Tests.csproj", "{FA7A4DAE-4777-4F91-899A-75264F8298D7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PatientChannelSimulator.Tests", "tests\simulators\patient-channel\PatientChannelSimulator.Tests\PatientChannelSimulator.Tests.csproj", "{40CB2895-4268-4077-BC9A-57C0AB07A5C7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MessagingSimulator.Tests", "tests\simulators\messaging\MessagingSimulator.Tests\MessagingSimulator.Tests.csproj", "{40CB2895-4268-4077-BC9A-57C0AB07A5C7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

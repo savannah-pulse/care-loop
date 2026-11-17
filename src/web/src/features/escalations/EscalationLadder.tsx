@@ -68,9 +68,11 @@ function rungDetail(rung: LadderRung, now: Date, me: StaffMember): string {
  *
  * @remarks
  * Reads `GET /programmes/{pathwayId}` for the ladder and the reminder time; while it loads or if it
- * fails, the ladder shows the escalations the case has. Done rungs say when they happened and who
- * acknowledged them, the current rung asks the role it went to for an acknowledgement, and later
- * rungs say when they will happen if the step is still late. Escalations go to a role at a
+ * fails, the ladder shows the escalations the case has, and if it fails a calm note says the
+ * programme's steps are not available, so a missing later level never looks like the end of the
+ * ladder. Nothing else on the screen depends on the programme. Done rungs say when they happened
+ * and who acknowledged them, the current rung asks the role it went to for an acknowledgement, and
+ * later rungs say when they will happen if the step is still late. Escalations go to a role at a
  * facility, never to a named person.
  */
 export function EscalationLadder({ detail, timeline, now }: EscalationLadderProps) {
@@ -83,23 +85,26 @@ export function EscalationLadder({ detail, timeline, now }: EscalationLadderProp
     now,
   })
   return (
-    <ol className="ladder" aria-label={t('escalation.ladderLabel')}>
-      {rungs.map((rung, index) => (
-        <li
-          key={rung.key}
-          className={`rung ${rung.state}`}
-          aria-current={rung.state === 'current' ? 'step' : undefined}
-        >
-          <span className="rung-n" aria-hidden="true">
-            {index + 1}
-          </span>
-          <span className="rung-text">
-            <b>{rungTitle(rung, detail, me)}</b>
-            <span>{rungDetail(rung, now, me)}</span>
-            <span className="visually-hidden">{t(`escalation.rungStates.${rung.state}`)}</span>
-          </span>
-        </li>
-      ))}
-    </ol>
+    <>
+      <ol className="ladder" aria-label={t('escalation.ladderLabel')}>
+        {rungs.map((rung, index) => (
+          <li
+            key={rung.key}
+            className={`rung ${rung.state}`}
+            aria-current={rung.state === 'current' ? 'step' : undefined}
+          >
+            <span className="rung-n" aria-hidden="true">
+              {index + 1}
+            </span>
+            <span className="rung-text">
+              <b>{rungTitle(rung, detail, me)}</b>
+              <span>{rungDetail(rung, now, me)}</span>
+              <span className="visually-hidden">{t(`escalation.rungStates.${rung.state}`)}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {programme.state.status === 'failed' ? <p className="note linkrow">{t('escalation.ladderPartial')}</p> : null}
+    </>
   )
 }

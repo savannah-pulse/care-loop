@@ -1,7 +1,7 @@
 namespace CareLoop.Api.Infrastructure.Notifications;
 
 /// <summary>
-/// One message as CareLoop posts it to the SMS and email simulator: <c>POST {BaseUrl}/messages</c>, JSON, camel case.
+/// One message as CareLoop posts it to the messaging simulator: <c>POST {BaseUrl}/messages</c>, JSON, camel case.
 /// </summary>
 /// <remarks>
 /// This is the whole of what the simulator learns: an address and a text. It carries no FHIR and no clinical
@@ -57,7 +57,7 @@ public sealed record SimulatorMetadata
 }
 
 /// <summary>
-/// What the SMS and email simulator posts back to <c>POST /notifications/inbound/{channel}</c>: a delivery report or a reply.
+/// What the messaging simulator posts back to <c>POST /notifications/inbound/{channel}</c>: a delivery report or a reply.
 /// </summary>
 /// <remarks>
 /// <c>type</c> is <c>delivery</c> or <c>reply</c>. A delivery report carries <see cref="MessageId"/>,

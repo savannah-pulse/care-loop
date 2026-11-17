@@ -19,7 +19,7 @@ namespace HisSimulator.Scenarios;
 /// plus its <c>at</c> offset compressed by the pacing (real seconds per scenario hour). The runner
 /// really waits, because CareLoop measures deadlines on a real clock: sending a two-day journey
 /// in one burst would never let a deadline pass. The runner never plays the patient: how a patient reacts to a
-/// notification is declared on the scenario patient and applied by the patient-channel simulator.
+/// notification is declared on the scenario patient and applied by the messaging simulator.
 /// </para>
 /// <para>
 /// A 4xx answer from CareLoop is recorded as <see cref="ScenarioStepStatus.Rejected"/> and the run

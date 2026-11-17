@@ -31,7 +31,7 @@
   },
   "staffInbox": {
     "title": "Staff inbox",
-    "description": "What CareLoop has told the hospital system about cases: escalations, handoffs, call requests and handoff summaries. Direct staff notices go by text message or email and are shown in the SMS and email simulator. Receiving an item is not an acknowledgement.",
+    "description": "What CareLoop has told the hospital system about cases: escalations, handoffs, call requests and handoff summaries. Direct staff notices go by text message or email and are shown in the messaging simulator. Receiving an item is not an acknowledgement.",
     "recipient": "Recipient identifier or queue (blank shows all)"
   },
   "fhirLog": {

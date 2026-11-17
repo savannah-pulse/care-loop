@@ -4,14 +4,15 @@ import type { Read, TimelineEntry } from '../../data'
 import {
   describeActor,
   groupByDay,
-  hasOwnReason,
   newestFirst,
+  refusalReason,
   sourceLabel,
   timelineEntryTitle,
   timelineKind,
   timelineSource,
 } from '../../domain'
 import { formatDayHeading, formatTime, parseInstant } from '../../format'
+import { useSignedInStaff } from '../../identity'
 import { t, tp } from '../../i18n'
 
 /** How many timeline entries show before "Show earlier events". */
@@ -29,13 +30,11 @@ interface ItemProps {
 }
 
 function TimelineItem({ entry, focusTarget = false }: ItemProps) {
+  const me = useSignedInStaff()
   const ref = useRef<HTMLLIElement>(null)
   const at = parseInstant(entry.sourceTimestamp)
   const actor = describeActor(entry.actorReference, entry.actorRole)
-  const refusedReason =
-    entry.disposition === 'Rejected' && entry.eventType !== 'EscalationAcknowledged' && hasOwnReason(entry)
-      ? entry.reason
-      : undefined
+  const refusedReason = refusalReason(entry, me.role)
   useEffect(() => {
     if (focusTarget) {
       ref.current?.focus()
@@ -54,7 +53,7 @@ function TimelineItem({ entry, focusTarget = false }: ItemProps) {
             {sourceLabel(timelineSource(entry))}
           </span>
         </span>
-        <p>{timelineEntryTitle(entry)}</p>
+        <p>{timelineEntryTitle(entry, me.role)}</p>
         {refusedReason ? <p className="tl-by">{refusedReason}</p> : null}
         {actor ? (
           <p className="tl-by" title={entry.actorReference}>
@@ -110,10 +109,12 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
  *
  * @remarks
  * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Each entry names its source system
- * in plain words (CareLoop, Hospital system, or Text message or email, C3) and who acted, when a person
+ * in plain words (CareLoop, Hospital system, Text message or Email, C3) and who acted, when a person
  * did. Its main line is its reason when the reason says more than the kind of event, and otherwise
  * the kind in words; nothing is made up. Events CareLoop refused, such as a closure without
  * evidence or an acknowledgement by the wrong role, are marked "Refused" and never read as done.
+ * The programme coordinator never sees the wording of entries from a hospital system, a text message
+ * or an email, which can quote the hospital's own numbers; they see the kind of event instead.
  * The first {@link TIMELINE_PAGE} entries show, with a button for the earlier ones; once they show,
  * focus moves to the first of them.
  */

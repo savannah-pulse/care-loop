@@ -38,10 +38,10 @@ services:
       DeadlineWorker__Interval: "00:00:01"
       ExternalSystems__Systems__his-simulator__BaseUrl: http://his-simulator:8080
       # Patients, caregivers and staff are reached by text message and email only. Both channels go to the
-      # SMS and email simulator (the patient-channel-simulator service), which calls back signed with the secret.
-      Notifications__Sms__BaseUrl: http://patient-channel-simulator:8080
+      # Messaging simulator (the messaging-simulator service), which calls back signed with the secret.
+      Notifications__Sms__BaseUrl: http://messaging-simulator:8080
       Notifications__Sms__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
-      Notifications__Email__BaseUrl: http://patient-channel-simulator:8080
+      Notifications__Email__BaseUrl: http://messaging-simulator:8080
       Notifications__Email__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
       # Messages give local dates and times, and name the facility in staff notices.
       Notifications__TimeZone: Asia/Dubai
@@ -126,11 +126,11 @@ services:
       timeout: 3s
       retries: 10
 
-  # The SMS and email simulator. The service keeps its patient-channel name.
-  patient-channel-simulator:
+  # The messaging simulator: text messages and emails to patients, caregivers and staff.
+  messaging-simulator:
     build:
       context: .
-      dockerfile: src/simulators/patient-channel/Dockerfile
+      dockerfile: src/simulators/messaging/Dockerfile
     environment:
       ASPNETCORE_URLS: http://+:8080
       # Delivery reports and replies go to {CallbackBaseUrl}/sms or /email.

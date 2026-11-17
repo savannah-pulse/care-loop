@@ -10,7 +10,7 @@ namespace HisSimulator.Scenarios;
 /// Reads scenario files from the directory configured in <see cref="ScenarioOptions.Directory"/>.
 /// </summary>
 /// <remarks>
-/// The scenario files are shared with the patient-channel simulator and CareLoop's journey tests,
+/// The scenario files are shared with the messaging simulator and CareLoop's journey tests,
 /// so this class only reads them. Files are deserialized with <see cref="ScenarioJson.Options"/>;
 /// <c>scenario.schema.json</c> itself is not a scenario and must be ignored.
 /// </remarks>
