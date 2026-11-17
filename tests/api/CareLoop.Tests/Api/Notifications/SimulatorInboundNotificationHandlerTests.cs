@@ -12,7 +12,7 @@ using CareLoop.Tests.Fakes;
 namespace CareLoop.Tests.Api.Notifications;
 
 /// <summary>
-/// What the SMS and email simulator reports back (delivery reports and replies) is translated into notification update events.
+/// What the messaging simulator reports back (delivery reports and replies) is translated into notification update events.
 /// </summary>
 public sealed class SimulatorInboundNotificationHandlerTests : IDisposable
 {

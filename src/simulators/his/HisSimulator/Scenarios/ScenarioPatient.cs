@@ -19,7 +19,7 @@ public sealed record ScenarioPatient
 
     /// <summary>
     /// How the patient reacts to notifications (<c>$defs/patientBehaviour</c>). Declared for the
-    /// patient-channel simulator; the HIS simulator reads it only so the shared file parses and
+    /// messaging simulator; the HIS simulator reads it only so the shared file parses and
     /// never acts on it.
     /// </summary>
     public System.Text.Json.JsonElement? Behaviour { get; init; }

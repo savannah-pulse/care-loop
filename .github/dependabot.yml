@@ -41,7 +41,7 @@ updates:
   - package-ecosystem: npm
     directories:
       - /src/simulators/his/HisSimulator/ClientApp
-      - /src/simulators/patient-channel/PatientChannelSimulator/ClientApp
+      - /src/simulators/messaging/MessagingSimulator/ClientApp
     schedule:
       interval: weekly
       day: monday

@@ -8,7 +8,7 @@ using static CareLoop.Tests.Api.Fhir.FhirTestSupport;
 namespace CareLoop.Tests.Api.Notifications;
 
 /// <summary>
-/// The text-message and email providers post plain JSON to the SMS and email simulator: no FHIR travels on the notification path.
+/// The text-message and email providers post plain JSON to the messaging simulator: no FHIR travels on the notification path.
 /// </summary>
 public sealed class SimulatorNotificationProviderTests
 {

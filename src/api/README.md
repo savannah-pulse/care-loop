@@ -62,7 +62,7 @@ Migrations are applied at startup only when `Database:MigrateOnStartup` is `true
 
 The base `appsettings.json` configures no external system and no simulator address. `appsettings.Development.json`,
 used by `dotnet run`, adds the HIS simulator as the one external system, points the `Sms` and `Email` providers at the
-SMS and email simulator and gives each staff role a synthetic address; Docker Compose sets the same through environment variables. Production supplies its own entries.
+Messaging simulator and gives each staff role a synthetic address; Docker Compose sets the same through environment variables. Production supplies its own entries.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -70,7 +70,7 @@ SMS and email simulator and gives each staff role a synthetic address; Docker Co
 | `Database:MigrateOnStartup` | `false` | Apply migrations when the API starts. |
 | `Pathways:Directory` | `Infrastructure/Pathways` | Folder the pathway definitions are loaded from. Development and Docker Compose use `Infrastructure/Pathways/demo`, which has the same rules with deadlines shortened for live demos. |
 | `ExternalSystems:Systems:{systemId}:BaseUrl` | none | Address of one system of record (HIS, EMR, lab system). Any number may be configured. The key must equal the source system identifier that system sends; messages about a case go back to the system the case came from. |
-| `Notifications:Sms:BaseUrl`, `Notifications:Email:BaseUrl` | none | Where each provider posts its messages, as JSON to `{BaseUrl}/messages`. In the prototype both are the SMS and email simulator. CareLoop reaches patients, caregivers and staff by text message and email only. |
+| `Notifications:Sms:BaseUrl`, `Notifications:Email:BaseUrl` | none | Where each provider posts its messages, as JSON to `{BaseUrl}/messages`. In the prototype both are the messaging simulator. CareLoop reaches patients, caregivers and staff by text message and email only. |
 | `Notifications:Sms:InboundSecret`, `Notifications:Email:InboundSecret` | none | Secret each channel's callbacks are signed with. Every message to `POST /notifications/inbound/sms` or `/email` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
 | `Notifications:StaffContacts:{role}:Channel`, `…:Address` | none | How each staff role is notified: `Sms` or `Email`, and its address. An optional `default` entry covers roles with none. A role with neither cannot be reached, and its notices are retried. |
 | `Notifications:TimeZone` | `Asia/Dubai` (UTC when empty) | The IANA time zone messages give dates and times in: appointment times for patients and caregivers, and when the previous escalation level was acknowledged. An unknown zone stops start-up. |

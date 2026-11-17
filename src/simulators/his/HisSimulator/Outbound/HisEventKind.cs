@@ -5,7 +5,7 @@ namespace HisSimulator.Outbound;
 /// </summary>
 /// <remarks>
 /// Patient notification updates are absent on purpose: those reach CareLoop through its notification
-/// provider, from the patient-channel simulator.
+/// provider, from the messaging simulator.
 /// </remarks>
 public enum HisEventKind
 {

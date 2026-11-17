@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Api.Infrastructure.Notifications;
 
 /// <summary>
-/// Sends a message to the SMS and email simulator, the way an SMS or email service is called.
+/// Sends a message to the messaging simulator, the way an SMS or email service is called.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -5,7 +5,7 @@ namespace HisSimulator.Scenarios;
 /// </summary>
 /// <remarks>
 /// Only the HIS simulator performs steps. A patient's reactions are not steps: they are declared
-/// as a behaviour on the scenario patient and applied by the patient-channel simulator when a
+/// as a behaviour on the scenario patient and applied by the messaging simulator when a
 /// notification arrives. The field is kept so another system of record can be added later.
 /// </remarks>
 public enum ScenarioActor

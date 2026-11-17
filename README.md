@@ -49,11 +49,11 @@ src/
   simulators/
     scenarios/              Scripted synthetic journeys shared by both simulators (scenario.schema.json)
     his/                    Stand-in for a hospital information system: HisSimulator (.NET) with a React ClientApp
-    patient-channel/        SMS and email simulator: PatientChannelSimulator (.NET) with a React ClientApp
+    messaging/              Messaging simulator (text messages and email): MessagingSimulator (.NET) with a React ClientApp
   worker/                   Deadline and escalation notes; the worker runs inside CareLoop.Api/Worker
 tests/
   api/CareLoop.Tests/       xUnit tests, fakes and synthetic FHIR samples for the API and Domain
-  simulators/               HisSimulator.Tests and PatientChannelSimulator.Tests
+  simulators/               HisSimulator.Tests and MessagingSimulator.Tests
   contracts/                Contract and schema compatibility workstream
   integration/              Synthetic journey test workstream
 .github/workflows/          Pull-request CI and tagged release packaging
@@ -65,7 +65,7 @@ tests/
 | Dashboard | [`src/web/README.md`](src/web/README.md) |
 | AI workflow | [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 | HIS simulator | [`src/simulators/his/README.md`](src/simulators/his/README.md) |
-| SMS and email simulator | [`src/simulators/patient-channel/README.md`](src/simulators/patient-channel/README.md) |
+| Messaging simulator | [`src/simulators/messaging/README.md`](src/simulators/messaging/README.md) |
 
 ```text
 HIS simulator ──FHIR R4──▶ ┌──────────────┐ ◀──REST── dashboard (src/web/)
@@ -99,7 +99,7 @@ docker compose up --build
 | Dashboard | http://localhost:4173 | |
 | AI workflow | http://localhost:8081 | `/health` |
 | HIS simulator | http://localhost:5081 | `/health` |
-| SMS and email simulator | http://localhost:5082 | `/health` |
+| Messaging simulator | http://localhost:5082 | `/health` |
 | PostgreSQL | localhost:5432 | |
 
 Ports are set in `.env`. The compose stack points the API at the demo pathway folder, whose deadlines are shortened for
@@ -115,12 +115,12 @@ ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for
 | API, Domain and both simulators | `dotnet build CareLoop.sln && dotnet test CareLoop.sln` |
 | API only | `dotnet run --project src/api/CareLoop.Api` (http://localhost:5080) |
 | HIS simulator | `dotnet run --project src/simulators/his/HisSimulator` (http://localhost:5081) |
-| SMS and email simulator | `dotnet run --project src/simulators/patient-channel/PatientChannelSimulator` (http://localhost:5082) |
+| Messaging simulator | `dotnet run --project src/simulators/messaging/MessagingSimulator` (http://localhost:5082) |
 | Simulator ClientApps | in each `ClientApp/`: `corepack yarn install && corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build` |
 | Dashboard | `cd src/web && npm ci && npm run dev` |
 | AI workflow | see [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 
-The HIS simulator supports headless HIS replay, source clinician actions, a staff inbox for what CareLoop sends it as FHIR, and exact FHIR logs. Staff notices go by email and show in the SMS and email simulator.
+The HIS simulator supports headless HIS replay, source clinician actions, a staff inbox for what CareLoop sends it as FHIR, and exact FHIR logs. Staff notices go by email and show in the messaging simulator.
 See its [demo and test guide](src/simulators/his/README.md). Replay completion does not assert completed care:
 patient behaviour, cohort expansion and full screening-to-care E2E assertions remain WS8/WS10.
 

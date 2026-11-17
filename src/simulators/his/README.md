@@ -117,7 +117,7 @@ for `limit=200`.
 
 Inbox resource replay replaces one deterministic inbox item; every exchange remains in the wire log.
 Direct staff notifications ("a case needs your action") do **not** arrive here: CareLoop sends them
-by text message or email, and the SMS and email simulator shows them. The staff inbox holds what
+by text message or email, and the messaging simulator shows them. The staff inbox holds what
 CareLoop tells the hospital system as FHIR: escalations, handoffs, call requests and handoff
 summaries. A `CommunicationRequest` is refused (422), and any other Task is filed as "Other case
 update". There is **no** `POST /staff-inbox/notifications`.
