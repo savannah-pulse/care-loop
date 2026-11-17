@@ -5,6 +5,8 @@ It is not a clinical system. It is built as for production and is currently conn
 
 Domain, persistence/intake, FHIR, outbox/notifications, deadlines and the WS6 read APIs are implemented.
 Remaining workstream stubs return **501**, including WS9 summary actions and WS10 simulation.
+The three AI agent endpoints also answer **501** until `Ai:Agents:Enabled` is `true` (see
+[AI agents on the dashboard](#ai-agents-on-the-dashboard)).
 See `docs/workstreams.md` for ownership and status.
 
 ## Projects
@@ -84,6 +86,12 @@ SMS and email simulator and gives each staff role a synthetic address; Docker Co
 | `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
 | `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. Development settings and Docker Compose use `00:00:01` because the demo pathway's deadlines last seconds. |
 | `Ai:Provider` | `NoOp` | `NoOp` (AI off) or `AzureOpenAi`. Azure settings come from environment variables only. |
+| `Ai:Agents:Enabled` | `false` | Switch on the three Foundry agents the dashboard asks for words. While `false` their endpoints answer 501 and nothing is sent. When `true`, the settings below are checked at start-up and a bad value stops the host. |
+| `Ai:Agents:ProjectEndpoint` | none | The Foundry project, `https://{resource}.services.ai.azure.com/api/projects/{project}`. `https` only. Set it from the environment (`Ai__Agents__ProjectEndpoint`), never in a committed file. |
+| `Ai:Agents:RoleBriefing`, `…:ImpactSummary`, `…:PatientNotification` | `role-briefing`, `impact-summary`, `patient-notification` | The agents' names in the project. |
+| `Ai:Agents:TimeoutSeconds` | `30` | How long one agent may take, token included, before the endpoint answers 503. From 1 to 300. |
+| `Ai:Agents:AccessToken` | none | A ready Entra token for `https://ai.azure.com/.default`, used instead of the API's identity. Honoured only in the `Development` environment (ignored, with a warning, anywhere else). For a local test only: set it in the shell for one session and never commit it. |
+| `Ai:Agents:UrgentCodes` | `[ "PLACEHOLDER-URGENCY-B" ]` | Which clinician-reviewed urgency codes the role briefing counts and orders as urgent. Must match the dashboard's table of urgency codes; a placeholder like the pathway's codes. |
 
 Clinical deadlines are **not** configuration keys here. They live in
 `src/api/CareLoop.Api/Infrastructure/Pathways/breast-screening.json`, where every value is a placeholder.
@@ -138,6 +146,9 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | POST | `/cases/{caseId}/handoff-summary` | WS9 |
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/approval` | WS9 |
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/rejection` | WS9 |
+| POST | `/ai/role-briefing` | AI agents (`Ai:Agents`) |
+| POST | `/ai/impact-summary` | AI agents (`Ai:Agents`) |
+| POST | `/cases/{caseId}/patient-message-draft` | AI agents (`Ai:Agents`) |
 
 External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard. Delivery reports and
 replies to text messages and emails arrive at `POST /notifications/inbound/sms` and `/notifications/inbound/email`,
@@ -197,10 +208,56 @@ Measures use applied audit snapshots only, including source-received progress ra
   separately averages each case's latest 1-5 rating.
 
 Empty populations have null rates/medians, not zero success. The API does not add simulation labels, a working-hours
-calendar, AI narrative or the WS10 escalation-off comparison.
+calendar or the WS10 escalation-off comparison, and `GET /metrics` carries no AI narrative: `POST /ai/impact-summary`
+writes one separately, from the same measures.
 
 Focused validation (98 passed, none skipped):
 
 ```sh
 dotnet test tests/api/CareLoop.Tests/CareLoop.Tests.csproj --no-restore --filter "FullyQualifiedName~ReadEndpointsTests|FullyQualifiedName~CaseDisplayLabelTests|FullyQualifiedName~EscalationAcknowledgementTests|FullyQualifiedName~DeadlineWorkerTests|FullyQualifiedName~DeadlinePolicyTests" --verbosity minimal
+```
+
+### AI agents on the dashboard
+
+Three Microsoft Foundry agents write a few words for staff. CareLoop works out every number, deadline and order; the
+agents only put them into words, and what they write is a draft: it is not stored, sets no urgency, changes no case and
+sends no message. `docs/ai-design/integration.md` has the full boundary.
+
+| Route | Agent (`Ai:Agents:…`) | Who | Built from |
+|---|---|---|---|
+| `POST /ai/role-briefing` (optional `facilityId`, `reason`) | `RoleBriefing` | every staff role | The reader's role and facility, counts of the open cases in the worklist scope (open, overdue, escalated, urgent, due today, needs an owner) and up to five of them, most pressing first, each by case number, programme, step, next action, due status and flags |
+| `POST /ai/impact-summary` (optional `facilityId`, `reason`) | `ImpactSummary` | every staff role | The aggregate measures `GET /metrics` returns for the same reader, nothing per case |
+| `POST /cases/{caseId}/patient-message-draft` (optional `channel` = `Sms` or `Email`, `reason`) | `PatientNotification` | nurse navigator, clinician | The next action, the upcoming appointment's day, time and place in local time, the channel and the reply codes; `{first name}` stands for the name |
+
+Each answers `AiTextResponse { agent, text, generatedAt }`. Identity, facility scope and reasons follow the reads they
+mirror (the worklist, `GET /metrics`, a case read), each call is recorded in `CaseReads` (views `role-briefing`,
+`impact-summary`, `patient-message-draft`, with `-denied` for a refusal), and the coordinator's briefing covers only the
+cases escalated to the coordinator. While `Ai:Agents:Enabled` is `false` they answer 501 with the not-implemented body.
+When the agent fails (no token, 401, 403, 429, 5xx, a timeout, an incomplete or empty answer) they answer 503 with the
+title "AI could not write this" and no text. No prompt carries a patient's name, contact details, MRN, patient
+reference, the hospital's result identifier, a staff reference or free text.
+
+`FoundryAgentClient` posts `{"input":[{"role":"user","content":"<prompt>"}]}` to
+`{ProjectEndpoint}/agents/{agent}/endpoint/protocols/openai/responses?api-version=v1` with an Entra bearer token for
+`https://ai.azure.com/.default`, and reads `output_text`, or every `output[].content[].text`. It logs the agent, status
+and duration, and the agent's error code on a failure, never the prompt or the text.
+
+Tokens come from `DefaultAzureCredential`: the managed identity when hosted in Azure (`AZURE_CLIENT_ID` picks a
+user-assigned one), the developer's Azure CLI or Visual Studio sign-in locally. That identity needs the **Azure AI
+User** role on the Foundry project, or every call answers 403 and the endpoints answer 503. To test locally with a
+token from your own sign-in instead:
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:Ai__Agents__Enabled = "true"
+$env:Ai__Agents__ProjectEndpoint = "https://<resource>.services.ai.azure.com/api/projects/<project>"
+$env:Ai__Agents__AccessToken = az account get-access-token --scope https://ai.azure.com/.default --query accessToken -o tsv
+dotnet run --project src/api/CareLoop.Api
+```
+
+On Windows also set `$env:Notifications__TimeZone = "Arabian Standard Time"`: with invariant globalization the host
+cannot resolve the IANA name `Asia/Dubai`.
+
+```sh
+dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~CareLoop.Tests.Api.Agents"
 ```

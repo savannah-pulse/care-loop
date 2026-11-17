@@ -11,9 +11,9 @@ AI makes already-recorded information easier to read and hand over. It does not 
 | Capability | Owner | What AI may do |
 |---|---|---|
 | Case state, ownership, deadlines, exceptions, referrals, appointments, closure | .NET API and the deadline worker | Nothing. No AI decisions, no AI writes |
-| Counts, rates, denominators, timing, overdue status | API read models | Nothing today. A narrative over precomputed aggregates is designed, not built |
+| Counts, rates, denominators, timing, overdue status | API read models | Nothing in the numbers. The impact summary agent puts precomputed aggregates into words beside them (see [Foundry agents](#foundry-agents-role-briefing-impact-summary-patient-message-draft)) |
 | Clinician handoff summary | Python AI workflow service, calling a Microsoft Foundry deployment | Organize supplied facts into cited sections. A draft only |
-| Patient-facing wording | Approved templates under `Infrastructure/Templates/{language}/` | Nothing. Patient wording is templated, not generated |
+| Patient-facing wording | Approved templates under `Infrastructure/Templates/{language}/` | Nothing that is sent. A staff-only preview of a message may be drafted; it is never sent |
 | Arabic | Deferred | Nothing. English only, everything language-keyed |
 
 The four rules that do not bend, from `AGENTS.md`:
@@ -213,7 +213,69 @@ Authentication is Entra ID throughout: `DefaultAzureCredential` locally with the
 | `POST /summaries/handoff` in `src/ai_workflow/` | Not built. Specified here and in the WS9 proposal |
 | Tests | 18, skipped, in `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs` |
 
-Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first.
+Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first. The Foundry agents below add `Azure.Identity` to the API, pending that agreement.
+
+## Foundry agents: role briefing, impact summary, patient message draft
+
+Separate from the handoff summary above, and from `IAiProvider` and `Ai:Provider`: three agents in the team's Foundry project write a few words for the dashboard. CareLoop works out every number, deadline and order; the agents only put them into words. All three are drafts in the sense of the four rules: shown labelled as written by AI, never stored, never acted on, and absent rather than invented when the agent fails.
+
+### The route
+
+The dashboard calls the CareLoop API, never Foundry. The API builds the prompt from the fields allowed below and calls the agent directly:
+
+```mermaid
+flowchart LR
+    SCREEN[Dashboard] -->|POST /ai/... with staff identity| API[".NET API<br/>access, read audit, prompt"]
+    API -->|plain-text prompt, Entra token| AGENT["Foundry agent<br/>role-briefing, impact-summary,<br/>patient-notification"]
+    AGENT -->|OpenAI Responses JSON| API
+    API -->|agent, text, generatedAt; or 501 or 503| SCREEN
+```
+
+`POST {ProjectEndpoint}/agents/{agent}/endpoint/protocols/openai/responses?api-version=v1`, body `{"input":[{"role":"user","content":"<prompt>"}]}`, header `Authorization: Bearer <token for https://ai.azure.com/.default>`. The text is `output_text`, or every `output[].content[].text` in order. The agents have no tools and receive nothing but the prompt.
+
+| Endpoint | Agent | Who may call it | Answer |
+|---|---|---|---|
+| `POST /ai/role-briefing` | `role-briefing` | Every staff role, scoped like the worklist | `AiTextResponse { agent, text, generatedAt }` |
+| `POST /ai/impact-summary` | `impact-summary` | Every staff role, scoped like `GET /metrics` | The same |
+| `POST /cases/{caseId}/patient-message-draft` | `patient-notification` | Nurse navigator and clinician, for a case they may open | The same; a preview that is never sent |
+
+501 with the not-implemented body while `Ai:Agents:Enabled` is `false`; 503, titled "AI could not write this", when the agent fails in any way (no token, 401, 403, 429, 5xx, a timeout, an answer marked incomplete, a refusal or no text); 401, 403 and 404 exactly as for the reads they mirror, including the documented reason for another facility. Every call is recorded in `CaseReads` like a read.
+
+### What each agent is given
+
+| Agent | Given | Never given |
+|---|---|---|
+| Role briefing | The reader's role in words and the facility's name; counts of open cases in scope (open, overdue, escalated, urgent, due today, needs an owner); up to five cases, overdue or escalated first, then urgent, then due today, each as its eight-character case number, programme, display step, next action in words, due status ("late by 18 hours", "due today at 12:00") and exception flags, and whether the reader or which role acts next. The coordinator's scope is the cases escalated to the coordinator | Patient names, MRNs, patient references, the hospital's result identifier, staff references, escalation reasons or any other free text |
+| Impact summary | The aggregate measures `GET /metrics` returns for the same reader: counts, rates with what each is out of, median times to each step, closures by reason, confidence participation. It is asked not to repeat the numbers, which the screen shows beside its words | Any case, case number or identifier |
+| Patient message draft | The case's next action in words, the facility's name, the upcoming appointment's day, time and place in local time when one is booked, the channel (text message or email) and the two reply codes: 1 "I got this message", 2 "call me". It writes `{first name}` where the name goes and is told never to mention or hint at a result | The patient's name, contact details, MRN, reference, the hospital's result identifier and any result or clinical content |
+
+"Urgent" means a clinician-reviewed urgency code listed in `Ai:Agents:UrgentCodes`, which must match the dashboard's table; CareLoop never sets urgency. Each prompt begins with its prompt version (`role-briefing-v1`, `impact-summary-v1`, `patient-message-v1`) so a change of wording can be traced. Agent instructions in Foundry should expect these inputs and must not ask for anything else.
+
+### Privacy rules
+
+- Patient names, contact details and identifiers are never sent. One test seeds a case with a name, an MRN, a patient reference and a hospital result identifier and checks that no prompt from any of the three endpoints contains them.
+- The patient message preview is not a message. Patient messages go out from the approved templates; the preview is shown to staff, labelled as a draft that was not sent, and is not stored.
+- No AI output changes a case, an owner, a deadline, urgency or a metric. The endpoints read through no-tracking queries and write only the read audit.
+- Prompts and texts are not logged. The client logs the agent, the status, the duration and, on failure, the agent's own error code.
+
+### Configuration
+
+`Ai:Agents`, off by default:
+
+| Setting | Purpose |
+|---|---|
+| `Enabled` | `false` by default. When `true`, the others are validated at start-up and a bad value stops the host |
+| `ProjectEndpoint` | `https://{resource}.services.ai.azure.com/api/projects/{project}`, from the environment (`Ai__Agents__ProjectEndpoint`); `https` only |
+| `RoleBriefing`, `ImpactSummary`, `PatientNotification` | Agent names; `role-briefing`, `impact-summary`, `patient-notification` |
+| `TimeoutSeconds` | `30`; from 1 to 300, token included |
+| `AccessToken` | A ready token, honoured only in the `Development` environment, for a developer's local test; never committed |
+| `UrgentCodes` | Urgency codes the briefing counts as urgent; a placeholder like the pathway's codes |
+
+Docker Compose passes `AI_AGENTS_ENABLED`, `AI_AGENTS_PROJECT_ENDPOINT` and the agent names through; see `.env.example`.
+
+### RBAC
+
+There is no key. The API authenticates with `DefaultAzureCredential`: the managed identity when hosted in Azure (`AZURE_CLIENT_ID` selects a user-assigned identity), and the developer's own sign-in locally. Whichever identity calls needs the **Azure AI User** role on the Foundry project; without it every call answers 403 and the dashboard shows "AI could not write this". Grant it to the API's managed identity for a deployment, and to each developer who tests locally.
 
 ## Before real data
 

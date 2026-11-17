@@ -27,7 +27,7 @@ These are deferred, not forbidden. Build the seams for them now and leave the im
 - **Real SMS and email delivery.** CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. The `Sms` and `Email` providers are built, but in the prototype both send to the SMS and email simulator. Providers for a real SMS or email service come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
 - **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS or Malaffi integration.** The simulators stand in for these.
-- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
+- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation is designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes it as an extension. Three Foundry agents write staff-facing drafts on the dashboard, behind `Ai:Agents` and off by default: a role briefing, an impact summary over aggregate measures, and a preview of a patient message that is never sent. [`docs/ai-design/integration.md`](docs/ai-design/integration.md) gives what each is sent; none can change a case or send a message.
 
 ## Before real patient data
 
@@ -96,15 +96,17 @@ care-loop/
 │   │       │   ├── Cases/              ListCases, GetCase, GetTimeline
 │   │       │   ├── Exceptions/         GetExceptions
 │   │       │   ├── Metrics/            GetMetrics, RunSimulation
-│   │       │   └── Summaries/          IAiProvider, fact and draft contracts, DraftHandoffSummary,
-│   │       │                           ApproveSummary, RejectSummary, AutoDraftOnHandoff
+│   │       │   ├── Summaries/          IAiProvider, fact and draft contracts, DraftHandoffSummary,
+│   │       │   │                       ApproveSummary, RejectSummary, AutoDraftOnHandoff
+│   │       │   └── Agents/             IAgentClient, DraftRoleBriefing, DraftImpactSummary, DraftPatientMessage
 │   │       ├── Infrastructure/
 │   │       │   ├── Persistence/        CareLoopDbContext, EfCaseRepository, Outbox/, Configurations/, Migrations/
 │   │       │   ├── Fhir/               FhirHttpClient
 │   │       │   ├── Notifications/      SmsNotificationProvider, EmailNotificationProvider (on SimulatorNotificationProvider),
 │   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
 │   │       │   │                       StaffContactOptions
-│   │       │   ├── Ai/                 NoOpAiProvider (default), AiWorkflowProvider, FoundryDirectProvider
+│   │       │   ├── Ai/                 NoOpAiProvider (default), AiWorkflowProvider, FoundryDirectProvider,
+│   │       │   │                       FoundryAgentClient and AgentOptions (the dashboard's Foundry agents)
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
 │   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
@@ -154,7 +156,7 @@ File names inside folders are a starting point. Folder boundaries and dependency
 - **Notification providers are the door for text messages and email.** Reaching a patient, a caregiver or a member of staff, and hearing back from them, belongs to the enabled notification provider, not to the FHIR boundary. No FHIR travels on this path. Outbound goes through `INotificationProvider`. Inbound (delivery reports and patient replies) arrives at `POST /notifications/inbound/{provider}` and is translated by that provider's `IInboundNotificationHandler` into `EventEnvelope`s for `EventIngestor`. A handler only verifies and translates; it contains no business logic.
 - **The dashboard is the exception.** `src/web/` is CareLoop's own UI and uses the plain REST read endpoints.
 - **Outbox for everything outbound.** Domain rules raise domain events. `OutboxDispatcher` delivers each to every `IDomainEventSubscriber` and tracks delivery per subscriber (`OutboxDelivery`), so subscribers retry independently and must be idempotent.
-- **Interfaces only at real seams.** `ICaseRepository`, `IPathwayProvider`, `IClock`, `IAiProvider`, `INotificationProvider`, `IInboundNotificationHandler`, `IDomainEventSubscriber`, `IEventHandler`, `IFhirInboundMapper`. Do not add generic repositories or an interface per handler.
+- **Interfaces only at real seams.** `ICaseRepository`, `IPathwayProvider`, `IClock`, `IAiProvider`, `IAgentClient`, `INotificationProvider`, `IInboundNotificationHandler`, `IDomainEventSubscriber`, `IEventHandler`, `IFhirInboundMapper`. Do not add generic repositories or an interface per handler.
 - **Simulators share no code with CareLoop.** They build and parse FHIR themselves, as a real hospital system would. Do not add project references between `src/simulators/` and `src/api/`.
 
 ## Domain model
@@ -318,6 +320,7 @@ public interface ICaseRepository
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
 | `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `AiWorkflowProvider`, `FoundryDirectProvider` |
+| `IAgentClient` | `Api/Features/Agents` | `FoundryAgentClient` |
 | `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
 | `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
@@ -344,7 +347,7 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
+| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. The dashboard's Foundry agents go through `IAgentClient`, off unless `Ai:Agents:Enabled`. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |
