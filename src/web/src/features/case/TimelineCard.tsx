@@ -109,12 +109,12 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
  *
  * @remarks
  * Reads `GET /cases/{caseId}/timeline`, the case's audit trail. Each entry names its source system
- * in plain words (CareLoop, Hospital system or Patient channel, C3) and who acted, when a person
+ * in plain words (CareLoop, Hospital system, Text message or Email, C3) and who acted, when a person
  * did. Its main line is its reason when the reason says more than the kind of event, and otherwise
  * the kind in words; nothing is made up. Events CareLoop refused, such as a closure without
  * evidence or an acknowledgement by the wrong role, are marked "Refused" and never read as done.
- * The programme coordinator never sees the wording of entries from a hospital system or the patient
- * channel, which can quote the hospital's own numbers; they see the kind of event instead.
+ * The programme coordinator never sees the wording of entries from a hospital system, a text message
+ * or an email, which can quote the hospital's own numbers; they see the kind of event instead.
  * The first {@link TIMELINE_PAGE} entries show, with a button for the earlier ones; once they show,
  * focus moves to the first of them.
  */

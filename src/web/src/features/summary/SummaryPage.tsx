@@ -369,7 +369,9 @@ function DraftView({ detail, accessReason, initial, initialEdits, me, onRedraft 
             </ul>
             <p className="note linkrow">{t('summary.keptNote')}</p>
           </section>
-          <OtherScreeningCard detail={detail} reason={accessReason} />
+          {detail.patientReference ? (
+            <OtherScreeningCard detail={detail} patientReference={detail.patientReference} reason={accessReason} />
+          ) : null}
         </div>
       </div>
 

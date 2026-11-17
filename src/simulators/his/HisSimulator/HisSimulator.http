@@ -52,18 +52,6 @@ Content-Type: application/fhir+json
   "description":"SIMULATED a case needs your action"
 }
 
-### Staff notice PUT (the case is resolved through FHIR GET, best effort; the notice is filed either way)
-PUT {{baseUrl}}/fhir/Task/staff-notice-demo
-Content-Type: application/fhir+json
-
-{
-  "resourceType":"Task","id":"staff-notice-demo","status":"requested","intent":"order",
-  "code":{"coding":[{"system":"https://careloop.invalid/fhir/CodeSystem/task-code","code":"staff-notice"}]},
-  "owner":{"identifier":{"value":"SYN-STAFF-DEMO"}},
-  "focus":{"reference":"Task/{{caseTaskId}}"},
-  "description":"SIMULATED a case needs your action"
-}
-
 ### Explicit human-reviewed urgency: choose the source-reviewed code from the pathway
 POST {{baseUrl}}/actions/clinical-review
 Content-Type: application/json

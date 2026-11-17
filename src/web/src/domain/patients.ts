@@ -3,7 +3,10 @@ import { groupDigits, patientLabel } from '../format'
 import { namesHiddenFor } from '../identity'
 import type { CaseSummary } from '../data'
 
-/** The patient fields every case read carries: the reference always, the name and MRN for staff. */
+/**
+ * The patient fields a case read carries: for staff the reference, name and MRN; the API leaves all
+ * three out for the programme coordinator.
+ */
 export type PatientFields = Pick<
   CaseSummary,
   'caseId' | 'patientReference' | 'patientDisplayName' | 'patientSecondaryIdentifier'
@@ -77,41 +80,45 @@ export function describePatient(patient: PatientFields, viewerRole: string): Pat
   }
   const name = patient.patientDisplayName?.trim()
   const identifier = patient.patientSecondaryIdentifier?.trim()
+  // Every role that sees names also gets the reference; without one, the case number stands in.
+  const reference = patient.patientReference ?? undefined
   if (name) {
     const identifierText = identifier ? secondaryIdentifierText(identifier) : undefined
     return {
       name,
       identifier: identifierText,
       hidden: false,
-      reference: patient.patientReference,
-      searchText: [name, identifier ?? '', identifierText ?? '', patient.patientReference].join(' '),
+      reference,
+      searchText: [name, identifier ?? '', identifierText ?? '', reference ?? ''].join(' '),
     }
   }
-  const label = patientLabel(patient.patientReference)
+  const label = reference ? patientLabel(reference) : t('patient.case', { number: caseNumber(patient.caseId) })
   return {
     name: label,
     identifier: identifier ? secondaryIdentifierText(identifier) : undefined,
     hidden: false,
-    reference: patient.patientReference,
-    searchText: [label, identifier ?? '', patient.patientReference].join(' '),
+    reference,
+    searchText: [label, identifier ?? '', reference ?? ''].join(' '),
   }
 }
 
 /**
  * Says where a case's result came from, for the person reading.
  *
- * @param sourceResultId - The hospital system's identifier of the result, as the API sent it.
+ * @param sourceResultId - The hospital system's identifier of the result, as the API sent it; the
+ * API leaves it out for the programme coordinator.
  * @param viewerRole - The role of the person reading.
  * @returns `Result DiagnosticReport/r-100245891 from the hospital system` for staff, so the result
  * can be found in the hospital record; `Result from the hospital system`, without the number, for
- * a role names are hidden from.
+ * a role names are hidden from, or when the API sent no number.
  *
  * @remarks
  * The hospital system's own numbers point to the patient as surely as the MRN does, so the
  * programme coordinator never sees them, even when the API sends them.
  */
-export function resultSourceText(sourceResultId: string, viewerRole: string): string {
-  return namesHiddenFor(viewerRole) ? t('case.resultFromHidden') : t('case.resultFrom', { result: sourceResultId })
+export function resultSourceText(sourceResultId: string | null | undefined, viewerRole: string): string {
+  const result = sourceResultId?.trim()
+  return namesHiddenFor(viewerRole) || !result ? t('case.resultFromHidden') : t('case.resultFrom', { result })
 }
 
 /**

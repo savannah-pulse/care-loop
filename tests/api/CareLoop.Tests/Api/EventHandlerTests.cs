@@ -144,9 +144,30 @@ public sealed class EventHandlerTests
         Assert.Equal("contact-patient-another-way", @case.NextAction);
         Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
 
-        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Delivered, NotificationChannel.Simulator));
+        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Delivered, NotificationChannel.Sms));
         Assert.Equal(NotificationStatus.Delivered, @case.Notification.Status);
         Assert.False(@case.Exceptions.HasFlag(CaseExceptions.Unreachable), "delivery on another channel means the patient was reached");
+        Assert.Equal("acknowledge-notification", @case.NextAction);
+        Assert.Equal(_harness.Clock.UtcNow.AddDays(1), @case.DueAt);
+    }
+
+    [Fact]
+    public async Task One_channel_failing_while_another_is_on_its_way_does_not_mark_the_patient_unreachable()
+    {
+        await _harness.ReviewedCaseAsync();
+        Guid sms = Guid.NewGuid(), email = Guid.NewGuid();
+        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Sent, NotificationChannel.Sms, sms));
+        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Sent, NotificationChannel.Email, email));
+
+        var @case = await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Failed, NotificationChannel.Sms, sms));
+
+        Assert.Equal(NotificationStatus.Sent, @case.Notification!.Status);
+        Assert.False(@case.Exceptions.HasFlag(CaseExceptions.Unreachable));
+        Assert.Equal("acknowledge-notification", @case.NextAction);
+
+        // A late "sent" never moves an attempt back.
+        await _harness.ApplyAsync(Envelopes.Notification(_harness.Clock.UtcNow, NotificationUpdateKind.Sent, NotificationChannel.Sms, sms));
+        Assert.Equal(NotificationAttemptStatus.Failed, Assert.Single(@case.Notification.Attempts, a => a.Id == sms).Status);
     }
 
     [Fact]

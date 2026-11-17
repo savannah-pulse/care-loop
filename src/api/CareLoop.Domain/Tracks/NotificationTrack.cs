@@ -152,6 +152,23 @@ public sealed class NotificationTrack
     }
 
     /// <summary>
+    /// Records that a member of staff has spoken to the patient on the phone, which answers any call request.
+    /// </summary>
+    /// <param name="at">When the call outcome was recorded.</param>
+    /// <param name="sourceReference">Reference to the record of the call.</param>
+    /// <remarks>
+    /// A call request stays open until someone has called the patient back; once a call is recorded it is
+    /// answered, so the owner is not chased for a call that already happened. What the patient said on the call
+    /// is recorded separately, as an acknowledgement, teach-back or rating.
+    /// </remarks>
+    public void RecordCallMade(DateTimeOffset at, string? sourceReference)
+    {
+        CallRequested = false;
+        SourceReference = sourceReference ?? SourceReference;
+        UpdatedAt = at > UpdatedAt ? at : UpdatedAt;
+    }
+
+    /// <summary>
     /// Records how confident the patient said they feel about what to do next.
     /// </summary>
     /// <param name="confidence">The rating, from <see cref="MinimumConfidence"/> to <see cref="MaximumConfidence"/>.</param>

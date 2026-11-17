@@ -14,8 +14,27 @@ public sealed class ScreeningResultBuilderTests
         Assert.Equal("#" + patient.Id, report.Subject!.Reference);
         Assert.Equal("Synthetic Patient 1", Assert.Single(patient.Name).Text);
         Assert.StartsWith("SYN-MRN-", Assert.Single(patient.Identifier).Value, StringComparison.Ordinal);
-        Assert.Equal(ContactPoint.ContactPointSystem.Other, Assert.Single(patient.Telecom).System);
+        var contact = Assert.Single(patient.Telecom);
+        Assert.Equal(ContactPoint.ContactPointSystem.Sms, contact.System);
+        Assert.Equal("SYN-PT-1", contact.Value);
     }
+    [Theory] [InlineData("email", ContactPoint.ContactPointSystem.Email)] [InlineData(" SMS ", ContactPoint.ContactPointSystem.Sms)]
+    public void Patient_contact_is_a_text_message_or_email_contact_as_configured(string channel, ContactPoint.ContactPointSystem system)
+    {
+        var builder = new ScreeningResultBuilder(Microsoft.Extensions.Options.Options.Create(new ContactOptions { PatientChannel = channel }));
+        var contact = Assert.Single(Assert.Single(builder.Build(SimulatorTestData.Request()).Contained.OfType<Patient>()).Telecom);
+        Assert.Equal(system, contact.System);
+    }
+    [Theory] [InlineData("other")] [InlineData("app")] [InlineData("portal")] [InlineData("phone")] [InlineData("")]
+    public void A_patient_contact_that_is_neither_text_message_nor_email_is_refused(string channel)
+    {
+        var builder = new ScreeningResultBuilder(Microsoft.Extensions.Options.Options.Create(new ContactOptions { PatientChannel = channel }));
+        Assert.Throws<InvalidOperationException>(() => builder.Build(SimulatorTestData.Request()));
+        Assert.False(ContactOptions.IsValid(new ContactOptions { PatientChannel = channel }));
+    }
+    [Theory] [InlineData("sms")] [InlineData(" Email ")]
+    public void A_text_message_or_email_patient_channel_passes_the_start_up_check(string channel) =>
+        Assert.True(ContactOptions.IsValid(new ContactOptions { PatientChannel = channel }));
     [Fact] public void Build_contains_observations_referenced_from_result()
     {
         var report = _builder.Build(SimulatorTestData.Request());

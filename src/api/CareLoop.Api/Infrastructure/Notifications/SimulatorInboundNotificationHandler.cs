@@ -1,81 +1,97 @@
 using System.Security.Cryptography;
 using System.Text;
-using CareLoop.Api.Features.Fhir;
+using System.Text.Json;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Events;
 using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Recipients;
-using Hl7.Fhir.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Infrastructure.Notifications;
 
 /// <summary>
-/// Understands what the patient-channel simulator sends back to CareLoop.
+/// Understands what the SMS and email simulator sends back to CareLoop: delivery reports and replies.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The simulator plays the patient: it receives a notification and then responds as the scenario
-/// under test requires (delivers or fails, acknowledges, confirms understanding, asks for a
-/// call, rates their confidence, or stays silent). It reports each of those as a FHIR
-/// <c>Communication</c>, which is this provider's private wire format.
-/// </para>
-/// <para>
-/// The category, in <see cref="StatusMap.CommunicationCategorySystem"/>, and the status decide the update
-/// through <see cref="StatusMap.ToNotificationUpdateKind"/>: <c>delivery-status</c> <c>completed</c> is
-/// delivered and <c>not-done</c> (with its <c>statusReason</c>) is failed; <c>acknowledgement</c>,
-/// <c>teach-back</c>, <c>call-me</c> and <c>confidence-rating</c> are the patient's replies, the last carrying
-/// a 1 to 5 value in its first <c>payload.contentString</c> (<see cref="StatusMap.ToConfidence"/>). A delivery
-/// report is never translated to an acknowledgement, and a rating is a measure, never an acknowledgement.
-/// </para>
-/// <para>
-/// <c>about</c> must name the case <c>Task</c> (<c>Task/{caseId}</c>) that the <c>CommunicationRequest</c> named;
-/// <c>basedOn</c> names that <c>CommunicationRequest</c>, whose id is the notification attempt identifier. The
-/// <c>Communication</c> id and <c>meta.versionId</c> form the source event identifier, so a redelivery is
-/// deduplicated. The time is <c>sent</c>, else <c>meta.lastUpdated</c>.
+/// The body is a <see cref="SimulatorCallback"/> as JSON. A <c>delivery</c> with status <c>delivered</c> is a
+/// delivery and <c>failed</c> (with its <c>reason</c>) a failure; any other status is not tracked. A
+/// <c>reply</c> carries the text exactly as the patient typed it, and this handler says what it means:
+/// <see cref="AcknowledgeReply"/> is an acknowledgement ("I got this message"), <see cref="CallMeReply"/> asks for a
+/// call, and any other text asks for a call too, because an unreadable reply is a patient trying to say
+/// something. A delivery report is never an acknowledgement, and no reply is ever teach-back or a confidence
+/// rating: a nurse records those after a call.
 /// </para>
 /// <para>
 /// Every message must be signed: header <see cref="SignatureHeader"/> carries <c>sha256=</c> followed by the lower-case
-/// hexadecimal HMAC-SHA256 of the raw body (UTF-8), keyed with <see cref="SimulatorNotificationOptions.InboundSecret"/>.
+/// hexadecimal HMAC-SHA256 of the raw body (UTF-8), keyed with the channel's <see cref="SimulatorNotificationOptions.InboundSecret"/>.
 /// A missing or wrong signature, or no secret configured, is refused before the body is read, so nobody who merely
 /// knows a case identifier can acknowledge for a patient.
 /// </para>
 /// <para>
-/// <c>basedOn</c> must name an attempt CareLoop made for a patient notification of the case named in <c>about</c>;
-/// anything else is a format error, so a report can never change a case it was not sent for.
+/// The callback echoes the <see cref="SimulatorMetadata"/> of the message it is about. A callback about a caregiver
+/// or staff message translates to nothing: the case's notification track is the patient's, and nobody else's
+/// delivery or reply may count as hers. For a patient message, the message identifier must be an attempt CareLoop
+/// made for a patient notification of that case on this channel, and a reply must come from one of the patient's
+/// own addresses on this channel; anything else is a format error, so a callback can never change a case it was
+/// not sent for. A reply to the appointment message counts like a reply to the follow-up; that message's delivery
+/// reports are ignored, because the case's notification track follows the follow-up message only.
 /// </para>
 /// <para>
-/// A <c>Communication</c> based on a caregiver message (its <c>CommunicationRequest</c> id starts with
-/// <see cref="SimulatorNotificationProvider.CaregiverIdPrefix"/>) translates to nothing: the case's notification
-/// track is the patient's, and a caregiver's delivery or acknowledgement must never count as the patient's.
+/// The source event identifier is built from the message identifier and status, or from the reply identifier, so
+/// a redelivery is deduplicated.
 /// </para>
 /// </remarks>
-public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHandler
+public abstract class SimulatorInboundNotificationHandler : IInboundNotificationHandler
 {
     /// <summary>The header that carries the message signature.</summary>
     public const string SignatureHeader = "X-CareLoop-Signature";
 
+    /// <summary>The reply that means "I got this message": an acknowledgement.</summary>
+    public const string AcknowledgeReply = "1";
+
+    /// <summary>The reply that asks the care team for a call.</summary>
+    public const string CallMeReply = "2";
+
+    /// <summary>Callback type of a delivery report.</summary>
+    public const string DeliveryType = "delivery";
+
+    /// <summary>Callback type of a reply.</summary>
+    public const string ReplyType = "reply";
+
+    /// <summary>Delivery status: the message reached the recipient's device or mailbox.</summary>
+    public const string DeliveredStatus = "delivered";
+
+    /// <summary>Delivery status: the message could not be delivered.</summary>
+    public const string FailedStatus = "failed";
+
     private const string SignaturePrefix = "sha256=";
+    private const string DefaultFailureReason = "The simulator reported the message as not delivered.";
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private readonly CareLoopDbContext _db;
-    private readonly IOptions<SimulatorNotificationOptions> _options;
+    private readonly RecipientResolver _recipients;
+    private readonly IOptionsMonitor<SimulatorNotificationOptions> _options;
 
     /// <summary>
     /// Creates the handler.
     /// </summary>
-    /// <param name="db">Read access to cases, to find the source identity of the case a reply is about.</param>
-    /// <param name="options">Supplies the secret that inbound messages are signed with.</param>
-    public SimulatorInboundNotificationHandler(CareLoopDbContext db, IOptions<SimulatorNotificationOptions> options)
+    /// <param name="db">Read access to cases, to find the source identity of the case a callback is about.</param>
+    /// <param name="recipients">Supplies the patient's own addresses, which a reply must come from.</param>
+    /// <param name="options">Supplies the secret that inbound messages are signed with, one named set per channel.</param>
+    protected SimulatorInboundNotificationHandler(CareLoopDbContext db, RecipientResolver recipients, IOptionsMonitor<SimulatorNotificationOptions> options)
     {
         _db = db;
+        _recipients = recipients;
         _options = options;
     }
 
     /// <summary>
-    /// Computes the signature header value for a body, as the patient-channel simulator must send it.
+    /// Computes the signature header value for a body, as the simulator must send it.
     /// </summary>
     /// <param name="body">The raw request body.</param>
     /// <param name="secret">The shared secret.</param>
@@ -88,100 +104,163 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
         return SignaturePrefix + Convert.ToHexStringLower(hash);
     }
 
+    /// <summary>
+    /// Says what a reply means.
+    /// </summary>
+    /// <param name="text">The reply exactly as typed.</param>
+    /// <returns>
+    /// <see cref="NotificationUpdateKind.Acknowledged"/> for <see cref="AcknowledgeReply"/>, ignoring surrounding
+    /// white space; <see cref="NotificationUpdateKind.CallRequested"/> for <see cref="CallMeReply"/> and for any other text.
+    /// </returns>
+    public static NotificationUpdateKind KindOfReply(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return string.Equals(text.Trim(), AcknowledgeReply, StringComparison.Ordinal)
+            ? NotificationUpdateKind.Acknowledged
+            : NotificationUpdateKind.CallRequested;
+    }
+
     /// <inheritdoc/>
-    public NotificationChannel Channel => NotificationChannel.Simulator;
+    public abstract NotificationChannel Channel { get; }
 
     /// <inheritdoc/>
     public async Task<IReadOnlyList<EventEnvelope>> TranslateAsync(InboundNotificationMessage message, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(message);
         Verify(message);
-        var communication = Parse(message.Body);
+        var callback = Parse(message.Body);
 
-        if (IsAboutCaregiverMessage(communication))
+        var isDelivery = string.Equals(callback.Type, DeliveryType, StringComparison.OrdinalIgnoreCase);
+        var isReply = string.Equals(callback.Type, ReplyType, StringComparison.OrdinalIgnoreCase);
+        if (!isDelivery && !isReply)
         {
+            // A kind of callback CareLoop does not track.
             return [];
         }
 
-        var kind = StatusMap.ToNotificationUpdateKind(communication);
-        if (kind is null)
+        var metadata = callback.Metadata
+            ?? throw new FormatException("The callback has no metadata, so the case it is about is not known.");
+        if (!string.Equals(metadata.Audience, SimulatorMetadata.PatientAudience, StringComparison.OrdinalIgnoreCase))
         {
-            // A category or status CareLoop does not track (for example an in-progress delivery report).
+            // A caregiver's or a staff member's message: nothing about it may count as the patient's.
             return [];
         }
 
-        if (string.IsNullOrWhiteSpace(communication.Id))
+        NotificationUpdateKind kind;
+        if (isDelivery)
         {
-            throw new FormatException("The Communication has no id, so a redelivery could not be recognised.");
+            if (string.Equals(callback.Status, DeliveredStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                kind = NotificationUpdateKind.Delivered;
+            }
+            else if (string.Equals(callback.Status, FailedStatus, StringComparison.OrdinalIgnoreCase))
+            {
+                kind = NotificationUpdateKind.Failed;
+            }
+            else
+            {
+                // An in-between status (queued, sent) that CareLoop does not track.
+                return [];
+            }
+        }
+        else
+        {
+            kind = KindOfReply(callback.Text ?? throw new FormatException("The reply has no text."));
         }
 
-        var caseId = ReferencedId(communication.About, "Task")
-            ?? throw new FormatException("The Communication's about does not name the case Task.");
-        var occurredAt = communication.SentElement?.ToDateTimeOffset(TimeSpan.Zero)
-            ?? communication.Meta?.LastUpdated
-            ?? throw new FormatException("The Communication has neither sent nor meta.lastUpdated.");
+        if (!Guid.TryParse(metadata.CaseId, out var caseId))
+        {
+            throw new FormatException("The callback's metadata does not name a case.");
+        }
 
-        var attemptId = ReferencedId(communication.BasedOn, "CommunicationRequest")
-            ?? throw new FormatException("The Communication's basedOn does not name the CommunicationRequest it reports on.");
+        var messageId = isDelivery ? callback.MessageId : callback.InReplyTo;
+        if (!Guid.TryParse(messageId, out var attemptId))
+        {
+            throw new FormatException(isDelivery
+                ? "The delivery report does not name the message it reports on."
+                : "The reply does not name the message it replies to.");
+        }
+
+        if (isReply && string.IsNullOrWhiteSpace(callback.ReplyId))
+        {
+            throw new FormatException("The reply has no identifier, so a redelivery could not be recognised.");
+        }
+
+        var occurredAt = callback.At ?? throw new FormatException("The callback does not say when it happened.");
 
         var source = await _db.Cases.AsNoTracking()
             .Where(c => c.Id == caseId)
             .Select(c => new { c.SourceSystem, c.SourceResultId, c.PatientReference })
             .SingleOrDefaultAsync(ct)
-            ?? throw new FormatException($"The Communication is about Task/{caseId:D}, which is not a known case.");
+            ?? throw new FormatException($"The callback is about case {caseId:D}, which is not a known case.");
 
-        if (!await IsPatientAttemptOfCaseAsync(caseId, source.PatientReference, attemptId, ct))
+        var sentFor = await PatientMessageOfCaseAsync(caseId, source.PatientReference, attemptId, ct);
+        if (sentFor is null)
         {
-            throw new FormatException($"CommunicationRequest/{attemptId:D} is not a patient notification of Task/{caseId:D}.");
+            throw new FormatException($"Message {attemptId:D} is not a patient message of case {caseId:D} on this channel.");
         }
 
-        var version = string.IsNullOrWhiteSpace(communication.Meta?.VersionId) ? "1" : communication.Meta.VersionId;
+        if (isDelivery && sentFor == nameof(Domain.Events.DomainEvents.AppointmentScheduled))
+        {
+            // The appointment message is not the follow-up notification the track follows: its delivery changes nothing.
+            // A reply to it still counts below, as any reply of the patient's does.
+            return [];
+        }
+
+        var channel = SimulatorNotificationProvider.WireName(Channel);
+        if (isReply && !await IsFromThePatientAsync(caseId, callback.From, ct))
+        {
+            throw new FormatException("The reply did not come from an address of the patient on this channel.");
+        }
+
+        var reference = isDelivery
+            ? $"{channel}/message/{attemptId:D}"
+            : $"{channel}/reply/{callback.ReplyId!.Trim()}";
         return
         [
             new EventEnvelope
             {
                 SourceSystem = source.SourceSystem,
-                SourceEventId = $"Communication/{communication.Id}/_history/{version}",
+                Origin = channel,
+                SourceEventId = isDelivery ? $"{reference}/delivery/{callback.Status!.ToLowerInvariant()}" : reference,
                 Type = CaseEventType.NotificationUpdated,
                 SourceResultId = source.SourceResultId,
                 OccurredAt = occurredAt,
                 Actor = null,
                 Payload = new NotificationUpdatePayload
                 {
-                    Kind = kind.Value,
-                    Channel = NotificationChannel.Simulator,
-                    CommunicationReference = $"Communication/{communication.Id}",
+                    Kind = kind,
+                    Channel = Channel,
+                    CommunicationReference = reference,
                     AttemptId = attemptId,
-                    FailureReason = kind == NotificationUpdateKind.Failed ? FailureReason(communication) : null,
-                    Confidence = kind == NotificationUpdateKind.ConfidenceRated ? StatusMap.ToConfidence(communication) : null,
+                    FailureReason = kind == NotificationUpdateKind.Failed
+                        ? (string.IsNullOrWhiteSpace(callback.Reason) ? DefaultFailureReason : callback.Reason.Trim())
+                        : null,
                 },
             },
         ];
     }
 
-    private static Communication Parse(string body)
+    private static SimulatorCallback Parse(string body)
     {
-        Resource resource;
         try
         {
-            resource = FhirJsonCodec.Deserialize(body);
+            return JsonSerializer.Deserialize<SimulatorCallback>(body, Json)
+                ?? throw new FormatException("The body is empty.");
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (JsonException ex)
         {
-            throw new FormatException($"The body is not a valid FHIR resource: {ex.Message}", ex);
+            throw new FormatException($"The body is not a valid simulator callback: {ex.Message}", ex);
         }
-
-        return resource as Communication
-            ?? throw new FormatException($"Expected a FHIR Communication, not {resource.TypeName}.");
     }
 
     /// <exception cref="UnauthorizedAccessException">No secret is configured, or the signature is missing or wrong.</exception>
     private void Verify(InboundNotificationMessage message)
     {
-        var secret = _options.Value.InboundSecret;
+        var secret = _options.Get(Channel.ToString()).InboundSecret;
         if (string.IsNullOrEmpty(secret))
         {
-            throw new UnauthorizedAccessException($"{SimulatorNotificationOptions.SectionName}:InboundSecret is not configured, so no inbound message can be trusted.");
+            throw new UnauthorizedAccessException($"{SimulatorNotificationOptions.SectionFor(Channel)}:InboundSecret is not configured, so no inbound message can be trusted.");
         }
 
         var given = message.Headers.FirstOrDefault(h => string.Equals(h.Key, SignatureHeader, StringComparison.OrdinalIgnoreCase)).Value;
@@ -194,44 +273,35 @@ public sealed class SimulatorInboundNotificationHandler : IInboundNotificationHa
     }
 
     /// <summary>
-    /// Tells whether an attempt identifier is one CareLoop gave a patient notification of this case on this channel.
+    /// Finds which patient message of this case on this channel an attempt identifier belongs to.
     /// </summary>
     /// <remarks>
-    /// Attempt identifiers are derived from the <see cref="Domain.Events.DomainEvents.NotificationRequested"/> event, the
-    /// patient and the channel (<see cref="NotificationSender.AttemptIdFor"/>), and every such event is in the case's
-    /// outbox. Recomputing them means a report whose <c>about</c> and <c>basedOn</c> disagree can never change the
-    /// wrong case, without storing sent attempts.
+    /// Attempt identifiers are derived from the domain event that caused the message, the patient and the channel
+    /// (<see cref="NotificationSender.AttemptIdFor"/>), and every such event is in the case's outbox. Recomputing them
+    /// means a callback whose metadata and message identifier disagree can never change the wrong case, without storing
+    /// sent attempts. The patient is written to for the follow-up (<see cref="Domain.Events.DomainEvents.NotificationRequested"/>)
+    /// and when an appointment is booked (<see cref="Domain.Events.DomainEvents.AppointmentScheduled"/>).
     /// </remarks>
-    private async Task<bool> IsPatientAttemptOfCaseAsync(Guid caseId, string patientReference, Guid attemptId, CancellationToken ct)
+    /// <returns>The name of the event the message was sent for, or <see langword="null"/> when it is none of the patient's.</returns>
+    private async Task<string?> PatientMessageOfCaseAsync(Guid caseId, string patientReference, Guid attemptId, CancellationToken ct)
     {
-        var notificationIds = await _db.OutboxMessages.AsNoTracking()
-            .Where(m => m.CaseId == caseId && m.EventType == nameof(Domain.Events.DomainEvents.NotificationRequested))
-            .Select(m => m.Id)
+        string[] patientEvents = [nameof(Domain.Events.DomainEvents.NotificationRequested), nameof(Domain.Events.DomainEvents.AppointmentScheduled)];
+        var sent = await _db.OutboxMessages.AsNoTracking()
+            .Where(m => m.CaseId == caseId && patientEvents.Contains(m.EventType))
+            .Select(m => new { m.Id, m.EventType })
             .ToListAsync(ct);
-        return notificationIds.Any(id => NotificationSender.AttemptIdFor(id, patientReference, Channel) == attemptId);
+        return sent.FirstOrDefault(m => NotificationSender.AttemptIdFor(m.Id, patientReference, Channel) == attemptId)?.EventType;
     }
 
-    private static bool IsAboutCaregiverMessage(Communication communication) =>
-        communication.BasedOn.Any(r => r.Reference is { } value
-            && value.StartsWith("CommunicationRequest/" + SimulatorNotificationProvider.CaregiverIdPrefix, StringComparison.Ordinal));
-
-    private static Guid? ReferencedId(IEnumerable<ResourceReference> references, string type)
+    private async Task<bool> IsFromThePatientAsync(Guid caseId, string? from, CancellationToken ct)
     {
-        var prefix = type + "/";
-        foreach (var reference in references)
+        if (string.IsNullOrWhiteSpace(from))
         {
-            var value = reference.Reference;
-            if (value is not null && value.StartsWith(prefix, StringComparison.Ordinal) && Guid.TryParse(value[prefix.Length..], out var id))
-            {
-                return id;
-            }
+            return false;
         }
 
-        return null;
+        var contactPoints = await _recipients.PatientContactPointsAsync(caseId, ct);
+        return contactPoints.Any(c => c.Channel == Channel
+            && string.Equals(c.Address.Trim(), from.Trim(), StringComparison.OrdinalIgnoreCase));
     }
-
-    private static string FailureReason(Communication communication) =>
-        communication.StatusReason?.Text
-        ?? communication.StatusReason?.Coding.Select(c => c.Display ?? c.Code).FirstOrDefault(t => !string.IsNullOrWhiteSpace(t))
-        ?? "The simulator reported the message as not delivered.";
 }

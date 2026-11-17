@@ -1,11 +1,11 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-/** Local address of the patient-channel simulator's .NET host during development. */
+/** Local address of the SMS and email simulator's .NET host during development. */
 const SIMULATOR_URL = 'http://localhost:5082';
 
 /** Path prefixes served by the .NET host; everything else is a client-side route. */
-const PROXIED_PREFIXES = ['/api', '/fhir', '/scenarios', '/health', '/openapi'];
+const PROXIED_PREFIXES = ['/api', '/messages', '/scenarios', '/health', '/openapi'];
 
 export default defineConfig({
   plugins: [react()],

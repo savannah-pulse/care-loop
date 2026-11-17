@@ -12,7 +12,9 @@ namespace PatientChannelSimulator.Scenarios;
 /// The runner sends nothing to CareLoop. Starting a run reads <c>patients[].behaviour</c> from the
 /// scenario and stores one <see cref="PatientBehaviour"/> per patient. From then on the simulator
 /// reacts whenever CareLoop notifies one of those patients: <c>DeliverySimulator</c> reports the
-/// delivery outcome and <c>AutomaticResponder</c> sends the patient's response.
+/// delivery outcome and <c>AutomaticResponder</c> sends the patient's reply. A behaviour is found by
+/// the address a message was sent to; the hospital system simulator sends a patient's synthetic
+/// identifier as that address until scenario files carry phone numbers and email addresses.
 /// </para>
 /// <para>
 /// The hospital-system events of the same scenario are replayed by the HIS simulator. The two are
@@ -75,7 +77,7 @@ public sealed class ScenarioRunner
         if (scenario.Cohort is not null)
         {
             throw new InvalidOperationException(
-                $"'{scenario.Name}' is a cohort scenario. The patient channel puts the behaviours of named patients in force; run the scenarios the cohort draws from instead.");
+                $"'{scenario.Name}' is a cohort scenario. This simulator puts the behaviours of named patients in force; run the scenarios the cohort draws from instead.");
         }
 
         var assignments = (scenario.Patients ?? [])
@@ -148,11 +150,16 @@ public sealed class ScenarioRunner
         {
             ScenarioVocabulary.ResponseNone => PatientResponseBehaviour.None,
             ScenarioVocabulary.ResponseAcknowledge => PatientResponseBehaviour.Acknowledge,
-            ScenarioVocabulary.ResponseUnderstand => PatientResponseBehaviour.Understand,
             ScenarioVocabulary.ResponseCallMe => PatientResponseBehaviour.CallMe,
-            ScenarioVocabulary.ResponseRateConfidence => PatientResponseBehaviour.RateConfidence,
+            ScenarioVocabulary.ResponseUnderstand or ScenarioVocabulary.ResponseRateConfidence => throw Invalid(
+                $"'{file.Response}' is not something a patient does by text message or email. A nurse records teach-back and a confidence rating after a call, in CareLoop."),
             _ => throw Invalid($"'{file.Response}' is not a known response value."),
         };
+
+        if (file.Confidence is not null)
+        {
+            throw Invalid("a patient gives no confidence rating by text message or email. A nurse records it after a call, in CareLoop.");
+        }
 
         TimeSpan journeyDelay;
         try
@@ -177,8 +184,7 @@ public sealed class ScenarioRunner
             response,
             file.FailureReason,
             TimeSpan.FromSeconds(realSeconds),
-            file.RespondToNotification ?? 1,
-            confidence: file.Confidence);
+            file.RespondToNotification ?? 1);
 
         return PatientBehaviourRules.Check(behaviour) is { } problem ? throw Invalid(problem) : behaviour;
     }

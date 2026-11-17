@@ -1,12 +1,10 @@
 import i18n from '../i18n';
 
 import type {
-  FhirMessageLogEntry,
-  InboxAction,
   InboxMessage,
+  MessageLogEntry,
   PatientBehaviour,
   PatientBehaviourAssignment,
-  PatientCaseStatus,
   ScenarioRunState,
   ScenarioSummary,
 } from './types';
@@ -108,9 +106,9 @@ function segment(value: string): string {
 }
 
 /**
- * Lists the simulated patient inbox.
+ * Lists every simulated text message and email.
  *
- * @returns The inbox messages, newest first.
+ * @returns The messages, newest first.
  * @throws ApiError if the request fails.
  */
 export function listInbox(): Promise<InboxMessage[]> {
@@ -118,60 +116,20 @@ export function listInbox(): Promise<InboxMessage[]> {
 }
 
 /**
- * Performs a one-click patient action on an inbox message.
+ * Sends the simulated patient's reply to a text message or an email.
  *
  * @remarks
- * These actions, the rating and the SMS reply are the only way a patient response is created
- * outside a patient's behaviour.
+ * The text goes to CareLoop exactly as typed. The simulator does not say what it means and
+ * refuses none for its wording: CareLoop reads 1 as "I got this message" and anything else as a request
+ * for a call. This is the only way a reply is created outside a patient's behaviour.
  *
- * @param messageId - Simulator-local identifier of the message.
- * @param action - The action to perform.
- * @returns The updated inbox message.
- * @throws ApiError if the message is unknown (404), cannot be answered (409), or CareLoop refused or could not be reached (502).
- */
-export function actOnInboxMessage(messageId: string, action: InboxAction): Promise<InboxMessage> {
-  return request('POST', `/api/inbox/${segment(messageId)}/${action}`);
-}
-
-/**
- * Sends the patient's 1 to 5 confidence rating for an inbox message.
- *
- * @remarks
- * A rating is a measure, not an acknowledgement: it never changes the message's response state.
- *
- * @param messageId - Simulator-local identifier of the message.
- * @param rating - Whole number from 1 to 5.
- * @returns The updated inbox message.
- * @throws ApiError if the rating is out of range (400), the message is unknown (404) or cannot be answered (409), or CareLoop refused or could not be reached (502).
- */
-export function rateConfidence(messageId: string, rating: number): Promise<InboxMessage> {
-  return request('POST', `/api/inbox/${segment(messageId)}/rate-confidence`, { rating });
-}
-
-/**
- * Sends the patient's text reply to an SMS message.
- *
- * @remarks
- * `1` acknowledges and `2` asks for a call. Any other text is refused and nothing is sent to CareLoop.
- *
- * @param messageId - Simulator-local identifier of the message.
+ * @param messageId - Identifier of the message being replied to.
  * @param text - What the patient typed.
  * @returns The updated inbox message.
- * @throws ApiError if the text is not understood (400), the message is unknown (404) or is not an SMS (409), or CareLoop refused or could not be reached (502).
+ * @throws ApiError if the text is empty (400), the message is unknown (404) or cannot be replied to (409), or CareLoop refused or could not be reached (502).
  */
-export function replyBySms(messageId: string, text: string): Promise<InboxMessage> {
+export function replyToMessage(messageId: string, text: string): Promise<InboxMessage> {
   return request('POST', `/api/inbox/${segment(messageId)}/reply`, { text });
-}
-
-/**
- * Reads the patient-facing status of a case.
- *
- * @param taskId - Logical id of the case `Task` in CareLoop.
- * @returns The case status.
- * @throws ApiError if the task is unknown (404) or CareLoop could not be reached (502).
- */
-export function getCaseStatus(taskId: string): Promise<PatientCaseStatus> {
-  return request('GET', `/api/case-status/${segment(taskId)}`);
 }
 
 /**
@@ -272,11 +230,11 @@ export function getScenarioRun(runId: string): Promise<ScenarioRunState> {
 }
 
 /**
- * Lists the FHIR exchanges between the simulator and CareLoop.
+ * Lists the exchanges between the simulator and CareLoop.
  *
  * @returns The logged exchanges, newest first.
  * @throws ApiError if the request fails.
  */
-export function listFhirLog(): Promise<FhirMessageLogEntry[]> {
-  return request('GET', '/api/fhir-log');
+export function listMessageLog(): Promise<MessageLogEntry[]> {
+  return request('GET', '/api/message-log');
 }

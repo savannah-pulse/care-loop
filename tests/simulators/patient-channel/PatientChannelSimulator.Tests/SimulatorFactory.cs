@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Hl7.Fhir.Model;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -25,21 +24,27 @@ internal sealed class FakeClock : ISimulatorClock
     public void Advance(TimeSpan by) => UtcNow += by;
 }
 
-/// <summary>One call the simulator made to CareLoop.</summary>
+/// <summary>One call the simulator made to CareLoop: a delivery report or a reply, as JSON.</summary>
 internal sealed record CareLoopCall(HttpMethod Method, Uri Uri, byte[] Body, string? Signature, string? ContentType)
 {
     public string Text => Encoding.UTF8.GetString(Body);
 
     public JsonElement Json => JsonDocument.Parse(Body).RootElement;
 
-    /// <summary>The Communication category code, or null for a call that is not a Communication.</summary>
-    public string? Category =>
-        Method == HttpMethod.Post
-        && Json.TryGetProperty("category", out var categories)
-            ? categories[0].GetProperty("coding")[0].GetProperty("code").GetString()
-            : null;
+    /// <summary><c>delivery</c> or <c>reply</c>.</summary>
+    public string? Type => String("type");
 
-    public string? Status => Method == HttpMethod.Post ? Json.GetProperty("status").GetString() : null;
+    /// <summary>The status of a delivery report: <c>delivered</c> or <c>failed</c>.</summary>
+    public string? Status => String("status");
+
+    /// <summary>The text of a reply, exactly as sent.</summary>
+    public string? ReplyText => String("text");
+
+    /// <summary>A short name for the callback: <c>delivered</c>, <c>failed</c>, or <c>reply:</c> and the text.</summary>
+    public string Kind => Type == "reply" ? "reply:" + ReplyText : Status ?? "?";
+
+    private string? String(string name) =>
+        Json.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 }
 
 /// <summary>Stands in for CareLoop: records every call and answers as the test says.</summary>
@@ -47,9 +52,8 @@ internal sealed class StubCareLoop : HttpMessageHandler
 {
     private readonly List<CareLoopCall> _calls = [];
 
-    /// <summary>Decides the answer to a call; the default accepts every callback and knows no Task.</summary>
-    public Func<CareLoopCall, HttpResponseMessage> Answer { get; set; } =
-        call => new HttpResponseMessage(call.Method == HttpMethod.Post ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+    /// <summary>Decides the answer to a call; the default accepts every callback.</summary>
+    public Func<CareLoopCall, HttpResponseMessage> Answer { get; set; } = _ => new HttpResponseMessage(HttpStatusCode.OK);
 
     public IReadOnlyList<CareLoopCall> Calls
     {
@@ -62,15 +66,15 @@ internal sealed class StubCareLoop : HttpMessageHandler
         }
     }
 
-    public IReadOnlyList<CareLoopCall> Callbacks => [.. Calls.Where(c => c.Method == HttpMethod.Post)];
+    public IReadOnlyList<CareLoopCall> Callbacks => Calls;
 
-    public IReadOnlyList<string?> Categories => [.. Callbacks.Select(c => c.Category)];
+    public IReadOnlyList<string> Kinds => [.. Calls.Select(c => c.Kind)];
 
     public void AnswerWith(HttpStatusCode status) => Answer = _ => new HttpResponseMessage(status);
 
-    /// <summary>Refuses callbacks of one category with a status code and accepts the rest.</summary>
-    public void Refuse(string category, HttpStatusCode status) =>
-        Answer = call => new HttpResponseMessage(call.Category == category ? status : HttpStatusCode.OK);
+    /// <summary>Refuses replies with a status code and accepts delivery reports.</summary>
+    public void RefuseReplies(HttpStatusCode status) =>
+        Answer = call => new HttpResponseMessage(call.Type == "reply" ? status : HttpStatusCode.OK);
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -79,7 +83,7 @@ internal sealed class StubCareLoop : HttpMessageHandler
             request.Method,
             request.RequestUri!,
             body,
-            request.Headers.TryGetValues(CareLoopFhirClient.SignatureHeader, out var values) ? values.Single() : null,
+            request.Headers.TryGetValues(CareLoopCallbackClient.SignatureHeader, out var values) ? values.Single() : null,
             request.Content?.Headers.ContentType?.ToString());
         lock (_calls)
         {
@@ -97,7 +101,9 @@ internal sealed class StubCareLoop : HttpMessageHandler
 internal sealed class SimulatorFactory : WebApplicationFactory<Program>
 {
     public const string Secret = "test-secret-not-a-credential";
-    public const string CallbackUrl = "http://careloop.invalid/notifications/inbound/simulator";
+    public const string CallbackBaseUrl = "http://careloop.invalid/notifications/inbound";
+    public const string SmsCallbackUrl = CallbackBaseUrl + "/sms";
+    public const string EmailCallbackUrl = CallbackBaseUrl + "/email";
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -122,8 +128,7 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-        builder.UseSetting("CareLoop:FhirBaseUrl", "http://careloop.invalid/fhir");
-        builder.UseSetting("CareLoop:NotificationCallbackUrl", CallbackUrl);
+        builder.UseSetting("CareLoop:CallbackBaseUrl", CallbackBaseUrl);
         builder.UseSetting("CareLoop:InboundSecret", _secret);
         builder.UseSetting("CareLoop:RetryDelayMilliseconds", "0");
         builder.UseSetting("Scenarios:Directory", _scenariosDirectory);
@@ -132,30 +137,33 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<ISimulatorClock>();
             services.AddSingleton<ISimulatorClock>(Clock);
-            services.AddHttpClient<CareLoopFhirClient>().ConfigurePrimaryHttpMessageHandler(() => CareLoop);
+            services.AddHttpClient<CareLoopCallbackClient>().ConfigurePrimaryHttpMessageHandler(() => CareLoop);
 
             var dispatcher = services.Single(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ResponseDispatcher));
             services.Remove(dispatcher);
         });
     }
 
-    /// <summary>Posts a notification request the way CareLoop's simulator provider does.</summary>
+    /// <summary>Posts a message the way CareLoop's text-message and email providers do.</summary>
     public Task<HttpResponseMessage> NotifyAsync(
-        string requestId = TestData.RequestId,
-        string patientId = TestData.PatientId,
-        string inboxAddress = "SYN-INBOX-0001",
-        bool caregiver = false,
-        string body = "SIMULATED: please contact the clinic about your follow-up.") =>
-        PostFhirAsync("CommunicationRequest", FhirJson.Serialize(Request(requestId, patientId, inboxAddress, caregiver, body)));
+        string messageId = TestData.MessageId,
+        string to = TestData.PatientId,
+        string channel = "sms",
+        string? audience = "patient",
+        string body = TestData.Body,
+        string? subject = null,
+        string? caseId = TestData.CaseId) =>
+        PostMessageAsync(JsonSerializer.Serialize(Message(messageId, to, channel, audience, body, subject, caseId), Json));
 
-    public Task<HttpResponseMessage> PostFhirAsync(string resourceType, string json) =>
-        CreateClient().PostAsync($"/fhir/{resourceType}", new StringContent(json, Encoding.UTF8, FhirJson.MediaType));
+    public Task<HttpResponseMessage> PostMessageAsync(string json) =>
+        CreateClient().PostAsync("/messages", new StringContent(json, Encoding.UTF8, "application/json"));
 
-    public async Task<InboxMessage> InboxMessageAsync(string messageId = TestData.RequestId) =>
+    public async Task<InboxMessage> InboxMessageAsync(string messageId = TestData.MessageId) =>
         (await CreateClient().GetFromJsonAsync<InboxMessage>($"/api/inbox/{messageId}", Json))!;
 
-    public Task<HttpResponseMessage> ActAsync(string action, string messageId = TestData.RequestId) =>
-        CreateClient().PostAsync($"/api/inbox/{messageId}/{action}", null);
+    /// <summary>Replies to a message as the simulated patient typing in the ClientApp.</summary>
+    public Task<HttpResponseMessage> ReplyAsync(string? text, string messageId = TestData.MessageId) =>
+        CreateClient().PostAsJsonAsync($"/api/inbox/{messageId}/reply", new { text });
 
     public void SetBehaviour(PatientBehaviour behaviour, string patientId = TestData.PatientId) =>
         Store.SetBehaviour(new PatientBehaviourAssignment(patientId, behaviour, null));
@@ -176,19 +184,17 @@ internal sealed class SimulatorFactory : WebApplicationFactory<Program>
 
     public IReadOnlyList<PatientReactionRecord> Reactions(string patientId = TestData.PatientId) => Store.GetReactions([patientId]);
 
-    /// <summary>The CommunicationRequest CareLoop sends: same fields as its simulator notification provider.</summary>
-    public static CommunicationRequest Request(string requestId, string patientId, string inboxAddress, bool caregiver, string body) =>
-        new()
+    /// <summary>The message CareLoop sends: same fields as its text-message and email providers.</summary>
+    public static object Message(string messageId, string to, string channel, string? audience, string body, string? subject, string? caseId) =>
+        new
         {
-            Id = caregiver ? "caregiver-" + requestId : requestId,
-            Identifier = [new Identifier("https://careloop.invalid/fhir/sid/notification-attempt", requestId)],
-            Status = RequestStatus.Active,
-            Category = [new CodeableConcept("https://careloop.invalid/fhir/CodeSystem/recipient-kind", caregiver ? "caregiver" : "patient")],
-            Subject = caregiver ? null : new ResourceReference($"Patient/{patientId}"),
-            Recipient = [new ResourceReference { Identifier = new Identifier("https://careloop.invalid/fhir/sid/simulator-inbox", inboxAddress) }],
-            About = [new ResourceReference($"Task/{TestData.CaseId}")],
-            Payload = [new CommunicationRequest.PayloadComponent { Content = new FhirString(body) }],
-            Language = "en",
+            messageId,
+            channel,
+            to,
+            subject,
+            body,
+            language = "en",
+            metadata = new { caseId, audience },
         };
 
     public static string ScenariosDirectory()

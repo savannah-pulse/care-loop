@@ -5,16 +5,15 @@ namespace CareLoop.Domain.Recipients;
 /// </summary>
 /// <remarks>
 /// Channels are system configuration, not recipient preference: a notification is sent on every
-/// enabled channel that can reach the recipient, because redundancy is intended.
+/// enabled channel that can reach the recipient, because redundancy is intended. Patients,
+/// caregivers and staff are reached by text message and email only: there is no patient app or
+/// portal. The values start at 1 because the earlier simulator-only channel, 0, was removed.
 /// </remarks>
 public enum NotificationChannel
 {
-    /// <summary>The simulator channel: patient messages go to the patient-channel simulator, staff messages to the HIS simulator's staff inbox. The only channel enabled in the prototype.</summary>
-    Simulator = 0,
-
-    /// <summary>Text message. Not allowed to carry sensitive content, so it always receives the SMS-safe template. Not built yet.</summary>
+    /// <summary>Text message. Not allowed to carry sensitive content, so it always receives the SMS-safe template.</summary>
     Sms = 1,
 
-    /// <summary>Email. Not built yet.</summary>
+    /// <summary>Email. Receives the standard template, with its subject line.</summary>
     Email = 2,
 }

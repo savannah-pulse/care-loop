@@ -24,9 +24,9 @@ If a task appears to conflict with any of these, stop and ask.
 
 These are deferred, not forbidden. Build the seams for them now and leave the implementations for later.
 
-- **Real SMS and email delivery.** For now the simulator notification provider is the only one enabled. SMS and email providers come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
+- **Real SMS and email delivery.** CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. The `Sms` and `Email` providers are built, but in the prototype both send to the SMS and email simulator. Providers for a real SMS or email service come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
 - **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
-- **Live HIS, Malaffi or patient-channel integration.** The simulators stand in for these.
+- **Live HIS or Malaffi integration.** The simulators stand in for these.
 - **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
 
 ## Before real patient data
@@ -35,7 +35,7 @@ The prototype is not yet fit for real patient data. These are prerequisites for 
 
 - **Authentication and authorization.** `DemoRoles` (identity stated in request headers) is replaced by real sign-in for dashboard users and authenticated system-to-system access on `/fhir`.
 - **Clinical approval.** The pathway definition and every message template are approved by a clinical adviser; no placeholder remains.
-- **Live integrations.** HIS, patient channel, SMS and email are implemented behind the existing seams and switched on through configuration.
+- **Live integrations.** HIS, SMS and email are implemented behind the existing seams and switched on through configuration.
 - **Security and data protection.** Encryption in transit and at rest, managed secrets, access logging, retention rules and a review against the health-data regulation that applies to the deployment. The case store holds patient names and identifiers, so it is personal health data from the first real record.
 
 ## Repository layout
@@ -101,12 +101,13 @@ care-loop/
 │   │       ├── Infrastructure/
 │   │       │   ├── Persistence/        CareLoopDbContext, EfCaseRepository, Outbox/, Configurations/, Migrations/
 │   │       │   ├── Fhir/               FhirHttpClient
-│   │       │   ├── Notifications/      SimulatorNotificationProvider, SimulatorInboundNotificationHandler,
-│   │       │   │                       SmsNotificationProvider, EmailNotificationProvider
+│   │       │   ├── Notifications/      SmsNotificationProvider, EmailNotificationProvider (on SimulatorNotificationProvider),
+│   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
+│   │       │   │                       StaffContactOptions
 │   │       │   ├── Ai/                 NoOpAiProvider (default), AiWorkflowProvider, FoundryDirectProvider
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
-│   │       │   ├── Templates/en/       approved message templates (standard and SMS-safe)
+│   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
 │   │       │   ├── Time/               SystemClock
 │   │       │   └── Auth/               DemoRoles
 │   │       └── Worker/                 DeadlineWorker
@@ -125,7 +126,7 @@ care-loop/
 │       │   └── HisSimulator/           ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, Time/, ClientApp/
 │       └── patient-channel/
 │           ├── README.md, Dockerfile
-│           └── PatientChannelSimulator/   ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, ClientApp/
+│           └── PatientChannelSimulator/   SMS and email simulator. ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, ClientApp/
 │
 └── tests/
     ├── api/CareLoop.Tests/             xUnit, references Domain and Api
@@ -150,7 +151,7 @@ File names inside folders are a starting point. Folder boundaries and dependency
 - **One intake pipeline.** `EventIngestor` runs the same steps for every inbound event: validate, deduplicate, append, apply to the projection, audit. Deduplication uses a unique index on source system plus source event ID.
 - **Reads go direct.** Read slices query `CareLoopDbContext` with no-tracking projections. Do not route reads through the repository.
 - **FHIR is the door for systems of record.** Hospital systems (HIS, EMR, lab) talk to CareLoop only through `/fhir/...`. There is no public `POST /events`. Inbound FHIR mappers translate a resource into an internal `EventEnvelope` and hand it to `EventIngestor`. The FHIR slice contains no business logic.
-- **Notification providers are the door for patient channels.** Reaching a patient, and hearing back from them, belongs to the enabled notification provider, not to the FHIR boundary. Outbound goes through `INotificationProvider`. Inbound (delivery reports and patient replies) arrives at `POST /notifications/inbound/{provider}` and is translated by that provider's `IInboundNotificationHandler` into `EventEnvelope`s for `EventIngestor`. A handler only verifies and translates; it contains no business logic.
+- **Notification providers are the door for text messages and email.** Reaching a patient, a caregiver or a member of staff, and hearing back from them, belongs to the enabled notification provider, not to the FHIR boundary. No FHIR travels on this path. Outbound goes through `INotificationProvider`. Inbound (delivery reports and patient replies) arrives at `POST /notifications/inbound/{provider}` and is translated by that provider's `IInboundNotificationHandler` into `EventEnvelope`s for `EventIngestor`. A handler only verifies and translates; it contains no business logic.
 - **The dashboard is the exception.** `src/web/` is CareLoop's own UI and uses the plain REST read endpoints.
 - **Outbox for everything outbound.** Domain rules raise domain events. `OutboxDispatcher` delivers each to every `IDomainEventSubscriber` and tracks delivery per subscriber (`OutboxDelivery`), so subscribers retry independently and must be idempotent.
 - **Interfaces only at real seams.** `ICaseRepository`, `IPathwayProvider`, `IClock`, `IAiProvider`, `INotificationProvider`, `IInboundNotificationHandler`, `IDomainEventSubscriber`, `IEventHandler`, `IFhirInboundMapper`. Do not add generic repositories or an interface per handler.
@@ -217,7 +218,7 @@ Outbound:
 |---|---|
 | Escalation notice | `Task` |
 | Handoff summary | `DocumentReference`, sent when a person approves it |
-| Case status (also feeds the patient view) | `Task` via `GET /fhir/Task/{id}` |
+| Case status | `Task` via `GET /fhir/Task/{id}` |
 
 Case to `Task` field mapping: handoff status to `Task.status`; pathway stage to `Task.businessStatus`; owner to `Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`; patient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to `Task.statusReason`. Keep all code mappings in `StatusMap`.
 
@@ -229,7 +230,7 @@ Endpoints: `POST /fhir/{resourceType}`, `PUT /fhir/{resourceType}/{id}` (the URL
 
 The sending system names itself in `meta.source`, using its key under `ExternalSystems:Systems`. A resource without it is refused with 400, and one from a system that is not configured there with 403. Replies go back to the system a case came from.
 
-A contact point with `ContactPoint.system` `other` is reached through the simulator channel, for the patient and for a consented caregiver alike; `sms` and `email` are reserved for the real providers.
+A contact point with `ContactPoint.system` `sms` is reached by text message and `email` by email, for the patient and for a consented caregiver alike. Any other system (`phone`, `other`, and so on) is not one CareLoop can send to. Staff are not reached through FHIR contact points: each role's address is configuration (`Notifications:StaffContacts`).
 
 ## Events and notifications
 
@@ -239,10 +240,10 @@ A contact point with `ContactPoint.system` `other` is reached through the simula
 | `HandoffProposed` | `Task` | Proposed owner |
 | `HandoffSummaryApproved` | `DocumentReference` (exactly the approved text) | None |
 | `HandoffRejected`, `ReferralRejected` | `Task` update | Current owner |
-| `CallRequested` | `Task` | Current owner |
+| `CallRequested` | `Task` | The role the pathway names for the call-back (the nurse navigator); the current owner when it names none |
 | `DeadlineApproaching` | None | Current owner |
 | `EscalationRaised` | `Task` | Facility lead, then coordinator |
-| `AppointmentScheduled` | None | Caregiver, only while the patient's consent is active |
+| `AppointmentScheduled` | None | Patient (date, time, place and the reply codes), and the caregiver while the patient's consent is active |
 | `CaseClosed` | `Task` completed | None |
 
 Two subscribers exist: `FhirPublisher` and `NotificationRouter`.
@@ -251,8 +252,12 @@ Notification rules:
 
 - Channels are **system configuration**, not recipient preference. `NotificationSender` sends on **every enabled provider** for which `CanReach(recipient)` is true. Redundancy is intended.
 - Each send is recorded as its own `NotificationAttempt`. The notification is delivered if any channel delivers and failed only if all fail. An acknowledgement on any channel acknowledges the notification.
-- Content is per channel: a provider with `AllowsSensitiveContent == false` (SMS) gets the SMS-safe template.
-- Staff notifications carry no patient detail: "a case needs your action" plus a link into the HIS.
+- Content is per channel: a provider with `AllowsSensitiveContent == false` (SMS) gets the `.sms.txt` template, email the standard `.txt` one with its subject. For now both say the same thing and neither carries a result: there is no secure place for a patient to read one, and a person always gives it.
+- A patient reply can say only two things. CareLoop reads `1` as "I got this message" (an acknowledgement; the message goes out before any appointment exists, so it never asks whether the patient will attend) and `2`, or any other text, as a request for a call. No reply is ever teach-back or a confidence rating: a nurse navigator records those after a call (`POST /cases/{caseId}/call-outcome`). Recording a call answers the patient's request for one; a later text reply of `1` does not.
+- Every channel a patient notification goes out on is recorded on the case as sent before anything is sent, so a failure on one channel marks the patient unreachable only once every channel has failed.
+- Staff notifications carry no patient detail: "a case at {facility} needs your action", and the case number to look for in CareLoop, with no link.
+- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`.
+- Every stored event says where it came from (`SourceEvent.Origin`: `careloop`, `sms` or `email`; empty for the case's own source system), so the timeline never has to guess.
 - Templates come from `Infrastructure/Templates/{language}/`. English only for now; keep everything language-keyed so Arabic can be added later.
 
 ```csharp
@@ -275,20 +280,22 @@ public interface IInboundNotificationHandler
 
 ```json
 "Notifications": {
-  "EnabledProviders": [ "Simulator" ],
+  "EnabledProviders": [ "Sms", "Email" ],
   "PerEventOverrides": { },
-  "Simulator": { "PatientChannelBaseUrl": "...", "StaffInboxBaseUrl": "..." }
+  "Sms": { "BaseUrl": "...", "InboundSecret": "..." },
+  "Email": { "BaseUrl": "...", "InboundSecret": "..." },
+  "StaffContacts": { "nurse-navigator": { "Channel": "Email", "Address": "..." } },
+  "TimeZone": "Asia/Dubai",
+  "FacilityNames": { "family-health-centre": "Family Health Centre" }
 }
 ```
 
 A channel is two-way, so a provider has two halves:
 
 - **Outbound**, `INotificationProvider`: sends the message.
-- **Inbound**, `IInboundNotificationHandler`: understands what comes back on that channel (delivery, failure, acknowledgement, teach-back, call-me, or a reply such as a patient answering an SMS) and translates it into internal events. Each provider has its own format, so each has its own handler, reached at `POST /notifications/inbound/{provider}`.
+- **Inbound**, `IInboundNotificationHandler`: understands what comes back on that channel (a delivery report, a failure, or the patient's reply as typed) and translates it into internal events. Each provider has its own format, so each has its own handler, reached at `POST /notifications/inbound/{provider}`.
 
-Most of the patient channel lives in the patient-channel simulator, not in the API. The simulator receives notifications and then responds as a patient would for the scenario under test: delivers or fails, acknowledges, confirms understanding, asks for a call, or stays silent. The API knows only that the `Simulator` provider is enabled.
-
-`SimulatorNotificationProvider` is the only enabled provider. It sends patient messages to the patient-channel simulator and staff messages to the HIS simulator's staff inbox; `SimulatorInboundNotificationHandler` receives what the patient-channel simulator sends back. The wire format between them (FHIR `CommunicationRequest` out, `Communication` back) is private to that provider. `SmsNotificationProvider` and `EmailNotificationProvider` are the production providers and are not being built yet: create them as documented stubs that throw `NotSupportedException`, so the seam exists and they can be implemented later without touching the sender or the router.
+In the prototype both providers send to the SMS and email simulator (`src/simulators/patient-channel`). The wire format is plain JSON and is CareLoop's own, so the shared classes are named for it: `SimulatorNotificationProvider` posts `{ messageId, channel, to, subject, body, language, metadata }` to `{BaseUrl}/messages`, and `SimulatorInboundNotificationHandler` receives the signed delivery reports and replies at `POST /notifications/inbound/sms` or `/email`. `metadata` carries the case and the audience (patient, caregiver or staff) and is returned on every callback; only a callback about a patient message can change a case. The simulator plays the people CareLoop writes to: it reports delivery or failure, and the patient replies or stays silent, as the scenario under test says. Going live means a provider written for a real service's API beside these; the sender and the router do not change.
 
 ## Key interfaces
 
@@ -311,8 +318,8 @@ public interface ICaseRepository
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
 | `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `AiWorkflowProvider`, `FoundryDirectProvider` |
-| `INotificationProvider` | `Api/Features/Notifications` | Simulator, SMS (stub), Email (stub) |
-| `IInboundNotificationHandler` | `Api/Features/Notifications` | Simulator; SMS and email when those providers are built |
+| `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
+| `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
 | `IEventHandler` | `Api/Features/Events` | Eight handlers, chosen by event type |
 | `IFhirInboundMapper` | `Api/Features/Fhir` | One per inbound resource |
@@ -324,7 +331,7 @@ Never read the system time directly. Always use `IClock`, so deadline tests and 
 Scenarios span days and CareLoop measures deadlines in real time, so a live run is compressed at the edges, never inside the API:
 
 - **API.** `Pathways:Directory` selects the pathway folder. `Infrastructure/Pathways/demo` holds the same definitions with every duration divided by 1800 (one pathway hour is two real seconds). Development and Docker Compose use it; the base settings use the real folder. A test asserts the two files differ only by that factor.
-- **Simulators.** `Scenarios:RealSecondsPerScenarioHour` (default 2) paces the HIS simulator's steps and compresses the patient's `respondAfter`. It must match the demo pathway's factor.
+- **Simulators.** `Scenarios:RealSecondsPerScenarioHour` (default 2) paces the HIS simulator's steps and compresses the patient's `respondAfter` in the SMS and email simulator. It must match the demo pathway's factor.
 - **Tests.** Journey tests use `FakeClock` with the real pathway folder and need neither.
 
 Timestamps are always real. Do not add a fast or fake clock to the API outside tests.
@@ -434,7 +441,7 @@ export function ExceptionRow({ item, onOpen }: ExceptionRowProps) {
 - Every FHIR mapper has a test against a sample resource in `tests/.../Fhir/Samples/`.
 - `EventIngestor` has an idempotency test: replaying the same source event produces one case and one event.
 - Outbox: a failing subscriber does not block the others and is retried.
-- Notifications: sends go to all enabled reachable channels; SMS gets the SMS-safe template; delivered-if-any and failed-if-all are both covered.
+- Notifications: sends go to all enabled reachable channels; SMS gets the `.sms.txt` template; delivered-if-any and failed-if-all are both covered; a reply of 1 acknowledges and any other reply asks for a call.
 - Journey tests cover the four scenarios in `src/simulators/scenarios/`.
 - End-to-end (Playwright): one successful journey and one broken handoff.
 - Run the relevant tests after every change and report failures plainly. Do not weaken or delete a test to make it pass.
@@ -449,9 +456,9 @@ Work in this order. Finish and test each step before starting the next.
 4. **Deadlines and escalation.** `DeadlineWorker`, escalation ladder, exception flags.
 5. **Read endpoints.** Cases, timeline, exceptions, metrics, with OpenAPI.
 6. **FHIR boundary.** Endpoints, then inbound mappers one resource at a time starting with `DiagnosticReport`, then outbound mappers.
-7. **Outbox and notifications.** Dispatcher, `FhirPublisher`, `NotificationRouter`, `NotificationSender`, simulator provider, templates.
+7. **Outbox and notifications.** Dispatcher, `FhirPublisher`, `NotificationRouter`, `NotificationSender`, SMS and email providers, templates.
 8. **Dashboard.** Exception queue, case timeline, metrics.
-9. **Simulators.** HIS first, then patient channel, each with its scenario runner; UIs last.
+9. **Simulators.** HIS first, then SMS and email, each with its scenario runner; UIs last.
 10. **AI handoff summary.** Draft, approval and rejection behind `IAiProvider`; see [`docs/ai-design/integration.md`](docs/ai-design/integration.md).
 11. **Scenarios and simulation.** Scenario scripts, cohort, the with-and-without-escalation comparison, end-to-end tests.
 

@@ -22,4 +22,10 @@ public enum NotificationUpdateKind
 
     /// <summary>The patient rated how confident they feel about what to do next, 1 to 5. A measure, not an acknowledgement; the value is in <see cref="NotificationUpdatePayload.Confidence"/>.</summary>
     ConfidenceRated = 5,
+
+    /// <summary>
+    /// CareLoop is sending the message on a channel. Recorded before the send, for every channel that can reach the
+    /// patient, so a delivery report from one channel is judged against every channel still on its way.
+    /// </summary>
+    Sent = 6,
 }

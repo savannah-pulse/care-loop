@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <!--
-    Patient-channel simulator (WS8). TargetFramework, Nullable, ImplicitUsings, documentation
+    SMS and email simulator (WS8; the project keeps its patient-channel name). TargetFramework, Nullable, ImplicitUsings, documentation
     generation and warnings-as-errors come from the repository-root Directory.Build.props.
     This project deliberately has NO project references: it shares no code with src/api/ or the
-    HIS simulator and builds and parses FHIR itself.
+    HIS simulator. It exchanges plain JSON with CareLoop and uses no FHIR library.
   -->
   <PropertyGroup>
     <RootNamespace>PatientChannelSimulator</RootNamespace>
@@ -14,7 +14,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Hl7.Fhir.R4" Version="6.8.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
   </ItemGroup>
 

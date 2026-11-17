@@ -19,7 +19,7 @@ public class SimulatorStoreTests
         Assert.Same(first, storedFirst);
         Assert.Same(first, storedReplay);
         Assert.Single(store.GetInboxMessages());
-        Assert.Same(first, store.FindInboxMessageByRequest(TestData.RequestId));
+        Assert.Same(first, store.FindInboxMessage(TestData.MessageId));
     }
 
     [Fact]
@@ -47,9 +47,9 @@ public class SimulatorStoreTests
         store.AddInboxMessage(TestData.Message());
 
         Parallel.For(0, 200, _ =>
-            store.UpdateInboxMessage(TestData.RequestId, m => m with { CallRequestCount = m.CallRequestCount + 1 }));
+            store.UpdateInboxMessage(TestData.MessageId, m => m with { Replies = [.. m.Replies, new InboxReply($"r{m.Replies.Count + 1}", "2", TestData.Now)] }));
 
-        Assert.Equal(200, store.FindInboxMessage(TestData.RequestId)!.CallRequestCount);
+        Assert.Equal(200, store.FindInboxMessage(TestData.MessageId)!.Replies.Count);
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public class SimulatorStoreTests
         var store = new SimulatorStore();
         for (var i = 0; i < SimulatorStore.LogCapacity + 10; i++)
         {
-            store.AppendLogEntry(new FhirMessageLogEntry(
-                $"entry-{i}", TestData.Now.AddSeconds(i), FhirMessageDirection.Inbound, "POST", "/fhir/CommunicationRequest", "CommunicationRequest", null, 201, null));
+            store.AppendLogEntry(new MessageLogEntry(
+                $"entry-{i}", TestData.Now.AddSeconds(i), MessageDirection.Inbound, "POST", "/messages", "message", null, 201, null));
         }
 
         var entries = store.GetLogEntries();
@@ -83,11 +83,11 @@ public class SimulatorStoreTests
     {
         var store = new SimulatorStore();
         store.AddInboxMessage(TestData.Message());
-        store.AddInboxMessage(TestData.Message(requestId: "caregiver-" + TestData.RequestId, recipientKind: RecipientKind.Caregiver));
-        store.AddInboxMessage(TestData.Message(requestId: "other", patientId: "SYN-PT-0002"));
+        store.AddInboxMessage(TestData.Message(messageId: "caregiver-" + TestData.MessageId, recipientKind: RecipientKind.Caregiver));
+        store.AddInboxMessage(TestData.Message(messageId: "other", to: "SYN-PT-0002"));
 
-        Assert.Equal(1, store.GetNotificationNumber(TestData.RequestId));
-        Assert.Equal(0, store.GetNotificationNumber("caregiver-" + TestData.RequestId));
+        Assert.Equal(1, store.GetNotificationNumber(TestData.MessageId));
+        Assert.Equal(0, store.GetNotificationNumber("caregiver-" + TestData.MessageId));
         Assert.Equal(0, store.GetNotificationNumber("unknown"));
     }
 
@@ -95,12 +95,12 @@ public class SimulatorStoreTests
     public void Setting_a_behaviour_starts_the_notification_count_again()
     {
         var store = new SimulatorStore();
-        store.AddInboxMessage(TestData.Message(requestId: "earlier"));
+        store.AddInboxMessage(TestData.Message(messageId: "earlier"));
 
         store.SetBehaviour(new PatientBehaviourAssignment(TestData.PatientId, new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge), "happy-path"));
         Assert.Equal(0, store.GetNotificationNumber("earlier"));
 
-        store.AddInboxMessage(TestData.Message(requestId: "under-the-behaviour"));
+        store.AddInboxMessage(TestData.Message(messageId: "under-the-behaviour"));
         Assert.Equal(1, store.GetNotificationNumber("under-the-behaviour"));
 
         store.RemoveBehaviour(TestData.PatientId);
@@ -111,9 +111,9 @@ public class SimulatorStoreTests
     public void Notifications_are_numbered_for_each_case_separately()
     {
         var store = new SimulatorStore();
-        store.AddInboxMessage(TestData.Message(requestId: "first"));
-        store.AddInboxMessage(TestData.Message(requestId: "other-case") with { CaseTaskId = "another-case" });
-        store.AddInboxMessage(TestData.Message(requestId: "reminder"));
+        store.AddInboxMessage(TestData.Message(messageId: "first"));
+        store.AddInboxMessage(TestData.Message(messageId: "other-case") with { CaseId = "another-case" });
+        store.AddInboxMessage(TestData.Message(messageId: "reminder"));
 
         Assert.Equal(1, store.GetNotificationNumber("first"));
         Assert.Equal(1, store.GetNotificationNumber("other-case"));
@@ -124,10 +124,10 @@ public class SimulatorStoreTests
     public void Setting_the_default_behaviour_starts_the_numbers_again_for_patients_without_their_own()
     {
         var store = new SimulatorStore();
-        store.AddInboxMessage(TestData.Message(requestId: "earlier"));
+        store.AddInboxMessage(TestData.Message(messageId: "earlier"));
 
         store.SetDefaultBehaviour(new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge));
-        store.AddInboxMessage(TestData.Message(requestId: "under-the-default"));
+        store.AddInboxMessage(TestData.Message(messageId: "under-the-default"));
 
         Assert.Equal(0, store.GetNotificationNumber("earlier"));
         Assert.Equal(1, store.GetNotificationNumber("under-the-default"));
@@ -150,8 +150,8 @@ public class SimulatorStoreTests
     public void A_due_response_is_claimed_exactly_once()
     {
         var store = new SimulatorStore();
-        store.SchedulePendingResponse(new PendingResponse("late", PatientResponseKind.Acknowledgement, null, TestData.Now.AddMinutes(10)));
-        store.SchedulePendingResponse(new PendingResponse("due", PatientResponseKind.CallMe, null, TestData.Now.AddMinutes(1)));
+        store.SchedulePendingResponse(new PendingResponse("late", ReplyCodes.WillCome, TestData.Now.AddMinutes(10)));
+        store.SchedulePendingResponse(new PendingResponse("due", ReplyCodes.CallMe, TestData.Now.AddMinutes(1)));
 
         Assert.Empty(store.ClaimDueResponses(TestData.Now));
         var claimed = store.ClaimDueResponses(TestData.Now.AddMinutes(1));

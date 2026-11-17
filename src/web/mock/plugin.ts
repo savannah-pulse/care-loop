@@ -162,7 +162,17 @@ function redacted<T extends { patientDisplayName?: string | null; patientSeconda
   who: Reader,
   value: T,
 ): T {
-  return who.role === 'coordinator' ? { ...value, patientDisplayName: null, patientSecondaryIdentifier: null } : value
+  if (who.role !== 'coordinator') {
+    return value
+  }
+  // As the API does: the coordinator sees no one's identity, so the patient reference and the hospital's result
+  // identifier go too, where the value has them.
+  const hidden: T = { ...value, patientDisplayName: null, patientSecondaryIdentifier: null }
+  return {
+    ...hidden,
+    ...('patientReference' in value ? { patientReference: null } : {}),
+    ...('sourceResultId' in value ? { sourceResultId: null } : {}),
+  }
 }
 
 function summaryOf(detail: CaseDetail): CaseSummary {
@@ -270,6 +280,7 @@ function acknowledge(fixture: CaseFixture, escalationId: string, who: Reader, re
     fixture.timeline.push({
       auditEventId: randomUUID(),
       sourceSystem: 'careloop',
+      origin: 'careloop',
       eventType: 'EscalationAcknowledged',
       disposition: rejection ? 'Rejected' : 'Applied',
       actorReference: who.reference,
@@ -364,6 +375,7 @@ function approve(state: MockState, fixture: CaseFixture, summary: HandoffSummary
   fixture.timeline.push({
     auditEventId: randomUUID(),
     sourceSystem: 'careloop',
+    origin: 'careloop',
     eventType: 'HandoffSummaryApproved',
     disposition: 'Applied',
     actorReference: who.reference,
@@ -389,6 +401,74 @@ function reject(state: MockState, summary: HandoffSummary, who: Reader, reason: 
   }
   state.summaries.set(summary.summaryId, rejected)
   return rejected
+}
+
+/** How far the patient-contact track has come, so a call outcome never moves it backwards. */
+const CONTACT_RANK: Readonly<Record<string, number>> = { Acknowledged: 1, Understood: 2 }
+
+/**
+ * Records what a nurse navigator learned on a call, with the API's rules: nurse navigators only, at
+ * least one outcome, a rating from 1 to 5, and only once a message has been sent to the patient.
+ */
+function recordCall(fixture: CaseFixture, who: Reader, reason: string | null, body: Record<string, unknown>): CaseDetail {
+  if (who.role !== 'nurse-navigator') {
+    throw new HttpError(403, 'Only a nurse navigator may record the outcome of a call with a patient.')
+  }
+  const acknowledged = body.acknowledged === true
+  const understood = body.understood === true
+  const rated = body.confidence !== null && body.confidence !== undefined
+  const confidence = Number(body.confidence)
+  if (!acknowledged && !understood && !rated) {
+    throw new HttpError(400, 'Record at least one outcome.')
+  }
+  if (rated && !(Number.isInteger(confidence) && confidence >= 1 && confidence <= 5)) {
+    throw new HttpError(400, 'A confidence rating must be between 1 and 5.')
+  }
+  const detail = fixture.detail
+  checkCase(who, detail, reason)
+  const now = mockNow().toISOString()
+  const record = (text: string, refused = false): void => {
+    fixture.timeline.push({
+      auditEventId: randomUUID(),
+      sourceSystem: detail.sourceSystem,
+      origin: 'careloop',
+      eventType: 'NotificationUpdated',
+      disposition: refused ? 'Rejected' : 'Applied',
+      actorReference: who.reference,
+      actorRole: who.role,
+      sourceTimestamp: now,
+      receivedTimestamp: now,
+      priorStage: detail.stage,
+      newStage: detail.stage,
+      reason: text,
+      evidenceReference: null,
+    })
+  }
+  const contact = detail.tracks.find((entry) => entry.kind === 'Notification')
+  if (!contact?.status) {
+    record('No notification has been requested for this case, so there is nothing to report on.', true)
+    throw new HttpError(409, 'No notification has been requested for this case, so there is nothing to report on.')
+  }
+  const advance = (status: 'Acknowledged' | 'Understood'): void => {
+    if ((CONTACT_RANK[contact.status ?? ''] ?? 0) < (CONTACT_RANK[status] ?? 0)) {
+      contact.status = status
+      contact.isComplete = true
+      contact.updatedAt = now
+    }
+  }
+  if (acknowledged) {
+    advance('Acknowledged')
+    record('On a call, the patient said they will come.')
+  }
+  if (understood) {
+    advance('Understood')
+    record('On a call, the patient said the next step back in their own words.')
+  }
+  if (rated) {
+    detail.confidence = confidence
+    record(`On a call, the patient rated their confidence ${confidence} out of 5.`)
+  }
+  return detail
 }
 
 function requireText(body: Record<string, unknown>, field: string): string {
@@ -475,6 +555,11 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     expect('GET')
     checkCase(who, fixture.detail, reason)
     send(res, 200, fixture.timeline)
+    return true
+  }
+  if (third === 'call-outcome' && fourth === undefined) {
+    expect('POST')
+    send(res, 200, redacted(who, recordCall(fixture, who, reason, await readJson(req))))
     return true
   }
   if (third === 'escalations' && fourth !== undefined && fifth === 'acknowledgement') {

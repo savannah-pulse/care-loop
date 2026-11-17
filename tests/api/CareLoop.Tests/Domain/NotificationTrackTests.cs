@@ -27,7 +27,7 @@ public sealed class NotificationTrackTests
         var track = new NotificationTrack(_clock.UtcNow);
 
         track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Failed));
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Delivered));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Delivered));
 
         Assert.Equal(NotificationStatus.Delivered, track.Status);
     }
@@ -40,7 +40,7 @@ public sealed class NotificationTrackTests
         track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Failed));
         Assert.Equal(NotificationStatus.Failed, track.Status);
 
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Sent));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Sent));
         Assert.Equal(NotificationStatus.Sent, track.Status);
 
         track.RecordAttempt(Attempt(NotificationChannel.Email, NotificationAttemptStatus.Failed));
@@ -52,7 +52,7 @@ public sealed class NotificationTrackTests
     {
         var track = new NotificationTrack(_clock.UtcNow);
 
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Delivered));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Delivered));
         track.Advance(NotificationStatus.Delivered, _clock.UtcNow, "SYN-COMM-0001");
 
         Assert.Equal(NotificationStatus.Delivered, track.Status);
@@ -64,7 +64,7 @@ public sealed class NotificationTrackTests
     {
         var track = new NotificationTrack(_clock.UtcNow);
         track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Failed));
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Delivered));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Delivered));
 
         track.Advance(NotificationStatus.Acknowledged, _clock.UtcNow, "SYN-COMM-0002");
 
@@ -98,14 +98,28 @@ public sealed class NotificationTrackTests
     }
 
     [Fact]
+    public void A_call_made_answers_the_call_request_and_acknowledges_nothing()
+    {
+        var track = new NotificationTrack(_clock.UtcNow);
+        track.Advance(NotificationStatus.Delivered, _clock.UtcNow, null);
+        track.RecordCallRequest(_clock.UtcNow, "SYN-COMM-0004");
+
+        track.RecordCallMade(_clock.UtcNow.AddMinutes(30), "call-outcome/SYN");
+
+        Assert.False(track.CallRequested);
+        Assert.Equal(NotificationStatus.Delivered, track.Status);
+        Assert.False(track.IsComplete());
+    }
+
+    [Fact]
     public void Each_send_is_recorded_as_its_own_attempt()
     {
         var track = new NotificationTrack(_clock.UtcNow);
         var simulatorAttemptId = Guid.NewGuid();
 
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Sent, simulatorAttemptId));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Sent, simulatorAttemptId));
         track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Sent));
-        track.RecordAttempt(Attempt(NotificationChannel.Simulator, NotificationAttemptStatus.Delivered, simulatorAttemptId));
+        track.RecordAttempt(Attempt(NotificationChannel.Sms, NotificationAttemptStatus.Delivered, simulatorAttemptId));
 
         Assert.Equal(2, track.Attempts.Count);
         Assert.Equal(NotificationAttemptStatus.Delivered, track.Attempts.Single(a => a.Id == simulatorAttemptId).Status);

@@ -2,6 +2,7 @@ using CareLoop.Api.Features.Common;
 using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Cases;
+using CareLoop.Domain.Events;
 using CareLoop.Domain.Time;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -45,8 +46,8 @@ public static class GetTimeline
             join source in db.SourceEvents.AsNoTracking() on audit.SourceEventId equals source.Id
             where audit.CaseId == caseId
             orderby audit.ReceivedTimestamp, audit.Id
-            select new { Audit = audit, source.SourceSystem }).ToListAsync(ct);
-        var parsed = entries.Select(e => new { e.Audit, e.SourceSystem, New = CaseProjection.FromJson(e.Audit.NewProjectionJson) }).ToList();
+            select new { Audit = audit, source.SourceSystem, source.Origin }).ToListAsync(ct);
+        var parsed = entries.Select(e => new { e.Audit, e.SourceSystem, e.Origin, New = CaseProjection.FromJson(e.Audit.NewProjectionJson) }).ToList();
         return Results.Ok(parsed.OrderBy(e => e.Audit.ReceivedTimestamp)
             .ThenBy(e => e.New.Version).Select(e => new TimelineEntryResponse
         {
@@ -56,6 +57,16 @@ public static class GetTimeline
             PriorStage = e.Audit.PriorProjectionJson is { } prior ? CaseProjection.FromJson(prior).Stage : null,
             NewStage = e.New.Stage,
             Reason = e.Audit.Reason, EvidenceReference = e.Audit.EvidenceReference,
+            Origin = OriginOf(e.Origin, e.SourceSystem),
         }).ToList());
     }
+
+    /// <summary>Where an entry came from, for the timeline; an event with no stored origin came from its source system.</summary>
+    /// <param name="origin">The stored origin, if any.</param>
+    /// <param name="sourceSystem">The source system the event is filed under.</param>
+    /// <returns><c>sms</c>, <c>email</c>, <c>careloop</c> or <c>hospital</c>.</returns>
+    public static string OriginOf(string? origin, string sourceSystem) =>
+        !string.IsNullOrWhiteSpace(origin) ? origin
+        : string.Equals(sourceSystem, EventOrigins.CareLoop, StringComparison.OrdinalIgnoreCase) ? EventOrigins.CareLoop
+        : EventOrigins.Hospital;
 }

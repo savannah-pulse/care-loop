@@ -52,6 +52,7 @@ const AT_CLOSURE_REVIEW = caseDetail({
 const REPEATED_RESULT = timelineEntry({
   auditEventId: 'a0000000-0000-4000-8000-000000000002',
   sourceSystem: 'fhc-his',
+  origin: 'hospital',
   eventType: 'ScreeningResultReceived',
   disposition: 'Rejected',
   actorReference: 'fhc-his',
@@ -63,6 +64,7 @@ const REPEATED_RESULT = timelineEntry({
 const OUTCOME = timelineEntry({
   auditEventId: 'a0000000-0000-4000-8000-000000000003',
   sourceSystem: 'fhc-his',
+  origin: 'hospital',
   eventType: 'OutcomeRecorded',
   actorReference: 'rekha-varghese',
   actorRole: 'clinician',

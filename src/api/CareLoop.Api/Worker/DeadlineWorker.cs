@@ -217,7 +217,8 @@ public sealed class DeadlineWorker : BackgroundService
         await repository.SaveAsync(@case, new SourceEvent
         {
             Id = Guid.NewGuid(),
-            SourceSystem = "careloop",
+            SourceSystem = EventOrigins.CareLoop,
+            Origin = EventOrigins.CareLoop,
             SourceEventId = sourceEventId,
             Type = CaseEventType.DeadlineElapsed,
             CaseId = @case.Id,

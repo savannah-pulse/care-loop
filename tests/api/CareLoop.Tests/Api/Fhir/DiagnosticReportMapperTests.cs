@@ -35,7 +35,7 @@ public sealed class DiagnosticReportMapperTests
         Assert.Equal("DiagnosticReport/SYN-RESULT-0001", payload.ResultReference);
         Assert.Equal("en", payload.PatientLanguage);
         var contact = Assert.Single(payload.PatientContactPoints);
-        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-INBOX-0001" }, contact);
+        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Sms, Address = "SYN-TEL-0001" }, contact);
         Assert.Equal("SYN-STAFF-0001", payload.NamedOwner?.Reference);
         Assert.Equal("clinician", payload.NamedOwner?.Role);
     }

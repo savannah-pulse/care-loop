@@ -1,20 +1,26 @@
 /**
- * Hand-written types mirroring the JSON contracts of the patient-channel simulator's .NET host.
+ * Hand-written types mirroring the JSON contracts of the SMS and email simulator's .NET host.
  *
  * @remarks
  * Every record is synthetic and carries a `simulated` (or `synthetic`) marker that the UI must show.
  */
 
-/** The simulated channel a message was presented on. */
-export type InboxChannel = 'App' | 'Sms' | 'Portal' | 'Email';
-
 /**
- * Who an inbox message was sent to.
+ * The channel a message arrived on.
  *
  * @remarks
- * A caregiver's copy is read-only: nothing a caregiver does may count as the patient's response.
+ * CareLoop reaches people by text message and email only: there is no health app or patient portal.
  */
-export type RecipientKind = 'Patient' | 'Caregiver';
+export type InboxChannel = 'Sms' | 'Email';
+
+/**
+ * Who a message is for.
+ *
+ * @remarks
+ * Only a message to the patient can be replied to: nothing a caregiver or a member of staff does
+ * may count as the patient's reply.
+ */
+export type RecipientKind = 'Patient' | 'Caregiver' | 'Staff';
 
 /**
  * What the simulator reported to CareLoop about delivery.
@@ -24,70 +30,59 @@ export type RecipientKind = 'Patient' | 'Caregiver';
  */
 export type DeliveryState = 'Pending' | 'Delivered' | 'Failed' | 'Silent';
 
-/** The simulated patient's latest response to a message. */
-export type ResponseState = 'None' | 'Acknowledged' | 'Understood' | 'CallRequested';
+/** One reply to a message, as the simulated patient typed it. */
+export interface InboxReply {
+  /** The simulator's identifier of the reply. */
+  replyId: string;
+  /** The text exactly as typed. The simulator does not say what it means: CareLoop decides. */
+  text: string;
+  /** ISO 8601 time CareLoop accepted the reply. */
+  sentAt: string;
+}
 
-/** One simulated message in the simulated patient inbox (`GET /api/inbox`). */
+/** One simulated text message or email (`GET /api/inbox`). */
 export interface InboxMessage {
-  /** Simulator-local identifier of the message. */
+  /** The identifier CareLoop gave the message. */
   messageId: string;
-  /** Logical id of the FHIR `CommunicationRequest` that produced the message. */
-  communicationRequestId: string;
-  /** Logical id of the CareLoop case `Task`, when the request referenced one. */
-  caseTaskId: string | null;
-  /** Synthetic identifier of whoever the message is for (prefixed `SYN-`): the patient, or a caregiver's inbox address. */
-  patientSyntheticId: string;
-  /** Visibly synthetic display name (starts with "Synthetic"). */
-  patientDisplayName: string;
-  /** Channel the message was presented on. */
+  /** The case the message is about, when its metadata named one. */
+  caseId: string | null;
+  /** The synthetic phone number or email address it was sent to (prefixed `SYN-`). */
+  to: string;
+  /** Visibly synthetic display name of whoever it is for (starts with "Synthetic"). */
+  displayName: string;
+  /** Whether it is a text message or an email. */
   channel: InboxChannel;
+  /** The subject line of an email; `null` for a text message. */
+  subject: string | null;
   /** BCP 47 language tag of the message content. */
   language: string;
   /** Message text exactly as CareLoop rendered it. */
   body: string;
-  /** ISO 8601 time the simulator received the request. */
+  /** ISO 8601 time the simulator received the message. */
   receivedAt: string;
   /** Delivery outcome reported to CareLoop. */
   delivery: DeliveryState;
   /** Reason reported with a failed delivery, otherwise `null`. */
   deliveryFailureReason: string | null;
-  /** The strongest response CareLoop accepted: understood, else acknowledged, else a call request. */
-  response: ResponseState;
-  /** ISO 8601 time of the latest response, otherwise `null`. */
-  respondedAt: string | null;
+  /** Whether the message is for the patient, a caregiver or a member of staff. */
+  recipientKind: RecipientKind;
+  /** The replies CareLoop accepted for this message, oldest first. */
+  replies: InboxReply[];
   /** Simulated-data marker; always `true`. */
   simulated: boolean;
-  /** Whether the message is for the patient or is a caregiver's copy. */
-  recipientKind: RecipientKind;
-  /** The patient's latest 1 to 5 confidence rating, otherwise `null`. A rating is not an acknowledgement. */
-  confidence: number | null;
-  /** ISO 8601 time of the latest rating, otherwise `null`. */
-  confidenceRatedAt: string | null;
-  /** How many call-me requests CareLoop has accepted for this message. */
-  callRequestCount: number;
-  /** How many confidence ratings CareLoop has accepted for this message. */
-  confidenceRatingCount: number;
-  /** ISO 8601 time CareLoop accepted the patient's acknowledgement, otherwise `null`. */
-  acknowledgedAt: string | null;
-  /** ISO 8601 time CareLoop accepted the patient's teach-back, otherwise `null`. */
-  understoodAt: string | null;
 }
-
-/**
- * A one-click action a patient can take on an inbox message.
- *
- * @remarks
- * `acknowledge` is "I will come": it sends an acknowledgement and nothing else. The confidence
- * rating and the SMS reply carry a value, so they have their own client functions.
- */
-export type InboxAction = 'acknowledge' | 'understand' | 'call-me';
 
 /** What the channel reports when a notification for a patient arrives. */
 export type DeliveryBehaviour = 'Deliver' | 'Fail' | 'StaySilent';
 
-/** What a patient does, on their own, after a notification has been delivered to them. */
-export type PatientResponseBehaviour =
-  'None' | 'Acknowledge' | 'Understand' | 'CallMe' | 'RateConfidence';
+/**
+ * What a patient does, on their own, after a notification has been delivered to them.
+ *
+ * @remarks
+ * `Acknowledge` replies 1 ("I got this message") and `CallMe` replies 2. A patient cannot say the next
+ * step back or rate their confidence by text or email: a nurse records those after a call.
+ */
+export type PatientResponseBehaviour = 'None' | 'Acknowledge' | 'CallMe';
 
 /**
  * How one simulated patient reacts when CareLoop notifies them.
@@ -108,16 +103,11 @@ export interface PatientBehaviour {
   respondToNotification: number;
   /** Simulated-data marker; always `true`. */
   simulated: boolean;
-  /**
-   * The 1 to 5 confidence rating the patient gives, or `null` for none. Required when `response`
-   * is `RateConfidence`; with another response the patient rates straight after it.
-   */
-  confidence: number | null;
 }
 
 /** The behaviour in force for one patient (`GET /api/patient-behaviours`). */
 export interface PatientBehaviourAssignment {
-  /** Synthetic identifier of the patient; always prefixed `SYN-`. */
+  /** Synthetic identifier of the patient, which is also the address their messages are sent to; always prefixed `SYN-`. */
   patientSyntheticId: string;
   /** How that patient reacts to notifications. */
   behaviour: PatientBehaviour;
@@ -127,8 +117,8 @@ export interface PatientBehaviourAssignment {
   simulated: boolean;
 }
 
-/** One FHIR exchange between the simulator and CareLoop (`GET /api/fhir-log`). */
-export interface FhirMessageLogEntry {
+/** One exchange between the simulator and CareLoop (`GET /api/message-log`). */
+export interface MessageLogEntry {
   /** Simulator-local identifier of the entry. */
   entryId: string;
   /** ISO 8601 time of the exchange. */
@@ -139,37 +129,14 @@ export interface FhirMessageLogEntry {
   method: string;
   /** Request URL or path. */
   url: string;
-  /** FHIR resource type exchanged. */
-  resourceType: string;
-  /** Logical id of the resource, when known. */
-  resourceId: string | null;
+  /** What was exchanged: `message`, `delivery` or `reply`. */
+  kind: string;
+  /** The message the exchange is about, when known. */
+  messageId: string | null;
   /** HTTP status of the response, or `null` when no response arrived. */
   statusCode: number | null;
-  /** The FHIR JSON exchanged, when there was a body. */
+  /** The JSON that was sent, when it was kept. */
   body: string | null;
-  /** Simulated-data marker; always `true`. */
-  simulated: boolean;
-}
-
-/**
- * The patient-facing view of a case (`GET /api/case-status/{taskId}`).
- *
- * @remarks
- * Coordination status only, read from the CareLoop case `Task`; it carries no clinical detail.
- */
-export interface PatientCaseStatus {
-  /** Logical id of the case `Task` in CareLoop. */
-  taskId: string;
-  /** FHIR `Task.status` code. */
-  taskStatus: string;
-  /** Pathway stage from `Task.businessStatus`, when present. */
-  stage: string | null;
-  /** Rejection or closure reason from `Task.statusReason`, when present. */
-  statusReason: string | null;
-  /** ISO 8601 current deadline from `Task.restriction.period`, when present. */
-  dueBy: string | null;
-  /** ISO 8601 time CareLoop last changed the task, when known. */
-  lastUpdated: string | null;
   /** Simulated-data marker; always `true`. */
   simulated: boolean;
 }
@@ -197,14 +164,7 @@ export type ScenarioRunStatus = 'Pending' | 'Running' | 'Completed' | 'Failed';
 
 /** One thing the simulator did in reaction to a notification. */
 export type PatientReactionKind =
-  | 'Delivered'
-  | 'DeliveryFailed'
-  | 'NoDeliveryReport'
-  | 'Acknowledged'
-  | 'Understood'
-  | 'CallRequested'
-  | 'NoResponse'
-  | 'ConfidenceRated';
+  'Delivered' | 'DeliveryFailed' | 'NoDeliveryReport' | 'Replied' | 'NoResponse';
 
 /** A record of one reaction to one notification. */
 export interface PatientReactionRecord {
@@ -216,7 +176,7 @@ export interface PatientReactionRecord {
   reaction: PatientReactionKind;
   /** Whether the reaction came from the patient's behaviour rather than a click in this app. */
   automatic: boolean;
-  /** Deterministic identifier of the emitted `Communication`, or `null` when nothing was sent. */
+  /** Identifier of the callback that was sent (the reply, or the message with its delivery status), or `null` when nothing was sent. */
   sourceEventId: string | null;
   /** ISO 8601 time of the reaction. */
   at: string;

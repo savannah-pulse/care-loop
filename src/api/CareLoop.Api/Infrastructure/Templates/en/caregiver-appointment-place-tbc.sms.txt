@@ -1,1 +1,1 @@
-[PLACEHOLDER] An appointment has been booked for someone you support: {{appointmentDate}} at {{appointmentTime}}.
+[PLACEHOLDER] An appointment has been booked for someone you support, who agreed that you may be told about it. Date: {{appointmentDate}}. Time: {{appointmentTime}}. Place: to be confirmed.

@@ -82,8 +82,11 @@ const GENERAL_HOSPITAL = 'general-hospital'
 const HOSPITAL_SYSTEM = 'fhc-his'
 /** The General Hospital's hospital system. */
 const GENERAL_HOSPITAL_SYSTEM = 'gh-his'
-/** The patient channel, which reports deliveries and patients' replies. */
-const PATIENT_CHANNEL = 'patient-channel'
+/**
+ * Who the API names on what comes back by text message or email (a delivery report or a reply):
+ * the case's own source system, because no person acted.
+ */
+const MESSAGE_ACTOR = HOSPITAL_SYSTEM
 
 const REKHA: Owner = { reference: 'rekha-varghese', role: 'clinician', facilityId: FACILITY, isQueue: false }
 const HUDA: Owner = { reference: 'huda-saleh', role: 'nurse-navigator', facilityId: FACILITY, isQueue: false }
@@ -150,8 +153,6 @@ function notStarted(kind: Track['kind']): Track {
 }
 
 interface EntrySpec {
-  /** Where the event came from: the hospital system by default, CareLoop for its own events. */
-  readonly source?: 'patient'
   readonly type: EventType
   readonly time: string
   readonly by: { readonly actor: string; readonly role: string }
@@ -160,6 +161,22 @@ interface EntrySpec {
   readonly reason: string
   readonly evidence?: string
   readonly refused?: boolean
+  /** Where the entry came from, when the actor alone does not say: `sms` or `email` for a channel callback. */
+  readonly origin?: string
+}
+
+/** Event types a person records in CareLoop itself rather than in the hospital system. */
+const CARELOOP_EVENTS: ReadonlySet<EventType> = new Set<EventType>(['EscalationAcknowledged', 'NotificationUpdated', 'HandoffSummaryApproved'])
+
+/** Where an entry came from, as the API's `origin` says it. */
+function originOf(spec: EntrySpec): string {
+  if (spec.origin) {
+    return spec.origin
+  }
+  if (spec.by.actor === 'careloop' || CARELOOP_EVENTS.has(spec.type)) {
+    return 'careloop'
+  }
+  return 'hospital'
 }
 
 function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
@@ -167,7 +184,7 @@ function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
     const source = at(spec.time)
     return {
       auditEventId: `${caseId.slice(0, -3)}${String(index + 1).padStart(3, '0')}`,
-      sourceSystem: spec.source === 'patient' ? PATIENT_CHANNEL : spec.by.actor === 'careloop' ? 'careloop' : HOSPITAL_SYSTEM,
+      sourceSystem: spec.by.actor === 'careloop' ? 'careloop' : HOSPITAL_SYSTEM,
       eventType: spec.type,
       disposition: spec.refused ? 'Rejected' : 'Applied',
       actorReference: spec.by.actor,
@@ -177,6 +194,7 @@ function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
       priorStage: spec.from,
       newStage: spec.to,
       reason: spec.reason,
+      origin: originOf(spec),
       evidenceReference: spec.evidence ?? null,
     }
   })
@@ -265,8 +283,8 @@ function hessa(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
-        source: 'patient',
-        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered asking her to expect a call from her care team.',
@@ -456,17 +474,17 @@ function salem(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-11T16:20:00+04:00',
-        source: 'patient',
-        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
-        reason: 'Acknowledged in his health app.',
+        reason: 'Replied 1 to the text message: he got the message.',
       },
       {
         type: 'NotificationUpdated',
         time: '2026-11-12T08:40:00+04:00',
-        source: 'patient',
-        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'He asked for a call back.',
@@ -650,8 +668,8 @@ function nasreen(): CaseFixture {
       {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
-        source: 'patient',
-        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered.',
@@ -861,10 +879,10 @@ function latifa(): CaseFixture {
         reason: 'Reviewed as routine.',
       },
       {
-        source: 'patient',
         type: 'NotificationUpdated',
         time: '2026-11-09T16:00:00+04:00',
-        by: { actor: PATIENT_CHANNEL, role: 'system' },
+        by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text not delivered: the number is not in service.',

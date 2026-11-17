@@ -2,19 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ApiError,
-  actOnInboxMessage,
-  getCaseStatus,
   listInbox,
+  listMessageLog,
   listPatientBehaviours,
-  rateConfidence,
   removePatientBehaviour,
-  replyBySms,
+  replyToMessage,
   runScenario,
   setPatientBehaviour,
 } from '../src/api';
 import en from '../src/locales/en.json';
 
-import { behaviour, inboxMessage, mockApi, problem, scenarioRun } from './helpers';
+import { behaviour, inboxMessage, logEntry, mockApi, problem, scenarioRun } from './helpers';
 
 describe('API client', () => {
   it('listInbox fetches GET /api/inbox', async () => {
@@ -26,54 +24,33 @@ describe('API client', () => {
     expect(api.calls).toEqual([{ method: 'GET', path: '/api/inbox', body: undefined }]);
   });
 
-  it('actOnInboxMessage posts to the action route', async () => {
-    const api = mockApi({
-      'POST /api/inbox/message%2F1/call-me': inboxMessage({ response: 'CallRequested' }),
+  it('replyToMessage posts the text as typed to the reply route', async () => {
+    const replied = inboxMessage({
+      replies: [
+        {
+          replyId: 'message/1-r1',
+          text: ' can you call me? ',
+          sentAt: '2026-03-02T09:31:00+00:00',
+        },
+      ],
     });
+    const api = mockApi({ 'POST /api/inbox/message%2F1/reply': replied });
 
-    const updated = await actOnInboxMessage('message/1', 'call-me');
+    const updated = await replyToMessage('message/1', ' can you call me? ');
 
-    expect(updated.response).toBe('CallRequested');
+    expect(updated.replies).toHaveLength(1);
     expect(api.calls[0]).toEqual({
       method: 'POST',
-      path: '/api/inbox/message%2F1/call-me',
-      body: undefined,
+      path: '/api/inbox/message%2F1/reply',
+      body: { text: ' can you call me? ' },
     });
   });
 
-  it('rateConfidence posts the rating to the rate-confidence route', async () => {
-    const api = mockApi({
-      'POST /api/inbox/message-1/rate-confidence': inboxMessage({ confidence: 4 }),
-    });
+  it('listMessageLog fetches GET /api/message-log', async () => {
+    const api = mockApi({ 'GET /api/message-log': [logEntry()] });
 
-    expect((await rateConfidence('message-1', 4)).confidence).toBe(4);
-    expect(api.calls[0]?.body).toEqual({ rating: 4 });
-  });
-
-  it('replyBySms posts the text to the reply route', async () => {
-    const api = mockApi({
-      'POST /api/inbox/message-1/reply': inboxMessage({ response: 'Acknowledged' }),
-    });
-
-    await replyBySms('message-1', '1');
-
-    expect(api.calls[0]?.body).toEqual({ text: '1' });
-  });
-
-  it('getCaseStatus fetches GET /api/case-status/{taskId}', async () => {
-    const status = {
-      taskId: 'case-1',
-      taskStatus: 'in-progress',
-      stage: 'follow-up-active',
-      statusReason: null,
-      dueBy: null,
-      lastUpdated: null,
-      simulated: true,
-    };
-    const api = mockApi({ 'GET /api/case-status/case-1': status });
-
-    expect(await getCaseStatus('case-1')).toEqual(status);
-    expect(api.calls).toHaveLength(1);
+    expect(await listMessageLog()).toEqual([logEntry()]);
+    expect(api.calls).toEqual([{ method: 'GET', path: '/api/message-log', body: undefined }]);
   });
 
   it('listPatientBehaviours fetches GET /api/patient-behaviours', async () => {
@@ -116,7 +93,7 @@ describe('API client', () => {
 
   it('rejects with a readable error on a non-2xx response', async () => {
     mockApi({
-      'POST /api/inbox/message-1/acknowledge': problem(
+      'POST /api/inbox/message-1/reply': problem(
         502,
         'CareLoop could not be reached.',
         'SIMULATED: connection refused',
@@ -126,7 +103,7 @@ describe('API client', () => {
       },
     });
 
-    const refused = await actOnInboxMessage('message-1', 'acknowledge').catch((e: unknown) => e);
+    const refused = await replyToMessage('message-1', '1').catch((e: unknown) => e);
     expect(refused).toBeInstanceOf(ApiError);
     expect((refused as ApiError).status).toBe(502);
     expect((refused as ApiError).message).toBe(

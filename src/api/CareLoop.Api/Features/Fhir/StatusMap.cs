@@ -27,9 +27,6 @@ public static class StatusMap
     /// <summary>Code system for closure and rejection reasons, used in <c>Task.statusReason</c>.</summary>
     public const string StatusReasonSystem = Base + "/CodeSystem/status-reason";
 
-    /// <summary>Code system for the category that distinguishes patient <c>Communication</c>s.</summary>
-    public const string CommunicationCategorySystem = Base + "/CodeSystem/communication-category";
-
     /// <summary>Code system for <c>Task.code</c>: which kind of task a <c>Task</c> is.</summary>
     public const string TaskCodeSystem = Base + "/CodeSystem/task-code";
 
@@ -101,21 +98,6 @@ public static class StatusMap
 
     /// <summary>Closure output: the explanation when closing on an exception (<c>valueString</c>).</summary>
     public const string ExceptionNoteOutput = "exception-note";
-
-    /// <summary>Communication category code of a delivery report.</summary>
-    public const string DeliveryStatusCategory = "delivery-status";
-
-    /// <summary>Communication category code of an acknowledgement.</summary>
-    public const string AcknowledgementCategory = "acknowledgement";
-
-    /// <summary>Communication category code of a teach-back answer.</summary>
-    public const string TeachBackCategory = "teach-back";
-
-    /// <summary>Communication category code of a call-me request.</summary>
-    public const string CallMeCategory = "call-me";
-
-    /// <summary>Communication category code of a confidence rating (C10).</summary>
-    public const string ConfidenceRatingCategory = "confidence-rating";
 
     private static readonly (CaseStage Stage, string Code)[] Stages =
     [
@@ -267,67 +249,18 @@ public static class StatusMap
     };
 
     /// <summary>
-    /// Works out what a <c>Communication</c> reports about a notification.
-    /// </summary>
-    /// <param name="communication">The communication sent by the patient channel.</param>
-    /// <returns>The kind of update, or <see langword="null"/> when the communication is not about a notification.</returns>
-    /// <remarks>A delivery report must never be read as an acknowledgement.</remarks>
-    public static NotificationUpdateKind? ToNotificationUpdateKind(Communication communication)
-    {
-        ArgumentNullException.ThrowIfNull(communication);
-
-        var category = communication.Category
-            .Select(c => CodeIn(c, CommunicationCategorySystem))
-            .FirstOrDefault(c => c is not null);
-
-        return (category, communication.Status) switch
-        {
-            (DeliveryStatusCategory, EventStatus.Completed) => NotificationUpdateKind.Delivered,
-            (DeliveryStatusCategory, EventStatus.NotDone) => NotificationUpdateKind.Failed,
-            (DeliveryStatusCategory, _) => null,
-            (_, not EventStatus.Completed) => null,
-            (AcknowledgementCategory, _) => NotificationUpdateKind.Acknowledged,
-            (TeachBackCategory, _) => NotificationUpdateKind.Understood,
-            (CallMeCategory, _) => NotificationUpdateKind.CallRequested,
-            (ConfidenceRatingCategory, _) => NotificationUpdateKind.ConfidenceRated,
-            _ => null,
-        };
-    }
-
-    /// <summary>
-    /// Reads the patient's 1 to 5 rating from a <c>confidence-rating</c> <c>Communication</c> (C10).
-    /// </summary>
-    /// <param name="communication">The communication sent by the patient channel.</param>
-    /// <returns>
-    /// The integer in the first <c>payload.contentString</c>, or <see langword="null"/> when there is none.
-    /// The range is not checked here: the notification handler refuses a value outside 1 to 5, so the refusal is audited.
-    /// </returns>
-    public static int? ToConfidence(Communication communication)
-    {
-        ArgumentNullException.ThrowIfNull(communication);
-
-        foreach (var payload in communication.Payload)
-        {
-            if (payload.Content is FhirString text && int.TryParse(text.Value, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var value))
-            {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
     /// Maps a FHIR contact point system to the CareLoop notification channel.
     /// </summary>
     /// <param name="system">The <c>ContactPoint.system</c>.</param>
     /// <returns>The channel, or <see langword="null"/> when CareLoop has no provider for that system.</returns>
-    /// <remarks><c>other</c> is the simulator inbox, the only channel that exists while only the simulators are connected.</remarks>
+    /// <remarks>
+    /// Patients and caregivers are reached by text message and email only, so <c>sms</c> and <c>email</c> are the
+    /// only systems that map. A <c>phone</c>, <c>other</c> or any other contact point is not one CareLoop can send to.
+    /// </remarks>
     public static NotificationChannel? ToNotificationChannel(Hl7.Fhir.Model.ContactPoint.ContactPointSystem? system) => system switch
     {
         Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Sms => NotificationChannel.Sms,
         Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Email => NotificationChannel.Email,
-        Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Other => NotificationChannel.Simulator,
         _ => null,
     };
 

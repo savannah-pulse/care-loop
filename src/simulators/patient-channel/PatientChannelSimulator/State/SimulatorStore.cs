@@ -1,14 +1,14 @@
 namespace PatientChannelSimulator.State;
 
 /// <summary>
-/// In-memory state of the patient-channel simulator: the simulated patient inbox, the FHIR
+/// In-memory state of the SMS and email simulator: the simulated inboxes, the
 /// message log, scenario runs, patient behaviours, the reactions to notifications and the
 /// responses that are waiting for their due time.
 /// </summary>
 /// <remarks>
 /// Registered as a singleton and therefore shared by concurrent requests, the scenario runner and
 /// the response dispatcher. One lock guards plain collections, because several operations must be
-/// atomic across more than one of them (for example "store unless this request was already
+/// atomic across more than one of them (for example "store unless this message was already
 /// received"). Every read returns a snapshot. Everything here is synthetic and is lost on restart
 /// by design: the simulator is not a system of record.
 /// </remarks>
@@ -19,9 +19,8 @@ public sealed class SimulatorStore
 
     private readonly Lock _gate = new();
     private readonly Dictionary<string, InboxMessage> _messages = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _messageIdByRequest = new(StringComparer.Ordinal);
     private readonly List<string> _messageOrder = [];
-    private readonly Queue<FhirMessageLogEntry> _log = new();
+    private readonly Queue<MessageLogEntry> _log = new();
     private readonly Dictionary<string, PatientBehaviourAssignment> _behaviours = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _behaviourInForceFrom = new(StringComparer.Ordinal);
     private readonly List<PatientReactionRecord> _reactions = [];
@@ -51,7 +50,7 @@ public sealed class SimulatorStore
     }
 
     /// <summary>
-    /// Adds a newly received message unless its <c>CommunicationRequest</c> was already received.
+    /// Adds a newly received message unless a message with its identifier was already received.
     /// </summary>
     /// <remarks>
     /// The check and the insert are one atomic step, so two concurrent deliveries of the same
@@ -59,18 +58,12 @@ public sealed class SimulatorStore
     /// </remarks>
     /// <param name="message">The message to store.</param>
     /// <param name="stored">The message now in the inbox: <paramref name="message"/> when it was added, otherwise the one stored earlier.</param>
-    /// <returns><see langword="true"/> when the message was added; <see langword="false"/> when the request, or the message identifier, was seen before.</returns>
+    /// <returns><see langword="true"/> when the message was added; <see langword="false"/> when the message identifier was seen before.</returns>
     public bool TryAddInboxMessage(InboxMessage message, out InboxMessage stored)
     {
         ArgumentNullException.ThrowIfNull(message);
         lock (_gate)
         {
-            if (_messageIdByRequest.TryGetValue(message.CommunicationRequestId, out var existingId))
-            {
-                stored = _messages[existingId];
-                return false;
-            }
-
             if (_messages.TryGetValue(message.MessageId, out var existing))
             {
                 stored = existing;
@@ -107,23 +100,6 @@ public sealed class SimulatorStore
         lock (_gate)
         {
             return _messages.GetValueOrDefault(messageId);
-        }
-    }
-
-    /// <summary>
-    /// Looks up the inbox message created from a given <c>CommunicationRequest</c>.
-    /// </summary>
-    /// <remarks>
-    /// Used to make inbound handling idempotent: CareLoop's outbox may resend the same request,
-    /// and a resend must not create a second inbox message.
-    /// </remarks>
-    /// <param name="communicationRequestId">Logical id of the FHIR <c>CommunicationRequest</c>.</param>
-    /// <returns>The existing message, or <see langword="null"/> when the request has not been seen.</returns>
-    public InboxMessage? FindInboxMessageByRequest(string communicationRequestId)
-    {
-        lock (_gate)
-        {
-            return _messageIdByRequest.TryGetValue(communicationRequestId, out var id) ? _messages[id] : null;
         }
     }
 
@@ -182,11 +158,11 @@ public sealed class SimulatorStore
     }
 
     /// <summary>
-    /// Appends one exchange to the FHIR message log.
+    /// Appends one exchange to the message log.
     /// </summary>
     /// <remarks>The log keeps the newest <see cref="LogCapacity"/> entries.</remarks>
     /// <param name="entry">The exchange to record.</param>
-    public void AppendLogEntry(FhirMessageLogEntry entry)
+    public void AppendLogEntry(MessageLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
         lock (_gate)
@@ -200,10 +176,10 @@ public sealed class SimulatorStore
     }
 
     /// <summary>
-    /// Lists the FHIR message log.
+    /// Lists the message log.
     /// </summary>
     /// <returns>A snapshot of the logged exchanges, newest first.</returns>
-    public IReadOnlyList<FhirMessageLogEntry> GetLogEntries()
+    public IReadOnlyList<MessageLogEntry> GetLogEntries()
     {
         lock (_gate)
         {
@@ -329,12 +305,12 @@ public sealed class SimulatorStore
     /// about the patient's next case is a first notification again.
     /// </para>
     /// <para>
-    /// Only messages addressed to the patient count. A caregiver's copy is not a notification the
+    /// Only messages addressed to the patient count. A caregiver's or staff member's message is not a notification the
     /// patient received, so it never moves the patient towards the notification they respond to.
     /// </para>
     /// </remarks>
     /// <param name="messageId">Simulator-local identifier of the inbox message.</param>
-    /// <returns>The number, counting from 1; 0 when the message is unknown, is a caregiver's copy, or arrived before the behaviour in force was set.</returns>
+    /// <returns>The number, counting from 1; 0 when the message is unknown, is not for the patient, or arrived before the behaviour in force was set.</returns>
     public int GetNotificationNumber(string messageId)
     {
         lock (_gate)
@@ -344,14 +320,14 @@ public sealed class SimulatorStore
                 return 0;
             }
 
-            var from = _behaviourInForceFrom.TryGetValue(message.PatientSyntheticId, out var own) ? own : _defaultInForceFrom;
+            var from = _behaviourInForceFrom.TryGetValue(message.To, out var own) ? own : _defaultInForceFrom;
             var number = 0;
             for (var i = from; i < _messageOrder.Count; i++)
             {
                 var other = _messages[_messageOrder[i]];
                 if (other.RecipientKind == RecipientKind.Patient
-                    && string.Equals(other.PatientSyntheticId, message.PatientSyntheticId, StringComparison.Ordinal)
-                    && string.Equals(other.CaseTaskId, message.CaseTaskId, StringComparison.Ordinal))
+                    && string.Equals(other.To, message.To, StringComparison.Ordinal)
+                    && string.Equals(other.CaseId, message.CaseId, StringComparison.Ordinal))
                 {
                     number++;
                 }
@@ -503,12 +479,11 @@ public sealed class SimulatorStore
     // A response that is still waiting was decided by the behaviour that has just been replaced.
     // Sending it anyway would make a patient who was just set to stay silent respond.
     private void DropPendingResponses(Func<string, bool> forPatient) =>
-        _pending.RemoveAll(p => _messages.TryGetValue(p.MessageId, out var message) && forPatient(message.PatientSyntheticId));
+        _pending.RemoveAll(p => _messages.TryGetValue(p.MessageId, out var message) && forPatient(message.To));
 
     private void Store(InboxMessage message)
     {
         _messages[message.MessageId] = message;
-        _messageIdByRequest[message.CommunicationRequestId] = message.MessageId;
         _messageOrder.Add(message.MessageId);
     }
 }

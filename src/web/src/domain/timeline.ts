@@ -27,38 +27,40 @@ export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)
 }
 
-/** Where a timeline entry came from: CareLoop itself, a hospital system or the patient channel. */
-export type TimelineSource = 'careLoop' | 'hospital' | 'patientChannel'
+/** Where a timeline entry came from: CareLoop itself, a hospital system, a text message or an email. */
+export type TimelineSource = 'careLoop' | 'hospital' | 'sms' | 'email'
 
 /**
- * Source systems the dashboard names, by the key the API reports in `sourceSystem`.
+ * Where an entry came from, by the `origin` the API reports for it.
  *
  * @remarks
- * CareLoop records its own events (deadlines, escalations, acknowledgements and approved summaries)
- * as `careloop`. Every other system that reaches CareLoop is a hospital system, through its FHIR
- * boundary, unless it is listed here as the patient channel.
+ * The API says it plainly: `careloop` for CareLoop itself (deadlines, escalations, acknowledgements, approved
+ * summaries, a call a nurse recorded, and CareLoop's record of what it sent), `sms` or `email` for a delivery
+ * report or the patient's reply on that channel, and `hospital` for the case's hospital system. Nothing is guessed
+ * from the event type or the actor.
  */
-export const SOURCE_SYSTEMS: Readonly<Record<string, TimelineSource>> = {
+export const ORIGINS: Readonly<Record<string, TimelineSource>> = {
   careloop: 'careLoop',
-  'patient-channel': 'patientChannel',
+  sms: 'sms',
+  email: 'email',
+  hospital: 'hospital',
 }
 
 /**
  * Works out where a timeline entry came from (C3).
  *
- * @param entry - The entry, with the source system the API joined from the stored event.
- * @returns `careLoop` for CareLoop's own events, `patientChannel` for the patient channel and
- * `hospital` for any other system.
+ * @param entry - The entry, with the origin the API reports.
+ * @returns `careLoop`, `sms`, `email` or `hospital`; an origin the dashboard does not know reads as a hospital system.
  */
-export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem'>): TimelineSource {
-  return SOURCE_SYSTEMS[entry.sourceSystem.trim().toLowerCase()] ?? 'hospital'
+export function timelineSource(entry: Pick<TimelineEntry, 'origin'>): TimelineSource {
+  return ORIGINS[entry.origin.trim().toLowerCase()] ?? 'hospital'
 }
 
 /**
  * Names where a timeline entry came from, in plain words.
  *
  * @param source - Where the entry came from.
- * @returns `CareLoop`, `Hospital system` or `Patient channel`.
+ * @returns `CareLoop`, `Hospital system`, `Text message` or `Email`.
  */
 export function sourceLabel(source: TimelineSource): string {
   return t(`timeline.sources.${source}`)
@@ -90,25 +92,25 @@ export function hasOwnReason(entry: Pick<TimelineEntry, 'eventType' | 'reason'>)
 /**
  * Tells whether the API's own wording of a timeline entry may be shown to a role.
  *
- * @param entry - The entry's source system.
+ * @param entry - The entry's origin, as the API reports it.
  * @param viewerRole - The role of the person reading.
- * @returns `true`, except for an entry from a hospital system or the patient channel read by a role
- * names are hidden from.
+ * @returns `true`, except for an entry from a hospital system, a text message or an email read by a
+ * role names are hidden from.
  *
  * @remarks
  * The wording of such an entry can quote the hospital system's own numbers, as in "A case already
  * exists for result 'fhc-his/DiagnosticReport/r-…'", or free text from the hospital system, and
  * either can point to the patient. CareLoop's own wording, such as "Deadline warning raised", never
- * does, so it is always shown.
+ * does, so it is always shown. Where an entry came from is decided by {@link timelineSource}.
  */
-export function mayQuoteReason(entry: Pick<TimelineEntry, 'sourceSystem'>, viewerRole: string): boolean {
+export function mayQuoteReason(entry: Pick<TimelineEntry, 'origin'>, viewerRole: string): boolean {
   return !namesHiddenFor(viewerRole) || timelineSource(entry) === 'careLoop'
 }
 
 /**
  * Words the main line of a timeline entry.
  *
- * @param entry - The entry's kind, disposition, reason and source system.
+ * @param entry - The entry's kind, disposition, reason and origin.
  * @param viewerRole - The role of the person reading.
  * @returns For an entry CareLoop refused, what was refused in plain words, so a refused attempt
  * never reads as done: for example `Acknowledgement refused` or `Referral update not accepted`.
@@ -121,7 +123,7 @@ export function mayQuoteReason(entry: Pick<TimelineEntry, 'sourceSystem'>, viewe
  * words, never the kind alone.
  */
 export function timelineEntryTitle(
-  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'sourceSystem'>,
+  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'origin'>,
   viewerRole: string,
 ): string {
   if (entry.disposition === 'Rejected') {
@@ -133,7 +135,7 @@ export function timelineEntryTitle(
 /**
  * Says why CareLoop refused a timeline entry, for a line under it.
  *
- * @param entry - The entry's kind, disposition, reason and source system.
+ * @param entry - The entry's kind, disposition, reason and origin.
  * @param viewerRole - The role of the person reading.
  * @returns The reason CareLoop recorded, when the entry was refused, the reason says more than the
  * kind (see {@link hasOwnReason}) and it may be shown to the role (see {@link mayQuoteReason});
@@ -144,7 +146,7 @@ export function timelineEntryTitle(
  * raw references and timestamps, and the main line already says it was refused.
  */
 export function refusalReason(
-  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'sourceSystem'>,
+  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'origin'>,
   viewerRole: string,
 ): string | undefined {
   const shown =

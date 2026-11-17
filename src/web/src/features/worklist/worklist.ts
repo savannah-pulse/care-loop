@@ -234,7 +234,7 @@ export function sortByRisk(rows: readonly WorklistRow[]): WorklistRow[] {
     if (a.status.rank !== b.status.rank) {
       return a.status.rank - b.status.rank
     }
-    return a.summary.patientReference.localeCompare(b.summary.patientReference)
+    return (a.summary.patientReference ?? a.summary.caseId).localeCompare(b.summary.patientReference ?? b.summary.caseId)
   })
 }
 

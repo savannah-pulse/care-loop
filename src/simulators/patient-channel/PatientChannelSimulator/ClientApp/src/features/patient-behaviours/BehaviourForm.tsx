@@ -9,13 +9,7 @@ import { fromDotNetDuration, toDotNetDuration } from './duration';
 const DELIVERIES: readonly DeliveryBehaviour[] = ['Deliver', 'Fail', 'StaySilent'];
 
 /** The patient responses, in the order they are offered. */
-const RESPONSES: readonly PatientResponseBehaviour[] = [
-  'None',
-  'Acknowledge',
-  'Understand',
-  'CallMe',
-  'RateConfidence',
-];
+const RESPONSES: readonly PatientResponseBehaviour[] = ['None', 'Acknowledge', 'CallMe'];
 
 /** The behaviour a new form starts from: delivered, and the patient does nothing. */
 export const DELIVER_AND_DO_NOTHING: PatientBehaviour = {
@@ -25,7 +19,6 @@ export const DELIVER_AND_DO_NOTHING: PatientBehaviour = {
   respondAfter: '00:00:00',
   respondToNotification: 1,
   simulated: true,
-  confidence: null,
 };
 
 /** Props for {@link BehaviourForm}. */
@@ -70,9 +63,6 @@ export function BehaviourForm({
     String(fromDotNetDuration(initial.respondAfter)),
   );
   const [respondTo, setRespondTo] = useState(String(initial.respondToNotification));
-  const [confidence, setConfidence] = useState(
-    initial.confidence === null ? '' : String(initial.confidence),
-  );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -88,10 +78,6 @@ export function BehaviourForm({
 
     if (delivery === 'Fail' && failureReason.trim().length === 0) {
       return t('patientBehaviours.validation.failureReason');
-    }
-
-    if (effectiveResponse === 'RateConfidence' && confidence === '') {
-      return t('patientBehaviours.validation.confidence');
     }
 
     if (!(Number(respondAfter) >= 0)) {
@@ -124,7 +110,6 @@ export function BehaviourForm({
           respondAfter: toDotNetDuration(Number(respondAfter)),
           respondToNotification: Number(respondTo),
           simulated: true,
-          confidence: effectiveResponse === 'None' || confidence === '' ? null : Number(confidence),
         },
         patientId.trim(),
       );
@@ -194,23 +179,6 @@ export function BehaviourForm({
           ))}
         </select>
         <small id={id('response-hint')}>{t('patientBehaviours.responseNeedsDelivery')}</small>
-      </div>
-
-      <div className="field">
-        <label htmlFor={id('confidence')}>{t('patientBehaviours.fields.confidence')}</label>
-        <select
-          id={id('confidence')}
-          value={effectiveResponse === 'None' ? '' : confidence}
-          disabled={effectiveResponse === 'None'}
-          onChange={(event) => setConfidence(event.target.value)}
-        >
-          <option value="">{t('patientBehaviours.confidenceNone')}</option>
-          {[1, 2, 3, 4, 5].map((rating) => (
-            <option key={rating} value={rating}>
-              {rating}
-            </option>
-          ))}
-        </select>
       </div>
 
       <div className="field">

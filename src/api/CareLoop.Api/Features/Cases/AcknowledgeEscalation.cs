@@ -72,7 +72,7 @@ public static class AcknowledgeEscalation
         {
             await repository.SaveAsync(@case, new SourceEvent
             {
-                Id = Guid.NewGuid(), SourceSystem = "careloop", SourceEventId = Guid.NewGuid().ToString("N"),
+                Id = Guid.NewGuid(), SourceSystem = EventOrigins.CareLoop, Origin = EventOrigins.CareLoop, SourceEventId = Guid.NewGuid().ToString("N"),
                 Type = CaseEventType.EscalationAcknowledged, CaseId = caseId, Actor = actor,
                 OccurredAt = now, ReceivedAt = now, PayloadJson = JsonSerializer.Serialize(new { escalationId, reason }),
                 Disposition = rejection is null ? SourceEventDisposition.Applied : SourceEventDisposition.Rejected,

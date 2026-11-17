@@ -1,30 +1,37 @@
 namespace PatientChannelSimulator.State;
 
 /// <summary>
-/// What a patient does, on their own, after a notification has been delivered to them.
+/// What a simulated patient does after a notification reaches them.
 /// </summary>
 /// <remarks>
-/// The response half of a <see cref="PatientBehaviour"/>. A response only ever follows a
-/// delivered notification: a patient cannot respond to a message that failed or was never
-/// reported. The same responses can also be given by hand from the inbox.
+/// A patient can only reply by text or email. Saying the next step back (teach-back) and rating
+/// their confidence are not things a patient does on these channels: a nurse records them after a
+/// call, in CareLoop.
 /// </remarks>
 public enum PatientResponseBehaviour
 {
-    /// <summary>The patient does nothing. The notification stays unacknowledged.</summary>
+    /// <summary>The patient stays silent. The message stays unacknowledged, which is what lets CareLoop's deadline be demonstrated.</summary>
     None,
 
-    /// <summary>The patient confirms they saw the message.</summary>
+    /// <summary>The patient replies <see cref="ReplyCodes.WillCome"/>: "I got this message".</summary>
     Acknowledge,
 
-    /// <summary>The patient confirms they understood the message (teach-back).</summary>
-    Understand,
-
-    /// <summary>The patient asks to be called.</summary>
+    /// <summary>The patient replies <see cref="ReplyCodes.CallMe"/>: they ask their care team for a call.</summary>
     CallMe,
+}
 
-    /// <summary>
-    /// The patient only rates their confidence (C10). A rating is not an acknowledgement, so the
-    /// notification stays unacknowledged.
-    /// </summary>
-    RateConfidence,
+/// <summary>
+/// The replies a message invites, as the message text tells the patient.
+/// </summary>
+/// <remarks>
+/// The simulator only uses them to type a reply for a patient whose behaviour says so. What a
+/// reply means is decided by CareLoop, which also has to cope with any other text.
+/// </remarks>
+public static class ReplyCodes
+{
+    /// <summary>"I got this message".</summary>
+    public const string WillCome = "1";
+
+    /// <summary>"Please call me".</summary>
+    public const string CallMe = "2";
 }

@@ -177,6 +177,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/cases/{caseId}/call-outcome": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Records the outcome of a call through the one intake pipeline. */
+        post: operations["RecordCallOutcome"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/metrics/simulation": {
         parameters: {
             query?: never;
@@ -335,6 +352,21 @@ export interface components {
             /** @description The text being approved. The approver may have edited the draft; what is approved is exactly this text. */
             approvedText: string;
         };
+        /**
+         * @description What a nurse records after speaking to the patient on the phone
+         *     (`POST /cases/{caseId}/call-outcome`).
+         */
+        CallOutcomeRequest: {
+            /** @description `true` when the patient said she will come: an acknowledgement. */
+            acknowledged?: boolean;
+            /** @description `true` when the patient said the next step back in her own words (teach-back). */
+            understood?: boolean;
+            /**
+             * Format: int32
+             * @description How confident the patient said she feels about what happens next, from 1 to 5; `null` when she was not asked or gave no rating.
+             */
+            confidence?: null | number | string;
+        };
         /** @description The full coordination state of one case, returned by `GET /cases/{caseId}`. */
         CaseDetailResponse: {
             /**
@@ -344,10 +376,10 @@ export interface components {
             caseId: string;
             /** @description Identifier of the system that produced the result. */
             sourceSystem: string;
-            /** @description The source system's identifier of the actionable result. */
-            sourceResultId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description The source system's identifier of the actionable result. `null` for the coordinator, who sees no one's identity. */
+            sourceResultId?: null | string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -424,8 +456,8 @@ export interface components {
              * @description CareLoop's identifier of the case.
              */
             caseId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -591,8 +623,8 @@ export interface components {
              * @description CareLoop's identifier of the case.
              */
             caseId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -998,6 +1030,11 @@ export interface components {
             reason: string;
             /** @description Reference to the supporting evidence, when there is any. */
             evidenceReference?: null | string;
+            /**
+             * @description Where the entry came from: `hospital` (the case's source system), `careloop` (CareLoop itself, including
+             *     a call a nurse recorded), `sms` or `email` (a delivery report or the patient's reply on that channel).
+             */
+            origin: string;
         };
         /** @description How a pathway uses one of the parallel tracks. */
         TrackDefinition: {
@@ -1530,6 +1567,80 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseDetailResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+        };
+    };
+    RecordCallOutcome: {
+        parameters: {
+            query?: {
+                /** @description Access reason required outside the nurse's facility. */
+                reason?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The case. */
+                caseId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Cancels the request. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CallOutcomeRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

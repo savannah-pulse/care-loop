@@ -14,7 +14,7 @@ public sealed class ClientAppFallback
     /// <summary>The marker put on the fallback endpoint.</summary>
     public static readonly ClientAppFallback Instance = new();
 
-    private static readonly string[] HostPrefixes = ["/api", "/fhir", "/scenarios", "/openapi", "/health"];
+    private static readonly string[] HostPrefixes = ["/api", "/messages", "/scenarios", "/openapi", "/health"];
 
     private ClientAppFallback()
     {

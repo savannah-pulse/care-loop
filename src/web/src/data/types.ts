@@ -8,6 +8,9 @@ export type CaseSummary = Schemas['CaseSummaryResponse']
 /** The full coordination state of one case, as returned by `GET /cases/{caseId}`. */
 export type CaseDetail = Schemas['CaseDetailResponse']
 
+/** What a nurse navigator records after a call with the patient, as sent to `POST /cases/{caseId}/call-outcome`. */
+export type CallOutcome = Schemas['CallOutcomeRequest']
+
 /** One audit entry of a case timeline, as returned by `GET /cases/{caseId}/timeline`. */
 export type TimelineEntry = Schemas['TimelineEntryResponse']
 

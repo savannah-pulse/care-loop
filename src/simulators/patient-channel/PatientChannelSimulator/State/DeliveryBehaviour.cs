@@ -10,10 +10,10 @@ namespace PatientChannelSimulator.State;
 /// </remarks>
 public enum DeliveryBehaviour
 {
-    /// <summary>Report the message as delivered (<c>Communication</c> status <c>completed</c>).</summary>
+    /// <summary>Report the message as delivered (a delivery report with status <c>delivered</c>).</summary>
     Deliver,
 
-    /// <summary>Report the delivery as failed (<c>Communication</c> status <c>not-done</c> with a reason).</summary>
+    /// <summary>Report the delivery as failed (a delivery report with status <c>failed</c> and a reason).</summary>
     Fail,
 
     /// <summary>Accept the message but report nothing at all, so CareLoop's deadline handling has to detect the silence.</summary>

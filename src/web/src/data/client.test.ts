@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { signInAs } from '../identity'
 import { caseDetail, caseSummary } from '../testing/builders'
+import { recordCallOutcome } from './callOutcome'
 import { createCareLoopClient } from './client'
 import { acknowledgeEscalation, loadEscalatedCases, mapAtMost } from './escalations'
 import { failureKindFor, type FailureKind } from './outcome'
@@ -194,6 +195,34 @@ describe('escalation acknowledgement', () => {
   ])('reports a refused acknowledgement (HTTP %i) as %s', async (status, kind) => {
     const { client } = fakeApi(() => problem(status, { title: 'Not acknowledged', status }))
     const outcome = await acknowledgeEscalation('case-1', 'escalation-1', undefined, client)
+    expect(outcome).toMatchObject({ ok: false, failure: { kind, status } })
+  })
+})
+
+describe('call outcome', () => {
+  it('posts what the nurse recorded, with the reason for a case outside the team', async () => {
+    const { client, requests } = fakeApi(() => Response.json(caseDetail({ confidence: 4 })))
+    const outcome = await recordCallOutcome(
+      'case/1',
+      { acknowledged: false, understood: true, confidence: 4 },
+      ' Covering clinic ',
+      client,
+    )
+    const url = new URL(requests[0].url)
+    expect(requests[0].method).toBe('POST')
+    expect(url.pathname).toBe('/api/cases/case%2F1/call-outcome')
+    expect(url.searchParams.get('reason')).toBe('Covering clinic')
+    expect(await requests[0].json()).toEqual({ acknowledged: false, understood: true, confidence: 4 })
+    expect(outcome).toMatchObject({ ok: true, data: { confidence: 4 } })
+  })
+
+  it.each<[number, FailureKind]>([
+    [400, 'invalid'],
+    [403, 'forbidden'],
+    [409, 'conflict'],
+  ])('reports a refused call outcome (HTTP %i) as %s', async (status, kind) => {
+    const { client } = fakeApi(() => problem(status, { title: 'Not recorded', status }))
+    const outcome = await recordCallOutcome('case-1', { understood: true }, undefined, client)
     expect(outcome).toMatchObject({ ok: false, failure: { kind, status } })
   })
 })

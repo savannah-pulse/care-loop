@@ -272,7 +272,7 @@ public sealed class EfCaseRepositoryTests : IDisposable
     public async Task Consent_withdrawn_in_a_later_save_is_stored()
     {
         var @case = DomainTestData.InFollowUp(_clock);
-        @case.RecordConsent(new ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-CAREGIVER-INBOX-0001" }, "Consent/SYN-CONSENT-0001", _clock.UtcNow);
+        @case.RecordConsent(new ContactPoint { Channel = NotificationChannel.Sms, Address = "SYN-CAREGIVER-INBOX-0001" }, "Consent/SYN-CONSENT-0001", _clock.UtcNow);
         await using (var db = NewContext())
         {
             await NewRepository(db).SaveAsync(@case, TestData.AppliedEvent(@case, "SYN-EVT-1", _clock.UtcNow, CaseEventType.ConsentRecorded), CancellationToken.None);
@@ -296,7 +296,7 @@ public sealed class EfCaseRepositoryTests : IDisposable
         Assert.Equal(_clock.UtcNow, stored.WithdrawnAt);
         Assert.Equal("Consent/SYN-CONSENT-0001/_history/2", stored.WithdrawalEvidenceReference);
         Assert.Equal("Consent/SYN-CONSENT-0001", stored.EvidenceReference);
-        Assert.Equal(NotificationChannel.Simulator, stored.CaregiverContactPoint.Channel);
+        Assert.Equal(NotificationChannel.Sms, stored.CaregiverContactPoint.Channel);
         Assert.Equal(2, await verify.AuditEvents.CountAsync());
     }
 
@@ -307,7 +307,7 @@ public sealed class EfCaseRepositoryTests : IDisposable
         @case.Notification!.RecordAttempt(new NotificationAttempt
         {
             Id = Guid.NewGuid(),
-            Channel = NotificationChannel.Simulator,
+            Channel = NotificationChannel.Sms,
             AttemptedAt = _clock.UtcNow,
             Status = NotificationAttemptStatus.Delivered,
             UsedSmsSafeTemplate = false,

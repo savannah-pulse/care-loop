@@ -100,7 +100,7 @@ describe('Scenario runner', () => {
               reactions: [
                 reaction(),
                 reaction({
-                  reaction: 'Acknowledged',
+                  reaction: 'Replied',
                   succeeded: false,
                   httpStatusCode: 422,
                   error: 'CareLoop answered 422.',
@@ -119,7 +119,7 @@ describe('Scenario runner', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]?.textContent).toContain('Delivery reported');
     expect(rows[0]?.textContent).toContain('Accepted (200)');
-    expect(rows[1]?.textContent).toContain('Acknowledged');
+    expect(rows[1]?.textContent).toContain(en.scenarioRunner.reaction.Replied);
     expect(rows[1]?.textContent).toContain('Failed: CareLoop answered 422.');
     expect(screen.getByTestId('run-status').textContent).toContain('Failed');
   });

@@ -15,8 +15,8 @@ public sealed record ExceptionItemResponse
     /// <summary>CareLoop's identifier of the case.</summary>
     public required Guid CaseId { get; init; }
 
-    /// <summary>Source-system reference of the patient. Never a name.</summary>
-    public required string PatientReference { get; init; }
+    /// <summary>Source-system reference of the patient. Never a name. <see langword="null"/> for the coordinator, who sees no one's identity.</summary>
+    public string? PatientReference { get; init; }
 
     /// <summary>Patient display name for staff; absent for a coordinator.</summary>
     public string? PatientDisplayName { get; init; }

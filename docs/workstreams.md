@@ -9,8 +9,10 @@ grep -rn "TODO(WS-4)" --include="*.cs" --include="*.ts" --include="*.tsx" .
 ```
 
 A second list, **Design gaps**, appears under some workstreams. These come from
-[`ui-design-gap-analysis.md`](ui-design-gap-analysis.md) (items C1 to C21), which compares the screen designs with the
-code. They are additive. The decisions in that document's section 5 (1 to 7 and 12 to 20) were taken on 13 November 2026.
+[`ui-design-gap-analysis.md`](ui-design-gap-analysis.md) (items C1 to C22), which compares the screen designs with the
+code. They are additive. The decisions in that document's section 5 (1 to 7 and 12 to 20) were taken on 13 November 2026,
+and decisions 21 to 30 (text message and email only, C22) on 16 November 2026, decision 31 (reply 1 means "I got this message") and decisions 32 to 36 (call-backs to the nurse, the patient's
+appointment message, event origin, coordinator redaction, staff message wording) on 17 November 2026.
 Every item, split by workstream with its status, is in the [design gap tracker](#design-gap-tracker) at the end of this
 file; update its row in the same change that finishes the work.
 
@@ -30,7 +32,7 @@ Rules of the road:
 | 5 | Deadlines and escalation | WS1, WS2 | Done |
 | 6 | Read endpoints and dashboard | WS2 (schema) | Done |
 | 7 | HIS simulator | WS3 (FHIR contract and codes) | Done |
-| 8 | Patient-channel simulator | WS3 (FHIR contract and codes), WS4 (notification delivery) | Done |
+| 8 | Patient-channel simulator (now the SMS and email simulator) | WS3 (FHIR contract and codes), WS4 (notification delivery) | Done |
 | 9 | AI handoff summary | WS2, WS6 | Open |
 | 10 | Scenarios and end-to-end tests | all of the above | Open |
 
@@ -125,12 +127,13 @@ Because the contracts already exist, every workstream can start now against the 
 
 **Design gaps**
 
-- C10: map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` in `StatusMap.ToNotificationUpdateKind`, and carry the 1 to 5 value into `NotificationUpdatePayload.Confidence` (the handler refuses a missing or out-of-range value). Done on the FHIR side: `StatusMap.ToConfidence` reads the value from the first `payload.contentString`; WS4's `SimulatorInboundNotificationHandler` has to call it, since patient replies do not cross the FHIR boundary.
+- C10 (superseded by C22: no `Communication` reaches CareLoop any more): map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` in `StatusMap.ToNotificationUpdateKind`, and carry the 1 to 5 value into `NotificationUpdatePayload.Confidence` (the handler refuses a missing or out-of-range value). Done on the FHIR side: `StatusMap.ToConfidence` reads the value from the first `payload.contentString`; WS4's `SimulatorInboundNotificationHandler` has to call it, since patient replies do not cross the FHIR boundary.
+- C22 (decisions 21, 22): `StatusMap.ToNotificationChannel` maps `sms` and `email` only; `other` and every other system map to nothing. `ToNotificationUpdateKind`, `ToConfidence` and the `communication-category` code system are removed, and the `Communication` and `CommunicationRequest` samples with them; the `Patient`, `DiagnosticReport` and `Consent` samples use `sms` and `email` contact points. Done.
 - C13: add a seventh inbound mapper, `ConsentMapper`, that turns a FHIR `Consent` resource into a `ConsentRecorded` envelope with a `ConsentPayload`: `status` `active` is `Granted` (with the caregiver's contact point read from the resource), `inactive` or `rejected` is `Withdrawn`; the resource identifier plus version is the source event ID. Register it with the other mappers. Done: the caregiver is a contained `RelatedPerson` named in `provision.actor`, and the consent names its screening result through the `screening-result` extension.
 - C20: `DiagnosticReportMapper` reads the patient's display name and MRN from the referenced FHIR `Patient` (contained or resolved through `FhirHttpClient`) into `ScreeningResultPayload`; a sample with a `Patient` in `Fhir/Samples/`. Done: a contained `Patient` (`subject` = `#id`) is read directly; a literal `Patient/{id}` is read from the source system when it is configured, and otherwise the case opens without demographics. `Patient.json` and the contained patient in `DiagnosticReport.json` are the samples.
 - C21: `Procedure` and follow-up `DiagnosticReport` mappers set `OutcomePayload.EvidenceKind` to one of the pathway's declared kinds; agree the FHIR code to kind mapping in `StatusMap`. Done: the kind is the code in `https://careloop.invalid/fhir/CodeSystem/evidence-kind` on `Procedure.code` or the follow-up report's `code`, passed through unchanged; WS7 sends the pathway's kind names there.
 - C13: `AppointmentMapper` reads the place into `AppointmentUpdatePayload.Location` from the participant whose actor is a `Location` (`Location/...` reference, actor `type` `Location`, or a contained `Location`): `actor.display`, else the contained `Location.name`. `FhirPublisher` publishes nothing for `AppointmentScheduled`. Done; `Samples/Appointment.json` carries a synthetic `Location` participant.
-- Review follow-up (done): a `meta.source` not configured under `ExternalSystems:Systems` is refused with 403; attendance and a missed appointment are dated at the appointment (`end`, else `start`), a booking when it was made; a caregiver's contact point uses `telecom` system `other`, like the patient's; an `active` `Consent` with a `deny` provision is a withdrawal, and a staff `performer` is recorded as its actor; the approved summary's `DocumentReference` is sent on `HandoffSummaryApproved`, not on `HandoffProposed`. From the PR review: an appointment's time is `meta.lastUpdated` first; a closure's `Provenance` counts only when it targets that case `Task`; a handoff rejection is published as the case `Task` with status `rejected` and the reason, unless a newer handoff is pending. `AGENTS.md` (shared) now shows the `PUT` route, the `Consent` and `Patient` mappings and these rules.
+- Review follow-up (done): a `meta.source` not configured under `ExternalSystems:Systems` is refused with 403; attendance and a missed appointment are dated at the appointment (`end`, else `start`), a booking when it was made; a caregiver's contact point uses `telecom` system `other`, like the patient's (since C22: `sms` or `email`); an `active` `Consent` with a `deny` provision is a withdrawal, and a staff `performer` is recorded as its actor; the approved summary's `DocumentReference` is sent on `HandoffSummaryApproved`, not on `HandoffProposed`. From the PR review: an appointment's time is `meta.lastUpdated` first; a closure's `Provenance` counts only when it targets that case `Task`; a handoff rejection is published as the case `Task` with status `rejected` and the reason, unless a newer handoff is pending. `AGENTS.md` (shared) now shows the `PUT` route, the `Consent` and `Patient` mappings and these rules.
 
 ## WS4 Outbox and notifications
 
@@ -148,18 +151,31 @@ Because the contracts already exist, every workstream can start now against the 
 - `Features/Notifications/NotificationRouter.cs`, `RecipientResolver.cs`, `NotificationSender.cs`, `TemplateRenderer.cs`
 - `Features/Notifications/ReceiveInboundNotification.cs` (the provider callback endpoint)
 - `Infrastructure/Notifications/SimulatorNotificationProvider.cs`, `SimulatorInboundNotificationHandler.cs`
-- Leave `SmsNotificationProvider` and `EmailNotificationProvider` as stubs: they are out of scope for now
+- `SmsNotificationProvider` and `EmailNotificationProvider` (built under C22; they were stubs until then)
 - Set `Outbox:Enabled` to `true` in `appsettings.json` when the dispatcher works
 
 **Design gaps**
 
-- C10 (decision 3): in `SimulatorInboundNotificationHandler`, map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` and the 1 to 5 value into `NotificationUpdatePayload.Confidence`, by calling WS3's `StatusMap.ToNotificationUpdateKind` and `StatusMap.ToConfidence`. A rating is a measure, never an acknowledgement. Done.
+- C10 (decision 3; superseded by C22, where no reply is ever a rating): in `SimulatorInboundNotificationHandler`, map `Communication.category` `confidence-rating` to `NotificationUpdateKind.ConfidenceRated` and the 1 to 5 value into `NotificationUpdatePayload.Confidence`, by calling WS3's `StatusMap.ToNotificationUpdateKind` and `StatusMap.ToConfidence`. A rating is a measure, never an acknowledgement. Done.
 - C13 (decision 7): `RecipientResolver` sends a caregiver with active consent the appointment date, time and place only, never the result. Add a caregiver template under `Templates/en/`, with a standard and an SMS-safe variant. Record each send as a `NotificationAttempt`. Check `Consent.IsActive` when the message is sent, not only when the event was raised, because the outbox may deliver after a withdrawal; a withdrawal stops every later send. `SimulatorNotificationProvider` marks the `CommunicationRequest` as a caregiver message on the `Email` channel, so the patient-channel simulator files it in its Email inbox (WS8). `EmailNotificationProvider` stays a stub. `Consent`, `RecipientKind.Caregiver`, `ConsentHandler` and `ConsentMapper` are done. Unblocked: route the new `AppointmentScheduled` domain event (`ScheduledFor`, `Location`, which may be null; WS1) to the caregiver, and to nobody else, while `Case.CaregiverConsent.IsActive`. The template shows date, time and place only; when `Location` is null it says the place will be confirmed rather than inventing one. Done when: `NotificationRouter` handles `AppointmentScheduled`; a test covers send with active consent, no send with none or withdrawn consent (including a withdrawal saved after the event was raised), the SMS-safe variant, and a `NotificationAttempt` per send. Done: templates `caregiver-appointment` and `caregiver-appointment-place-tbc`, whose SMS-safe variants leave out the place (a clinic name can say what the appointment is for). The caregiver's language is the patient's, falling back to English. Caregiver attempts are not recorded on the case's notification track, which follows the patient; the caregiver `CommunicationRequest` id is prefixed `caregiver-`, and reports based on it are ignored, so a caregiver's delivery or acknowledgement never counts as the patient's. A booking without a time raises no `AppointmentScheduled` (WS2), so nobody is told a time the source never gave.
 - C15 (decision 13): each `EscalationRaised` staff notice says who acknowledged the previous level, if anyone (WS5 sends the event). `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt` now exist (WS1, filled by `Case.Escalate`). Add a placeholder to the staff template that renders, for example, "Level 1 was acknowledged by facility-lead at 09:40", and nothing when both are null. Staff notices still carry no patient detail. Done when: a template test covers both cases. Done: `{{previousAcknowledgement}}` in both staff templates, filled by `NotificationRouter.PreviousAcknowledgementFor` (for example "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.").
+- C22 (decisions 21 to 30): text message and email only. Done:
+  - `NotificationChannel` is `Sms` and `Email`; migration `SmsAndEmailChannelsOnly` rewrites stored `Simulator` values as `Sms`. `NotificationUpdatePayload.Channel` is optional: null when a person recorded the outcome of a call.
+  - `SmsNotificationProvider` and `EmailNotificationProvider` share `SimulatorNotificationProvider`, which posts `{ messageId, channel, to, subject, body, language, metadata }` as JSON to `{Notifications:<channel>:BaseUrl}/messages`. `metadata` carries the case and the audience (patient, caregiver or staff).
+  - `SmsInboundNotificationHandler` and `EmailInboundNotificationHandler` share `SimulatorInboundNotificationHandler`, at `POST /notifications/inbound/sms` and `/email`: signed delivery reports and replies. `1` is `Acknowledged`; `2` and any other text are `CallRequested`. A reply must come from one of the patient's own addresses on that channel; a callback about a caregiver or staff message changes nothing.
+  - Staff contacts come from `Notifications:StaffContacts`, one address per role, with an optional `default`. `EnabledProviders` and `PerEventOverrides` may name only `Sms` and `Email`, checked at start-up.
+  - Templates: patient messages ask for a reply of 1 or 2 and carry no link; the caregiver SMS variants now say the place too, so both variants say the same.
+- Review of PR 43 (decisions 31 to 36). Done:
+  - Every channel a patient notification goes out on is recorded on the track as sent (`NotificationUpdateKind.Sent`) before anything is sent, so one channel's failure marks the patient unreachable only once every channel has failed; each refusal is fed back as it is.
+  - `CallRequested` goes to the role the pathway names for the call (`CallerRole`, the nurse navigator), not the case owner.
+  - `AppointmentScheduled` also goes to the patient (`patient-appointment`, `patient-appointment-place-tbc`) with the reply codes; a reply to it counts, its delivery reports are ignored.
+  - Staff messages: "A case at {facility} needs your action. Open CareLoop and look for case {number}." The escalation line says who acknowledged the previous level in plain words and local time. `Notifications:TimeZone` and `Notifications:FacilityNames` (`MessageFormat`); an unknown time zone stops start-up.
+  - The inbound endpoint also accepts a channel enabled only by a per-event override; provider names must be exactly `Sms` or `Email`.
+  - Each applied notification update has a plain-words summary on the timeline, and the callbacks carry `Origin` `sms` or `email`.
 - Decision 2: a patient reply never changes appointment status. "I will come" arrives as `acknowledgement` and is translated to `Acknowledged` only.
-- Contract points settled by WS4: "Staff notification transport" and "Simulator provider wire format" (see the table below). Language: a template missing in the recipient's language falls back to English (`TemplateRenderer.FallbackLanguage`).
-- Delivery guarantees: several API instances can run the dispatcher; each delivery is claimed with one conditional update (`OutboxDelivery.LeaseOwner`, `LeasedUntil`, `Outbox:LeaseDuration`) and only the claim owner records the outcome. A staff or caregiver send a provider refused makes the router throw, so the outbox retries it (then parks it); a patient refusal is recorded on the case only when no channel accepted.
-- Known limits: `NotificationSendLog` (which remembers accepted attempts so a retry resends only failed channels) is in memory, so a restart, or a claim taken over by another instance, can send an accepted message again; attempt identifiers are deterministic, so the receiver can drop the repeat. A durable record needs a WS2 table. The caregiver message shows the time in the offset the hospital system sent; showing facility local time needs a configured time zone.
+- Contract points settled by WS4: "Staff notification transport" and "Simulator provider wire format" (see the table below; both changed under C22). Language: a template missing in the recipient's language falls back to English (`TemplateRenderer.FallbackLanguage`).
+- Delivery guarantees: several API instances can run the dispatcher; each delivery is claimed with one conditional update (`OutboxDelivery.LeaseOwner`, `LeasedUntil`, `Outbox:LeaseDuration`) and only the claim owner records the outcome. A staff, caregiver or patient-appointment send a provider refused makes the router throw, so the outbox retries it (then parks it); a refused patient follow-up is recorded on the case as a failed attempt.
+- Known limits: `NotificationSendLog` (which remembers accepted attempts so a retry resends only failed channels) is in memory, so a restart, or a claim taken over by another instance, can send an accepted message again; attempt identifiers are deterministic, so the receiver can drop the repeat. A durable record needs a WS2 table. Messages give local time in one configured zone (`Notifications:TimeZone`); a deployment spanning time zones would need one per facility.
 
 ## WS5 Deadlines and escalation
 
@@ -237,6 +253,20 @@ aggregate measures but case reads only for open coordinator escalations, with na
 design's "Who sees what" table (a coordinator sees one case only when it is escalated to them) and is a requirement
 of this workstream, not only a completion note; the review's request to confirm it is recorded as a decision for the
 product owner.
+C22 (decisions 24, 30): `POST /cases/{caseId}/call-outcome` lets a nurse navigator record, after a call, that the
+patient will come, that they said the next step back, and a 1 to 5 confidence rating. Each outcome is a
+`NotificationUpdated` event with the nurse as actor and no channel, sent through `EventIngestor`; other roles get 403 and
+recording never changes the owner. On the case screen, the "After a call with the patient" card does the same, and the
+timeline labels each entry from its `origin` ("Text message", "Email", "CareLoop", "Hospital system"). Done.
+
+Review of PR 43 (decisions 32, 34, 35). Done: recording a call answers a pending call-back and resolves its
+escalations (a rating alone puts the case back to waiting for the acknowledgement); the access is written to the read
+audit with its reason; the case's `patientReference` and `sourceResultId` are null for the coordinator, and the screens
+leave out "Result … from the hospital system" and the other-screening card without them. The card keeps focus (the
+button is `aria-disabled` rather than disabled; focus goes to the heading after a success and to the message after a
+refusal), ties its hints to the controls, says why it is locked before the controls, keeps 1 to 5 on one row, says what
+was just recorded, and on a 409 reads the case and timeline again. The footnotes no longer say "Read-only".
+
 Read lists are resilient to inconsistent data: an exception row with no deadline or next action is returned with
 those fields null, and a metric leaves out (and logs) a case whose history cannot support it, instead of failing the
 whole read. `GET /exceptions` accepts `skip` and `take` (default and maximum 200).
@@ -275,15 +305,16 @@ documentation-tool dependency findings remain; production dependency audit has z
 - C11: Done. `ActingStaff` and the action forms support `nurse-navigator`, `receiving-clinician` and `lab`.
 - Decision 4: Done. The HIS receives approved DocumentReferences only and calls CareLoop exclusively through `/fhir`.
 - C13 / decision 7: Done for WS7. Consent grant/withdrawal builders and `consent-recorded` actions carry synthetic caregiver contacts; appointments include the Location participant. Shared schema and consent scenarios remain WS10.
-- WS7 contract points: Done. Id-bearing PUT, `his-simulator` source, reviewed-urgency extension, simulated metadata tag, staff-notice Tasks and `other` contact points match WS3/WS4.
+- WS7 contract points: Done. Id-bearing PUT, `his-simulator` source, reviewed-urgency extension and simulated metadata tag match WS3/WS4.
+- C22 (decisions 21, 28): Done. Patient contact points are `sms` (or `email`, `Contacts:PatientChannel`), caregivers' `email`; the value is still the synthetic id until scenarios carry addresses (WS10). The `staff-notice` Task and `CommunicationRequest` receipt are removed: staff notices go by email or text to the SMS and email simulator. The staff inbox keeps what CareLoop sends as FHIR, and an unrecognised Task is filed as "Other case update".
 
 **Validation and remaining boundaries**
 
 - 189 HIS backend tests and 36 UI tests pass with no skips/todos; 161 existing CareLoop FHIR/provider regression tests passed earlier. Frontend lint, type-check, production build and formatting pass.
 - Real-host/browser checks cover replay, manual actions, refused outcomes, evidence-backed closure, inbox/log views and mobile layout against a local synthetic fake CareLoop upstream. This is not a real API/database patient journey; Docker was not built.
-- Cohort starts are explicitly unsupported pending WS10. Patient-channel behaviour is WS8; shared scenario corrections (including the happy-path evidence placeholder) and full end-to-end journeys remain WS10. See the [HIS guide](../src/simulators/his/README.md) and [manual HTTP harness](../src/simulators/his/HisSimulator/HisSimulator.http).
+- Cohort starts are explicitly unsupported pending WS10. Patient behaviour is WS8 (the SMS and email simulator); shared scenario corrections (including the happy-path evidence placeholder) and full end-to-end journeys remain WS10. See the [HIS guide](../src/simulators/his/README.md) and [manual HTTP harness](../src/simulators/his/HisSimulator/HisSimulator.http).
 
-## WS8 Patient-channel simulator
+## WS8 Patient-channel simulator (now the SMS and email simulator)
 
 **Owns**
 
@@ -299,9 +330,11 @@ documentation-tool dependency findings remain; production dependency audit has z
 
 **Design gaps**
 
-- C7 (Done): on the `Sms` channel accept an inbound reply of `1` as acknowledge and `2` as call-me (screen 9). Built as `POST /api/inbox/{messageId}/reply`; any other text is refused and nothing is sent. CareLoop sends no channel, so a patient message lands in the `Sms` inbox when its inbox address starts with `SYN-SMS-` (`SYN-PORTAL-` for the portal; anything else goes to `PatientChannel:DefaultChannel`, `App`). The SMS-safe template is not shown there, because the simulator provider allows sensitive content and so always receives the standard text.
-- C10 (Done, decision 3): a confidence rating action (1 to 5) on the inbox and a sixth `Communication` builder with category `confidence-rating`. A rating is not an acknowledgement. Built as `POST /api/inbox/{messageId}/rate-confidence`; a patient behaviour can also rate (`rate-confidence`, or a `confidence` beside another response).
-- C13 (Done, decision 7): an `Email` value in `InboxChannel` so caregiver messages are shown, not sent. A caregiver message is recognised by its `caregiver` recipient kind; it gets a delivery report, is never answered and cannot be acted on.
+- Review of PR 43 (Done): times read as on the dashboard (`17 Nov 2026, 00:11`, 24-hour, Abu Dhabi time), and a record's time sits under its text so "What CareLoop is told" keeps its width in a narrow column.
+- C22 (Done, decisions 21 to 30): the simulator is now an SMS and email simulator; the folder and project keep their name. `POST /messages` takes plain JSON from CareLoop's `Sms` and `Email` providers; delivery reports and replies go back as signed JSON to `{CareLoop:CallbackBaseUrl}/sms` or `/email`. Inboxes are the patient's text messages, the patient's email, caregiver and staff; only a patient's message can be replied to, and a reply is forwarded as typed. Removed: the `App` and `Portal` channels, the smartphone view, the case-status view and its FHIR read, the teach-back and rating actions and behaviours, every FHIR builder and the Firely package. Behaviours are found by the message's address. A scenario using `understand`, `rate-confidence` or `confidence` is refused (schema change is WS10).
+- C7 (Done; since C22 CareLoop, not the simulator, reads the reply): on the `Sms` channel accept an inbound reply of `1` as acknowledge and `2` as call-me (screen 9). Built as `POST /api/inbox/{messageId}/reply`; any other text is refused and nothing is sent. CareLoop sends no channel, so a patient message lands in the `Sms` inbox when its inbox address starts with `SYN-SMS-` (`SYN-PORTAL-` for the portal; anything else goes to `PatientChannel:DefaultChannel`, `App`). The SMS-safe template is not shown there, because the simulator provider allows sensitive content and so always receives the standard text.
+- C10 (Done, decision 3; removed under C22, a nurse records the rating): a confidence rating action (1 to 5) on the inbox and a sixth `Communication` builder with category `confidence-rating`. A rating is not an acknowledgement. Built as `POST /api/inbox/{messageId}/rate-confidence`; a patient behaviour can also rate (`rate-confidence`, or a `confidence` beside another response).
+- C13 (Done, decision 7): an `Email` value in `InboxChannel` so caregiver messages are shown, not sent. Since C22 a caregiver message is recognised by its `caregiver` audience in the metadata. A caregiver message is recognised by its `caregiver` recipient kind; it gets a delivery report, is never answered and cannot be acted on.
 - Decision 2 (Done): "I will come" sends an `acknowledgement` `Communication` only. There is no appointment-confirmation reply.
 - Contract points (see the table below): WS8 has confirmed the `Communication.category` codes, the simulator provider wire format and the simulated marker, and sends no `PUT`.
 
@@ -313,6 +346,9 @@ documentation-tool dependency findings remain; production dependency audit has z
 - `src/api/CareLoop.Api/Contracts/Summaries/**`
 - `src/api/CareLoop.Api/Infrastructure/Ai/**`
 - `src/api/CareLoop.Api/Infrastructure/Persistence/Summaries/**`, `Infrastructure/Persistence/Configurations/HandoffSummaryRecordConfiguration.cs`
+
+When `ApproveSummary` and `RejectSummary` are built, their source event is CareLoop's own: set `Origin` to
+`EventOrigins.CareLoop` (decision 34) so the timeline shows it as CareLoop, not the hospital system.
 - `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs`
 - `src/ai_workflow/**` (decision 8: the Python service calls Foundry, so one workstream owns the whole summary path)
 
@@ -359,9 +395,20 @@ Two contract points are still open for WS9 (see the table below): summary approv
 - Decision 19: journey tests assert the display label at each step of the happy path.
 - C21: `happy-path.json` still sends `PLACEHOLDER-EVIDENCE-KIND`, which the API now refuses; change every scenario outcome to a kind the pathway declares.
 - C5: give `SimulationArmResponse` the same measures as `MetricsResponse` so the escalation-off comparison is like for like.
-- C10 (Done, edited by WS8): a `rate-confidence` patient behaviour in `scenario.schema.json`, plus an optional `confidence` (1 to 5) beside another response. No scenario file uses it yet.
+- C10 (Done, edited by WS8; to remove under C22): a `rate-confidence` patient behaviour in `scenario.schema.json`, plus an optional `confidence` (1 to 5) beside another response. No scenario file uses it.
 - C13: a scenario with a consented caregiver and one where consent is withdrawn. The schema's step `action` list has no consent action yet: add one (for example `consent`, with grant or withdraw) for the HIS simulator to send, agreed with WS7. The consented-caregiver scenario books an appointment with a place and expects the caregiver's Email message (date, time and place only); the withdrawn one books after withdrawal and expects no caregiver message.
-- Decision 2: patient behaviours stay `acknowledge`, `understand` and `call-me` (plus `rate-confidence`). There is no appointment-confirmation behaviour.
+- Decision 2: there is no appointment-confirmation behaviour.
+- C22 (decisions 21 to 30), to do with WS10, agreed with WS7 and WS8 (both mirror the schema; the HIS loader refuses unknown fields):
+  - Add a `contact` to scenario patients, and to the consent action's caregiver: `{ "channel": "sms" | "email", "address": "SYN-…" }`. WS7 sends it as the `telecom`, replacing `Contacts:PatientChannel` and the synthetic id it sends today. WS8 finds the behaviour by that address.
+  - Remove `understand` and `rate-confidence` from `patientBehaviour.response`, and `confidence`; a patient can only reply 1 (`acknowledge`) or 2 (`call-me`), or stay silent. The SMS and email simulator already refuses them; the HIS loader still accepts `understand`.
+  - Nurse-recorded outcomes (teach-back, rating, "will come" on a call) become steps against `POST /cases/{caseId}/call-outcome`, not patient behaviours. C8's "understand after a reminder" scenario becomes "the patient acknowledges on the reminder, then the nurse records understanding".
+  - New scenarios: a patient reached by email, a patient with both a phone number and an email, and a reply that is neither 1 nor 2 (expect `CallRequested` and no acknowledgement).
+  - The consented-caregiver scenario (C13) expects the caregiver's email in the SMS and email simulator.
+  - Journey tests assert the SMS or email attempts on the notification track, and that staff notices reach the configured staff addresses.
+- Review of PR 43 (decisions 32 to 36), to do with WS10:
+  - A call-back scenario expects the call-back email at the nurse navigators' address, and the case to move on once the nurse records the call.
+  - Booking an appointment expects a patient message with the date, time and place (local time), as well as the caregiver's.
+  - Scenario facilities: the scenarios use `SYN-FAC-A`, which no one in "Signed in as" belongs to; use a facility the dashboard knows (`family-health-centre`) or add it to the sign-in list (WS7, WS10).
 
 ## Shared (change by agreement)
 
@@ -383,24 +430,24 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Topic | Between | State |
 |---|---|---|
 | `PUT` route shape | WS3, WS7, WS8 | Settled: WS3 and WS7 implement `PUT /fhir/{resourceType}/{id}`; URL and body ids must match or the request is refused with 400. CareLoop's outbound sends use the same shape. WS8 sends no `PUT`: it posts `Communication`s to the notification callback and reads `GET /fhir/Task/{id}`. `AGENTS.md` is aligned. |
-| `Communication.category` codes | WS4, WS8 | Both sides use system `https://careloop.invalid/fhir/CodeSystem/communication-category`. Settled: codes `delivery-status`, `acknowledgement`, `teach-back`, `call-me`, plus `confidence-rating` (decision 3, C10, value in the first `payload.contentString`); `StatusMap` has all five and WS8 sends them. |
+| `Communication.category` codes | WS4, WS8 | Retired (decision 22, C22): no `Communication` crosses between CareLoop and the simulator. A delivery report is `{ "type": "delivery", "status": "delivered" \| "failed" }`, a reply `{ "type": "reply", "text": … }`. |
 | External system identifiers | WS2, WS3, WS7 | Settled and built: WS7 sends `meta.source = his-simulator`, matching the development `ExternalSystems:Systems` key. WS3 refuses missing source with 400 and unconfigured source with 403. The case retains that source system and replies are routed to it. |
-| Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`, `confidence`), applied by the patient-channel simulator when a notification arrives. `response` may be `rate-confidence` (C10), which needs a `confidence`; `respondToNotification` counts the notifications about one case received since the behaviour was put in force. Cohort runs need a way to give each generated patient their scenario's behaviour. |
+| Scenario patient behaviour | WS7, WS8, WS10 | A scenario's steps are hospital-system events only. How a patient reacts is `patients[].behaviour` (`delivery`, `response`, `respondAfter`, `respondToNotification`), applied by the SMS and email simulator when a message arrives at the patient's address. Since C22 `response` is `none`, `acknowledge` (replies 1) or `call-me` (replies 2); `understand`, `rate-confidence` and `confidence` are refused and are to be removed from the schema (WS10). `respondToNotification` counts the notifications about one case received since the behaviour was put in force. Cohort runs need a way to give each generated patient their scenario's behaviour. |
 | Time in a live run | WS1, WS5, WS7, WS8, WS10 | CareLoop runs on real time. A live run uses the demo pathway folder (`Pathways:Directory`), whose deadlines are divided by 1800, and both simulators pace scenarios with `Scenarios:RealSecondsPerScenarioHour` = 2. The three figures must stay equal. End-to-end tests should assert outcomes, not exact times, and leave headroom for slow machines. |
-| Simulator provider wire format | WS4, WS8 | Settled by WS4 (`SimulatorNotificationProvider`): `POST {PatientChannelBaseUrl}/fhir/CommunicationRequest` with the attempt identifier as the `https://careloop.invalid/fhir/sid/notification-attempt` identifier and as the id (prefixed `caregiver-` for a caregiver message), category `patient` or `caregiver` in `https://careloop.invalid/fhir/CodeSystem/recipient-kind` (a caregiver message belongs in the Email inbox), `recipient` naming the inbox, `about` the case `Task`, `payload` the text and `language`. The simulator answers with a `Communication` to `POST /notifications/inbound/simulator` whose `basedOn` is that request and `about` the case `Task`; reports based on a caregiver request are ignored. Each post must carry `X-CareLoop-Signature: sha256=` plus the lower-case hex HMAC-SHA256 of the raw UTF-8 body, keyed with the secret shared through `SIMULATOR_INBOUND_SECRET` (`Notifications:Simulator:InboundSecret` in the API); anything unsigned or wrongly signed gets 401. WS8 signs in `CareLoopFhirClient.SendCommunicationAsync` (its setting is `CareLoop:InboundSecret`; with no secret it sends nothing). Each `Communication` has the id `{request id}-{kind}` and a `meta.versionId`, which a resend repeats. |
-| Patient replies beyond acknowledgement | WS1, WS4, WS8 | Settled (decisions 2 and 3): the replies are acknowledgement, teach-back, call-me and confidence rating. Accepting an appointment is an acknowledgement; a patient reply never changes appointment status. |
-| Simulated marker on FHIR resources | WS7, WS8 | Settled and built: WS7 and WS8 both mark the resources they send with `meta.tag` in `https://careloop.invalid/fhir/CodeSystem/data-origin`, code `simulated`, matching the API samples. CareLoop neither requires nor emits a marker. |
-| Staff notification transport | WS4, WS7 | Settled and built: WS4 sends a `staff-notice` Task with `PUT {StaffInboxBaseUrl}/fhir/Task/staff-notice-{attempt}`; `owner` names the staff inbox, `focus` the case Task and `description` the text. WS7 accepts that PUT and upserts the inbox item; the obsolete plain notification POST was removed. |
+| Simulator provider wire format | WS4, WS8 | Settled under C22 (decision 22): `POST {Notifications:<Sms\|Email>:BaseUrl}/messages` with `{ messageId, channel, to, subject, body, language, metadata: { caseId, audience } }`; `messageId` is the notification attempt identifier, and a resend repeats it. The simulator calls back on `POST /notifications/inbound/sms` or `/email` with a delivery report (`messageId`, `status`, `reason`, `at`) or a reply (`replyId`, `inReplyTo`, `from`, `text`, `at`), each returning `metadata`. Every callback carries `X-CareLoop-Signature: sha256=` plus the lower-case hex HMAC-SHA256 of the raw UTF-8 body, keyed with `SIMULATOR_INBOUND_SECRET` (`Notifications:<channel>:InboundSecret` in the API, `CareLoop:InboundSecret` in the simulator); anything unsigned or wrongly signed gets 401. |
+| Patient replies beyond acknowledgement | WS1, WS4, WS6, WS8 | Settled (decisions 2, 3, 23, 24, 29): a patient replies `1` (acknowledgement) or `2` (call-me) by text or email, and any other reply is a call-me. Teach-back and the confidence rating are recorded by a nurse navigator after a call. A patient reply never changes appointment status. |
+| Simulated marker on FHIR resources | WS7 | Settled and built: WS7 marks the resources it sends with `meta.tag` in `https://careloop.invalid/fhir/CodeSystem/data-origin`, code `simulated`, matching the API samples. CareLoop neither requires nor emits a marker. Since C22 WS8 sends no FHIR; its messages and callbacks carry `simulated` in their own JSON. |
+| Staff notification transport | WS4, WS7, WS8 | Settled under C22 (decisions 21, 27, 28): a staff notice is an email or text message to the address configured for the owner's role (`Notifications:StaffContacts`), shown in the SMS and email simulator's staff inbox. The `staff-notice` Task and its `PUT` to the HIS simulator are retired. |
 | Urgency on the review `Task` | WS3, WS7 | Settled and built: WS7 carries source-reviewed urgency unchanged in `https://careloop.invalid/fhir/StructureDefinition/reviewed-urgency` as `valueCode`, because placeholder codes do not fit FHIR priority. WS3 reads the extension first and retains its existing `Task.priority` fallback. |
 | Nine event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`. Caregiver consent is its own event, `ConsentRecorded` (C13), so there are exactly nine source events and handlers. |
 | Internal events | WS2, WS5, WS6, WS9 | `DeadlineElapsed`, `HandoffSummaryApproved` and `EscalationAcknowledged` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
-| Contact point channel | WS3, WS4, WS7, WS8 | Settled and built: `ContactPoint.system = other` maps to the simulator channel; WS7 sends it for Patient and RelatedPerson contacts. `sms` and `email` stay unreachable while only the simulator provider is enabled. WS4 carries recipient kind, and WS8 shows a caregiver message in its Email inbox. WS8 proposal for WS7 and WS10: a patient contact address starting `SYN-SMS-` is shown in the simulator's `Sms` inbox and `SYN-PORTAL-` in its portal inbox; any other address goes to the health app. |
+| Contact point channel | WS3, WS4, WS7, WS8 | Settled under C22 (decision 21): `ContactPoint.system = sms` is a text message and `email` an email; every other system maps to nothing. WS7 sends `sms` for patients (or `email`, by configuration) and `email` for caregivers. Staff contacts are configuration, not FHIR. |
 | Publishing the approved summary | WS1, WS3, WS9 | Settled with this review: a new domain event, `HandoffSummaryApproved` (summary id and approver), is raised by `ApproveSummary` (WS9) and published by `FhirPublisher` as the `DocumentReference` for that summary only. `HandoffProposed` sends the case `Task` alone, so a summary approved after the proposal is still sent and an older one never is. |
 | Repeated requests | WS2, WS3 | Settled with this review: the HIS sends a consultation or referral as a `ServiceRequest` plus a `Task`, and resends new versions. A request repeated while the consultation is already requested, or the referral already sent, is recorded but leaves the deadline alone; a request after a rejection restarts it. |
 | Rejected events | WS1, WS2 | A refused event is saved with `Disposition = Rejected`, so the attempt is audited through the same write path. |
 | Stage model | WS1, WS6 | Settled (decision 1): five stages in the Domain; the design's ten stages are display labels derived from stage plus track statuses, by the API since decision 19. |
 | Patient appointment confirmation | WS1, WS4, WS8 | Settled (decision 2): dropped. "I will come" is an acknowledgement; a patient reply never changes appointment status. |
-| Confidence rating | WS1, WS2, WS3, WS4, WS6, WS8, WS10 | Settled (decision 3): build it (C10). `NotificationUpdateKind.ConfidenceRated` with a 1 to 5 value; `Communication.category` `confidence-rating`. |
+| Confidence rating | WS1, WS2, WS3, WS4, WS6, WS8, WS10 | Settled (decision 3, source changed by decisions 24 and 30): `NotificationUpdateKind.ConfidenceRated` with a 1 to 5 value, recorded by a nurse navigator after a call through `POST /cases/{caseId}/call-outcome`. No reply is a rating. |
 | Where the AI summary is approved | WS6, WS7, WS9 | Settled (decision 4): the CareLoop web app case screen drafts and approves; the HIS simulator receives the approved `DocumentReference` only. The case screen also rejects (decision 10). |
 | Where the model is called | WS9 | Settled (decision 8): the Python AI workflow service calls Foundry and the API calls it; `FoundryDirect` is a second route from the API. Both sit behind `IAiProvider`, whose `NoOp` default keeps AI off. |
 | Clinical text in a prompt | WS2, WS9 | Settled (decision 9): clinician-finalized clinical facts may be summarized, as typed facts with a source reference and review status. They are read for one draft and never written to the coordination store. Patient names, contact details, images and unfinalized or conflicting readings are never sent. |
@@ -410,8 +457,8 @@ The scaffold made these choices or left them open. Settle each one before both s
 | AI settings in the shared config files | WS9, plus whoever owns the file | Open. `appsettings.json`, `.env.example` and `docker-compose.yml` still carry the removed `Ai:AzureOpenAi` section and an API key setting. |
 | Roles | WS1, WS6, WS7 | Settled (decision 5): add `nurse-navigator`, `receiving-clinician` and `lab` (C11). `DemoRoles` is shared; WS6 edits it after announcing. |
 | Consultation reply deadline | WS1, WS2 | Settled (decision 6): `answer-consultation` and `respond-to-referral` replace `respond-to-handoff`; both placeholders (C12). |
-| Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the patient-channel simulator's `Email` channel; real email stays out of scope. |
-| Caregiver appointment message | WS1, WS2, WS3, WS4, WS7 | Settled and built: domain event `AppointmentScheduled` (`ScheduledFor`, `Location`) is raised on booking, rebooking and time changes; WS7 sends the Location participant and WS3 reads its `actor.display`. WS4 notifies the caregiver only while consent is active; `FhirPublisher` ignores the event. A booking without a time raises nothing. |
+| Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the SMS and email simulator; since C22 the caregiver's contact is an email address and real email delivery stays out of scope. |
+| Caregiver appointment message | WS1, WS2, WS3, WS4, WS7 | Settled and built: domain event `AppointmentScheduled` (`ScheduledFor`, `Location`) is raised on booking, rebooking and time changes; WS7 sends the Location participant and WS3 reads its `actor.display`. WS4 notifies the patient, and the caregiver only while consent is active (decision 33); times are local; `FhirPublisher` ignores the event. A booking without a time raises nothing. |
 | Acknowledgement in escalation notices | WS1, WS4, WS5 | Settled and built (WS1, WS4): `EscalationRaised.AcknowledgedByRole` and `AcknowledgedAt`, filled by `Case.Escalate` from the previous level, so WS5 only calls `Escalate`; WS4's staff templates show them through `{{previousAcknowledgement}}`. |
 | Escalation identifier | WS1, WS2, WS6 | Settled and built (WS1, WS2): `Escalation.Id` (uuid), carried on `EscalationRaised.EscalationId`, persisted unique; `Case.AcknowledgeEscalation(escalationId, ...)` refuses a superseded escalation. WS6's acknowledgement endpoint takes it as `{escalationId}`. |
 | Read audit | WS2, WS6 | Settled and built (WS2): staff reads are recorded in `CaseReads` (`CaseReadRecord`), not in `AuditEvents`, because a read changes no case state and has no source event. WS6 writes one per read (C4, C19). |
@@ -421,13 +468,14 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Evidence kinds | WS1, WS2, WS3, WS6, WS7, WS10 | Settled (decision 20): C21. The pathway declares the kinds (placeholders); intake rejects others; a `treatment-plan` outcome starts the `start-treatment` deadline. The PM confirms the names; WS3 and WS7 agree the FHIR code mapping. |
 | Reply deadline placeholders | WS1 | Settled (decision 18): the pathway file follows screen 4 of the design. Clock time, not working hours; a working-hours calendar is future work. |
 | HIS simulator screens | WS7, WS10 | WS7 built the four screens and API-driven headless replay (decision 16, C6). The full headless patient journey demo remains WS10. |
+| Patient addresses in scenarios | WS7, WS8, WS10 | Open (C22): scenario files carry no phone number or email address. Until WS10 adds a `contact`, WS7 sends each patient's synthetic id as the address, and WS8 finds the behaviour by it. |
 
 ## Design gap tracker
 
 One row per item and workstream, so no part is lost between owners. **Open** means not started or not merged;
 **Done** means built, tested and merged on `main` (or on this branch's pull request). Change a row only in the change
 that finishes it. Items come from [`ui-design-gap-analysis.md`](ui-design-gap-analysis.md); C14 and C16 to C18 were
-withdrawn.
+withdrawn. C22 retired some earlier parts; those rows stay Done and say so.
 
 | Item | WS | Part | Status |
 |---|---|---|---|
@@ -441,14 +489,14 @@ withdrawn.
 | C5 Screen 3 measures | WS6 | `MetricsResponse` measures with denominators, incl. display-label counts and C21 treatment measures | Done |
 | C5 | WS10 | `SimulationArmResponse` with the same measures | Open |
 | C6 HIS clinician actions and headless mode | WS7 | `/actions/consultation-request`, `/consultation-answer`, `/referral`, `/appointment`, forms, API-driven headless replay | Done |
-| C7 SMS reply codes | WS8 | `1` acknowledge, `2` call-me on the `Sms` inbox | Done |
+| C7 SMS reply codes | WS8 | `1` acknowledge, `2` call-me on the `Sms` inbox (read by CareLoop since C22) | Done |
 | C8 Exception-path and demo scenarios | WS10 | Six exception scenarios with `expect` entries; demo scenario for screens 15, 16, 19 to 21 | Open |
 | C8 | WS10 | Replace `PLACEHOLDER-EVIDENCE-KIND` in `happy-path.json` with a declared kind (C21) | Open |
 | C9 Dashboard | WS6 | Screens 1 to 4, 17, 18; summary draft, edit-on-approve, reject; escalation acknowledge; other-cases card | Done |
 | C10 Confidence rating | WS1, WS2, WS3 | Domain, payload, handler, `StatusMap` | Done |
-| C10 | WS4 | `SimulatorInboundNotificationHandler` maps `confidence-rating` | Done |
+| C10 | WS4 | `SimulatorInboundNotificationHandler` maps `confidence-rating` (retired by C22) | Done |
 | C10 | WS6 | `confidenceRate` on `MetricsResponse` | Done |
-| C10 | WS8 | Inbox rating action and `confidence-rating` `Communication` builder | Done |
+| C10 | WS8 | Inbox rating action and `confidence-rating` `Communication` builder (removed by C22) | Done |
 | C10 | WS10 | `rate-confidence` behaviour in `scenario.schema.json` (edited by WS8) | Done |
 | C11 Roles | WS1 | Pathway `allowedRoles`, `authorizedRoles`, `OwnershipRules` | Done |
 | C11 | WS6 (shared) | `nurse-navigator`, `receiving-clinician`, `lab` in `DemoRoles.HumanRoles` | Done |
@@ -472,6 +520,14 @@ withdrawn.
 | C21 Evidence kinds | WS1, WS2, WS3 | Pathway vocabulary, intake rejection, mapper | Done |
 | C21 | WS5 | `start-treatment` handled like any other deadline | Done |
 | C21 | WS7 | Outcome resources carry a declared kind | Done |
+| C22 Text message and email only | WS1, WS2 | `NotificationChannel` is `Sms` and `Email`; optional payload channel; migration `SmsAndEmailChannelsOnly` | Done |
+| C22 | WS3 | `sms` and `email` contact points only; `Communication` mapping and samples removed | Done |
+| C22 | WS4 | SMS and email providers and inbound handlers over plain JSON; reply rules; staff contacts; templates | Done |
+| C22 | WS6 | `POST /cases/{caseId}/call-outcome`; "After a call with the patient" card; timeline source wording | Done |
+| C22 | WS7 | `sms`/`email` contact points; staff-notice and `CommunicationRequest` receipt removed | Done |
+| C22 | WS8 | SMS and email simulator: `POST /messages`, JSON callbacks, four inboxes, replies as typed; app, portal, case status, teach-back and rating removed | Done |
+| C22 | Shared | `appsettings`, `docker-compose.yml`, `.env.example`, `AGENTS.md`, `README.md` | Done |
+| C22 | WS10 | Scenario `contact`; remove `understand`, `rate-confidence`, `confidence`; email, both-channel and unrecognised-reply scenarios; call outcomes as steps | Open |
 | Decision 19 Display labels | WS1 | `CaseDisplayLabels.From` | Done |
 | Decision 19 | WS6 | `DisplayLabel` on case reads and in metrics | Done |
 | Decision 19 | WS10 | Journey tests assert the label at each happy-path step | Open |
