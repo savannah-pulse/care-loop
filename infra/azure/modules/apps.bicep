@@ -156,6 +156,22 @@ module api 'container-app.bicep' = {
 
 // --- Web --------------------------------------------------------------------------------------------
 
+// The web image's own nginx configuration (src/web/nginx.conf) forwards /api/ to http://api:8080,
+// the Docker Compose address. In Container Apps the API is reached over HTTPS on its own host name
+// and the environment routes by Host header, so those two lines are rewritten here and the result
+// is mounted over the image's copy. There is one source file; if its proxy lines change shape the
+// deployment stops with the message below rather than shipping a proxy that points nowhere.
+var nginxSource = loadTextContent('../../../src/web/nginx.conf')
+var nginxUpstream = 'proxy_pass http://api:8080/;'
+var nginxHostHeader = 'proxy_set_header Host $host;'
+var webNginxConf = contains(nginxSource, nginxUpstream) && contains(nginxSource, nginxHostHeader)
+  ? replace(
+      replace(nginxSource, nginxUpstream, 'proxy_pass https://${apiHost}/;\n        proxy_ssl_server_name on;'),
+      nginxHostHeader,
+      'proxy_set_header Host ${apiHost};'
+    )
+  : fail('src/web/nginx.conf no longer contains "${nginxUpstream}" and "${nginxHostHeader}". Update nginxUpstream and nginxHostHeader in infra/azure/modules/apps.bicep to match.')
+
 module web 'container-app.bicep' = {
   name: 'app-web'
   params: {
@@ -176,10 +192,7 @@ module web 'container-app.bicep' = {
     maxReplicas: webMaxReplicas
     // The nginx configuration is not a secret; a secret volume is simply how Container Apps mounts a file.
     secrets: [
-      {
-        name: 'nginx-conf'
-        value: replace(loadTextContent('../config/web-nginx.conf'), '__API_HOST__', apiHost)
-      }
+      { name: 'nginx-conf', value: webNginxConf }
     ]
     volumes: [
       {
@@ -274,6 +287,6 @@ module messagingSimulator 'container-app.bicep' = if (deploySimulators) {
 }
 
 output webUrl string = 'https://${web.outputs.fqdn}'
-output apiUrl string = exposeApi ? 'https://${apiHost}' : ''
+output apiUrl string = exposeApi ? 'https://${apiHost}' : 'https://${web.outputs.fqdn}/api'
 output hisSimulatorUrl string = deploySimulators && exposeSimulators ? 'https://${hisSimulatorHost}' : ''
 output messagingSimulatorUrl string = deploySimulators && exposeSimulators ? 'https://${messagingSimulatorHost}' : ''

@@ -21,10 +21,8 @@ param keyVaultPurgeProtection = true
 // pushed from a runner inside the virtual network.
 param registryPublicAccess = true
 
-// The API is reached through the web app only. Turn this on when a hospital system has to post to
-// /fhir, and restrict allowedIpRanges to that system's addresses.
-param exposeApi = false
-param allowedIpRanges = []
+// The dashboard and the API are public, as in dev. Before real use, set exposeApi = false or an
+// allowedIpRanges list (see "What is reachable from the internet" in ../README.md).
 
 param postgresSkuName = 'Standard_D2ds_v5'
 param postgresSkuTier = 'GeneralPurpose'

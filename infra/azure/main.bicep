@@ -51,13 +51,13 @@ param deployMonitoring bool = true
 @description('Image tag to run. Empty deploys the platform only (pass 1); scripts/deploy.sh sets it for pass 2.')
 param imageTag string = ''
 
-@description('Give the API its own public address. Off by default: the dashboard reaches it through the web app on /api/, and the API has demo-level authentication only. A real hospital system that posts to /fhir needs this on.')
-param exposeApi bool = false
+@description('Give the API its own public address, so a hospital system can post to /fhir. false: reachable only from the other apps, and from outside through the web app on /api/.')
+param exposeApi bool = true
 
-@description('Give the simulators public addresses so their screens can be opened in a browser. They hold synthetic data only.')
+@description('Give the simulators public addresses so their screens can be opened in a browser. false: reachable only from the other apps.')
 param exposeSimulators bool = true
 
-@description('CIDR ranges allowed to reach the public addresses. Empty allows everyone.')
+@description('CIDR ranges allowed to reach the public apps. Empty, the default, allows everyone. Not yet tried with a list: a list on an app may also block calls from the other apps, so test before relying on it.')
 param allowedIpRanges array = []
 
 @description('Use the demo pathway (deadlines divided by 1800) and a one-second deadline sweep. Must be true wherever the simulators run scenarios, false for real use.')
