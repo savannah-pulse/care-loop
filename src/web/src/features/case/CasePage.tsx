@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Icon, OutsideTeamCard, ReadView, Toast } from '../../components'
 import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
-import { describePatient, openEscalations, programmeName } from '../../domain'
+import { describePatient, openEscalations, programmeName, resultSourceText } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
 import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
@@ -56,11 +56,9 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
             </span>
           ))}
         </p>
-        {detail.sourceResultId ? (
-          <p className="quiet" title={detail.sourceSystem}>
-            {t('case.resultFrom', { result: detail.sourceResultId })}
-          </p>
-        ) : null}
+        <p className="quiet" title={detail.sourceSystem}>
+          {resultSourceText(detail.sourceResultId, me.role)}
+        </p>
         <p className="quiet">{patient.hidden ? t('patient.hiddenDetail') : t('patient.detail')}</p>
       </div>
     </div>
@@ -125,11 +123,12 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
  * Reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. The one thing recorded here is
  * what a patient said on a call, by a nurse navigator (`POST /cases/{caseId}/call-outcome`), after
  * which the case shows as the API returned it and the timeline is read again. Staff see the patient's
- * name and MRN; the programme coordinator sees a case number and a note that names are hidden for
- * their role. A case at another facility opens only after the person says why (board 14): the API
- * refuses the read without a reason, the screen asks for one, and the reason then goes with every
- * read of the case. Any other refusal says calmly that the case is not open to the person.
- * Clinicians reach the AI handoff summary from the next action when a referral is due.
+ * name and MRN; the programme coordinator sees a case number and a note that names and hospital
+ * record numbers are hidden for their role, and the result reads as coming from the hospital
+ * system, without its number. A case at another facility opens only after the person says why
+ * (board 14): the API refuses the read without a reason, the screen asks for one, and the reason
+ * then goes with every read of the case. Any other refusal says calmly that the case is not open to
+ * the person. Clinicians reach the AI handoff summary from the next action when a referral is due.
  */
 export function CasePage({ caseId }: CasePageProps) {
   const me = useSignedInStaff()

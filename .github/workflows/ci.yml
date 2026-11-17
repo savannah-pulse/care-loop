@@ -132,7 +132,7 @@ jobs:
       matrix:
         client-app:
           - src/simulators/his/HisSimulator/ClientApp
-          - src/simulators/patient-channel/PatientChannelSimulator/ClientApp
+          - src/simulators/messaging/MessagingSimulator/ClientApp
     defaults:
       run:
         working-directory: ${{ matrix.client-app }}

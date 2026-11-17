@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Api.Infrastructure.Notifications;
 
 /// <summary>
-/// Understands what the SMS and email simulator sends back to CareLoop: delivery reports and replies.
+/// Understands what the messaging simulator sends back to CareLoop: delivery reports and replies.
 /// </summary>
 /// <remarks>
 /// <para>

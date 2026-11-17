@@ -1,5 +1,6 @@
 import { t } from '../i18n'
 import { dayKey, parseInstant } from '../format'
+import { namesHiddenFor } from '../identity'
 import type { CaseEventType, TimelineEntry } from '../data'
 
 /**
@@ -59,7 +60,7 @@ export function timelineSource(entry: Pick<TimelineEntry, 'origin'>): TimelineSo
  * Names where a timeline entry came from, in plain words.
  *
  * @param source - Where the entry came from.
- * @returns `CareLoop`, `Hospital system` or `Text message or email`.
+ * @returns `CareLoop`, `Hospital system`, `Text message` or `Email`.
  */
 export function sourceLabel(source: TimelineSource): string {
   return t(`timeline.sources.${source}`)
@@ -89,24 +90,71 @@ export function hasOwnReason(entry: Pick<TimelineEntry, 'eventType' | 'reason'>)
 }
 
 /**
+ * Tells whether the API's own wording of a timeline entry may be shown to a role.
+ *
+ * @param entry - The entry's origin, as the API reports it.
+ * @param viewerRole - The role of the person reading.
+ * @returns `true`, except for an entry from a hospital system, a text message or an email read by a
+ * role names are hidden from.
+ *
+ * @remarks
+ * The wording of such an entry can quote the hospital system's own numbers, as in "A case already
+ * exists for result 'fhc-his/DiagnosticReport/r-…'", or free text from the hospital system, and
+ * either can point to the patient. CareLoop's own wording, such as "Deadline warning raised", never
+ * does, so it is always shown. Where an entry came from is decided by {@link timelineSource}.
+ */
+export function mayQuoteReason(entry: Pick<TimelineEntry, 'origin'>, viewerRole: string): boolean {
+  return !namesHiddenFor(viewerRole) || timelineSource(entry) === 'careLoop'
+}
+
+/**
  * Words the main line of a timeline entry.
  *
- * @param entry - The entry's kind, disposition and reason.
+ * @param entry - The entry's kind, disposition, reason and origin.
+ * @param viewerRole - The role of the person reading.
  * @returns For an entry CareLoop refused, what was refused in plain words, so a refused attempt
  * never reads as done: for example `Acknowledgement refused` or `Referral update not accepted`.
- * Otherwise the reason when it says more than the kind (see {@link hasOwnReason}), or the kind in
- * words.
+ * Otherwise the reason when it says more than the kind (see {@link hasOwnReason}) and may be shown
+ * to the role (see {@link mayQuoteReason}), or the kind in words.
  *
  * @remarks
  * The API writes refused acknowledgements to the timeline as `EscalationAcknowledged` entries with
  * the disposition `Rejected`, even the programme coordinator's, so the disposition decides the
  * words, never the kind alone.
  */
-export function timelineEntryTitle(entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason'>): string {
+export function timelineEntryTitle(
+  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'origin'>,
+  viewerRole: string,
+): string {
   if (entry.disposition === 'Rejected') {
     return t(`timeline.refusedEvents.${entry.eventType}`)
   }
-  return hasOwnReason(entry) ? entry.reason : timelineTitle(entry.eventType)
+  return hasOwnReason(entry) && mayQuoteReason(entry, viewerRole) ? entry.reason : timelineTitle(entry.eventType)
+}
+
+/**
+ * Says why CareLoop refused a timeline entry, for a line under it.
+ *
+ * @param entry - The entry's kind, disposition, reason and origin.
+ * @param viewerRole - The role of the person reading.
+ * @returns The reason CareLoop recorded, when the entry was refused, the reason says more than the
+ * kind (see {@link hasOwnReason}) and it may be shown to the role (see {@link mayQuoteReason});
+ * otherwise `undefined`.
+ *
+ * @remarks
+ * A refused acknowledgement never shows its reason: the API writes it for the audit trail, with
+ * raw references and timestamps, and the main line already says it was refused.
+ */
+export function refusalReason(
+  entry: Pick<TimelineEntry, 'eventType' | 'disposition' | 'reason' | 'origin'>,
+  viewerRole: string,
+): string | undefined {
+  const shown =
+    entry.disposition === 'Rejected' &&
+    entry.eventType !== 'EscalationAcknowledged' &&
+    hasOwnReason(entry) &&
+    mayQuoteReason(entry, viewerRole)
+  return shown ? entry.reason : undefined
 }
 
 function instant(entry: TimelineEntry): Date | undefined {

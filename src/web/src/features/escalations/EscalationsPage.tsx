@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { Badge, EmptyState, Icon, ReadView } from '../../components'
 import { useEscalatedCases, type EscalatedCase } from '../../data'
 import {
+  caseLinkNames,
   currentEscalation,
   describeOwner,
   describePatient,
@@ -69,7 +70,13 @@ function sortRows(rows: readonly EscalationRow[]): EscalationRow[] {
   })
 }
 
-function EscalationCard({ row, now }: { readonly row: EscalationRow; readonly now: Date }) {
+interface EscalationCardProps {
+  readonly row: EscalationRow
+  readonly linkName: string
+  readonly now: Date
+}
+
+function EscalationCard({ row, linkName, now }: EscalationCardProps) {
   const me = useSignedInStaff()
   const ids = useId()
   const { summary } = row.item
@@ -88,11 +95,16 @@ function EscalationCard({ row, now }: { readonly row: EscalationRow; readonly no
               className="cc-link"
               href={routeHref({ name: 'escalation', caseId: summary.caseId })}
               title={patient.reference}
+              aria-label={linkName === patient.name ? undefined : linkName}
               aria-describedby={`${ids}-status ${ids}-action`}
             >
               {patient.name}
             </a>
-            {patient.identifier ? <span className="cc-id">{patient.identifier}</span> : null}
+            {patient.identifier ? (
+              <span className="cc-id" aria-hidden={patient.hidden ? undefined : true}>
+                {patient.identifier}
+              </span>
+            ) : null}
           </span>
         </h3>
         <span className="pills" id={`${ids}-status`}>
@@ -133,6 +145,13 @@ function EscalationCard({ row, now }: { readonly row: EscalationRow; readonly no
 function EscalationList({ items, now }: { readonly items: readonly EscalatedCase[]; readonly now: Date }) {
   const me = useSignedInStaff()
   const rows = sortRows(items.map((item) => toRow(item, me, now)))
+  const linkNames = caseLinkNames(
+    rows.map(({ item }) => ({
+      caseId: item.summary.caseId,
+      patient: describePatient(item.summary, me.role),
+      programme: programmeName(item.summary.pathwayId),
+    })),
+  )
   const needMe = rows.filter((row) => row.needsMe).length
   if (rows.length === 0) {
     return (
@@ -150,8 +169,8 @@ function EscalationList({ items, now }: { readonly items: readonly EscalatedCase
     <>
       <Lede now={now} needMe={needMe} />
       <ul className="case-list one">
-        {rows.map((row) => (
-          <EscalationCard key={row.item.summary.caseId} row={row} now={now} />
+        {rows.map((row, index) => (
+          <EscalationCard key={row.item.summary.caseId} row={row} linkName={linkNames[index]} now={now} />
         ))}
       </ul>
     </>
@@ -177,7 +196,8 @@ function Lede({ now, needMe }: { readonly now: Date; readonly needMe?: number })
  * Reads `GET /cases?escalated=true`, then each case for its escalation ladder. The facility lead
  * sees their facility's escalated cases; the programme coordinator sees the cases escalated to them,
  * without names. Each row says whether it waits for the reader, who acknowledged it, or who it is
- * with now, and opens the escalation.
+ * with now, and opens the escalation; its link is named by the patient as shown, with the MRN, so
+ * no two links read the same.
  */
 export function EscalationsPage() {
   useDocumentTitle(t('escalations.title'))

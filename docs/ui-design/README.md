@@ -129,7 +129,7 @@ Where each screen is built:
 
 - CareLoop web app: `src/web`
 - HIS simulator: `src/simulators/his/HisSimulator/ClientApp`
-- Messaging simulator: `src/simulators/patient-channel/PatientChannelSimulator/ClientApp`
+- Messaging simulator: `src/simulators/messaging/MessagingSimulator/ClientApp`
 
 | # | Screen | Used by | Built in | Stories | Requirements | Hackathon |
 |---|---|---|---|---|---|---|

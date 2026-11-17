@@ -11,6 +11,7 @@ import {
   nextActionText,
   nextActionWhy,
   noticeActor,
+  outcomeEvidenceText,
 } from '../../domain'
 import { describeDue, formatWhen, parseInstant } from '../../format'
 import { isClinicianRole, isEscalationRole, sameReference, useSignedInStaff } from '../../identity'
@@ -108,7 +109,7 @@ export function NextActionCard({ detail, now, children }: NextActionCardProps) {
         <p className="closed-line">{t('case.closedAs', { reason: t(`closureReasons.${detail.closureReason}`) })}</p>
       ) : null}
       {detail.outcomeEvidenceReference ? (
-        <p className="closed-line">{t('case.outcomeEvidence', { reference: detail.outcomeEvidenceReference })}</p>
+        <p className="closed-line">{outcomeEvidenceText(detail.outcomeEvidenceReference, me.role)}</p>
       ) : null}
       <dl className="facts">
         <div>

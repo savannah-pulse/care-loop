@@ -11,7 +11,7 @@ The orchestration API is the authority for case state. It accepts events, valida
 ```mermaid
 flowchart LR
     HIS[HIS simulator]
-    CHANNEL[SMS and email simulator]
+    CHANNEL[messaging simulator]
     HISADAPTER[Mock HIS adapter]
     CHANNELADAPTER[Mock channel adapter]
     API[Orchestration API<br/>validate · correlate · authorize · audit]
@@ -71,7 +71,7 @@ sequenceDiagram
     participant API as Orchestration API
     participant Store as Coordination store
     participant AI as Python AI service
-    participant Channel as SMS and email simulator
+    participant Channel as messaging simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
 

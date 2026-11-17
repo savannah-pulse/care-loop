@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://careloop.invalid/schemas/scenario.schema.json",
   "title": "CareLoop simulator scenario",
-  "description": "A SYNTHETIC test journey in two parts. The steps are hospital-system events that the HIS simulator replays against CareLoop's FHIR boundary. The behaviour on each patient says how that patient reacts when CareLoop notifies them, which the patient-channel simulator applies when a notification actually arrives. Clinical values (result category, urgency, closure reason) are placeholder codes that must exist in the pathway definition; a scenario never invents clinical content.",
+  "description": "A SYNTHETIC test journey in two parts. The steps are hospital-system events that the HIS simulator replays against CareLoop's FHIR boundary. The behaviour on each patient says how that patient reacts when CareLoop notifies them, which the messaging simulator applies when a notification actually arrives. Clinical values (result category, urgency, closure reason) are placeholder codes that must exist in the pathway definition; a scenario never invents clinical content.",
   "type": "object",
   "additionalProperties": false,
   "required": ["name", "synthetic", "description", "pathwayId"],
@@ -75,7 +75,7 @@
     },
     "patientBehaviour": {
       "type": "object",
-      "description": "How the simulated patient reacts when CareLoop notifies them. The patient-channel simulator applies it each time a notification for this patient arrives. It is a reaction, not a timetable: if CareLoop never sends a notification, nothing is reported and nothing is acknowledged.",
+      "description": "How the simulated patient reacts when CareLoop notifies them. The messaging simulator applies it each time a notification for this patient arrives. It is a reaction, not a timetable: if CareLoop never sends a notification, nothing is reported and nothing is acknowledged.",
       "additionalProperties": false,
       "required": ["delivery", "response"],
       "properties": {
