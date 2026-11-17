@@ -32,7 +32,8 @@ builder.Services
     .AddFhirBoundary(builder.Configuration)
     .AddOutboxAndNotifications(builder.Configuration)
     .AddDeadlines(builder.Configuration)
-    .AddSummaries(builder.Configuration);
+    .AddSummaries(builder.Configuration)
+    .AddAiAgents(builder.Configuration);
 
 var app = builder.Build();
 

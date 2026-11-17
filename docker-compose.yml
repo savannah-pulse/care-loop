@@ -65,6 +65,14 @@ services:
       Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
       Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}
       Ai__AzureOpenAi__ApiKey: ${AZURE_OPENAI_API_KEY:-}
+      # Foundry agents on the dashboard: off unless AI_AGENTS_ENABLED is true. The API calls them with its own Entra
+      # identity (DefaultAzureCredential), which needs Azure AI User on the project; no key or token is set here.
+      Ai__Agents__Enabled: ${AI_AGENTS_ENABLED:-false}
+      Ai__Agents__ProjectEndpoint: ${AI_AGENTS_PROJECT_ENDPOINT:-}
+      Ai__Agents__RoleBriefing: ${AI_AGENTS_ROLE_BRIEFING:-role-briefing}
+      Ai__Agents__ImpactSummary: ${AI_AGENTS_IMPACT_SUMMARY:-impact-summary}
+      Ai__Agents__PatientNotification: ${AI_AGENTS_PATIENT_NOTIFICATION:-patient-notification}
+      Ai__Agents__TimeoutSeconds: ${AI_AGENTS_TIMEOUT_SECONDS:-30}
     ports:
       - "${API_PORT:-8080}:8080"
     healthcheck:

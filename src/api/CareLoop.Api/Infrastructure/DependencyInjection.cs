@@ -1,3 +1,5 @@
+using Azure.Identity;
+using CareLoop.Api.Features.Agents;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Features.Events.Handlers;
 using CareLoop.Api.Features.Fhir;
@@ -19,6 +21,7 @@ using CareLoop.Domain.Pathways;
 using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Time;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Infrastructure;
 
@@ -216,6 +219,37 @@ public static class DependencyInjection
             // Off by default: an automatic draft spends a model call and sends facts out of CareLoop with nobody having asked.
             services.AddScoped<IDomainEventSubscriber, AutoDraftOnHandoff>();
         }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the client for the three Microsoft Foundry agents the dashboard asks for words: the role briefing,
+    /// the impact summary and the patient message draft.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configuration">Application configuration; supplies the <c>Ai:Agents</c> section.</param>
+    /// <returns>The same service collection, for chaining.</returns>
+    /// <remarks>
+    /// Separate from <see cref="AddSummaries"/>: these agents do not draft the handoff summary and do not go through
+    /// <see cref="IAiProvider"/>. The client is always registered, and the endpoints answer 501 while
+    /// <c>Ai:Agents:Enabled</c> is <see langword="false"/>. Once it is <see langword="true"/>, the settings are checked
+    /// at start-up, so a missing project endpoint stops the host. Tokens come from <c>DefaultAzureCredential</c>: the
+    /// managed identity in Azure, which needs <c>Azure AI User</c> on the Foundry project.
+    /// </remarks>
+    public static IServiceCollection AddAiAgents(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<AgentOptions>()
+            .Bind(configuration.GetSection(AgentOptions.SectionName))
+            .Validate(AgentOptions.IsValid,
+                "Ai:Agents needs an https ProjectEndpoint, agent names of letters, digits, '-', '_' or '.', and TimeoutSeconds from 1 to 300 when Enabled is true.")
+            .ValidateOnStart();
+        services.AddSingleton(sp => new AgentAccessToken(new DefaultAzureCredential(),
+            sp.GetRequiredService<IOptions<AgentOptions>>(), sp.GetRequiredService<IHostEnvironment>(),
+            sp.GetRequiredService<IClock>(), sp.GetRequiredService<ILogger<AgentAccessToken>>()));
+        // A backstop only: the client cancels each call itself after Ai:Agents:TimeoutSeconds, token included.
+        services.AddHttpClient<IAgentClient, FoundryAgentClient>((sp, http) =>
+            http.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<AgentOptions>>().Value.TimeoutSeconds, 1, AgentOptions.MaximumTimeoutSeconds) + 5));
 
         return services;
     }
