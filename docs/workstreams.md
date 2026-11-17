@@ -278,7 +278,7 @@ Validation: 560 API tests (34 skipped, all WS9/WS10) passed. The dashboard is th
 was given to Birir at the 13 November sync), connected to these endpoints; it replaces the first dashboard, whose original
 25 tests were ported to its Vitest suite. 50 screen tests (Testing Library and user-event in jsdom, against a fake API at
 the `fetch` level) cover the handoff summary, escalation, case, worklist and identity screens, including D1, D3 and D5,
-for 151 Vitest tests in all. Lint, type-check, unit tests and build run in CI.
+for 181 Vitest tests in all. Lint, type-check, unit tests and build run in CI.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/

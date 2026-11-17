@@ -75,6 +75,17 @@ describe('timeline (C3)', () => {
     }
   })
 
+  it('shows the programme coordinator CareLoop’s own wording, never what came back by text message or email', () => {
+    const contact = (origin: string, reason: string) => timelineEntry({ origin, eventType: 'NotificationUpdated', reason })
+    const call = contact('careloop', 'On a call, the patient said they will come.')
+    expect(timelineEntryTitle(call, 'coordinator')).toBe('On a call, the patient said they will come.')
+    for (const origin of ['sms', 'email']) {
+      const reply = contact(origin, 'The patient replied 1: they got the message.')
+      expect(timelineEntryTitle(reply, 'coordinator')).toBe('Patient contact updated')
+      expect(timelineEntryTitle(reply, STAFF_ROLE)).toBe('The patient replied 1: they got the message.')
+    }
+  })
+
   it('never shows a refused acknowledgement as an acknowledgement', () => {
     const refused = timelineEntry({
       eventType: 'EscalationAcknowledged',
