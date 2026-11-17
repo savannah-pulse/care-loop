@@ -119,14 +119,17 @@ public sealed class FoundryAgentClientTests
         var logs = new CapturingLogger();
         var ok = new StubHandler(_ => Json(HttpStatusCode.OK, """{"output_text":"SYN text the log must not hold"}"""));
         var refused = new StubHandler(_ => Json(HttpStatusCode.Forbidden, """{"error":{"code":"PermissionDenied","message":"SYN no role"}}"""));
+        var foundryRefused = new StubHandler(_ => Json(HttpStatusCode.Forbidden, """{"code":"UserError","message":"SYN identity lacks agents/write"}"""));
 
         await Client(ok, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None);
         await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(refused, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None));
+        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(foundryRefused, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None));
 
-        Assert.Equal(2, logs.Messages.Count);
+        Assert.Equal(3, logs.Messages.Count);
         Assert.All(logs.Messages, m => Assert.Contains("role-briefing", m));
         Assert.Contains(logs.Messages, m => m.Contains("200", StringComparison.Ordinal));
-        Assert.Contains(logs.Messages, m => m.Contains("403", StringComparison.Ordinal) && m.Contains("PermissionDenied", StringComparison.Ordinal));
+        Assert.Contains(logs.Messages, m => m.Contains("403", StringComparison.Ordinal) && m.Contains("PermissionDenied: SYN no role", StringComparison.Ordinal));
+        Assert.Contains(logs.Messages, m => m.Contains("UserError: SYN identity lacks agents/write", StringComparison.Ordinal));
         Assert.All(logs.Messages, m => Assert.DoesNotContain("3F6B1C2A", m));
         Assert.All(logs.Messages, m => Assert.DoesNotContain("must not hold", m));
     }

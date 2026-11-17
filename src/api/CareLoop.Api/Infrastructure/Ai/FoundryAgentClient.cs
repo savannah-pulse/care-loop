@@ -214,17 +214,22 @@ public sealed class FoundryAgentClient : IAgentClient
     }
 
     /// <summary>The agent's own error code and message, shortened, for the log; never anything from the prompt.</summary>
+    /// <remarks>Foundry answers either <c>{"error":{"code","message"}}</c> or <c>{"code","message"}</c> at the top level.</remarks>
     private static string ErrorOf(string body)
     {
         try
         {
             using var document = JsonDocument.Parse(body);
-            if (document.RootElement.ValueKind == JsonValueKind.Object
-                && document.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object)
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object)
             {
+                var error = root.TryGetProperty("error", out var nested) && nested.ValueKind == JsonValueKind.Object ? nested : root;
                 var code = error.TryGetProperty("code", out var c) ? c.ToString() : null;
                 var message = error.TryGetProperty("message", out var m) ? m.ToString() : null;
-                return Shorten($"{code}: {message}");
+                if (code is not null || message is not null)
+                {
+                    return Shorten($"{code}: {message}");
+                }
             }
         }
         catch (JsonException)
