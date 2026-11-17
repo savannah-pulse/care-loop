@@ -105,11 +105,16 @@ function CaseCard({ row, now }: RowProps) {
               className="cc-link"
               href={routeHref({ name: 'case', caseId: summary.caseId })}
               title={patient.reference}
+              aria-label={row.linkName === patient.name ? undefined : row.linkName}
               aria-describedby={`${ids}-action ${ids}-due`}
             >
               {patient.name}
             </a>
-            {patient.identifier ? <span className="cc-id">{patient.identifier}</span> : null}
+            {patient.identifier ? (
+              <span className="cc-id" aria-hidden={patient.hidden ? undefined : true}>
+                {patient.identifier}
+              </span>
+            ) : null}
           </span>
         </h3>
         <StatusPills row={row} />
@@ -156,10 +161,19 @@ function CaseRow({ row, now, roomy }: CaseRowProps) {
   return (
     <tr className="row-link" onClick={(event) => openCase(event, summary.caseId)}>
       <td>
-        <a className="name" href={routeHref({ name: 'case', caseId: summary.caseId })} title={patient.reference}>
+        <a
+          className="name"
+          href={routeHref({ name: 'case', caseId: summary.caseId })}
+          title={patient.reference}
+          aria-label={row.linkName === patient.name ? undefined : row.linkName}
+        >
           {patient.name}
         </a>
-        {patient.identifier ? <span className="l2">{patient.identifier}</span> : null}
+        {patient.identifier ? (
+          <span className="l2" aria-hidden={patient.hidden ? undefined : true}>
+            {patient.identifier}
+          </span>
+        ) : null}
         {roomy ? null : <StatusPills row={row} />}
         <span className="l2">{[row.programme, row.stage].join(t('common.separator'))}</span>
       </td>
@@ -473,6 +487,8 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
  * that list. On wide screens each group is a table, with a separate status column from 1200 px and
  * the status under the patient below that; below 900 px each case is a card that opens the case
  * wherever it is tapped. The chips are the exception queues, and a case can sit in more than one.
+ * Each case's link is named by the patient as shown, with the MRN (the case number for the
+ * coordinator), so no two links read the same to a screen reader.
  * When nothing needs attention it says so, with the next deadline, instead of listing cases.
  */
 export function WorklistPage() {

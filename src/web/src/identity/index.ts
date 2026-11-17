@@ -37,5 +37,5 @@ export {
   staffDescription,
 } from './staff'
 export type { StaffMember } from './staff'
-export { SIGNED_IN_STORAGE_KEY, getSignedInStaff, signInAs, useSignedInStaff } from './store'
+export { SIGNED_IN_STORAGE_KEY, getSignedInStaff, onSignedInChange, signInAs, useSignedInStaff } from './store'
 export { SignedInMenu } from './SignedInMenu'
