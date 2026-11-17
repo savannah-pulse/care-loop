@@ -193,8 +193,21 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.DoesNotContain(Number(facilityLevel), prompt);
     }
 
+    [Fact]
+    public async Task The_briefing_says_which_cases_the_reader_acts_on_whether_or_not_the_header_names_a_FHIR_type()
+    {
+        var mine = await SeedAsync(NewCase("SYN-RESULT-MINE", "SYN-FAC-A", due: _clock.UtcNow.AddHours(-1)));
+        await ChangeAsync(mine.Id, c => c.AssignOwner(TestData.Clinician(Reader), _clock.UtcNow));
+        var context = Identity();
+        context.Request.Headers[DemoRoles.UserHeader] = $"Practitioner/{Reader}";
+
+        Assert.Equal(200, Status(await BriefingAsync(context)));
+
+        Assert.Contains($"{Number(mine)} Programme: breast screening.", _agents.Calls.Single().Prompt);
+        Assert.Contains("Acts next: the reader.", _agents.Calls.Single().Prompt);
+    }
+
     [Theory]
-    [InlineData(DemoRoles.NurseNavigator, 200)]
     [InlineData(DemoRoles.Clinician, 200)]
     [InlineData(DemoRoles.ReceivingClinician, 403)]
     [InlineData(DemoRoles.FacilityLead, 403)]

@@ -178,12 +178,20 @@ public static class DraftRoleBriefing
 
     private static string ActsNext(CaseOwner owner, Actor reader)
     {
-        if (!owner.IsQueue && string.Equals(owner.Reference, reader.Reference, StringComparison.OrdinalIgnoreCase))
+        if (!owner.IsQueue && string.Equals(WithoutType(owner.Reference), WithoutType(reader.Reference), StringComparison.OrdinalIgnoreCase))
         {
             return "the reader";
         }
 
         var role = AgentWords.Role(owner.Role);
         return owner.IsQueue ? $"the {role} queue" : $"a {role}";
+    }
+
+    // Staff are stored without a FHIR type ("rekha-varghese") but a caller may state one ("Practitioner/rekha-varghese").
+    private static string WithoutType(string reference)
+    {
+        var trimmed = reference.Trim();
+        var slash = trimmed.IndexOf('/', StringComparison.Ordinal);
+        return slash > 0 && trimmed[..slash].All(char.IsAsciiLetter) ? trimmed[(slash + 1)..] : trimmed;
     }
 }
