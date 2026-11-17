@@ -1164,6 +1164,287 @@
         }
       }
     },
+    "/ai/role-briefing": {
+      "post": {
+        "tags": [
+          "Ai"
+        ],
+        "summary": "Asks the role-briefing agent to sum up the reader's worklist in a few plain words.",
+        "operationId": "DraftRoleBriefing",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "query",
+            "description": "Facility to brief on; defaults to the staff reader's facility, and every facility for the coordinator.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason required to brief on another facility's cases, recorded with the read.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/impact-summary": {
+      "post": {
+        "tags": [
+          "Ai"
+        ],
+        "summary": "Asks the impact-summary agent to say in plain words what the aggregate numbers show.",
+        "operationId": "DraftImpactSummary",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "query",
+            "description": "Optional facility, as for `GET /metrics`; the coordinator otherwise gets every facility.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Reason for staff reading another facility's numbers, recorded with the read.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/cases/{caseId}/patient-message-draft": {
+      "post": {
+        "tags": [
+          "Ai"
+        ],
+        "summary": "Asks the patient-notification agent for a preview of a message to the patient. Nothing is sent.",
+        "operationId": "DraftPatientMessage",
+        "parameters": [
+          {
+            "name": "caseId",
+            "in": "path",
+            "description": "The case.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "The channel to draft for, `Sms` (the default) or `Email`.",
+            "schema": {
+              "default": "Sms",
+              "$ref": "#/components/schemas/NotificationChannel"
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "description": "Access reason required outside the reader's facility, recorded with the read.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiTextResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not Implemented",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotImplementedResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fhir/metadata": {
       "get": {
         "tags": [
@@ -1428,6 +1709,30 @@
   },
   "components": {
     "schemas": {
+      "AiTextResponse": {
+        "required": [
+          "agent",
+          "text",
+          "generatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "The agent that wrote the text, as named in the Foundry project, for example `role-briefing`."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text exactly as the agent wrote it, trimmed. Plain text, never markup to render."
+          },
+          "generatedAt": {
+            "type": "string",
+            "description": "When CareLoop received the text.",
+            "format": "date-time"
+          }
+        },
+        "description": "Text a Microsoft Foundry agent wrote for a member of staff to read, returned by the three AI endpoints."
+      },
       "ApproveSummaryRequest": {
         "required": [
           "approvedText"
@@ -2588,6 +2893,13 @@
         },
         "description": "Body returned with HTTP 501 by endpoints that are scaffolded but not yet implemented."
       },
+      "NotificationChannel": {
+        "enum": [
+          "Sms",
+          "Email"
+        ],
+        "description": "A channel over which CareLoop can send a notification."
+      },
       "OwnerResponse": {
         "required": [
           "reference",
@@ -3200,6 +3512,9 @@
     },
     {
       "name": "Summaries"
+    },
+    {
+      "name": "Ai"
     },
     {
       "name": "FHIR"

@@ -59,20 +59,33 @@ public static class GetMetrics
         }
 
         var query = ReadAccess.FacilityScope(db.Cases.AsNoTracking(), actor, facilityId);
-        var cases = await query.ToListAsync(ct);
+        var response = await MeasureAsync(query, db, pathways, clock.UtcNow, loggerFactory.CreateLogger(typeof(GetMetrics)), ct);
+        await ReadAccess.AuditAsync(db, actor, clock, "metrics", null, outside, reason, queryText, ct);
+        return Results.Ok(response);
+    }
+
+    /// <summary>Measures the cases in a scope from their current state and applied history.</summary>
+    /// <param name="scope">The cases to measure, already limited to what the reader may see.</param>
+    /// <param name="db">The no-tracking read context, for the applied history.</param>
+    /// <param name="pathways">The configured display-label and closure rules.</param>
+    /// <param name="now">The measurement time.</param>
+    /// <param name="logger">Records cases left out of a measure because their history is inconsistent.</param>
+    /// <param name="ct">Cancels the reads.</param>
+    /// <returns>The same counts, rates and medians <c>GET /metrics</c> returns; the AI impact summary is written from them.</returns>
+    internal static async Task<MetricsResponse> MeasureAsync(IQueryable<Case> scope, CareLoopDbContext db,
+        IPathwayProvider pathways, DateTimeOffset now, ILogger logger, CancellationToken ct)
+    {
+        var cases = await scope.ToListAsync(ct);
         var auditRows = await (from audit in db.AuditEvents.AsNoTracking()
-            join @case in query on audit.CaseId equals @case.Id
+            join @case in scope on audit.CaseId equals @case.Id
             where audit.Disposition == SourceEventDisposition.Applied
             select new { audit.CaseId, audit.Id, audit.EventType, audit.SourceTimestamp, audit.ReceivedTimestamp, audit.NewProjectionJson })
             .ToListAsync(ct);
         var history = auditRows.GroupBy(a => a.CaseId).ToDictionary(g => g.Key, g => g
             .Select(a => new HistoryEntry(a.EventType, a.SourceTimestamp, a.ReceivedTimestamp, CaseProjection.FromJson(a.NewProjectionJson)))
             .OrderBy(e => e.ReceivedAt).ThenBy(e => e.Projection.Version).ToList());
-        var logger = loggerFactory.CreateLogger(typeof(GetMetrics));
-        var response = Compute(cases, history, pathways, clock.UtcNow,
+        return Compute(cases, history, pathways, now,
             (caseId, problem) => logger.LogWarning("Case {CaseId} left out of a metric: {Problem}", caseId, problem));
-        await ReadAccess.AuditAsync(db, actor, clock, "metrics", null, outside, reason, queryText, ct);
-        return Results.Ok(response);
     }
 
     private static MetricsResponse Compute(List<Case> cases, Dictionary<Guid, List<HistoryEntry>> history,

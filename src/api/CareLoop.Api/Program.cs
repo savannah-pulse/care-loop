@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using CareLoop.Api.Features.Agents;
 using CareLoop.Api.Features.Cases;
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Features.Exceptions;
@@ -60,6 +61,9 @@ app.MapRunSimulation();
 app.MapDraftHandoffSummary();
 app.MapApproveSummary();
 app.MapRejectSummary();
+app.MapDraftRoleBriefing();
+app.MapDraftImpactSummary();
+app.MapDraftPatientMessage();
 
 await app.RunAsync();
 
