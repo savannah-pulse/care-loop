@@ -6,7 +6,7 @@ namespace CareLoop.Domain.Events;
 /// <remarks>
 /// <para>
 /// <b>Definition.</b> A source event is an inbound fact: something that happened in a hospital
-/// system or the patient channel (a result arrived, a referral was rejected, a patient
+/// system, a text message or an email (a result arrived, a referral was rejected, a patient
 /// acknowledged), or one of the few events CareLoop raises internally (a deadline elapsed, a
 /// handoff summary was approved). <see cref="CaseEventType"/> lists them. It is the opposite
 /// direction to a <see cref="CareLoop.Domain.Events.DomainEvents.IDomainEvent"/>, which is

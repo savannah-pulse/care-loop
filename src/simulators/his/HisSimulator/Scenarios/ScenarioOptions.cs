@@ -23,7 +23,7 @@ public sealed class ScenarioOptions
     /// <remarks>
     /// CareLoop runs on real time, so a scenario that spans days has to be compressed to be shown
     /// live. The default of 2 turns a two-day journey into about a minute and a half. It must equal
-    /// the factor CareLoop's demo pathway deadlines were shortened by, and the patient-channel
+    /// the factor CareLoop's demo pathway deadlines were shortened by, and the messaging
     /// simulator's setting of the same name, or deadlines will pass at the wrong moment.
     /// </remarks>
     public double RealSecondsPerScenarioHour { get; set; } = 2;

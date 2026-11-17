@@ -1,6 +1,6 @@
 # CareLoop web
 
-CareLoop's own dashboard for staff: the worklist, a case, escalations, the AI handoff summary, impact and programmes (screens 1, 2, 17, 18, 3 and 4 in [docs/ui-design](../../docs/ui-design/README.md)). React 19, strict TypeScript and Vite. It reads and writes through the CareLoop REST API only, never a simulator's store, and makes no clinical decisions; the hospital-system and patient-channel screens belong to the simulators.
+CareLoop's own dashboard for staff: the worklist, a case, escalations, the AI handoff summary, impact and programmes (screens 1, 2, 17, 18, 3 and 4 in [docs/ui-design](../../docs/ui-design/README.md)). React 19, strict TypeScript and Vite. It reads and writes through the CareLoop REST API only, never a simulator's store, and makes no clinical decisions; the hospital-system and messaging screens belong to the simulators.
 
 ## Run it
 

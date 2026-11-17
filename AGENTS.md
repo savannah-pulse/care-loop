@@ -24,7 +24,7 @@ If a task appears to conflict with any of these, stop and ask.
 
 These are deferred, not forbidden. Build the seams for them now and leave the implementations for later.
 
-- **Real SMS and email delivery.** CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. The `Sms` and `Email` providers are built, but in the prototype both send to the SMS and email simulator. Providers for a real SMS or email service come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
+- **Real SMS and email delivery.** CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. The `Sms` and `Email` providers are built, but in the prototype both send to the messaging simulator. Providers for a real SMS or email service come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
 - **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS or Malaffi integration.** The simulators stand in for these.
 - **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
@@ -124,9 +124,9 @@ care-loop/
 │       ├── his/
 │       │   ├── README.md, Dockerfile
 │       │   └── HisSimulator/           ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, Time/, ClientApp/
-│       └── patient-channel/
+│       └── messaging/
 │           ├── README.md, Dockerfile
-│           └── PatientChannelSimulator/   SMS and email simulator. ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, ClientApp/
+│           └── MessagingSimulator/     text messages and email. ASP.NET minimal API: Outbound/, Inbound/, Scenarios/, State/, ClientApp/
 │
 └── tests/
     ├── api/CareLoop.Tests/             xUnit, references Domain and Api
@@ -135,7 +135,7 @@ care-loop/
     │   └── Fakes/                      FakeClock, InMemoryCaseRepository, TestData
     ├── simulators/
     │   ├── his/HisSimulator.Tests/
-    │   └── patient-channel/PatientChannelSimulator.Tests/
+    │   └── messaging/MessagingSimulator.Tests/
     ├── ai_workflow/                    Python workflow tests (under src/ai_workflow/tests today)
     ├── contracts/                      contract and schema compatibility tests (reserved)
     └── integration/                    end-to-end synthetic journey tests (reserved)
@@ -295,7 +295,7 @@ A channel is two-way, so a provider has two halves:
 - **Outbound**, `INotificationProvider`: sends the message.
 - **Inbound**, `IInboundNotificationHandler`: understands what comes back on that channel (a delivery report, a failure, or the patient's reply as typed) and translates it into internal events. Each provider has its own format, so each has its own handler, reached at `POST /notifications/inbound/{provider}`.
 
-In the prototype both providers send to the SMS and email simulator (`src/simulators/patient-channel`). The wire format is plain JSON and is CareLoop's own, so the shared classes are named for it: `SimulatorNotificationProvider` posts `{ messageId, channel, to, subject, body, language, metadata }` to `{BaseUrl}/messages`, and `SimulatorInboundNotificationHandler` receives the signed delivery reports and replies at `POST /notifications/inbound/sms` or `/email`. `metadata` carries the case and the audience (patient, caregiver or staff) and is returned on every callback; only a callback about a patient message can change a case. The simulator plays the people CareLoop writes to: it reports delivery or failure, and the patient replies or stays silent, as the scenario under test says. Going live means a provider written for a real service's API beside these; the sender and the router do not change.
+In the prototype both providers send to the messaging simulator (`src/simulators/messaging`). The wire format is plain JSON and is CareLoop's own, so the shared classes are named for it: `SimulatorNotificationProvider` posts `{ messageId, channel, to, subject, body, language, metadata }` to `{BaseUrl}/messages`, and `SimulatorInboundNotificationHandler` receives the signed delivery reports and replies at `POST /notifications/inbound/sms` or `/email`. `metadata` carries the case and the audience (patient, caregiver or staff) and is returned on every callback; only a callback about a patient message can change a case. The simulator plays the people CareLoop writes to: it reports delivery or failure, and the patient replies or stays silent, as the scenario under test says. Going live means a provider written for a real service's API beside these; the sender and the router do not change.
 
 ## Key interfaces
 
@@ -331,7 +331,7 @@ Never read the system time directly. Always use `IClock`, so deadline tests and 
 Scenarios span days and CareLoop measures deadlines in real time, so a live run is compressed at the edges, never inside the API:
 
 - **API.** `Pathways:Directory` selects the pathway folder. `Infrastructure/Pathways/demo` holds the same definitions with every duration divided by 1800 (one pathway hour is two real seconds). Development and Docker Compose use it; the base settings use the real folder. A test asserts the two files differ only by that factor.
-- **Simulators.** `Scenarios:RealSecondsPerScenarioHour` (default 2) paces the HIS simulator's steps and compresses the patient's `respondAfter` in the SMS and email simulator. It must match the demo pathway's factor.
+- **Simulators.** `Scenarios:RealSecondsPerScenarioHour` (default 2) paces the HIS simulator's steps and compresses the patient's `respondAfter` in the messaging simulator. It must match the demo pathway's factor.
 - **Tests.** Journey tests use `FakeClock` with the real pathway folder and need neither.
 
 Timestamps are always real. Do not add a fast or fake clock to the API outside tests.
@@ -432,7 +432,7 @@ export function ExceptionRow({ item, onOpen }: ExceptionRowProps) {
 
 ### Project documentation
 
-- Each project folder (`src/api/`, `src/web/`, `src/ai_workflow/`, `src/simulators/his/`, `src/simulators/patient-channel/`) has a `README.md`: what it is, how to run it, how to test it, and its configuration.
+- Each project folder (`src/api/`, `src/web/`, `src/ai_workflow/`, `src/simulators/his/`, `src/simulators/messaging/`) has a `README.md`: what it is, how to run it, how to test it, and its configuration.
 - The root `README.md` explains the whole system and how to start it with Docker Compose.
 
 ## Testing

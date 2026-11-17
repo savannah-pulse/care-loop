@@ -6,7 +6,7 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// </summary>
 /// <remarks>
 /// These settings belong to the provider of that channel alone. In the prototype both sections point at
-/// the SMS and email simulator, which stands in for a real SMS and email service; nothing else in CareLoop knows
+/// the messaging simulator, which stands in for a real SMS and email service; nothing else in CareLoop knows
 /// the simulator exists.
 /// </remarks>
 public sealed class SimulatorNotificationOptions

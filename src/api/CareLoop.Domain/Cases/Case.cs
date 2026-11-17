@@ -125,7 +125,7 @@ public sealed class Case
     /// The patient's display name as the source system supplied it, or <see langword="null"/> when it
     /// did not. Demographic, not clinical: it is kept so staff can recognise who a case is about
     /// (decision 15, C20), is returned to staff roles only, and never appears in the audit snapshot,
-    /// in a domain event, in an outbound FHIR message or in anything sent to a patient channel.
+    /// in a domain event, in an outbound FHIR message or in any text message or email.
     /// </summary>
     public string? PatientDisplayName { get; private set; }
 
