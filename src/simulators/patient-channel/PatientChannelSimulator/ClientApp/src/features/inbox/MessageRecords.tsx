@@ -57,7 +57,7 @@ function meaningOf(text: string): 'WillCome' | 'CallMe' | 'Other' {
  *
  * @remarks
  * The two are kept apart on purpose. Delivery is a transport fact and never an acknowledgement.
- * A reply is shown as typed, with how CareLoop reads it: 1 is "I will come", and 2 or any other
+ * A reply is shown as typed, with how CareLoop reads it: 1 is "I got this message", and 2 or any other
  * text asks for a call and is never an acknowledgement. Whether the patient understood, and how
  * confident they feel, are not shown here: a nurse records those in CareLoop after a call. A
  * caregiver's or a staff member's message shows delivery only, because only the patient replies.

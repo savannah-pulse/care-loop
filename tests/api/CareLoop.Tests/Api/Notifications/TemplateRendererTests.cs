@@ -44,7 +44,8 @@ public sealed class TemplateRendererTests
     {
         var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
 
-        Assert.Contains("Reply 1 to say you will come", body);
+        Assert.Contains("Reply 1 to confirm you got this message", body);
+        Assert.DoesNotContain("will come", body);
         Assert.Contains("Reply 2 if you would like your care team to call you", body);
         foreach (var notThere in new[] { "patient channel", "health app", "the app", "your app", "portal", "http", "www.", "log in", "open " })
         {

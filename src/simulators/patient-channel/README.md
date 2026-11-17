@@ -61,7 +61,7 @@ Safety meaning carried by the design (see the XML documentation for detail):
   replies; a delivery report says nothing about a reply.
 - **The simulator never rewrites content.** It shows exactly what CareLoop rendered.
 - **A reply is forwarded as typed.** The simulator does not say what a reply means and refuses none
-  for its wording. CareLoop decides: `1` is "I will come" (the acknowledgement), and `2` or any
+  for its wording. CareLoop decides: `1` is "I got this message" (the acknowledgement), and `2` or any
   other text asks for a call.
 - **Only the patient replies.** A caregiver's message and a staff notice are shown, get a delivery
   report and can never be replied to.

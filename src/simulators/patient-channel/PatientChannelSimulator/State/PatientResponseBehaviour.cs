@@ -13,7 +13,7 @@ public enum PatientResponseBehaviour
     /// <summary>The patient stays silent. The message stays unacknowledged, which is what lets CareLoop's deadline be demonstrated.</summary>
     None,
 
-    /// <summary>The patient replies <see cref="ReplyCodes.WillCome"/>: "I will come".</summary>
+    /// <summary>The patient replies <see cref="ReplyCodes.WillCome"/>: "I got this message".</summary>
     Acknowledge,
 
     /// <summary>The patient replies <see cref="ReplyCodes.CallMe"/>: they ask their care team for a call.</summary>
@@ -29,7 +29,7 @@ public enum PatientResponseBehaviour
 /// </remarks>
 public static class ReplyCodes
 {
-    /// <summary>"I will come".</summary>
+    /// <summary>"I got this message".</summary>
     public const string WillCome = "1";
 
     /// <summary>"Please call me".</summary>

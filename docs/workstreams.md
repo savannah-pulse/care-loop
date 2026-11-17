@@ -11,7 +11,7 @@ grep -rn "TODO(WS-4)" --include="*.cs" --include="*.ts" --include="*.tsx" .
 A second list, **Design gaps**, appears under some workstreams. These come from
 [`ui-design-gap-analysis.md`](ui-design-gap-analysis.md) (items C1 to C22), which compares the screen designs with the
 code. They are additive. The decisions in that document's section 5 (1 to 7 and 12 to 20) were taken on 13 November 2026,
-and decisions 21 to 30 (text message and email only, C22) on 16 November 2026.
+and decisions 21 to 30 (text message and email only, C22) on 16 November 2026, and decision 31 (reply 1 means "I got this message") on 17 November 2026.
 Every item, split by workstream with its status, is in the [design gap tracker](#design-gap-tracker) at the end of this
 file; update its row in the same change that finishes the work.
 

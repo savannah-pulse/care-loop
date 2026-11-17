@@ -27,7 +27,7 @@ namespace CareLoop.Api.Features.Events.Handlers;
 /// waiting for (the acknowledgement itself, or trying another way to reach the patient) gives the owner the
 /// follow-up action (<see cref="HandlerSupport.ArrangeFollowUpAction"/>) with its own deadline and resolves any
 /// escalation raised meanwhile. A call-me request becomes a next action for the current owner by raising
-/// <see cref="CallRequested"/>; a text-message "will come" does not answer it, because the patient still asked
+/// <see cref="CallRequested"/>; a text-message "1" does not answer it, because the patient still asked
 /// to be rung.
 /// </para>
 /// <para>
@@ -300,7 +300,7 @@ public sealed class NotificationUpdateHandler : IEventHandler
         (NotificationStatus.Understood, true) => "On a call, the patient said the next step back in their own words.",
         (NotificationStatus.Understood, false) => "The patient confirmed they understood the next step.",
         (_, true) => "On a call, the patient said they will come.",
-        _ => "The patient replied that they will come.",
+        _ => "The patient replied 1: they got the message.",
     };
 
     private static string WireName(NotificationChannel channel) => channel switch
@@ -316,7 +316,7 @@ public sealed class NotificationUpdateHandler : IEventHandler
 
     /// <summary>
     /// Whether the case's next action is one an acknowledgement answers: waiting for it, trying another way to
-    /// reach the patient, or (for an outcome recorded after a call) the call itself. A text-message "will come"
+    /// reach the patient, or (for an outcome recorded after a call) the call itself. A text-message "1"
     /// does not answer a call the patient asked for: someone still has to ring them.
     /// </summary>
     private static bool IsWaitingForThePatient(Case @case, PathwayDefinition pathway, bool fromCall)

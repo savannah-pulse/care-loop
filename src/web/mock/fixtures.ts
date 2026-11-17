@@ -459,7 +459,7 @@ function salem(): CaseFixture {
         by: { actor: MESSAGE_ACTOR, role: 'system' },
         from: 'FollowUpActive',
         to: 'FollowUpActive',
-        reason: 'Replied 1 to the text message: he will come.',
+        reason: 'Replied 1 to the text message: he got the message.',
       },
       {
         type: 'NotificationUpdated',

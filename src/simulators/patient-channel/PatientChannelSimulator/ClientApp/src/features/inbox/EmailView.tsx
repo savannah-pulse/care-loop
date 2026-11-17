@@ -21,7 +21,7 @@ export interface EmailViewProps {
  * @remarks
  * The email carries a subject and the text exactly as CareLoop worded it, and no link. A patient
  * replies in the box under it, the same way as to a text message: the reply goes to CareLoop as
- * typed, and CareLoop reads 1 as "I will come" and anything else as a request for a call. A
+ * typed, and CareLoop reads 1 as "I got this message" and anything else as a request for a call. A
  * caregiver's or a staff member's email is read-only by design: a patient may name someone to
  * receive the day, time and place of their appointments, but only the patient replies to the
  * clinic, so those emails have no reply box and nothing shown can send an event to CareLoop.

@@ -90,7 +90,7 @@ export function inboxMessage(overrides: Partial<InboxMessage> = {}): InboxMessag
     channel: 'Sms',
     subject: null,
     language: 'en',
-    body: 'SIMULATED: a follow-up step is waiting. Reply 1 to say you will come. Reply 2 for a call.',
+    body: 'SIMULATED: a follow-up step is waiting. Reply 1 to confirm you got this message. Reply 2 for a call.',
     receivedAt: '2026-03-02T09:30:00+00:00',
     delivery: 'Delivered',
     deliveryFailureReason: null,

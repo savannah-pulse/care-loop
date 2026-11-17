@@ -26,7 +26,7 @@ export interface PatientBehavioursPageProps {
  *
  * @remarks
  * A behaviour has two halves: what the channel reports (delivered, failed, or nothing) and what
- * the patient then does (nothing, reply 1 to say they will come, or reply 2 to ask for a call).
+ * the patient then does (nothing, reply 1 to confirm they got the message, or reply 2 to ask for a call).
  * It is a reaction, applied only when a notification actually arrives, so a
  * patient is never shown as acknowledging a message CareLoop did not send. Delivery alone is
  * never an acknowledgement. Scenario runs set these behaviours; this screen is for setting them

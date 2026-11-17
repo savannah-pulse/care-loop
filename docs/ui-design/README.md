@@ -3,7 +3,7 @@
 One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 - Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the SMS and email simulator, and 13 across all of them.
-- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 30 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is now the patient's email. The image `10-patient-view.png` and `ui-design.html` still show the earlier app design and are to be redrawn (P20).
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is now the patient's email. The image `10-patient-view.png` and `ui-design.html` still show the earlier app design and are to be redrawn (P20).
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
@@ -19,7 +19,7 @@ The design follows the seven decisions in the [UI design gap analysis](../ui-des
 | # | Decision | What changed in the design |
 |---|---|---|
 | 1 | Five stages in code; the ten on screen are display labels | The flow table maps each label to its stage and track status. The flow has a row "In code". |
-| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Screens 9, 10, 12 and 14 say "she will come": a reply of 1, which sends `NotificationUpdated/Acknowledged` only. |
+| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Screens 9, 10, 12 and 14 say "she will come": a reply of 1, which sends `NotificationUpdated/Acknowledged` only. Since decision 31, reply 1 means "I got this message"; the screens are to be reworded (P22). |
 | 3 | Build the confidence rating | A nurse navigator records it after a call, on screen 2 (decision 30), as `NotificationUpdated/ConfidenceRated` from 1 to 5. Screen 3 reports it. |
 | 4 | The AI handoff summary is approved in the CareLoop web app | New screen 18. Screen 6 shows the approved summary, read-only. |
 | 5 | Add the roles `nurse-navigator`, `receiving-clinician` and `lab` | Who sees what gives each person their role in CareLoop. |
@@ -97,7 +97,7 @@ Each person sees only the cases they care for, and only what their part of the c
 
 | Person | Role in CareLoop | Sees | Can do | Cannot |
 |---|---|---|---|---|
-| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she will come or 2 to ask for a call; on a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
+| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
 | Family member the patient named in writing: Saeed | None. A recipient of messages (`Caregiver`), only while her consent is active. | The day, time and place of her appointments, by email | Help her get there. Nothing in CareLoop. | See results or the reason for the visit. Reply for her or change anything. |
 | Nurse navigator: Huda | `nurse-navigator` | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved | Call patients and record on the case what they said (will come, said the next step back, a 1 to 5 confidence rating), hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
 | Screening doctor: Dr. Rekha | `clinician` | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts. | See patients she does not care for |
@@ -257,7 +257,7 @@ Hessa's journey:
 ![Basic phone, no internet](09-basic-phone.png)
 
 - Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`. On a call, the nurse records on screen 2 that she will come (`/Acknowledged`), that she said the next step back (`/Understood`) and how sure she feels (`/ConfidenceRated`).
-- Replying 1 sends `/Acknowledged` (she will come), and 2 sends `/CallRequested`. Any other reply also sends `/CallRequested`: someone should call her (decision 29). Replies need two-way texts: C7 and C22 in the simulator, and an agreement with the text provider in production.
+- Replying 1 sends `/Acknowledged` (she got the message, decision 31), and 2 sends `/CallRequested`. Any other reply also sends `/CallRequested`: someone should call her (decision 29). Replies need two-way texts: C7 and C22 in the simulator, and an agreement with the text provider in production.
 - A person gives results. Texts carry only dates and places, with no links, and come from a number the patient can reply to.
 - Automated calls are future work: there is no voice channel in `NotificationChannel`. The screen shows how they would work.
 - Texts are in English in the prototype (screen 11).

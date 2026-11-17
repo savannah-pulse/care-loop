@@ -120,7 +120,7 @@ export function listInbox(): Promise<InboxMessage[]> {
  *
  * @remarks
  * The text goes to CareLoop exactly as typed. The simulator does not say what it means and
- * refuses none for its wording: CareLoop reads 1 as "I will come" and anything else as a request
+ * refuses none for its wording: CareLoop reads 1 as "I got this message" and anything else as a request
  * for a call. This is the only way a reply is created outside a patient's behaviour.
  *
  * @param messageId - Identifier of the message being replied to.

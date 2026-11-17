@@ -1,5 +1,5 @@
 [PLACEHOLDER WORDING, NOT APPROVED]
 Subject: A follow-up step is waiting for you
 
-Your screening provider has a follow-up step for you. Reply 1 to say you will come. Reply 2 if you would like your care team to call you.
+Your screening provider has a follow-up step for you and will be in touch about it. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.
 Reference: {{caseReference}}

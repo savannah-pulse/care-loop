@@ -20,7 +20,7 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// The body is a <see cref="SimulatorCallback"/> as JSON. A <c>delivery</c> with status <c>delivered</c> is a
 /// delivery and <c>failed</c> (with its <c>reason</c>) a failure; any other status is not tracked. A
 /// <c>reply</c> carries the text exactly as the patient typed it, and this handler says what it means:
-/// <see cref="AcknowledgeReply"/> is an acknowledgement ("I will come"), <see cref="CallMeReply"/> asks for a
+/// <see cref="AcknowledgeReply"/> is an acknowledgement ("I got this message"), <see cref="CallMeReply"/> asks for a
 /// call, and any other text asks for a call too, because an unreadable reply is a patient trying to say
 /// something. A delivery report is never an acknowledgement, and no reply is ever teach-back or a confidence
 /// rating: a nurse records those after a call.
@@ -49,7 +49,7 @@ public abstract class SimulatorInboundNotificationHandler : IInboundNotification
     /// <summary>The header that carries the message signature.</summary>
     public const string SignatureHeader = "X-CareLoop-Signature";
 
-    /// <summary>The reply that means "I will come": an acknowledgement.</summary>
+    /// <summary>The reply that means "I got this message": an acknowledgement.</summary>
     public const string AcknowledgeReply = "1";
 
     /// <summary>The reply that asks the care team for a call.</summary>
