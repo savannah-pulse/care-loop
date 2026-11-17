@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# One-time setup, per Azure subscription and GitHub environment, that lets the Deploy workflow sign
+# in to Azure without a stored secret (OpenID Connect).
+#
+#   infra/azure/scripts/setup-github-oidc.sh <owner/repo> <environment>
+#
+# Run it signed in (az login) to the target subscription as someone who may create app
+# registrations and assign roles (Owner, or Contributor plus User Access Administrator).
+#
+# It creates an Entra ID app registration that trusts GitHub runs of <owner/repo> in the GitHub
+# environment <environment>, and gives it two roles on the subscription:
+#   Contributor                              create the resources
+#   Role Based Access Control Administrator  give the managed identities their roles
+# It then prints the values to store in the GitHub environment.
+set -euo pipefail
+
+REPO="${1:-}"
+ENVIRONMENT="${2:-}"
+if [ -z "$REPO" ] || [ -z "$ENVIRONMENT" ]; then
+  sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+  exit 1
+fi
+
+SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+TENANT_ID="$(az account show --query tenantId -o tsv)"
+APP_NAME="careloop-deploy-$ENVIRONMENT"
+
+echo "Subscription: $(az account show --query name -o tsv) ($SUBSCRIPTION_ID)"
+
+CLIENT_ID="$(az ad app list --display-name "$APP_NAME" --query '[0].appId' -o tsv)"
+if [ -z "$CLIENT_ID" ]; then
+  CLIENT_ID="$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)"
+  echo "Created app registration $APP_NAME"
+fi
+az ad sp show --id "$CLIENT_ID" >/dev/null 2>&1 || az ad sp create --id "$CLIENT_ID" --output none
+PRINCIPAL_ID="$(az ad sp show --id "$CLIENT_ID" --query id -o tsv)"
+
+if ! az ad app federated-credential list --id "$CLIENT_ID" --query '[].name' -o tsv | grep -qx "github-$ENVIRONMENT"; then
+  az ad app federated-credential create --id "$CLIENT_ID" --output none --parameters "{
+    \"name\": \"github-$ENVIRONMENT\",
+    \"issuer\": \"https://token.actions.githubusercontent.com\",
+    \"subject\": \"repo:$REPO:environment:$ENVIRONMENT\",
+    \"audiences\": [\"api://AzureADTokenExchange\"]
+  }"
+fi
+
+for role in "Contributor" "Role Based Access Control Administrator"; do
+  az role assignment create --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \
+    --role "$role" --scope "/subscriptions/$SUBSCRIPTION_ID" --output none
+done
+
+cat <<EOF
+
+Done. In GitHub, create the environment "$ENVIRONMENT" for $REPO and store:
+
+  Variables
+    AZURE_CLIENT_ID        $CLIENT_ID
+    AZURE_TENANT_ID        $TENANT_ID
+    AZURE_SUBSCRIPTION_ID  $SUBSCRIPTION_ID
+    AZURE_LOCATION         (optional, default uaenorth)
+
+  Secrets
+    POSTGRES_ADMIN_PASSWORD   letters and digits only, 16 or more, with upper case, lower case and a digit
+    SIMULATOR_INBOUND_SECRET  16 or more characters
+
+With the GitHub CLI:
+
+  gh variable set AZURE_CLIENT_ID --env $ENVIRONMENT --repo $REPO --body $CLIENT_ID
+  gh variable set AZURE_TENANT_ID --env $ENVIRONMENT --repo $REPO --body $TENANT_ID
+  gh variable set AZURE_SUBSCRIPTION_ID --env $ENVIRONMENT --repo $REPO --body $SUBSCRIPTION_ID
+  gh secret set POSTGRES_ADMIN_PASSWORD --env $ENVIRONMENT --repo $REPO
+  gh secret set SIMULATOR_INBOUND_SECRET --env $ENVIRONMENT --repo $REPO
+EOF

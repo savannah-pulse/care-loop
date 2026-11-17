@@ -1,0 +1,60 @@
+name: Deploy to Azure
+
+# Run by hand. Deploys the chosen ref to the Azure subscription configured on the GitHub environment
+# of the same name, using infra/azure/environments/<environment>.bicepparam.
+# One-time setup per environment: infra/azure/scripts/setup-github-oidc.sh (see infra/azure/README.md).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment (a GitHub environment and a file in infra/azure/environments)
+        required: true
+        default: dev
+        type: string
+      what_if:
+        description: Only show what would change
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+# One deployment per environment at a time; a second run waits for the first.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sign in to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy
+        env:
+          AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'uaenorth' }}
+          AZURE_AI_LOCATION: ${{ vars.AZURE_AI_LOCATION || 'swedencentral' }}
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
+          SIMULATOR_INBOUND_SECRET: ${{ secrets.SIMULATOR_INBOUND_SECRET }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          WHAT_IF: ${{ inputs.what_if && '--what-if' || '' }}
+          # Build on the runner; ACR Tasks are not available on every subscription type.
+          BUILD_MODE: docker
+        run: |
+          if [ -z "$POSTGRES_ADMIN_PASSWORD" ] || [ -z "$SIMULATOR_INBOUND_SECRET" ]; then
+            echo "::error::Set the POSTGRES_ADMIN_PASSWORD and SIMULATOR_INBOUND_SECRET secrets on the $ENVIRONMENT environment."
+            exit 1
+          fi
+          infra/azure/scripts/deploy.sh "$ENVIRONMENT" $WHAT_IF

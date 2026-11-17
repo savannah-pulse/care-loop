@@ -1,0 +1,45 @@
+// Production shape: private networking, no simulators, real pathway timing, a database sized for
+// steady load with geo-redundant backups, and Key Vault purge protection.
+//
+// This file sets the infrastructure up for real use; it does not make the prototype fit for real
+// patient data. See "Before real patient data" in ../README.md and the prerequisites in AGENTS.md.
+using '../main.bicep'
+
+param environmentName = 'prod'
+param location = readEnvironmentVariable('AZURE_LOCATION', 'uaenorth')
+param namePrefix = readEnvironmentVariable('NAME_PREFIX', 'careloop')
+
+param privateNetworking = true
+param deploySimulators = false
+param demoTiming = false
+param deployMonitoring = true
+param logRetentionDays = 90
+param keyVaultPurgeProtection = true
+
+// With private networking the registry needs the Premium tier. It stays reachable from the
+// internet (Entra ID sign-in required) so the Deploy workflow can push; set false once images are
+// pushed from a runner inside the virtual network.
+param registryPublicAccess = true
+
+// The API is reached through the web app only. Turn this on when a hospital system has to post to
+// /fhir, and restrict allowedIpRanges to that system's addresses.
+param exposeApi = false
+param allowedIpRanges = []
+
+param postgresSkuName = 'Standard_D2ds_v5'
+param postgresSkuTier = 'GeneralPurpose'
+param postgresStorageGb = 64
+param postgresBackupRetentionDays = 35
+param postgresGeoRedundantBackup = true
+// 'ZoneRedundant' where the region has availability zones and the cost is accepted.
+param postgresHighAvailability = 'Disabled'
+
+// AI stays off until the model region, data residency, retention and the guardrail are approved.
+param deployAi = false
+param apiAiProvider = 'NoOp'
+
+// Set by scripts/deploy.sh and the Deploy workflow. Never write a value here.
+param imageTag = readEnvironmentVariable('IMAGE_TAG', '')
+param postgresAdminPassword = readEnvironmentVariable('POSTGRES_ADMIN_PASSWORD')
+param simulatorInboundSecret = readEnvironmentVariable('SIMULATOR_INBOUND_SECRET')
+param deployerPrincipalId = readEnvironmentVariable('DEPLOYER_PRINCIPAL_ID', '')

@@ -1,0 +1,279 @@
+// The CareLoop container apps and the settings that wire them together. This is the Azure
+// counterpart of docker-compose.yml; keep the two in step when a service gains a setting.
+//
+// Apps call each other over HTTPS on <app>.internal.<environment domain> (or <app>.<environment
+// domain> when the app is public). The addresses are built from names rather than read from the
+// apps, because the API and the simulators point at each other.
+param location string
+param tags object
+param environmentId string
+param environmentDefaultDomain string
+param registryServer string
+param imageTag string
+param appsIdentityId string
+param appsIdentityClientId string
+param aiIdentityId string
+param aiIdentityClientId string
+param connectionStringSecretUri string
+param inboundSecretUri string
+param appInsightsConnectionString string
+param deploySimulators bool
+param deployAi bool
+param exposeApi bool
+param exposeSimulators bool
+param allowedIpRanges array
+param demoTiming bool
+param migrateOnStartup bool
+param notificationsTimeZone string
+param apiAiProvider string
+param apiExtraEnv array
+param webMaxReplicas int
+param aiProjectEndpoint string
+param aiAccountEndpoint string
+param aiModelDeploymentName string
+param aiInferenceEnabled bool
+param aiPromptShieldsAttested bool
+
+var appNames = {
+  api: 'api'
+  web: 'web'
+  aiWorkflow: 'ai-workflow'
+  hisSimulator: 'his-simulator'
+  messagingSimulator: 'messaging-simulator'
+}
+
+var internalDomain = 'internal.${environmentDefaultDomain}'
+var apiHost = '${appNames.api}.${exposeApi ? environmentDefaultDomain : internalDomain}'
+var aiWorkflowHost = '${appNames.aiWorkflow}.${internalDomain}'
+var hisSimulatorHost = '${appNames.hisSimulator}.${exposeSimulators ? environmentDefaultDomain : internalDomain}'
+var messagingSimulatorHost = '${appNames.messagingSimulator}.${exposeSimulators ? environmentDefaultDomain : internalDomain}'
+
+var images = {
+  api: '${registryServer}/careloop/api:${imageTag}'
+  web: '${registryServer}/careloop/web:${imageTag}'
+  aiWorkflow: '${registryServer}/careloop/ai-workflow:${imageTag}'
+  hisSimulator: '${registryServer}/careloop/his-simulator:${imageTag}'
+  messagingSimulator: '${registryServer}/careloop/messaging-simulator:${imageTag}'
+}
+
+var connectionStringSecret = {
+  name: 'careloop-connection-string'
+  keyVaultUrl: connectionStringSecretUri
+  identity: appsIdentityId
+}
+var inboundSecret = {
+  name: 'simulator-inbound-secret'
+  keyVaultUrl: inboundSecretUri
+  identity: appsIdentityId
+}
+
+var telemetryEnv = empty(appInsightsConnectionString)
+  ? []
+  : [{ name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsightsConnectionString }]
+
+var dotnetEnv = [
+  { name: 'ASPNETCORE_ENVIRONMENT', value: 'Production' }
+  { name: 'ASPNETCORE_URLS', value: 'http://+:8080' }
+  // The environment's ingress ends TLS; trust its X-Forwarded-* headers.
+  { name: 'ASPNETCORE_FORWARDEDHEADERS_ENABLED', value: 'true' }
+]
+
+// --- API --------------------------------------------------------------------------------------------
+
+var apiBaseEnv = [
+  { name: 'ConnectionStrings__CareLoop', secretRef: connectionStringSecret.name }
+  { name: 'Database__MigrateOnStartup', value: string(migrateOnStartup) }
+  { name: 'Notifications__Sms__InboundSecret', secretRef: inboundSecret.name }
+  { name: 'Notifications__Email__InboundSecret', secretRef: inboundSecret.name }
+  { name: 'Notifications__TimeZone', value: notificationsTimeZone }
+  { name: 'Ai__Provider', value: apiAiProvider }
+  // Lets DefaultAzureCredential pick the user-assigned identity.
+  { name: 'AZURE_CLIENT_ID', value: appsIdentityClientId }
+]
+
+// The demo pathway's deadlines last seconds, so the sweep must run about once a second.
+var apiDemoEnv = demoTiming
+  ? [
+      { name: 'Pathways__Directory', value: 'Infrastructure/Pathways/demo' }
+      { name: 'DeadlineWorker__Interval', value: '00:00:01' }
+    ]
+  : []
+
+// Text messages and emails both go to the messaging simulator. Staff addresses and facility names
+// are the synthetic ones from docker-compose.yml.
+var apiSimulatorEnv = deploySimulators
+  ? [
+      { name: 'ExternalSystems__Systems__his-simulator__BaseUrl', value: 'https://${hisSimulatorHost}' }
+      { name: 'Notifications__Sms__BaseUrl', value: 'https://${messagingSimulatorHost}' }
+      { name: 'Notifications__Email__BaseUrl', value: 'https://${messagingSimulatorHost}' }
+      { name: 'Notifications__FacilityNames__family-health-centre', value: 'Family Health Centre' }
+      { name: 'Notifications__FacilityNames__general-hospital', value: 'General Hospital' }
+      { name: 'Notifications__FacilityNames__regional-hospital', value: 'Regional Hospital' }
+      { name: 'Notifications__StaffContacts__nurse-navigator__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__nurse-navigator__Address', value: 'SYN-EMAIL-NURSE-NAVIGATORS' }
+      { name: 'Notifications__StaffContacts__clinician__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__clinician__Address', value: 'SYN-EMAIL-CLINICIANS' }
+      { name: 'Notifications__StaffContacts__receiving-clinician__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__receiving-clinician__Address', value: 'SYN-EMAIL-RECEIVING-CLINICIANS' }
+      { name: 'Notifications__StaffContacts__lab__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__lab__Address', value: 'SYN-EMAIL-LAB' }
+      { name: 'Notifications__StaffContacts__facility-lead__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__facility-lead__Address', value: 'SYN-EMAIL-FACILITY-LEADS' }
+      { name: 'Notifications__StaffContacts__coordinator__Channel', value: 'Email' }
+      { name: 'Notifications__StaffContacts__coordinator__Address', value: 'SYN-EMAIL-COORDINATORS' }
+    ]
+  : []
+
+var apiAiEnv = deployAi
+  ? [
+      { name: 'Ai__AiWorkflow__BaseUrl', value: 'https://${aiWorkflowHost}' }
+      { name: 'Ai__AzureOpenAi__Endpoint', value: aiAccountEndpoint }
+      { name: 'Ai__AzureOpenAi__Deployment', value: aiModelDeploymentName }
+    ]
+  : []
+
+module api 'container-app.bicep' = {
+  name: 'app-api'
+  params: {
+    location: location
+    tags: tags
+    name: appNames.api
+    environmentId: environmentId
+    identityId: appsIdentityId
+    registryServer: registryServer
+    image: images.api
+    targetPort: 8080
+    external: exposeApi
+    allowedIpRanges: allowedIpRanges
+    secrets: [connectionStringSecret, inboundSecret]
+    env: concat(dotnetEnv, apiBaseEnv, apiDemoEnv, apiSimulatorEnv, apiAiEnv, telemetryEnv, apiExtraEnv)
+    // One replica exactly: the deadline worker, the outbox and the in-memory notification send log
+    // live in this process, and migrations run at startup.
+    minReplicas: 1
+    maxReplicas: 1
+  }
+}
+
+// --- Web --------------------------------------------------------------------------------------------
+
+module web 'container-app.bicep' = {
+  name: 'app-web'
+  params: {
+    location: location
+    tags: tags
+    name: appNames.web
+    environmentId: environmentId
+    identityId: appsIdentityId
+    registryServer: registryServer
+    image: images.web
+    targetPort: 80
+    external: true
+    allowedIpRanges: allowedIpRanges
+    healthPath: '/'
+    cpu: '0.25'
+    memory: '0.5Gi'
+    minReplicas: 1
+    maxReplicas: webMaxReplicas
+    // The nginx configuration is not a secret; a secret volume is simply how Container Apps mounts a file.
+    secrets: [
+      {
+        name: 'nginx-conf'
+        value: replace(loadTextContent('../config/web-nginx.conf'), '__API_HOST__', apiHost)
+      }
+    ]
+    volumes: [
+      {
+        name: 'nginx-conf'
+        storageType: 'Secret'
+        secrets: [{ secretRef: 'nginx-conf', path: 'default.conf' }]
+      }
+    ]
+    volumeMounts: [
+      { volumeName: 'nginx-conf', mountPath: '/etc/nginx/conf.d' }
+    ]
+  }
+  // nginx resolves the API's host name once, when it starts.
+  dependsOn: [api]
+}
+
+// --- AI workflow service ----------------------------------------------------------------------------
+
+// Never public: the service does not yet check who is calling it.
+module aiWorkflow 'container-app.bicep' = if (deployAi) {
+  name: 'app-ai-workflow'
+  params: {
+    location: location
+    tags: tags
+    name: appNames.aiWorkflow
+    environmentId: environmentId
+    identityId: aiIdentityId
+    registryServer: registryServer
+    image: images.aiWorkflow
+    targetPort: 8080
+    external: false
+    env: concat(
+      [
+        { name: 'CARELOOP_AI_PROVIDER', value: aiInferenceEnabled ? 'foundry' : 'disabled' }
+        { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiProjectEndpoint }
+        { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: aiModelDeploymentName }
+        { name: 'CARELOOP_AZURE_HOSTED', value: 'true' }
+        { name: 'AZURE_CLIENT_ID', value: aiIdentityClientId }
+        { name: 'CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED', value: string(aiPromptShieldsAttested) }
+      ],
+      telemetryEnv
+    )
+  }
+}
+
+// --- Simulators -------------------------------------------------------------------------------------
+
+// One replica each: a simulator keeps its state in memory.
+module hisSimulator 'container-app.bicep' = if (deploySimulators) {
+  name: 'app-his-simulator'
+  params: {
+    location: location
+    tags: tags
+    name: appNames.hisSimulator
+    environmentId: environmentId
+    identityId: appsIdentityId
+    registryServer: registryServer
+    image: images.hisSimulator
+    targetPort: 8080
+    external: exposeSimulators
+    allowedIpRanges: allowedIpRanges
+    env: concat(dotnetEnv, [
+      { name: 'CareLoop__FhirBaseUrl', value: 'https://${apiHost}/fhir' }
+      { name: 'Contacts__PatientChannel', value: 'sms' }
+      { name: 'Scenarios__Directory', value: '/app/scenarios' }
+      { name: 'Scenarios__RealSecondsPerScenarioHour', value: '2' }
+    ])
+  }
+}
+
+module messagingSimulator 'container-app.bicep' = if (deploySimulators) {
+  name: 'app-messaging-simulator'
+  params: {
+    location: location
+    tags: tags
+    name: appNames.messagingSimulator
+    environmentId: environmentId
+    identityId: appsIdentityId
+    registryServer: registryServer
+    image: images.messagingSimulator
+    targetPort: 8080
+    external: exposeSimulators
+    allowedIpRanges: allowedIpRanges
+    secrets: [inboundSecret]
+    env: concat(dotnetEnv, [
+      { name: 'CareLoop__CallbackBaseUrl', value: 'https://${apiHost}/notifications/inbound' }
+      { name: 'CareLoop__InboundSecret', secretRef: inboundSecret.name }
+      { name: 'Scenarios__Directory', value: '/app/scenarios' }
+      { name: 'Scenarios__RealSecondsPerScenarioHour', value: '2' }
+    ])
+  }
+}
+
+output webUrl string = 'https://${web.outputs.fqdn}'
+output apiUrl string = exposeApi ? 'https://${apiHost}' : ''
+output hisSimulatorUrl string = deploySimulators && exposeSimulators ? 'https://${hisSimulatorHost}' : ''
+output messagingSimulatorUrl string = deploySimulators && exposeSimulators ? 'https://${messagingSimulatorHost}' : ''
