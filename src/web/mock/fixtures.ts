@@ -1365,3 +1365,40 @@ export function createProgrammes(): Programme[] {
       : item,
   )
 }
+/**
+ * What the role-briefing agent writes in the mock: one sentence for the "Start here today" card.
+ *
+ * @param coordinator - `true` for the programme coordinator, whose list holds only cases escalated to them.
+ * @returns A synthetic sentence. It names no patient: the API never gives an agent a name.
+ */
+export function roleBriefingWords(coordinator: boolean): string {
+  return coordinator
+    ? 'Two cases are escalated to you and both are past their deadline. Start with the one that has waited longest, then check whether the facility lead has acknowledged the other.'
+    : 'One case is late and already escalated, so start there. The urgent one is due at noon, and the last one by the end of the day.'
+}
+
+/** What the impact-summary agent writes in the mock: a few sentences on the numbers, with no numbers in them. */
+export const IMPACT_SUMMARY_WORDS = [
+  'Most next steps are being done by their deadline, and most patients who were called said their next step back.',
+  'Where cases are waiting, it is mostly for a unit to accept a referral, often after another unit declined for lack of capacity.',
+  'A few appointments whose time has passed have no outcome recorded yet, which is worth checking before reading the attendance figure.',
+].join('\n\n')
+
+/**
+ * What the patient-notification agent writes in the mock: a preview of a message to a patient.
+ *
+ * @param channel - `Sms` for a text message, `Email` for an email.
+ * @param facility - The care team's facility, by name.
+ * @returns A synthetic draft with `{first name}` where the name goes and the two reply codes at the end. It never
+ * mentions a result.
+ */
+export function patientMessageWords(channel: 'Sms' | 'Email', facility: string): string {
+  return channel === 'Sms'
+    ? `{first name}, this is your care team at ${facility}. We have a follow-up step for you and will be in touch about it soon. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.`
+    : [
+        'Subject: A follow-up step from your care team',
+        `Dear {first name},\n\nThis is your care team at ${facility}. We have a follow-up step for you, and someone from the team will be in touch about it soon.`,
+        'Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.',
+        `Your care team at ${facility}`,
+      ].join('\n\n')
+}

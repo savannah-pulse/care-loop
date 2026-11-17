@@ -1,6 +1,6 @@
 # CareLoop web
 
-CareLoop's own dashboard for staff: the worklist, a case, escalations, the AI handoff summary, impact and programmes (screens 1, 2, 17, 18, 3 and 4 in [docs/ui-design](../../docs/ui-design/README.md)). React 19, strict TypeScript and Vite. It reads and writes through the CareLoop REST API only, never a simulator's store, and makes no clinical decisions; the hospital-system and messaging screens belong to the simulators.
+CareLoop's own dashboard for staff: the worklist, a case, escalations, the AI handoff summary, impact and programmes (screens 1, 2, 17, 18, 3 and 4 in [docs/ui-design](../../docs/ui-design/README.md)), with a few words from the team's AI agents where they help (see [AI on the dashboard](#ai-on-the-dashboard)). React 19, strict TypeScript and Vite. It reads and writes through the CareLoop REST API only, never a simulator's store, and makes no clinical decisions; the hospital-system and messaging screens belong to the simulators.
 
 ## Run it
 
@@ -16,7 +16,7 @@ $env:CARELOOP_MOCK_API='1'; npm run dev                           # local data, 
 In bash, use `CARELOOP_API_URL=http://localhost:8080 npm run dev` or `CARELOOP_MOCK_API=1 npm run dev`. The same works for `npm run preview` after `npm run build`.
 
 - **Against the API.** The dev server forwards `/api/*`, without the `/api` prefix, to `CARELOOP_API_URL`: `http://localhost:5080` by default, where `dotnet run --project src/api/CareLoop.Api` starts the API. Docker Compose publishes the API on `http://localhost:8080`. The API has no CORS policy, so the browser always calls `/api` on the dashboard's own origin. In the container, nginx forwards `/api/` to the `api` service, and the dashboard is on <http://localhost:4173>; start everything with `docker compose up --build` at the repository root.
-- **Without the API.** `CARELOOP_MOCK_API=1` answers `/api` from `mock/`, typed against the generated API types, with the API's read rules: identity headers, the reader's facility, a reason for other facilities, the coordinator's narrower view without names, the clinician-only patient search, paging limits and who may acknowledge. It also answers the handoff summary and the comparison, which the API does not build yet (501), so those screens can be worked on; it returns the same measures for every facility. It runs only inside `vite` and `vite preview`; the app does not know it exists and the build never contains it. Changes last until the server stops. The fixtures' times (Thu 12 Nov 2026, 09:00 in Abu Dhabi) move to the moment the server starts; set `CARELOOP_MOCK_NOW=2026-11-12T09:00:00+04:00` to keep them.
+- **Without the API.** `CARELOOP_MOCK_API=1` answers `/api` from `mock/`, typed against the generated API types, with the API's read rules: identity headers, the reader's facility, a reason for other facilities, the coordinator's narrower view without names, the clinician-only patient search, paging limits and who may acknowledge. It also answers the handoff summary and the comparison, which the API does not build yet (501), so those screens can be worked on; it returns the same measures for every facility. Its three AI endpoints answer with synthetic words, or as the API does when AI is off (501) or fails (503): set `CARELOOP_MOCK_AI` to `on` (the default), `off`, `fail` or `slow` (the words after four seconds, to see the loading state), or send an `X-Mock-AI` header with one request. It runs only inside `vite` and `vite preview`; the app does not know it exists and the build never contains it. Changes last until the server stops. The fixtures' times (Thu 12 Nov 2026, 09:00 in Abu Dhabi) move to the moment the server starts; set `CARELOOP_MOCK_NOW=2026-11-12T09:00:00+04:00` to keep them.
 
 ## Configuration
 
@@ -25,6 +25,7 @@ In bash, use `CARELOOP_API_URL=http://localhost:8080 npm run dev` or `CARELOOP_M
 | `CARELOOP_API_URL` | `vite`, `vite preview` | `http://localhost:5080` | Where `/api` is forwarded |
 | `CARELOOP_MOCK_API` | `vite`, `vite preview` | unset | `1` answers `/api` from `mock/` instead |
 | `CARELOOP_MOCK_NOW` | `vite`, `vite preview` | server start | The moment the mock's fixtures describe |
+| `CARELOOP_MOCK_AI` | `vite`, `vite preview` | `on` | How the mock's AI endpoints answer: `on`, `off` (501), `fail` (503) or `slow` |
 
 Settings can also go in `.env.local`. Times are shown in Abu Dhabi time (`TIME_ZONE` in `src/format/time.ts`) on the 24-hour clock. All text is in `src/locales/en.json`; layouts use logical CSS so Arabic can follow.
 
@@ -43,16 +44,28 @@ The header's "Signed in as" menu offers six invented staff, remembered in this b
 - **Clinicians** (clinician, receiving clinician) see a patient's other screening and the handoff summary; the API refuses the patient search to other roles.
 - **People.** Owners and actors are matched to the sign-in list by `sameReference` (`src/identity/staff.ts`), which ignores a FHIR type in front, so `Practitioner/joy-bautista` and `joy-bautista` are the same person.
 
+## AI on the dashboard
+
+Three agents in the team's Microsoft Foundry project write a few plain words for staff, through the CareLoop API only (`src/data/agents.ts`); the API builds every prompt and never sends an agent a patient's name, contact details or identifiers. CareLoop works out every number, deadline and order, and every screen works without AI. Each piece of AI text is a figure captioned with who wrote it (`AiWords` in `src/components/AiWords.tsx`), so the label is read with the words, and it is never acted on, stored or sent.
+
+| Where | Who | What it shows | Calls |
+|---|---|---|---|
+| Worklist, "Start here today" | Everyone, on their own team | Up to three of the person's cases (theirs, their role's queue at their facility, or for the coordinator their escalated cases), overdue or escalated first, then urgent, then due today, each linking to its case. Worked out in the browser from the worklist already loaded (`src/features/worklist/startHere.ts`), so it works without AI. When it lists cases, one sentence "Written by AI from your worklist." When nothing is due, one calm line with the next deadline, and AI is not asked | `POST /ai/role-briefing` |
+| Impact, "What the numbers say" | Everyone | A few sentences "Written by AI from the numbers on this page. Check them before you act on it.", read beside `GET /metrics` so the numbers never wait for it | `POST /ai/impact-summary` |
+| Case, "Message to the patient" | Nurse navigator and clinician (`isMessagePreviewRole`), open cases | "Preview a message to the patient" opens a dialog with a text message or an email the agent drafted, "Draft written by AI. Not sent: messages go out from approved templates." It uses `{first name}` where the name goes. Focus moves into the dialog and back to the button when it closes | `POST /cases/{id}/patient-message-draft?channel=Sms` or `Email` |
+
+States are the same everywhere: while loading, a grey skeleton; while AI is switched off in the API (501), the worklist leaves the AI line out, and Impact and the preview say "Not ready yet" in one calm line; when the agent could not write it (503), a small grey note says so and that everything else is up to date. No half-written text is ever shown.
+
 ## Screens
 
 | Address | Screen | Reads |
 |---|---|---|
-| `#/` | Worklist (1): open cases by what needs action now, with filters, search by name, MRN or number, and how many are shown | `GET /cases`, page by page (`take` 200, up to 1,000 cases) |
-| `#/cases/{id}` | Case (2): where the case is (the API's display label), the next action, escalation state, tracks, timeline with its sources in words, other screening for clinicians, and for the nurse navigator "After a call with the patient" | `GET /cases/{id}`, `/timeline`, `GET /cases?patientReference=…`, `GET /programmes/{id}`, `POST /cases/{id}/call-outcome` |
+| `#/` | Worklist (1): "Start here today", then open cases by what needs action now, with filters, search by name, MRN or number, and how many are shown | `GET /cases`, page by page (`take` 200, up to 1,000 cases); `POST /ai/role-briefing` |
+| `#/cases/{id}` | Case (2): where the case is (the API's display label), the next action, escalation state, tracks, timeline with its sources in words, other screening for clinicians, for the nurse navigator "After a call with the patient", and for the nurse navigator and the clinician a message preview | `GET /cases/{id}`, `/timeline`, `GET /cases?patientReference=…`, `GET /programmes/{id}`, `POST /cases/{id}/call-outcome`, `POST /cases/{id}/patient-message-draft` |
 | `#/escalations` | Escalations: open escalations, those needing the signed-in person first | `GET /cases?escalated=true`, then each case |
 | `#/cases/{id}/escalation` | Escalation (17): what is late and why, who is responsible, how late, the ladder from the programme with the current level (if the programme cannot be read, the escalations so far and a calm note), the notice history, "Acknowledge" | `GET /cases/{id}`, `/timeline`, `GET /programmes/{id}`, `POST …/escalations/{escalationId}/acknowledgement` |
 | `#/cases/{id}/summary` | Handoff summary (18): draft, edit, approve exactly the edited text, or reject. An open draft and its edits are kept in memory, never in browser storage, while the reviewer looks at other screens, until they approve or reject it or someone else signs in; the API cannot send a draft back, so reloading the page loses it | `POST /cases/{id}/handoff-summary`, `…/approval`, `…/rejection` |
-| `#/impact` | Impact (3): measures with what each is out of, median time to each step, closures by reason, cases by stage, patient confidence, and the comparison with and without reminders | `GET /metrics`, `POST /metrics/simulation` |
+| `#/impact` | Impact (3): measures with what each is out of, "What the numbers say", median time to each step, closures by reason, cases by stage, patient confidence, and the comparison with and without reminders | `GET /metrics`, `POST /ai/impact-summary`, `POST /metrics/simulation` |
 | `#/programmes`, `#/programmes/{id}` | Programmes (4): steps with deadline, reminder and owner, citations, what happens when a step is late, evidence and closure rules, change history | `GET /programmes`, `GET /programmes/{id}` |
 
 The dashboard shows what the API sends and makes nothing up: display labels as given (decision 19), each timeline entry's source as CareLoop, a hospital system, a text message or an email, from the `origin` the API gives each entry, a refused timeline entry as refused (never as done), durations from .NET `TimeSpan` (`1.00:00:00`) or ISO 8601, and a rate with nobody to count as "Not measured yet", never 0%. A feature the API answers with 501 (the AI summary, WS9; the comparison, WS10) shows a calm "isn't ready yet".
@@ -68,13 +81,14 @@ npm run build       # lint, typecheck, then the production bundle in dist/
 
 The unit tests (`src/**/*.test.ts`, run in jsdom with `src/testing/setup.ts`, builders in `src/testing/`) cover the data layer (identity headers, the reason parameter, paging, failures including 403, 409 and 501, cancellation, the exact approval payload, the acknowledgement call), coordinator redaction, names, worklist grouping and ordering, display labels, timeline sources and refused entries, who may acknowledge, the escalation ladder and notices, durations, rates and the programme and impact formatting.
 
-The screen tests (`src/App.test.tsx` and `src/**/*Page.test.tsx`) open the whole dashboard with `renderApp` (`src/testing/screens.tsx`), signed in as one of the six staff, and act on it with Testing Library and user-event. A fake API (`src/testing/api.ts`) answers the app's own `fetch`, so the real client and identity headers run, and fails any test whose screen calls a route the test did not answer; `src/testing/browser.ts` fills what jsdom lacks (media queries, modal dialogs, scrolling). They cover:
+The screen tests (`src/App.test.tsx`, `src/**/*Page.test.tsx` and the cards' `*Card.test.tsx`) open the whole dashboard with `renderApp` (`src/testing/screens.tsx`), signed in as one of the six staff, and act on it with Testing Library and user-event. A fake API (`src/testing/api.ts`) answers the app's own `fetch`, so the real client and identity headers run, and fails any test whose screen calls a route the test did not answer; `src/testing/browser.ts` fills what jsdom lacks (media queries, modal dialogs, scrolling). They cover:
 
 - **Handoff summary.** Approving sends exactly the edited text, untrimmed, and only after the confirmation; the draft and its edits survive leaving the page and coming back (D1), and are forgotten once approved or rejected, when the API says the draft was decided or replaced, and when someone else signs in; when the API says the draft was decided, replaced or removed, the dialog offers to draft the summary again; rejecting needs a reason; a 501 reads calmly as not ready yet; the coordinator sees where the result came from, without its number.
 - **Escalation.** "Acknowledge" shows only for the role the latest open escalation went to, at the case's facility, and never for another facility's lead; the confirmation says acknowledging changes neither who is responsible nor the clock; success shows the toast and the acknowledged state; a 409 or 403 reads calmly, and closing it clears the message and reads the case again (D3); a programme that cannot be read leaves the rest of the page working (D5).
 - **Case.** The coordinator sees a case number and the note that names, MRNs and hospital record numbers are hidden, never a name, MRN, result number, outcome evidence reference or hospital wording that quotes one, even when the API sends them; other roles see them; only clinicians see the patient's other screening; a 403 reads calmly as not open to you; a programme that cannot be read leaves the case working (D5).
 - **Worklist.** Every case's link is named by its patient and MRN, in tables and on cards, so no two share a name, even for namesakes or one patient's two cases; the Escalations list does the same; another team's cases ask for a reason, then send `reason` and `facilityId` with every read; the coordinator searches by case number, never by name, MRN or patient reference.
 - **Identity.** Every request states the person, role and facility in the `X-Demo-*` headers, with no facility for the coordinator, including straight after a change of person.
+- **AI words.** For each of "Start here today", "What the numbers say" and the message preview: the words with their caption when the agent answers (200), the skeleton while it writes, the calm line when AI is off (501) and the calm note when it fails (503); the right endpoint with the person's identity headers (and the channel for the preview); the cards still list cases and show every number when AI fails; the card's order and its three-case limit, the coordinator's case numbers without names, and no AI request when nothing is due; the preview only for the nurse navigator and the clinician, with focus moving into the dialog and back to its button (`StartHereCard.test.tsx`, `ImpactPage.test.tsx`, `PatientMessageCard.test.tsx`).
 
 The call outcome card's own tests (`src/features/case/CallOutcomeCard.test.tsx`) render the card alone: nothing is ticked for the nurse, exactly what was ticked is sent, focus moves to the card heading after recording and to the message after a refusal, the scale hint is tied to the rating, and the card is locked, saying why first, until a message has been sent to the patient.
 
@@ -95,10 +109,10 @@ npm run generate:api
 | Folder | What it holds |
 |---|---|
 | `src/api/` | Generated API types |
-| `src/data/` | API client and identity headers, paged list reads, read hooks, acknowledgement and summary calls |
+| `src/data/` | API client and identity headers, paged list reads, read hooks, acknowledgement and summary calls, the three AI agents' calls |
 | `src/domain/` | Display rules: display stages, status words, next actions and why they are needed, patients and names, escalations (who may acknowledge, the ladder, notices), tracks, people, timeline entries |
 | `src/features/` | One folder per screen |
-| `src/components/`, `src/hooks/` | Header, icons, status pills, dialog, toast, states (loading placeholders, not ready yet, not open to you, error, empty), the reason form, shared hooks |
+| `src/components/`, `src/hooks/` | Header, icons, status pills, dialog, toast, states (loading placeholders, not ready yet, not open to you, error, empty), the reason form, the captioned figure for AI words, shared hooks |
 | `src/i18n/`, `src/locales/`, `src/format/`, `src/routing/`, `src/identity/` | Text, dates, durations and numbers, readable names, the hash router, sign-in and reasons for other teams |
 | `src/testing/` | Test setup (DOM matchers from Testing Library, the fake API at the `fetch` level and what jsdom lacks), builders of synthetic API responses, and `renderApp` for the screen tests |
 | `mock/` | The local mock API (dev and preview only) |

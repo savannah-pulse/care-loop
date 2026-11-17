@@ -17,14 +17,15 @@ const test = { environment: 'jsdom', setupFiles: ['./src/testing/setup.ts'] }
  * where `dotnet run` starts the API; Docker Compose publishes it on `http://localhost:8080`. With
  * `CARELOOP_MOCK_API=1` they answer `/api` from the local mock API in `mock/` instead, which is
  * loaded only then and never reaches the built app; `CARELOOP_MOCK_NOW` pins the moment its
- * fixtures describe. Settings are read from the environment or `.env` files.
+ * fixtures describe, and `CARELOOP_MOCK_AI` (`on`, `off`, `fail` or `slow`) how its AI endpoints
+ * answer. Settings are read from the environment or `.env` files.
  */
 export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'CARELOOP_')
   const plugins: PluginOption[] = [react()]
   if (env.CARELOOP_MOCK_API === '1') {
     const { careLoopMockApi } = await import('./mock/plugin.ts')
-    plugins.push(careLoopMockApi({ now: env.CARELOOP_MOCK_NOW }))
+    plugins.push(careLoopMockApi({ now: env.CARELOOP_MOCK_NOW, ai: env.CARELOOP_MOCK_AI }))
     return { plugins, test }
   }
   const proxy: Record<string, ProxyOptions> = {

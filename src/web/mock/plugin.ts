@@ -7,8 +7,9 @@
  * default scope, a recorded reason for anything outside it, the programme coordinator's view
  * (cases escalated to them only, without names), the clinician-only patient search, paging limits,
  * and who may acknowledge an escalation. Drafted, approved and rejected summaries and
- * acknowledgements last until the server stops. It is never part of the built app: the app knows
- * nothing about it.
+ * acknowledgements last until the server stops. The three AI endpoints answer with synthetic words,
+ * or as switched off (501) or failing (503), as `CARELOOP_MOCK_AI` or an `X-Mock-AI` request header
+ * says (see `AI_MODES`). It is never part of the built app: the app knows nothing about it.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -18,6 +19,7 @@ import type { components } from '../src/api/schema.d.ts'
 import {
   COHORT_SEED,
   HESSA_CASE_ID,
+  IMPACT_SUMMARY_WORDS,
   WITHOUT_ESCALATION,
   WITH_ESCALATION,
   createCases,
@@ -25,6 +27,8 @@ import {
   createProgrammes,
   draftHessaSummary,
   mockNow,
+  patientMessageWords,
+  roleBriefingWords,
   startScenarioClock,
   type CaseFixture,
   type HandoffSummary,
@@ -35,6 +39,37 @@ type Schemas = components['schemas']
 type Problem = Schemas['ProblemDetails']
 type CaseDetail = Schemas['CaseDetailResponse']
 type CaseSummary = Schemas['CaseSummaryResponse']
+type AiText = Schemas['AiTextResponse']
+type NotImplemented = Schemas['NotImplementedResponse']
+
+/**
+ * How the mock's three AI endpoints answer.
+ *
+ * @remarks
+ * - `on`: with synthetic words, at once (the default).
+ * - `off`: 501, as the API does while `Ai:Agents:Enabled` is false.
+ * - `fail`: 503, as the API does when an agent refuses or times out.
+ * - `slow`: with the words after four seconds, to see the loading state.
+ *
+ * Set for the whole server with `CARELOOP_MOCK_AI`, or for one request with the `X-Mock-AI` header.
+ */
+const AI_MODES = ['on', 'off', 'fail', 'slow'] as const
+
+/** One of {@link AI_MODES}. */
+type AiMode = (typeof AI_MODES)[number]
+
+/** How long `slow` waits before answering. */
+const SLOW_AI_MS = 4000
+
+/** Roles that may preview a message to a patient, as in the API. */
+const MESSAGE_PREVIEW_ROLES: readonly string[] = ['nurse-navigator', 'clinician']
+
+/** Facility names for the mock's message previews, as the API's `Notifications:FacilityNames` gives them. */
+const FACILITY_NAMES: Readonly<Record<string, string>> = {
+  'family-health-centre': 'Family Health Centre',
+  'general-hospital': 'General Hospital',
+  'regional-hospital': 'Regional Hospital',
+}
 
 /** Roles that may approve or reject a handoff summary in the mock, like the clinician roles in the app. */
 const SUMMARY_REVIEWER_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
@@ -56,6 +91,7 @@ interface MockState {
   readonly cases: CaseFixture[]
   readonly summaries: Map<string, HandoffSummary>
   readonly programmes: Programme[]
+  readonly ai: AiMode
 }
 
 interface Reader {
@@ -479,6 +515,53 @@ function requireText(body: Record<string, unknown>, field: string): string {
   return value
 }
 
+function aiModeOf(value: string | undefined): AiMode | undefined {
+  const mode = value?.trim().toLowerCase()
+  return AI_MODES.find((known) => known === mode)
+}
+
+/**
+ * Answers one of the three AI endpoints as the API would: words from an agent, 501 while AI is off, or a calm 503.
+ *
+ * @param state - The mock's state, with the server-wide AI mode.
+ * @param req - The request; an `X-Mock-AI` header overrides the mode for it.
+ * @param res - The response to write.
+ * @param feature - The endpoint's feature name, for the 501 body.
+ * @param agent - The agent's name, for the answer.
+ * @param words - Writes the agent's synthetic words.
+ */
+async function answerAi(
+  state: MockState,
+  req: IncomingMessage,
+  res: ServerResponse,
+  feature: string,
+  agent: string,
+  words: () => string,
+): Promise<void> {
+  const mode = aiModeOf(header(req, 'X-Mock-AI')) ?? state.ai
+  if (mode === 'off') {
+    const body: NotImplemented = {
+      workstream: 'AI agents',
+      feature,
+      message: `${feature} is switched off here: Ai:Agents:Enabled is false.`,
+    }
+    send(res, 501, body)
+    return
+  }
+  if (mode === 'fail') {
+    send(res, 503, {
+      ...problem(503, 'AI could not write this', 'The agent answered HTTP 403. Nothing else depends on it, so everything else still works. Try again later.'),
+      agent,
+    })
+    return
+  }
+  if (mode === 'slow') {
+    await new Promise((resolve) => setTimeout(resolve, SLOW_AI_MS))
+  }
+  const text: AiText = { agent, text: words(), generatedAt: mockNow().toISOString() }
+  send(res, 200, text)
+}
+
 async function route(state: MockState, req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   const url = new URL(req.url ?? '/', 'http://careloop.local')
   const path = url.pathname.replace(/\/+$/, '') || '/'
@@ -526,6 +609,18 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     send(res, 200, createMetrics())
     return true
   }
+  if (path === '/ai/role-briefing') {
+    expect('POST')
+    checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
+    await answerAi(state, req, res, 'RoleBriefing', 'role-briefing', () => roleBriefingWords(who.role === 'coordinator'))
+    return true
+  }
+  if (path === '/ai/impact-summary') {
+    expect('POST')
+    checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
+    await answerAi(state, req, res, 'ImpactSummary', 'impact-summary', () => IMPACT_SUMMARY_WORDS)
+    return true
+  }
   if (first === 'programmes' && third === undefined) {
     expect('GET')
     if (second === undefined) {
@@ -543,6 +638,21 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     return false
   }
   const caseId = second
+  if (third === 'patient-message-draft' && fourth === undefined) {
+    expect('POST')
+    if (!MESSAGE_PREVIEW_ROLES.includes(who.role)) {
+      throw new HttpError(403, 'Only a nurse navigator or a clinician may preview a message to the patient.')
+    }
+    const channel = query.get('channel') ?? 'Sms'
+    if (channel !== 'Sms' && channel !== 'Email') {
+      throw new HttpError(400, 'The channel must be Sms or Email.')
+    }
+    const target = findCase(state, caseId)
+    checkCase(who, target.detail, query.get('reason'))
+    const facility = FACILITY_NAMES[target.detail.facilityId] ?? target.detail.facilityId
+    await answerAi(state, req, res, 'PatientMessageDraft', 'patient-notification', () => patientMessageWords(channel, facility))
+    return true
+  }
   const fixture = findCase(state, caseId)
   const reason = query.get('reason')
   if (third === undefined) {
@@ -595,17 +705,27 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
 export interface MockApiOptions {
   /** The moment the fixtures describe, as an ISO 8601 date-time (`CARELOOP_MOCK_NOW`); now when absent. */
   readonly now?: string
+  /**
+   * How the three AI endpoints answer (`CARELOOP_MOCK_AI`): `on` (the default), `off` (501), `fail` (503) or
+   * `slow` (after four seconds). An `X-Mock-AI` request header overrides it for one request.
+   */
+  readonly ai?: string
 }
 
 /**
  * Creates the Vite plugin that answers `/api` from the fixtures.
  *
- * @param options - Where the fixtures' moment falls on the real clock.
+ * @param options - Where the fixtures' moment falls on the real clock, and how AI answers.
  * @returns A plugin adding the mock API to the dev server and to `vite preview`.
  */
 export function careLoopMockApi(options: MockApiOptions = {}): Plugin {
   startScenarioClock(options.now)
-  const state: MockState = { cases: createCases(), summaries: new Map(), programmes: createProgrammes() }
+  const state: MockState = {
+    cases: createCases(),
+    summaries: new Map(),
+    programmes: createProgrammes(),
+    ai: aiModeOf(options.ai) ?? 'on',
+  }
 
   const handler: Connect.NextHandleFunction = (req, res) => {
     route(state, req, res)
