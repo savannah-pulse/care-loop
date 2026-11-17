@@ -97,14 +97,14 @@ Each person sees only the cases they care for, and only what their part of the c
 
 | Person | Role in CareLoop | Sees | Can do | Cannot |
 |---|---|---|---|---|
-| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
+| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say whether she will come, say the next step back and say how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
 | Family member the patient named in writing: Saeed | None. A recipient of messages (`Caregiver`), only while her consent is active. | The day, time and place of her appointments, by email | Help her get there. Nothing in CareLoop. | See results or the reason for the visit. Reply for her or change anything. |
 | Nurse navigator: Huda | `nurse-navigator` | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved | Call patients and record on the case what they said (will come, said the next step back, a 1 to 5 confidence rating), hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
 | Screening doctor: Dr. Rekha | `clinician` | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts. | See patients she does not care for |
 | Receiving doctor: Dr. Layla | `receiving-clinician` | Referrals sent to her unit: the request, the approved summary, the screening report and images | Accept or decline with a reason, book, record the outcome and close the case with evidence | See referrals sent to other units, or other cases at the Family Health Centre |
 | Lab and test teams | `lab` | Test requests sent to them, and what each test needs | Accept a request, record that the test was done and send the report to the doctor who asked | See the rest of the patient's case |
 | Facility lead: Joy | `facility-lead` | Every case at her facility, to cover gaps and escalations | Choose or change who is responsible, and acknowledge escalations | See reports, images or notes, or cases at other facilities |
-| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case only when it is escalated to him. | Approve the impact summary and act on escalations | See named lists of patients |
+| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case, by its case number only, when it is escalated to him (decision 35). | Approve the impact summary and act on escalations | See named lists of patients |
 | AI drafting, inside CareLoop | None. Part of CareLoop. | The facts of one case, only while drafting | Draft plain words and summaries for a person to approve | Send, decide, set urgency or close anything. Keep data, or learn from it. |
 | Engineers and support | None | Synthetic data only | Build, test and fix CareLoop | See real patient data, unless it is approved and recorded |
 
@@ -119,7 +119,7 @@ The rules behind the table:
 - **Data stays in the UAE.** All patient data, backups and AI processing stay in the UAE (DoH Standard, 4.1.4; Federal Law No. 2 of 2019, Article 13).
 - **Written consent for anything beyond care.** Sharing with family, or research that names patients, needs the patient's written consent (DoH Standard, 4.2.3; Federal Law No. 2 of 2019, Article 16; HIPAA, 45 CFR 164.510(b)).
 - **Automated calls check who answered.** When automated calls are added, a call gives no details until the person who answers says they are the patient.
-- **Staff notices come by email or text message.** Staff are told about tasks and escalations at one address per role, kept in CareLoop's settings (decisions 27 and 28), not in the hospital system's inbox. Like every message, a notice never carries a result.
+- **Staff notices come by email or text message.** Staff are told about tasks and escalations at one address per role, kept in CareLoop's settings (decisions 27 and 28), not in the hospital system's inbox. A notice says only that a case at their facility needs action and gives the case number to look for in CareLoop: no link, no patient details and no result (decision 36).
 
 ## Screens
 
