@@ -1,23 +1,14 @@
-from typing import Protocol, TypeVar
+from typing import Protocol
 
-from pydantic import BaseModel
+from careloop_ai_workflow.models import AgentProposal, WorkflowContext
+from careloop_ai_workflow.workflow import AgentRole
 
-OutputModel = TypeVar("OutputModel", bound=BaseModel)
 
+class ProposalProvider(Protocol):
+    """Optional model adapter returning schema-constrained, reviewable proposals."""
 
-class StructuredOutputProvider(Protocol):
-    """Provider-neutral interface for schema-constrained LLM responses."""
-
-    provider_name: str
-    deployment_name: str
-    enabled: bool
-
-    async def generate(
+    async def propose(
         self,
-        *,
-        system_prompt: str,
-        payload: dict[str, object],
-        output_model: type[OutputModel],
-    ) -> OutputModel: ...
-
-    def close(self) -> None: ...
+        agent_role: AgentRole,
+        context: WorkflowContext,
+    ) -> AgentProposal: ...
