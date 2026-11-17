@@ -45,17 +45,18 @@ def test_stage_endpoint_lists_complete_journey_and_human_gated_closure() -> None
     assert all(stage["human_review_required"] for stage in stages)
 
 
-def test_workflow_context_rejects_unexpected_fields() -> None:
+def test_workflow_context_rejects_non_synthetic_or_unexpected_fields() -> None:
     base = {
         "case_reference": "case-demo-001",
         "source_event_reference": "event-demo-001",
         "stage": WorkflowStage.RESULT_RECEIVED,
     }
 
-    assert WorkflowContext(**base).case_reference == "case-demo-001"
+    with pytest.raises(ValidationError):
+        WorkflowContext(**base, synthetic=False)
 
     with pytest.raises(ValidationError):
-        WorkflowContext(**base, clinical_notes="not accepted")
+        WorkflowContext(**base, synthetic=True, clinical_notes="not accepted")
 
 
 def test_agent_proposal_requires_review_and_cannot_request_case_closure() -> None:
@@ -99,6 +100,7 @@ def test_coordinator_routes_stage_and_returns_reviewable_proposal() -> None:
         case_reference="case-demo-001",
         source_event_reference="event-demo-001",
         stage=WorkflowStage.PATIENT_NOTIFIED,
+        synthetic=True,
     )
     coordinator = WorkflowCoordinator(
         {
@@ -121,6 +123,7 @@ def test_coordinator_rejects_actions_not_allowed_at_the_current_stage() -> None:
         case_reference="case-demo-001",
         source_event_reference="event-demo-001",
         stage=WorkflowStage.PATIENT_NOTIFIED,
+        synthetic=True,
     )
     coordinator = WorkflowCoordinator(
         {
@@ -140,6 +143,7 @@ def test_coordinator_fails_explicitly_when_stage_agent_is_not_configured() -> No
         case_reference="case-demo-001",
         source_event_reference="event-demo-001",
         stage=WorkflowStage.RESULT_RECEIVED,
+        synthetic=True,
     )
 
     with pytest.raises(AgentNotConfiguredError):
@@ -151,6 +155,7 @@ def test_coordinator_never_routes_closed_cases_to_an_agent() -> None:
         case_reference="case-demo-001",
         source_event_reference="event-demo-001",
         stage=WorkflowStage.CLOSED,
+        synthetic=True,
     )
 
     proposal = asyncio.run(WorkflowCoordinator({}).propose_for_stage(context))

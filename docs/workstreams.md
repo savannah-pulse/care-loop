@@ -361,10 +361,10 @@ When `ApproveSummary` and `RejectSummary` are built, their source event is CareL
 - `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
 - `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
 - `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `src/ai_workflow/`: the stateless FastAPI service now exposes typed draft endpoints for AG1–AG5 and aggregate insights for AG6, with a Foundry provider and post-generation safety checks. The .NET API provider bridge and `POST /summaries/handoff` integration described in [`ai-design/integration.md`](ai-design/integration.md) remain unbuilt.
+- `src/ai_workflow/`: exploratory scaffold code exposes health and an informational stage map only. Purpose-specific draft endpoints, model-provider integration and the .NET API bridge described in [`ai-design/integration.md`](ai-design/integration.md) remain unbuilt.
 - `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
-The Python service uses the requested `azure-identity` and Foundry SDK dependencies and authenticates with Entra ID; Foundry inference remains disabled by default. The API-side provider bridge and direct Foundry route are not part of this implementation.
+The Python service has no model-provider integration. Implement the purpose-specific request contracts and API-supplied minimum-necessary data boundary before connecting Microsoft Foundry. The API-side provider bridge and direct Foundry route are also not built.
 
 The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
 
