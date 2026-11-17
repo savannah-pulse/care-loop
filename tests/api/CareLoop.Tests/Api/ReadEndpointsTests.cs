@@ -272,9 +272,16 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(escalated.Id, summary.CaseId);
         Assert.Null(summary.PatientDisplayName);
         Assert.Null(summary.PatientSecondaryIdentifier);
+        Assert.Null(summary.PatientReference);
         var detail = Value<CaseDetailResponse>(await GetAsync(escalated.Id, coordinator));
         Assert.Null(detail.PatientDisplayName);
         Assert.Null(detail.PatientSecondaryIdentifier);
+        Assert.Null(detail.PatientReference);
+        Assert.Null(detail.SourceResultId);
+        // Staff on the case's own team still see both.
+        var lead = Value<CaseDetailResponse>(await GetAsync(escalated.Id, Identity("facility-lead", "SYN-FAC-B")));
+        Assert.NotNull(lead.PatientReference);
+        Assert.NotNull(lead.SourceResultId);
         Assert.Equal(2, Value<MetricsResponse>(await MetricsAsync(coordinator)).TotalCases);
     }
 
@@ -459,6 +466,12 @@ public sealed class ReadEndpointsTests : IDisposable
         var asked = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.CallRequested));
         Assert.Equal(NotificationUpdateHandler.CallPatientAction, asked.NextAction);
         Assert.True(asked.Notification!.CallRequested);
+        using (var outbox = _services.CreateScope())
+        {
+            // The pathway names the nurse navigator for the call, so they are told, whoever owns the case.
+            var raised = Assert.Single(await Db(outbox).OutboxMessages.AsNoTracking().Where(m => m.CaseId == @case.Id && m.EventType == "CallRequested").ToListAsync());
+            Assert.Contains("\"callerRole\":\"nurse-navigator\"", raised.PayloadJson);
+        }
 
         // A text-message "will come" after asking for a call does not ring the patient back.
         var replied = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
@@ -488,6 +501,21 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.False(after.Notification.IsComplete());
         Assert.Equal(@case.NextAction, after.NextAction);
         Assert.Equal(3, after.Notification.Confidence);
+    }
+
+    [Fact]
+    public async Task The_timeline_says_where_each_entry_came_from()
+    {
+        var @case = await NotifiedCaseAsync();
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Delivered) with { Origin = EventOrigins.Sms });
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Confidence = 4 })));
+
+        var entries = Rows<TimelineEntryResponse>(await TimelineAsync(@case.Id));
+
+        Assert.Equal(EventOrigins.Hospital, entries.First(e => e.EventType == CaseEventType.ScreeningResultReceived).Origin);
+        Assert.Contains(entries, e => e.EventType == CaseEventType.NotificationUpdated && e.Origin == EventOrigins.Sms);
+        Assert.Contains(entries, e => e.EventType == CaseEventType.NotificationUpdated && e.Origin == EventOrigins.CareLoop && e.ActorRole == DemoRoles.NurseNavigator);
+        Assert.All(entries, e => Assert.Contains(e.Origin, new[] { EventOrigins.Hospital, EventOrigins.CareLoop, EventOrigins.Sms, EventOrigins.Email }));
     }
 
     [Fact]

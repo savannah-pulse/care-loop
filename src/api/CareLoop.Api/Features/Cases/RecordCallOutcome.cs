@@ -104,6 +104,7 @@ public static class RecordCallOutcome
                 var result = await ingestor.IngestAsync(new EventEnvelope
                 {
                     SourceSystem = @case.SourceSystem,
+                    Origin = EventOrigins.CareLoop,
                     SourceEventId = $"call-outcome/{call:N}/{kind}",
                     Type = CaseEventType.NotificationUpdated,
                     SourceResultId = @case.SourceResultId,

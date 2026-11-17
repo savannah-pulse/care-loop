@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Icon, OutsideTeamCard, ReadView, Toast } from '../../components'
-import { useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
+import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
 import { describePatient, openEscalations, programmeName } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
@@ -56,9 +56,11 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
             </span>
           ))}
         </p>
-        <p className="quiet" title={detail.sourceSystem}>
-          {t('case.resultFrom', { result: detail.sourceResultId })}
-        </p>
+        {detail.sourceResultId ? (
+          <p className="quiet" title={detail.sourceSystem}>
+            {t('case.resultFrom', { result: detail.sourceResultId })}
+          </p>
+        ) : null}
         <p className="quiet">{patient.hidden ? t('patient.hiddenDetail') : t('patient.detail')}</p>
       </div>
     </div>
@@ -71,7 +73,7 @@ interface CaseViewProps {
   readonly reason?: string
   readonly now: Date
   readonly onCallRecorded: (detail: CaseDetail) => void
-  /** Called when recording a call outcome was refused in part; reads the timeline again. */
+  /** Called when recording a call outcome was refused because the case changed; reads the case and timeline again. */
   readonly onCallConflict: () => void
 }
 
@@ -104,7 +106,9 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
               onConflict={onCallConflict}
             />
           )}
-          {isClinicianRole(me.role) ? <OtherScreeningCard detail={detail} reason={reason} /> : null}
+          {isClinicianRole(me.role) && detail.patientReference ? (
+            <OtherScreeningCard detail={detail} patientReference={detail.patientReference} reason={reason} />
+          ) : null}
         </div>
         <TimelineCard read={timeline} />
       </div>
@@ -147,6 +151,18 @@ export function CasePage({ caseId }: CasePageProps) {
     },
     [retryTimeline],
   )
+  // A refused call: the case changed meanwhile. Read it again in one call, as the API now has it, and show that in
+  // place of the read it replaces, so the card keeps its message and focus instead of the page reloading.
+  const onCallConflict = useCallback(
+    async (base: CaseDetail) => {
+      retryTimeline()
+      const fresh = await readCase(caseId, reason)
+      if (fresh.ok) {
+        setRecorded({ base, detail: fresh.data })
+      }
+    },
+    [caseId, reason, retryTimeline],
+  )
   const ready = read.state.status === 'ready'
   useDocumentTitle(
     read.state.status === 'ready' ? describePatient(read.state.data, me.role).name : t('case.titleFallback'),
@@ -185,7 +201,7 @@ export function CasePage({ caseId }: CasePageProps) {
               reason={reason}
               now={now}
               onCallRecorded={(updated) => onCallRecorded(detail, updated)}
-              onCallConflict={retryTimeline}
+              onCallConflict={() => void onCallConflict(detail)}
             />
           )}
         </ReadView>

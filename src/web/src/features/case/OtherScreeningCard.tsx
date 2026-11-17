@@ -11,6 +11,8 @@ import { routeHref } from '../../routing'
 export interface OtherScreeningCardProps {
   /** The case being looked at. */
   readonly detail: CaseDetail
+  /** The patient's reference to search by; clinicians always have one (the API leaves it out only for the coordinator). */
+  readonly patientReference: string
   /** The reason given for a case outside the reader's team, sent with the search too. */
   readonly reason?: string
 }
@@ -26,9 +28,9 @@ export interface OtherScreeningCardProps {
  * clinician roles see this card, and the API refuses the search to anyone else. The full history
  * stays in the hospital record.
  */
-export function OtherScreeningCard({ detail, reason }: OtherScreeningCardProps) {
+export function OtherScreeningCard({ detail, patientReference, reason }: OtherScreeningCardProps) {
   const headingId = useId()
-  const read = usePatientCases(detail.patientReference, detail.facilityId, reason)
+  const read = usePatientCases(patientReference, detail.facilityId, reason)
   const name = detail.patientDisplayName?.trim()
   return (
     <section className="card" aria-labelledby={headingId}>

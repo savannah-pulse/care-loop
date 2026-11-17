@@ -156,6 +156,24 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
         Assert.Equal(StatusCodes.Status422UnprocessableEntity, StatusOf(result));
     }
 
+    [Fact]
+    public async Task A_reply_to_the_appointment_message_counts_and_its_delivery_does_not_touch_the_track()
+    {
+        var caseId = await PatientNotifiedAsync();
+        await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled,
+            scheduledFor: _store.Clock.UtcNow.AddDays(3), location: "SYN Breast Imaging Clinic"));
+        var scheduled = Assert.Single(await _store.RaisedAsync<CareLoop.Domain.Events.DomainEvents.AppointmentScheduled>());
+        var patient = (await _store.TheCaseAsync()).PatientReference;
+        _attemptId = NotificationSender.AttemptIdFor(scheduled.EventId, patient, NotificationChannel.Sms);
+        var before = await _store.TheCaseAsync();
+
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Delivery(caseId)));
+        Assert.Equal(before.Version, (await _store.TheCaseAsync()).Version);
+
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Reply(caseId, "1")));
+        Assert.Equal(NotificationStatus.Acknowledged, (await _store.TheCaseAsync()).Notification!.Status);
+    }
+
     /// <summary>Reviews a case so its patient notification goes out, and points <see cref="_attemptId"/> at that attempt.</summary>
     private async Task<Guid> PatientNotifiedAsync()
     {

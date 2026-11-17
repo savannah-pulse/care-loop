@@ -32,6 +32,12 @@ public sealed record EventEnvelope
     /// <summary>Who performed the action at the source, when the source reported it.</summary>
     public Actor? Actor { get; init; }
 
+    /// <summary>
+    /// Who actually sent the event when it is not <see cref="SourceSystem"/> itself: CareLoop, or a text message or
+    /// email channel (<see cref="Domain.Events.EventOrigins"/>). <see langword="null"/> for an event from the source system.
+    /// </summary>
+    public string? Origin { get; init; }
+
     /// <summary>The event-specific data.</summary>
     public required EventPayload Payload { get; init; }
 }

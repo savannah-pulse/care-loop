@@ -117,7 +117,9 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(NotificationOptions.SectionName))
             .Validate(NotificationOptions.NamesOnlyKnownProviders,
                 "Notifications:EnabledProviders and Notifications:PerEventOverrides may only name Sms and Email.")
+            .Validate(NotificationOptions.HasKnownTimeZone, "Notifications:TimeZone must name a time zone this host knows, such as Asia/Dubai.")
             .ValidateOnStart();
+        services.AddSingleton(sp => new MessageFormat(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<NotificationOptions>>().Value));
         foreach (var channel in Enum.GetValues<NotificationChannel>())
         {
             services.Configure<SimulatorNotificationOptions>(channel.ToString(), configuration.GetSection(SimulatorNotificationOptions.SectionFor(channel)));

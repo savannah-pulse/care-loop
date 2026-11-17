@@ -139,6 +139,7 @@ public sealed class EventIngestor
             Disposition = result.Applied ? SourceEventDisposition.Applied : SourceEventDisposition.Rejected,
             DispositionReason = result.Applied ? result.Summary : result.RejectionReason,
             EvidenceReference = result.EvidenceReference,
+            Origin = envelope.Origin,
         };
 
         await _cases.SaveAsync(result.Case, sourceEvent, ct);

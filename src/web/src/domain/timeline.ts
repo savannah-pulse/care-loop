@@ -26,42 +26,33 @@ export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)
 }
 
-/** Where a timeline entry came from: CareLoop itself, a hospital system, or a text message or email. */
-export type TimelineSource = 'careLoop' | 'hospital' | 'message'
-
-/** The role the API reports when no person acted: a system did. */
-export const SYSTEM_ROLE = 'system'
+/** Where a timeline entry came from: CareLoop itself, a hospital system, a text message or an email. */
+export type TimelineSource = 'careLoop' | 'hospital' | 'sms' | 'email'
 
 /**
- * Source systems the dashboard names, by the key the API reports in `sourceSystem`.
+ * Where an entry came from, by the `origin` the API reports for it.
  *
  * @remarks
- * CareLoop records its own events (deadlines, escalations, acknowledgements and approved summaries)
- * as `careloop`. Every other system that reaches CareLoop is a hospital system, through its FHIR
- * boundary.
+ * The API says it plainly: `careloop` for CareLoop itself (deadlines, escalations, acknowledgements, approved
+ * summaries, a call a nurse recorded, and CareLoop's record of what it sent), `sms` or `email` for a delivery
+ * report or the patient's reply on that channel, and `hospital` for the case's hospital system. Nothing is guessed
+ * from the event type or the actor.
  */
-export const SOURCE_SYSTEMS: Readonly<Record<string, TimelineSource>> = {
+export const ORIGINS: Readonly<Record<string, TimelineSource>> = {
   careloop: 'careLoop',
+  sms: 'sms',
+  email: 'email',
+  hospital: 'hospital',
 }
 
 /**
  * Works out where a timeline entry came from (C3).
  *
- * @param entry - The entry, with the source system the API joined from the stored event.
- * @returns `careLoop` for CareLoop's own events, `message` for what came back by text message or
- * email, and `hospital` for any other system.
- *
- * @remarks
- * Patients are reached by text message and email only. The API files what comes back (a delivery
- * report or a reply) as `NotificationUpdated` under the case's own source system with no person as
- * the actor, so that is how such an entry is recognised. The same kind of entry with a person as
- * the actor is what a nurse navigator recorded in CareLoop after a call with the patient.
+ * @param entry - The entry, with the origin the API reports.
+ * @returns `careLoop`, `sms`, `email` or `hospital`; an origin the dashboard does not know reads as a hospital system.
  */
-export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem' | 'eventType' | 'actorRole'>): TimelineSource {
-  if (entry.eventType === 'NotificationUpdated') {
-    return entry.actorRole.trim().toLowerCase() === SYSTEM_ROLE ? 'message' : 'careLoop'
-  }
-  return SOURCE_SYSTEMS[entry.sourceSystem.trim().toLowerCase()] ?? 'hospital'
+export function timelineSource(entry: Pick<TimelineEntry, 'origin'>): TimelineSource {
+  return ORIGINS[entry.origin.trim().toLowerCase()] ?? 'hospital'
 }
 
 /**

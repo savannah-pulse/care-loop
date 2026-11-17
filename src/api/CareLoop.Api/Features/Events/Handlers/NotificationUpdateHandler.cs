@@ -244,6 +244,7 @@ public sealed class NotificationUpdateHandler : IEventHandler
             OccurredAt = _clock.UtcNow,
             CurrentOwner = @case.Owner,
             DueAt = @case.DueAt!.Value,
+            CallerRole = HandlerSupport.FindDeadline(CallPatientAction, @case.Urgency, pathway).OwnerRole,
         });
 
         return HandlerSupport.Applied(@case, payload.CommunicationReference,

@@ -19,6 +19,32 @@ public sealed class NotificationOptions
     public Dictionary<string, List<string>> PerEventOverrides { get; set; } = [];
 
     /// <summary>
+    /// The time zone messages give dates and times in, as an IANA identifier such as <c>Asia/Dubai</c>; UTC when not set.
+    /// </summary>
+    /// <remarks>
+    /// People read an appointment or an acknowledgement time as local time, so a message never shows UTC to a patient,
+    /// a caregiver or a member of staff unless the deployment is set to it. Checked at start-up (<see cref="HasKnownTimeZone"/>).
+    /// </remarks>
+    public string? TimeZone { get; set; }
+
+    /// <summary>
+    /// The names staff messages give facilities, keyed by facility identifier (for example <c>family-health-centre</c> to
+    /// <c>Family Health Centre</c>). A facility with no entry is named by its identifier in words.
+    /// </summary>
+    public Dictionary<string, string> FacilityNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Checks that <see cref="TimeZone"/>, when set, names a time zone this host knows.
+    /// </summary>
+    /// <param name="options">The options to check.</param>
+    /// <returns><see langword="false"/> when the time zone is set but unknown.</returns>
+    public static bool HasKnownTimeZone(NotificationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return string.IsNullOrWhiteSpace(options.TimeZone) || TimeZoneInfo.TryFindSystemTimeZoneById(options.TimeZone.Trim(), out _);
+    }
+
+    /// <summary>
     /// Checks that every provider named is a notification channel.
     /// </summary>
     /// <param name="options">The options to check.</param>

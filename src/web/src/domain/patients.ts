@@ -77,22 +77,24 @@ export function describePatient(patient: PatientFields, viewerRole: string): Pat
   }
   const name = patient.patientDisplayName?.trim()
   const identifier = patient.patientSecondaryIdentifier?.trim()
+  // Every role that sees names also gets the reference; without one, the case number stands in.
+  const reference = patient.patientReference ?? undefined
   if (name) {
     const identifierText = identifier ? secondaryIdentifierText(identifier) : undefined
     return {
       name,
       identifier: identifierText,
       hidden: false,
-      reference: patient.patientReference,
-      searchText: [name, identifier ?? '', identifierText ?? '', patient.patientReference].join(' '),
+      reference,
+      searchText: [name, identifier ?? '', identifierText ?? '', reference ?? ''].join(' '),
     }
   }
-  const label = patientLabel(patient.patientReference)
+  const label = reference ? patientLabel(reference) : t('patient.case', { number: caseNumber(patient.caseId) })
   return {
     name: label,
     identifier: identifier ? secondaryIdentifierText(identifier) : undefined,
     hidden: false,
-    reference: patient.patientReference,
-    searchText: [label, identifier ?? '', patient.patientReference].join(' '),
+    reference,
+    searchText: [label, identifier ?? '', reference ?? ''].join(' '),
   }
 }
