@@ -7,6 +7,7 @@ import { ROOMY_LAYOUT_QUERY, WIDE_LAYOUT_QUERY, useDocumentTitle, useMediaQuery,
 import { namesHiddenFor, rememberAccessReasons, useSignedInStaff } from '../../identity'
 import { t, tp } from '../../i18n'
 import { navigate, routeHref } from '../../routing'
+import { StartHereCard } from './StartHereCard'
 import {
   FILTER_TONES,
   WORKLIST_FILTERS,
@@ -306,9 +307,11 @@ interface WorklistBodyProps {
   readonly list: CaseList
   readonly now: Date
   readonly toolbarExtra?: ReactNode
+  /** `true` on the person's own team, where the "Start here today" card lists their cases. */
+  readonly startHere: boolean
 }
 
-function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
+function WorklistBody({ list, now, toolbarExtra, startHere }: WorklistBodyProps) {
   const me = useSignedInStaff()
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY)
   const roomy = useMediaQuery(ROOMY_LAYOUT_QUERY)
@@ -372,6 +375,7 @@ function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
     <>
       <Greeting now={now} summary={summary} />
       {toolbarExtra}
+      {startHere ? <StartHereCard rows={rows} now={now} /> : null}
       <div className="toolbar">
         <label className="field search" htmlFor={`${ids}-search`}>
           <Icon name="search" />
@@ -489,6 +493,9 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
  * wherever it is tapped. The chips are the exception queues, and a case can sit in more than one.
  * Each case's link is named by the patient as shown, with the MRN (the case number for the
  * coordinator), so no two links read the same to a screen reader.
+ * On the person's own team, a "Start here today" card above the groups lists up to three of their
+ * cases (see {@link StartHereCard}); the only AI on the page is its one optional sentence from
+ * `POST /ai/role-briefing`, and the card works without it.
  * When nothing needs attention it says so, with the next deadline, instead of listing cases.
  */
 export function WorklistPage() {
@@ -533,7 +540,7 @@ export function WorklistPage() {
         errorTitle={t('worklist.errorTitle')}
         forbidden={{ title: t('worklist.forbiddenTitle'), body: t('worklist.forbiddenBody') }}
       >
-        {(list) => <WorklistBody list={list} now={now} toolbarExtra={teamBar} />}
+        {(list) => <WorklistBody list={list} now={now} toolbarExtra={teamBar} startHere={!scope} />}
       </ReadView>
       <p className="note">{t('worklist.note')}</p>
       {me.facilityId ? (

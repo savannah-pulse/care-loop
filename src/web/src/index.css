@@ -2939,3 +2939,108 @@ a.name:focus-visible {
   gap: 4px;
   color: var(--ink2);
 }
+
+/* Start here today */
+.start-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.start-head .card-title {
+  margin-block-end: 4px;
+}
+
+.start-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink3);
+}
+
+.start-source svg.i {
+  inline-size: 16px;
+  block-size: 16px;
+}
+
+.start-intro {
+  font-size: 14px;
+  color: var(--ink2);
+}
+
+.start-none {
+  color: var(--ink2);
+}
+
+.start-list {
+  list-style: none;
+  margin-block-start: 8px;
+}
+
+.start-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 15rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding-block: 12px;
+  border-block-start: 1px solid var(--line2);
+}
+
+.start-row:first-child {
+  border-block-start: 0;
+}
+
+.start-n {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 28px;
+  block-size: 28px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.start-who,
+.start-what {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.start-who a.name {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.start-row .l2 {
+  color: var(--ink3);
+  font-size: 14px;
+}
+
+.start-ai {
+  margin-block-start: 8px;
+  padding-block-start: 16px;
+  border-block-start: 1px solid var(--line2);
+}
+
+@media (max-width: 899px) {
+  .start-row {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .start-status {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .start-what {
+    grid-row: 2;
+    grid-column: 2 / -1;
+  }
+}

@@ -127,6 +127,7 @@ describe('worklist', () => {
     const first = caseSummary({ ...HESSA, isEscalated: true })
     const second = caseSummary({ ...NOURA, isEscalated: true, exceptions: ['Overdue'] })
     answer('GET /cases', json([first, second]))
+    answer('POST /ai/role-briefing', problem(501, 'RoleBriefing is switched off here.'))
     const { user } = renderApp({ at: '#/', as: 'obaid-al-suwaidi' })
 
     expect(await screen.findByRole('link', { name: 'Case 1A2B3C4D' })).toBeInTheDocument()

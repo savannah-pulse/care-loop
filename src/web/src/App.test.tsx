@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { STAFF } from './identity'
-import { answer, json, sentRequests } from './testing/api'
+import { answer, json, problem, sentRequests } from './testing/api'
 import { caseDetail, caseSummary, escalation, programme } from './testing/builders'
 import { renderApp } from './testing/screens'
 
@@ -42,6 +42,7 @@ describe('who is acting', () => {
 
   it('sends the next person’s identity as soon as they sign in, with no facility for the programme coordinator', async () => {
     answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'] })]))
+    answer('POST /ai/role-briefing', problem(501, 'RoleBriefing is switched off here.'))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
     await screen.findByRole('link', { name: 'Hessa Al Dhaheri, MRN 100\u00a0245\u00a0891' })
     const before = sentRequests().length

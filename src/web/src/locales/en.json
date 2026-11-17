@@ -282,7 +282,24 @@
       "reasonRecorded": "Your reason is recorded with each case you open: {reason}",
       "back": "Back to my team"
     },
-    "note": "Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next."
+    "note": "Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next.",
+    "start": {
+      "title": "Start here today",
+      "source": "Worked out by CareLoop from your deadlines, not by AI",
+      "intro": "Your cases in this order: overdue or escalated, then urgent, then due today. Up to three.",
+      "none": "Nothing of yours is overdue, urgent or due today.",
+      "noneNext": "Nothing of yours is overdue, urgent or due today. Your next deadline is {date}.",
+      "linkName": "{name}, {reason}",
+      "reasons": {
+        "overdue": "Overdue",
+        "escalated": "Escalated",
+        "urgent": "Urgent",
+        "dueToday": "Due today"
+      },
+      "aiCaption": "Written by AI from your worklist.",
+      "aiLoading": "Loading a sentence written by AI",
+      "aiFailed": "AI could not sum this up this time. The cases above come from CareLoop and are up to date."
+    }
   },
   "case": {
     "titleFallback": "Case",
