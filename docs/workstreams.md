@@ -32,7 +32,7 @@ Rules of the road:
 | 5 | Deadlines and escalation | WS1, WS2 | Done |
 | 6 | Read endpoints and dashboard | WS2 (schema) | Done |
 | 7 | HIS simulator | WS3 (FHIR contract and codes) | Done |
-| 8 | Messaging simulator (was the patient-channel simulator) | WS3 (FHIR contract and codes), WS4 (notification delivery) | Done |
+| 8 | Messaging simulator | WS3 (FHIR contract and codes), WS4 (notification delivery) | Done |
 | 9 | AI handoff summary | WS2, WS6 | Open |
 | 10 | Scenarios and end-to-end tests | all of the above | Open |
 
@@ -314,7 +314,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 - Real-host/browser checks cover replay, manual actions, refused outcomes, evidence-backed closure, inbox/log views and mobile layout against a local synthetic fake CareLoop upstream. This is not a real API/database patient journey; Docker was not built.
 - Cohort starts are explicitly unsupported pending WS10. Patient behaviour is WS8 (the messaging simulator); shared scenario corrections (including the happy-path evidence placeholder) and full end-to-end journeys remain WS10. See the [HIS guide](../src/simulators/his/README.md) and [manual HTTP harness](../src/simulators/his/HisSimulator/HisSimulator.http).
 
-## WS8 Messaging simulator (was the patient-channel simulator)
+## WS8 Messaging simulator
 
 **Owns**
 
@@ -332,7 +332,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 
 - Rename (Done): the patient-channel simulator is now the messaging simulator. Folder `src/simulators/messaging`, project and namespace `MessagingSimulator`, tests `tests/simulators/messaging/MessagingSimulator.Tests`, Docker Compose service and health name `messaging-simulator`, ClientApp package `messaging-simulator-client`. The API's `Notifications:Sms:BaseUrl` and `Notifications:Email:BaseUrl` point at the new service name; nothing else in the API changes.
 - Review of PR 43 (Done): times read as on the dashboard (`17 Nov 2026, 00:11`, 24-hour, Abu Dhabi time), and a record's time sits under its text so "What CareLoop is told" keeps its width in a narrow column.
-- C22 (Done, decisions 21 to 30): the simulator now handles text messages and email only (renamed from the patient-channel simulator to the messaging simulator in a later change). `POST /messages` takes plain JSON from CareLoop's `Sms` and `Email` providers; delivery reports and replies go back as signed JSON to `{CareLoop:CallbackBaseUrl}/sms` or `/email`. Inboxes are the patient's text messages, the patient's email, caregiver and staff; only a patient's message can be replied to, and a reply is forwarded as typed. Removed: the `App` and `Portal` channels, the smartphone view, the case-status view and its FHIR read, the teach-back and rating actions and behaviours, every FHIR builder and the Firely package. Behaviours are found by the message's address. A scenario using `understand`, `rate-confidence` or `confidence` is refused (schema change is WS10).
+- C22 (Done, decisions 21 to 30): the simulator now handles text messages and email only (it was renamed the messaging simulator in a later change). `POST /messages` takes plain JSON from CareLoop's `Sms` and `Email` providers; delivery reports and replies go back as signed JSON to `{CareLoop:CallbackBaseUrl}/sms` or `/email`. Inboxes are the patient's text messages, the patient's email, caregiver and staff; only a patient's message can be replied to, and a reply is forwarded as typed. Removed: the `App` and `Portal` channels, the smartphone view, the case-status view and its FHIR read, the teach-back and rating actions and behaviours, every FHIR builder and the Firely package. Behaviours are found by the message's address. A scenario using `understand`, `rate-confidence` or `confidence` is refused (schema change is WS10).
 - C7 (Done; since C22 CareLoop, not the simulator, reads the reply): on the `Sms` channel accept an inbound reply of `1` as acknowledge and `2` as call-me (screen 9). Built as `POST /api/inbox/{messageId}/reply`; any other text is refused and nothing is sent. CareLoop sends no channel, so a patient message lands in the `Sms` inbox when its inbox address starts with `SYN-SMS-` (`SYN-PORTAL-` for the portal; anything else goes to `PatientChannel:DefaultChannel`, `App`). The SMS-safe template is not shown there, because the simulator provider allows sensitive content and so always receives the standard text.
 - C10 (Done, decision 3; removed under C22, a nurse records the rating): a confidence rating action (1 to 5) on the inbox and a sixth `Communication` builder with category `confidence-rating`. A rating is not an acknowledgement. Built as `POST /api/inbox/{messageId}/rate-confidence`; a patient behaviour can also rate (`rate-confidence`, or a `confidence` beside another response).
 - C13 (Done, decision 7): an `Email` value in `InboxChannel` so caregiver messages are shown, not sent. Since C22 a caregiver message is recognised by its `caregiver` audience in the metadata. A caregiver message is recognised by its `caregiver` recipient kind; it gets a delivery report, is never answered and cannot be acted on.

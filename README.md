@@ -70,14 +70,14 @@ tests/
 ```text
 HIS simulator ──FHIR R4──▶ ┌──────────────┐ ◀──REST── dashboard (src/web/)
                            │ CareLoop API │ ◀──proposals── AI workflow (src/ai_workflow/)
-SMS and email  ◀─JSON──▶  └──────┬───────┘
+Messaging      ◀─JSON──▶  └──────┬───────┘
 simulator                         │
                               PostgreSQL
 ```
 
 The HIS simulator talks to CareLoop only through `/fhir/...`. CareLoop reaches patients, caregivers and staff by text
-message and email only (there is no patient app or portal): its `Sms` and `Email` providers post plain JSON to the SMS
-and email simulator, which calls back on `/notifications/inbound/sms` and `/email`. Neither simulator shares code
+message and email only (there is no patient app or portal): its `Sms` and `Email` providers post plain JSON to the
+messaging simulator, which calls back on `/notifications/inbound/sms` and `/email`. Neither simulator shares code
 with CareLoop. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit; the
 Python workflow proposes actions for the API and authorized people to review.
 
