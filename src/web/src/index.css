@@ -442,7 +442,8 @@ h1 {
   border-color: var(--accent-ink);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -2828,12 +2829,14 @@ a.name:focus-visible {
   font-weight: 600;
 }
 
+/* "Not asked" sits on its own line, so 1 to 5 always reads as one scale on one row. */
 .call-rating-options {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
+  flex-wrap: nowrap;
+  gap: 8px 14px;
 }
 
+.call-not-asked,
 .call-rating-options label {
   display: inline-flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Icon, OutsideTeamCard, ReadView, Toast } from '../../components'
-import { useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
+import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
 import { describePatient, openEscalations, programmeName } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
@@ -56,9 +56,11 @@ function PatientHeader({ detail }: { readonly detail: CaseDetail }) {
             </span>
           ))}
         </p>
-        <p className="quiet" title={detail.sourceSystem}>
-          {t('case.resultFrom', { result: detail.sourceResultId })}
-        </p>
+        {detail.sourceResultId ? (
+          <p className="quiet" title={detail.sourceSystem}>
+            {t('case.resultFrom', { result: detail.sourceResultId })}
+          </p>
+        ) : null}
         <p className="quiet">{patient.hidden ? t('patient.hiddenDetail') : t('patient.detail')}</p>
       </div>
     </div>
@@ -71,9 +73,11 @@ interface CaseViewProps {
   readonly reason?: string
   readonly now: Date
   readonly onCallRecorded: (detail: CaseDetail) => void
+  /** Called when recording a call outcome was refused because the case changed; reads the case and timeline again. */
+  readonly onCallConflict: () => void
 }
 
-function CaseView({ detail, timeline, reason, now, onCallRecorded }: CaseViewProps) {
+function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflict }: CaseViewProps) {
   const me = useSignedInStaff()
   const escalated = openEscalations(detail.escalations).length > 0
   const callOffer = callOutcomeOffer(detail, me.role)
@@ -94,9 +98,17 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded }: CaseViewPro
         <div className="side">
           <TracksCard tracks={detail.tracks} />
           {callOffer === 'hidden' ? null : (
-            <CallOutcomeCard detail={detail} offer={callOffer} reason={reason} onRecorded={onCallRecorded} />
+            <CallOutcomeCard
+              detail={detail}
+              offer={callOffer}
+              reason={reason}
+              onRecorded={onCallRecorded}
+              onConflict={onCallConflict}
+            />
           )}
-          {isClinicianRole(me.role) ? <OtherScreeningCard detail={detail} reason={reason} /> : null}
+          {isClinicianRole(me.role) && detail.patientReference ? (
+            <OtherScreeningCard detail={detail} patientReference={detail.patientReference} reason={reason} />
+          ) : null}
         </div>
         <TimelineCard read={timeline} />
       </div>
@@ -125,17 +137,31 @@ export function CasePage({ caseId }: CasePageProps) {
   const read = useCase(caseId, reason)
   const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
-  const [recorded, setRecorded] = useState<CaseDetail>()
+  // The case as the API returned it after a call outcome, tied to the read it replaced: any newer read
+  // (another person signing in, a retry) is a different object and wins, so the snapshot never outlives it.
+  const [recorded, setRecorded] = useState<{ readonly base: CaseDetail; readonly detail: CaseDetail }>()
   const [toast, setToast] = useState<string>()
   const dismissToast = useCallback(() => setToast(undefined), [])
   const retryTimeline = timeline.retry
   const onCallRecorded = useCallback(
-    (detail: CaseDetail) => {
-      setRecorded(detail)
+    (base: CaseDetail, detail: CaseDetail) => {
+      setRecorded({ base, detail })
       setToast(t('callOutcome.recordedToast'))
       retryTimeline()
     },
     [retryTimeline],
+  )
+  // A refused call: the case changed meanwhile. Read it again in one call, as the API now has it, and show that in
+  // place of the read it replaces, so the card keeps its message and focus instead of the page reloading.
+  const onCallConflict = useCallback(
+    async (base: CaseDetail) => {
+      retryTimeline()
+      const fresh = await readCase(caseId, reason)
+      if (fresh.ok) {
+        setRecorded({ base, detail: fresh.data })
+      }
+    },
+    [caseId, reason, retryTimeline],
   )
   const ready = read.state.status === 'ready'
   useDocumentTitle(
@@ -170,11 +196,12 @@ export function CasePage({ caseId }: CasePageProps) {
         >
           {(detail) => (
             <CaseView
-              detail={recorded?.caseId === detail.caseId ? recorded : detail}
+              detail={recorded?.base === detail ? recorded.detail : detail}
               timeline={timeline}
               reason={reason}
               now={now}
-              onCallRecorded={onCallRecorded}
+              onCallRecorded={(updated) => onCallRecorded(detail, updated)}
+              onCallConflict={() => void onCallConflict(detail)}
             />
           )}
         </ReadView>

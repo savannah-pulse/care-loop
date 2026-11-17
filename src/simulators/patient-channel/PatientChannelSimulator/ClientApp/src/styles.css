@@ -289,9 +289,10 @@ button:disabled {
   list-style: none;
 }
 
+/* The time sits under the text, not in a column of its own, so the text keeps the width in a narrow column. */
 .check li {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 24px minmax(0, 1fr);
   align-items: start;
   gap: 12px;
   padding-block: 12px;
@@ -314,6 +315,7 @@ button:disabled {
 }
 
 .record-time {
+  grid-column: 2;
   color: var(--ink3);
   font-size: 13px;
   white-space: nowrap;
@@ -349,7 +351,7 @@ button:disabled {
 /* Inbox layout: message picker, device, records */
 .inbox-layout {
   display: grid;
-  grid-template-columns: minmax(200px, 260px) auto minmax(280px, 1fr);
+  grid-template-columns: minmax(200px, 260px) auto minmax(320px, 1fr);
   align-items: start;
   gap: 32px;
 }

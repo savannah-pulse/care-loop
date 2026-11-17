@@ -376,10 +376,10 @@ export interface components {
             caseId: string;
             /** @description Identifier of the system that produced the result. */
             sourceSystem: string;
-            /** @description The source system's identifier of the actionable result. */
-            sourceResultId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description The source system's identifier of the actionable result. `null` for the coordinator, who sees no one's identity. */
+            sourceResultId?: null | string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -456,8 +456,8 @@ export interface components {
              * @description CareLoop's identifier of the case.
              */
             caseId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -623,8 +623,8 @@ export interface components {
              * @description CareLoop's identifier of the case.
              */
             caseId: string;
-            /** @description Source-system reference of the patient. Never a name. */
-            patientReference: string;
+            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
+            patientReference?: null | string;
             /** @description Patient display name for staff; absent for a coordinator. */
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
@@ -1030,6 +1030,11 @@ export interface components {
             reason: string;
             /** @description Reference to the supporting evidence, when there is any. */
             evidenceReference?: null | string;
+            /**
+             * @description Where the entry came from: `hospital` (the case's source system), `careloop` (CareLoop itself, including
+             *     a call a nurse recorded), `sms` or `email` (a delivery report or the patient's reply on that channel).
+             */
+            origin: string;
         };
         /** @description How a pathway uses one of the parallel tracks. */
         TrackDefinition: {

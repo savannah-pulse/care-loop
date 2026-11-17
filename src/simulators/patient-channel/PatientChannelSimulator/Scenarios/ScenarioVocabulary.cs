@@ -22,7 +22,7 @@ public static class ScenarioVocabulary
     /// <summary>Value of <c>behaviour.response</c>: the patient does nothing.</summary>
     public const string ResponseNone = "none";
 
-    /// <summary>Value of <c>behaviour.response</c>: the patient replies 1, "I will come".</summary>
+    /// <summary>Value of <c>behaviour.response</c>: the patient replies 1, "I got this message".</summary>
     public const string ResponseAcknowledge = "acknowledge";
 
     /// <summary>Value of <c>behaviour.response</c> that the schema still allows and this simulator refuses: teach-back is recorded by a nurse after a call, not sent by the patient.</summary>

@@ -240,10 +240,10 @@ A contact point with `ContactPoint.system` `sms` is reached by text message and 
 | `HandoffProposed` | `Task` | Proposed owner |
 | `HandoffSummaryApproved` | `DocumentReference` (exactly the approved text) | None |
 | `HandoffRejected`, `ReferralRejected` | `Task` update | Current owner |
-| `CallRequested` | `Task` | Current owner |
+| `CallRequested` | `Task` | The role the pathway names for the call-back (the nurse navigator); the current owner when it names none |
 | `DeadlineApproaching` | None | Current owner |
 | `EscalationRaised` | `Task` | Facility lead, then coordinator |
-| `AppointmentScheduled` | None | Caregiver, only while the patient's consent is active |
+| `AppointmentScheduled` | None | Patient (date, time, place and the reply codes), and the caregiver while the patient's consent is active |
 | `CaseClosed` | `Task` completed | None |
 
 Two subscribers exist: `FhirPublisher` and `NotificationRouter`.
@@ -253,8 +253,11 @@ Notification rules:
 - Channels are **system configuration**, not recipient preference. `NotificationSender` sends on **every enabled provider** for which `CanReach(recipient)` is true. Redundancy is intended.
 - Each send is recorded as its own `NotificationAttempt`. The notification is delivered if any channel delivers and failed only if all fail. An acknowledgement on any channel acknowledges the notification.
 - Content is per channel: a provider with `AllowsSensitiveContent == false` (SMS) gets the `.sms.txt` template, email the standard `.txt` one with its subject. For now both say the same thing and neither carries a result: there is no secure place for a patient to read one, and a person always gives it.
-- A patient reply can say only two things. CareLoop reads `1` as "I will come" (an acknowledgement) and `2`, or any other text, as a request for a call. No reply is ever teach-back or a confidence rating: a nurse navigator records those after a call (`POST /cases/{caseId}/call-outcome`).
-- Staff notifications carry no patient detail: "a case needs your action" plus a link into the HIS.
+- A patient reply can say only two things. CareLoop reads `1` as "I got this message" (an acknowledgement; the message goes out before any appointment exists, so it never asks whether the patient will attend) and `2`, or any other text, as a request for a call. No reply is ever teach-back or a confidence rating: a nurse navigator records those after a call (`POST /cases/{caseId}/call-outcome`). Recording a call answers the patient's request for one; a later text reply of `1` does not.
+- Every channel a patient notification goes out on is recorded on the case as sent before anything is sent, so a failure on one channel marks the patient unreachable only once every channel has failed.
+- Staff notifications carry no patient detail: "a case at {facility} needs your action", and the case number to look for in CareLoop, with no link.
+- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`.
+- Every stored event says where it came from (`SourceEvent.Origin`: `careloop`, `sms` or `email`; empty for the case's own source system), so the timeline never has to guess.
 - Templates come from `Infrastructure/Templates/{language}/`. English only for now; keep everything language-keyed so Arabic can be added later.
 
 ```csharp
@@ -281,7 +284,9 @@ public interface IInboundNotificationHandler
   "PerEventOverrides": { },
   "Sms": { "BaseUrl": "...", "InboundSecret": "..." },
   "Email": { "BaseUrl": "...", "InboundSecret": "..." },
-  "StaffContacts": { "nurse-navigator": { "Channel": "Email", "Address": "..." } }
+  "StaffContacts": { "nurse-navigator": { "Channel": "Email", "Address": "..." } },
+  "TimeZone": "Asia/Dubai",
+  "FacilityNames": { "family-health-centre": "Family Health Centre" }
 }
 ```
 

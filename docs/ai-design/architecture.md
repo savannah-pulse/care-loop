@@ -83,7 +83,7 @@ sequenceDiagram
     Staff->>API: Review, edit, approve, or reject draft
     API->>Store: Audit review decision
     API-->>Channel: Approved text message or email (JSON)
-    Channel->>API: Delivery / failure / reply (1 = will come, anything else = call request)
+    Channel->>API: Delivery / failure / reply (1 = got the message, anything else = call request)
     API->>Store: Append attributed event; update coordination projection
     HIS->>API: Consultation, referral, appointment, outcome events
     API->>Store: Validate evidence and append correlated events

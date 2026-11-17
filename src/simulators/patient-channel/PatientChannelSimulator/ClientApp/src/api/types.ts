@@ -79,7 +79,7 @@ export type DeliveryBehaviour = 'Deliver' | 'Fail' | 'StaySilent';
  * What a patient does, on their own, after a notification has been delivered to them.
  *
  * @remarks
- * `Acknowledge` replies 1 ("I will come") and `CallMe` replies 2. A patient cannot say the next
+ * `Acknowledge` replies 1 ("I got this message") and `CallMe` replies 2. A patient cannot say the next
  * step back or rate their confidence by text or email: a nurse records those after a call.
  */
 export type PatientResponseBehaviour = 'None' | 'Acknowledge' | 'CallMe';

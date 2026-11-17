@@ -26,6 +26,17 @@ public sealed class ContactOptions
     public string PatientChannel { get; set; } = Sms;
 
     /// <summary>
+    /// Tells whether the options name a channel CareLoop can reach a patient on.
+    /// </summary>
+    /// <param name="options">The options to check.</param>
+    /// <returns><see langword="true"/> when <see cref="PatientChannel"/> is <see cref="Sms"/> or <see cref="Email"/>, ignoring case and surrounding white space.</returns>
+    public static bool IsValid(ContactOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return options.PatientChannel?.Trim().ToLowerInvariant() is Sms or Email;
+    }
+
+    /// <summary>
     /// The FHIR contact point system for a patient's contact.
     /// </summary>
     /// <returns><c>sms</c> or <c>email</c>.</returns>

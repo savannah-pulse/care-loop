@@ -43,6 +43,11 @@ services:
       Notifications__Sms__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
       Notifications__Email__BaseUrl: http://patient-channel-simulator:8080
       Notifications__Email__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
+      # Messages give local dates and times, and name the facility in staff notices.
+      Notifications__TimeZone: Asia/Dubai
+      Notifications__FacilityNames__family-health-centre: Family Health Centre
+      Notifications__FacilityNames__general-hospital: General Hospital
+      Notifications__FacilityNames__regional-hospital: Regional Hospital
       # Where each staff role is notified. Synthetic addresses, one per role.
       Notifications__StaffContacts__nurse-navigator__Channel: Email
       Notifications__StaffContacts__nurse-navigator__Address: SYN-EMAIL-NURSE-NAVIGATORS

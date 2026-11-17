@@ -277,7 +277,7 @@
       "reasonRecorded": "Your reason is recorded with each case you open: {reason}",
       "back": "Back to my team"
     },
-    "note": "Read-only. Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next."
+    "note": "Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next."
   },
   "case": {
     "titleFallback": "Case",
@@ -312,7 +312,7 @@
     "errorTitle": "We couldn't load this case",
     "notFoundTitle": "Case not found",
     "notFoundBody": "There is no case at this link. Check the link, or find the case on the worklist.",
-    "note": "Read-only. Reports, images and notes stay in the hospital system, and every view is recorded.",
+    "note": "Reports, images and notes stay in the hospital system. Every view, and every call you record here, is kept.",
     "escalatedTo": "Escalated to {target}, {date}.",
     "escalatedToNoDate": "Escalated to {target}.",
     "escalationAcknowledged": "Acknowledged by {name}, {date}.",
@@ -404,7 +404,8 @@
     "sources": {
       "careLoop": "CareLoop",
       "hospital": "Hospital system",
-      "message": "Text message or email"
+      "sms": "Text message",
+      "email": "Email"
     },
     "refusedEvents": {
       "ScreeningResultReceived": "Result not accepted",
@@ -818,8 +819,14 @@
   },
   "callOutcome": {
     "title": "After a call with the patient",
-    "lede": "A text message or email reply can only say \"I will come\" or ask for a call. Record here what the patient told you on the phone.",
+    "lede": "A text message or email reply can only say \"I got this message\" or ask for a call. Record here what the patient told you on the phone.",
     "currentConfidence": "Confidence on record: {rating} out of 5.",
+    "lastCall": "Recorded at {time}: {outcome}.",
+    "summary": {
+      "willCome": "will come",
+      "saidBack": "said the next step back",
+      "separator": ", "
+    },
     "willCome": "The patient said they will come",
     "saidBack": "The patient said the next step back in their own words",
     "confidence": "How sure does the patient feel about what happens next?",
@@ -833,7 +840,7 @@
     "note": "Recording a call never changes who is responsible for the case.",
     "failed": {
       "forbidden": "Only a nurse navigator on this patient's team can record a call.",
-      "conflict": "This could not be recorded. No message has been sent to this patient yet, or the case changed. Refresh and try again.",
+      "conflict": "The case changed while you were recording, and it has been read again. Anything already saved from this call is on the timeline below; check it before trying again.",
       "invalid": "Tick at least one thing the patient said, and use a rating from 1 to 5.",
       "error": "The call outcome could not be recorded. Try again."
     }

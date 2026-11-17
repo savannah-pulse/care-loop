@@ -161,6 +161,22 @@ interface EntrySpec {
   readonly reason: string
   readonly evidence?: string
   readonly refused?: boolean
+  /** Where the entry came from, when the actor alone does not say: `sms` or `email` for a channel callback. */
+  readonly origin?: string
+}
+
+/** Event types a person records in CareLoop itself rather than in the hospital system. */
+const CARELOOP_EVENTS: ReadonlySet<EventType> = new Set<EventType>(['EscalationAcknowledged', 'NotificationUpdated', 'HandoffSummaryApproved'])
+
+/** Where an entry came from, as the API's `origin` says it. */
+function originOf(spec: EntrySpec): string {
+  if (spec.origin) {
+    return spec.origin
+  }
+  if (spec.by.actor === 'careloop' || CARELOOP_EVENTS.has(spec.type)) {
+    return 'careloop'
+  }
+  return 'hospital'
 }
 
 function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
@@ -178,6 +194,7 @@ function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
       priorStage: spec.from,
       newStage: spec.to,
       reason: spec.reason,
+      origin: originOf(spec),
       evidenceReference: spec.evidence ?? null,
     }
   })
@@ -267,6 +284,7 @@ function hessa(): CaseFixture {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
         by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered asking her to expect a call from her care team.',
@@ -457,14 +475,16 @@ function salem(): CaseFixture {
         type: 'NotificationUpdated',
         time: '2026-11-11T16:20:00+04:00',
         by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
-        reason: 'Replied 1 to the text message: he will come.',
+        reason: 'Replied 1 to the text message: he got the message.',
       },
       {
         type: 'NotificationUpdated',
         time: '2026-11-12T08:40:00+04:00',
         by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'He asked for a call back.',
@@ -649,6 +669,7 @@ function nasreen(): CaseFixture {
         type: 'NotificationUpdated',
         time: '2026-11-10T10:00:00+04:00',
         by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text delivered.',
@@ -861,6 +882,7 @@ function latifa(): CaseFixture {
         type: 'NotificationUpdated',
         time: '2026-11-09T16:00:00+04:00',
         by: { actor: MESSAGE_ACTOR, role: 'system' },
+        origin: 'sms',
         from: 'FollowUpActive',
         to: 'FollowUpActive',
         reason: 'Text not delivered: the number is not in service.',

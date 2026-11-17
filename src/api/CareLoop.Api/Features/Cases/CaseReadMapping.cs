@@ -9,7 +9,10 @@ using CareLoop.Domain.Tracks;
 
 namespace CareLoop.Api.Features.Cases;
 
-/// <summary>Projects coordination state into staff reads, with coordinator demographics redacted.</summary>
+/// <summary>
+/// Projects coordination state into staff reads. The coordinator sees no one's identity: no name, no record number,
+/// no patient reference and no hospital result identifier, only CareLoop's case number.
+/// </summary>
 internal static class CaseReadMapping
 {
     /// <summary>Projects a case-list row.</summary>
@@ -19,7 +22,7 @@ internal static class CaseReadMapping
     /// <returns>The summary.</returns>
     public static CaseSummaryResponse Summary(Case @case, Actor actor, IPathwayProvider pathways) => new()
     {
-        CaseId = @case.Id, PatientReference = @case.PatientReference,
+        CaseId = @case.Id, PatientReference = actor.Role == DemoRoles.Coordinator ? null : @case.PatientReference,
         PatientDisplayName = actor.Role == DemoRoles.Coordinator ? null : @case.PatientDisplayName,
         PatientSecondaryIdentifier = actor.Role == DemoRoles.Coordinator ? null : @case.PatientSecondaryIdentifier,
         FacilityId = @case.FacilityId, PathwayId = @case.PathwayId, Stage = @case.Stage,
@@ -36,8 +39,9 @@ internal static class CaseReadMapping
     /// <returns>The detail response.</returns>
     public static CaseDetailResponse Detail(Case @case, Actor actor, IPathwayProvider pathways) => new()
     {
-        CaseId = @case.Id, SourceSystem = @case.SourceSystem, SourceResultId = @case.SourceResultId,
-        PatientReference = @case.PatientReference,
+        CaseId = @case.Id, SourceSystem = @case.SourceSystem,
+        SourceResultId = actor.Role == DemoRoles.Coordinator ? null : @case.SourceResultId,
+        PatientReference = actor.Role == DemoRoles.Coordinator ? null : @case.PatientReference,
         PatientDisplayName = actor.Role == DemoRoles.Coordinator ? null : @case.PatientDisplayName,
         PatientSecondaryIdentifier = actor.Role == DemoRoles.Coordinator ? null : @case.PatientSecondaryIdentifier,
         PathwayId = @case.PathwayId, FacilityId = @case.FacilityId, Stage = @case.Stage,

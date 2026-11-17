@@ -56,4 +56,10 @@ public sealed record SourceEvent
 
     /// <summary>Reference to the evidence the event carries (for example a <c>Procedure</c> reference), when it carries any.</summary>
     public string? EvidenceReference { get; init; }
+
+    /// <summary>
+    /// Who actually sent the event (<see cref="EventOrigins"/>) when it was not <see cref="SourceSystem"/> itself:
+    /// CareLoop, or a text message or email channel. <see langword="null"/> when the source system sent it.
+    /// </summary>
+    public string? Origin { get; init; }
 }

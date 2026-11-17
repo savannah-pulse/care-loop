@@ -20,7 +20,7 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// The body is a <see cref="SimulatorCallback"/> as JSON. A <c>delivery</c> with status <c>delivered</c> is a
 /// delivery and <c>failed</c> (with its <c>reason</c>) a failure; any other status is not tracked. A
 /// <c>reply</c> carries the text exactly as the patient typed it, and this handler says what it means:
-/// <see cref="AcknowledgeReply"/> is an acknowledgement ("I will come"), <see cref="CallMeReply"/> asks for a
+/// <see cref="AcknowledgeReply"/> is an acknowledgement ("I got this message"), <see cref="CallMeReply"/> asks for a
 /// call, and any other text asks for a call too, because an unreadable reply is a patient trying to say
 /// something. A delivery report is never an acknowledgement, and no reply is ever teach-back or a confidence
 /// rating: a nurse records those after a call.
@@ -37,7 +37,8 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// delivery or reply may count as hers. For a patient message, the message identifier must be an attempt CareLoop
 /// made for a patient notification of that case on this channel, and a reply must come from one of the patient's
 /// own addresses on this channel; anything else is a format error, so a callback can never change a case it was
-/// not sent for.
+/// not sent for. A reply to the appointment message counts like a reply to the follow-up; that message's delivery
+/// reports are ignored, because the case's notification track follows the follow-up message only.
 /// </para>
 /// <para>
 /// The source event identifier is built from the message identifier and status, or from the reply identifier, so
@@ -49,7 +50,7 @@ public abstract class SimulatorInboundNotificationHandler : IInboundNotification
     /// <summary>The header that carries the message signature.</summary>
     public const string SignatureHeader = "X-CareLoop-Signature";
 
-    /// <summary>The reply that means "I will come": an acknowledgement.</summary>
+    /// <summary>The reply that means "I got this message": an acknowledgement.</summary>
     public const string AcknowledgeReply = "1";
 
     /// <summary>The reply that asks the care team for a call.</summary>
@@ -193,9 +194,17 @@ public abstract class SimulatorInboundNotificationHandler : IInboundNotification
             .SingleOrDefaultAsync(ct)
             ?? throw new FormatException($"The callback is about case {caseId:D}, which is not a known case.");
 
-        if (!await IsPatientAttemptOfCaseAsync(caseId, source.PatientReference, attemptId, ct))
+        var sentFor = await PatientMessageOfCaseAsync(caseId, source.PatientReference, attemptId, ct);
+        if (sentFor is null)
         {
-            throw new FormatException($"Message {attemptId:D} is not a patient notification of case {caseId:D} on this channel.");
+            throw new FormatException($"Message {attemptId:D} is not a patient message of case {caseId:D} on this channel.");
+        }
+
+        if (isDelivery && sentFor == nameof(Domain.Events.DomainEvents.AppointmentScheduled))
+        {
+            // The appointment message is not the follow-up notification the track follows: its delivery changes nothing.
+            // A reply to it still counts below, as any reply of the patient's does.
+            return [];
         }
 
         var channel = SimulatorNotificationProvider.WireName(Channel);
@@ -212,6 +221,7 @@ public abstract class SimulatorInboundNotificationHandler : IInboundNotification
             new EventEnvelope
             {
                 SourceSystem = source.SourceSystem,
+                Origin = channel,
                 SourceEventId = isDelivery ? $"{reference}/delivery/{callback.Status!.ToLowerInvariant()}" : reference,
                 Type = CaseEventType.NotificationUpdated,
                 SourceResultId = source.SourceResultId,
@@ -263,21 +273,24 @@ public abstract class SimulatorInboundNotificationHandler : IInboundNotification
     }
 
     /// <summary>
-    /// Tells whether an attempt identifier is one CareLoop gave a patient notification of this case on this channel.
+    /// Finds which patient message of this case on this channel an attempt identifier belongs to.
     /// </summary>
     /// <remarks>
-    /// Attempt identifiers are derived from the <see cref="Domain.Events.DomainEvents.NotificationRequested"/> event, the
-    /// patient and the channel (<see cref="NotificationSender.AttemptIdFor"/>), and every such event is in the case's
-    /// outbox. Recomputing them means a callback whose metadata and message identifier disagree can never change the
-    /// wrong case, without storing sent attempts.
+    /// Attempt identifiers are derived from the domain event that caused the message, the patient and the channel
+    /// (<see cref="NotificationSender.AttemptIdFor"/>), and every such event is in the case's outbox. Recomputing them
+    /// means a callback whose metadata and message identifier disagree can never change the wrong case, without storing
+    /// sent attempts. The patient is written to for the follow-up (<see cref="Domain.Events.DomainEvents.NotificationRequested"/>)
+    /// and when an appointment is booked (<see cref="Domain.Events.DomainEvents.AppointmentScheduled"/>).
     /// </remarks>
-    private async Task<bool> IsPatientAttemptOfCaseAsync(Guid caseId, string patientReference, Guid attemptId, CancellationToken ct)
+    /// <returns>The name of the event the message was sent for, or <see langword="null"/> when it is none of the patient's.</returns>
+    private async Task<string?> PatientMessageOfCaseAsync(Guid caseId, string patientReference, Guid attemptId, CancellationToken ct)
     {
-        var notificationIds = await _db.OutboxMessages.AsNoTracking()
-            .Where(m => m.CaseId == caseId && m.EventType == nameof(Domain.Events.DomainEvents.NotificationRequested))
-            .Select(m => m.Id)
+        string[] patientEvents = [nameof(Domain.Events.DomainEvents.NotificationRequested), nameof(Domain.Events.DomainEvents.AppointmentScheduled)];
+        var sent = await _db.OutboxMessages.AsNoTracking()
+            .Where(m => m.CaseId == caseId && patientEvents.Contains(m.EventType))
+            .Select(m => new { m.Id, m.EventType })
             .ToListAsync(ct);
-        return notificationIds.Any(id => NotificationSender.AttemptIdFor(id, patientReference, Channel) == attemptId);
+        return sent.FirstOrDefault(m => NotificationSender.AttemptIdFor(m.Id, patientReference, Channel) == attemptId)?.EventType;
     }
 
     private async Task<bool> IsFromThePatientAsync(Guid caseId, string? from, CancellationToken ct)

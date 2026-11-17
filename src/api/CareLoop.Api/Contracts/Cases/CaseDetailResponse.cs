@@ -14,11 +14,11 @@ public sealed record CaseDetailResponse
     /// <summary>Identifier of the system that produced the result.</summary>
     public required string SourceSystem { get; init; }
 
-    /// <summary>The source system's identifier of the actionable result.</summary>
-    public required string SourceResultId { get; init; }
+    /// <summary>The source system's identifier of the actionable result. <see langword="null"/> for the coordinator, who sees no one's identity.</summary>
+    public string? SourceResultId { get; init; }
 
-    /// <summary>Source-system reference of the patient. Never a name.</summary>
-    public required string PatientReference { get; init; }
+    /// <summary>Source-system reference of the patient. Never a name. <see langword="null"/> for the coordinator, who sees no one's identity.</summary>
+    public string? PatientReference { get; init; }
 
     /// <summary>Patient display name for staff; absent for a coordinator.</summary>
     public string? PatientDisplayName { get; init; }

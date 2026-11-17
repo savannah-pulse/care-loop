@@ -162,7 +162,17 @@ function redacted<T extends { patientDisplayName?: string | null; patientSeconda
   who: Reader,
   value: T,
 ): T {
-  return who.role === 'coordinator' ? { ...value, patientDisplayName: null, patientSecondaryIdentifier: null } : value
+  if (who.role !== 'coordinator') {
+    return value
+  }
+  // As the API does: the coordinator sees no one's identity, so the patient reference and the hospital's result
+  // identifier go too, where the value has them.
+  const hidden: T = { ...value, patientDisplayName: null, patientSecondaryIdentifier: null }
+  return {
+    ...hidden,
+    ...('patientReference' in value ? { patientReference: null } : {}),
+    ...('sourceResultId' in value ? { sourceResultId: null } : {}),
+  }
 }
 
 function summaryOf(detail: CaseDetail): CaseSummary {
@@ -270,6 +280,7 @@ function acknowledge(fixture: CaseFixture, escalationId: string, who: Reader, re
     fixture.timeline.push({
       auditEventId: randomUUID(),
       sourceSystem: 'careloop',
+      origin: 'careloop',
       eventType: 'EscalationAcknowledged',
       disposition: rejection ? 'Rejected' : 'Applied',
       actorReference: who.reference,
@@ -364,6 +375,7 @@ function approve(state: MockState, fixture: CaseFixture, summary: HandoffSummary
   fixture.timeline.push({
     auditEventId: randomUUID(),
     sourceSystem: 'careloop',
+    origin: 'careloop',
     eventType: 'HandoffSummaryApproved',
     disposition: 'Applied',
     actorReference: who.reference,
@@ -419,6 +431,7 @@ function recordCall(fixture: CaseFixture, who: Reader, reason: string | null, bo
     fixture.timeline.push({
       auditEventId: randomUUID(),
       sourceSystem: detail.sourceSystem,
+      origin: 'careloop',
       eventType: 'NotificationUpdated',
       disposition: refused ? 'Rejected' : 'Applied',
       actorReference: who.reference,

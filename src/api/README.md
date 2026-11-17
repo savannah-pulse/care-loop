@@ -73,6 +73,8 @@ SMS and email simulator and gives each staff role a synthetic address; Docker Co
 | `Notifications:Sms:BaseUrl`, `Notifications:Email:BaseUrl` | none | Where each provider posts its messages, as JSON to `{BaseUrl}/messages`. In the prototype both are the SMS and email simulator. CareLoop reaches patients, caregivers and staff by text message and email only. |
 | `Notifications:Sms:InboundSecret`, `Notifications:Email:InboundSecret` | none | Secret each channel's callbacks are signed with. Every message to `POST /notifications/inbound/sms` or `/email` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
 | `Notifications:StaffContacts:{role}:Channel`, `…:Address` | none | How each staff role is notified: `Sms` or `Email`, and its address. An optional `default` entry covers roles with none. A role with neither cannot be reached, and its notices are retried. |
+| `Notifications:TimeZone` | `Asia/Dubai` (UTC when empty) | The IANA time zone messages give dates and times in: appointment times for patients and caregivers, and when the previous escalation level was acknowledged. An unknown zone stops start-up. |
+| `Notifications:FacilityNames:{facilityId}` | none | The name a staff message gives a facility ("A case at Family Health Centre needs your action"). A facility with no entry is named by its identifier in words. |
 | `Notifications:EnabledProviders` | `[ "Sms", "Email" ]` | Enabled notification providers. Only `Sms` and `Email` are accepted; any other name stops the host at start-up. |
 | `Notifications:PerEventOverrides` | `{ }` | Optional provider list per domain event name. |
 | `Outbox:Enabled` | `false` (on in `appsettings.json`) | Run the outbox dispatcher. Test hosts leave it off. |
@@ -150,7 +152,16 @@ unsupported roles are 403 and malformed headers/filters are 400.
 Staff reads default to their facility (the current team boundary). An explicit different `facilityId`, or a case
 outside that facility, requires a nonblank `reason` of at most 1000 characters. Coordinators have global aggregate
 metrics, but their case reads are limited to cases with an open escalation addressed to the coordinator.
-Names and MRNs are null on coordinator case, detail and exception responses.
+Names, MRNs, patient references and the hospital's result identifier are null on coordinator case, detail and
+exception responses: the coordinator sees CareLoop's case number only.
+
+Each timeline entry has an `origin`: `hospital` (the case's source system), `careloop` (CareLoop itself, including a
+call a nurse recorded and CareLoop's record of what it sent), `sms` or `email` (a delivery report or the patient's reply
+on that channel). Each applied patient-contact entry also says in plain words what it recorded.
+
+Recording a call (`POST /cases/{caseId}/call-outcome`) answers the patient's request for one: the case moves on to
+arranging the follow-up, or, after a rating alone, back to waiting for the acknowledgement. A text reply of `1` never
+cancels a call the patient asked for. The access is written to the read audit with its reason, like a case read.
 Each authorized-identity read records one `CaseReadRecord`; denied facility/role reads use a denied view name.
 Read audits do not change case state and are not timeline events.
 

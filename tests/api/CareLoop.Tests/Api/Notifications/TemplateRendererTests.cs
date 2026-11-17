@@ -44,7 +44,8 @@ public sealed class TemplateRendererTests
     {
         var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
 
-        Assert.Contains("Reply 1 to say you will come", body);
+        Assert.Contains("Reply 1 to confirm you got this message", body);
+        Assert.DoesNotContain("will come", body);
         Assert.Contains("Reply 2 if you would like your care team to call you", body);
         foreach (var notThere in new[] { "patient channel", "health app", "the app", "your app", "portal", "http", "www.", "log in", "open " })
         {
@@ -116,13 +117,14 @@ public sealed class TemplateRendererTests
     public void Staff_notice_shows_the_previous_acknowledgement_only_when_there_was_one(bool smsSafe)
     {
         var renderer = ShippedTemplates();
-        const string Acknowledgement = "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.";
+        const string Acknowledgement = "The facility lead acknowledged level 1 at 13:40 on Saturday 14 November.";
 
-        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = Acknowledgement });
-        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = string.Empty });
+        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["facility"] = "Family Health Centre", ["previousAcknowledgement"] = Acknowledgement });
+        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["facility"] = "Family Health Centre", ["previousAcknowledgement"] = string.Empty });
 
         Assert.Contains(Acknowledgement, acknowledged.Body);
         Assert.DoesNotContain("acknowledged", none.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("Task/SYN", none.Body);
+        Assert.EndsWith("A case at Family Health Centre needs your action. Open CareLoop and look for case AB12CD34.", none.Body);
+        Assert.DoesNotContain("Task/", none.Body);
     }
 }

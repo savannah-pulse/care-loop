@@ -98,12 +98,47 @@ public sealed class NotificationRouterTests : IDisposable
         {
             Assert.Equal(NotificationRouter.StaffTemplateKey, message.TemplateKey);
             var text = $"{message.Subject} {message.Body}";
-            Assert.Contains(NotificationRouter.HisLinkFor(@case.Id), text);
+            Assert.Contains(NotificationRouter.CaseReferenceFor(@case.Id), text);
+            Assert.DoesNotContain("Task/", text);
             foreach (var patientDetail in new[] { "SYN-PT-0001", "SYNTHETIC Patient One", "SYN-MRN-0001", Envelopes.PatientPhone, Envelopes.PatientEmail, Envelopes.ResultId, "out of area" })
             {
                 Assert.DoesNotContain(patientDetail, text);
             }
         }
+    }
+
+    [Fact]
+    public async Task A_call_back_is_sent_to_the_role_that_makes_the_call_not_the_owner()
+    {
+        var @case = await _store.OpenCaseAsync();
+
+        await RouteAsync(new CallRequested
+        {
+            EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, CurrentOwner = TestData.FacilityLeadQueue(),
+            DueAt = _store.Clock.UtcNow.AddHours(2), CallerRole = "nurse-navigator",
+        });
+        await RouteAsync(new CallRequested
+        {
+            EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, CurrentOwner = TestData.FacilityLeadQueue(),
+            DueAt = _store.Clock.UtcNow.AddHours(2),
+        });
+
+        Assert.Equal(2, _email.Sent.Count);
+        Assert.Equal("nurse-navigator", _email.Sent[0].Recipient.Reference);
+        Assert.Equal(TestData.FacilityLeadQueue().Reference, _email.Sent[1].Recipient.Reference);
+    }
+
+    [Fact]
+    public async Task Staff_notice_names_the_facility_and_points_to_CareLoop()
+    {
+        var @case = await _store.OpenCaseAsync();
+        var format = new MessageFormat(new NotificationOptions { FacilityNames = new(StringComparer.OrdinalIgnoreCase) { [@case.FacilityId] = "SYN Family Health Centre" } });
+
+        await RouteAsync(new DeadlineApproaching { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, CurrentOwner = @case.Owner, NextAction = "review-result", DueAt = _store.Clock.UtcNow.AddHours(1) }, format: format);
+
+        var body = Assert.Single(_email.Sent).Body;
+        Assert.Contains("A case at SYN Family Health Centre needs your action. Open CareLoop and look for case " + NotificationRouter.CaseReferenceFor(@case.Id) + ".", body);
+        Assert.DoesNotContain("HIS", body);
     }
 
     [Fact]
@@ -132,7 +167,10 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(before.DueAt, after.DueAt);
         Assert.Equal(before.NextAction, after.NextAction);
         Assert.Equal(before.Notification!.Status, after.Notification!.Status);
-        Assert.Equal(before.Version, after.Version);
+        // The one thing written is the send itself, recorded on the track before it went out.
+        var sent = Assert.Single(after.Notification.Attempts);
+        Assert.Equal(NotificationAttemptStatus.Sent, sent.Status);
+        Assert.Equal(_email.Sent[0].AttemptId, sent.Id);
     }
 
     [Fact]
@@ -172,12 +210,11 @@ public sealed class NotificationRouterTests : IDisposable
 
         await RouteAsync(scheduled);
 
-        var message = Assert.Single(_email.Sent);
-        Assert.Equal(RecipientKind.Caregiver, message.Recipient.Kind);
+        var message = Assert.Single(_email.Sent, m => m.Recipient.Kind == RecipientKind.Caregiver);
         Assert.Equal(CaregiverInbox, message.ContactPoint.Address);
         Assert.Equal(NotificationRouter.CaregiverTemplateKey, message.TemplateKey);
-        Assert.Contains(scheduled.ScheduledFor.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), message.Body);
-        Assert.Contains(scheduled.ScheduledFor.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), message.Body);
+        Assert.Contains(MessageFormat.Default.Date(scheduled.ScheduledFor), message.Body);
+        Assert.Contains(MessageFormat.Default.Time(scheduled.ScheduledFor), message.Body);
         Assert.Contains("SYN Breast Imaging Clinic", message.Body);
         var text = $"{message.Subject} {message.Body}";
         foreach (var patientDetail in new[] { "SYN-PT-0001", Envelopes.PatientPhone, Envelopes.PatientEmail, Envelopes.ResultId, NotificationRouter.CaseReferenceFor(scheduled.CaseId), "PLACEHOLDER-URGENCY-A" })
@@ -193,20 +230,46 @@ public sealed class NotificationRouterTests : IDisposable
 
         await RouteAsync(scheduled);
 
-        var message = Assert.Single(_email.Sent);
-        Assert.Equal(NotificationRouter.CaregiverPlaceToBeConfirmedTemplateKey, message.TemplateKey);
-        Assert.Contains("to be confirmed", message.Body);
+        var caregiver = Assert.Single(_email.Sent, m => m.Recipient.Kind == RecipientKind.Caregiver);
+        Assert.Equal(NotificationRouter.CaregiverPlaceToBeConfirmedTemplateKey, caregiver.TemplateKey);
+        Assert.Contains("to be confirmed", caregiver.Body);
+        var patient = Assert.Single(_email.Sent, m => m.Recipient.Kind == RecipientKind.Patient);
+        Assert.Equal(NotificationRouter.PatientPlaceToBeConfirmedTemplateKey, patient.TemplateKey);
+        Assert.Contains("to be confirmed", patient.Body);
     }
 
     [Fact]
-    public async Task AppointmentScheduled_without_consent_notifies_nobody()
+    public async Task AppointmentScheduled_tells_the_patient_the_day_time_and_place_in_local_time_with_the_reply_codes()
+    {
+        await _store.ReviewedCaseAsync();
+        var at = new DateTimeOffset(2026, 11, 24, 9, 30, 0, TimeSpan.Zero);
+        await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: at, location: "SYN Breast Imaging Clinic"));
+        var scheduled = Assert.Single(await _store.RaisedAsync<AppointmentScheduled>());
+        var before = await _store.TheCaseAsync();
+
+        await RouteAsync(scheduled, format: new MessageFormat(new NotificationOptions { TimeZone = "Asia/Dubai" }));
+
+        var message = Assert.Single(_email.Sent);
+        Assert.Equal(RecipientKind.Patient, message.Recipient.Kind);
+        Assert.Equal(NotificationRouter.PatientAppointmentTemplateKey, message.TemplateKey);
+        Assert.Contains("Tuesday 24 November 2026", message.Body);
+        Assert.Contains("13:30", message.Body);
+        Assert.Contains("SYN Breast Imaging Clinic", message.Body);
+        Assert.Contains("Reply 1 to confirm you got this message", message.Body);
+        Assert.Contains(NotificationRouter.CaseReferenceFor(scheduled.CaseId), message.Body);
+        // Not the follow-up notification: the track is left as it was.
+        Assert.Equal(before.Notification!.Attempts.Count, (await _store.TheCaseAsync()).Notification!.Attempts.Count);
+    }
+
+    [Fact]
+    public async Task AppointmentScheduled_without_consent_goes_to_the_patient_only()
     {
         await _store.ReviewedCaseAsync();
         await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: _store.Clock.UtcNow.AddDays(3), location: "SYN Breast Imaging Clinic"));
 
         await RouteAsync(Assert.Single(await _store.RaisedAsync<AppointmentScheduled>()));
 
-        Assert.Empty(_email.Sent);
+        Assert.Equal(RecipientKind.Patient, Assert.Single(_email.Sent).Recipient.Kind);
     }
 
     [Fact]
@@ -221,7 +284,7 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.False((await _store.TheCaseAsync()).CaregiverConsent!.IsActive);
         await RouteAsync(scheduled);
 
-        Assert.Empty(_email.Sent);
+        Assert.DoesNotContain(_email.Sent, m => m.Recipient.Kind == RecipientKind.Caregiver);
     }
 
     [Fact]
@@ -231,7 +294,7 @@ public sealed class NotificationRouterTests : IDisposable
         var scheduled = await BookedWithConsentAsync("SYN Breast Imaging Clinic", NotificationChannel.Sms);
 
         await using var db = _store.NewContext();
-        var recipient = Assert.Single(await NotificationTestSupport.Resolver(db, NotificationChannel.Email).ResolveAsync(scheduled, CancellationToken.None));
+        var recipient = Assert.Single(await NotificationTestSupport.Resolver(db, NotificationChannel.Email).ResolveAsync(scheduled, CancellationToken.None), r => r.Kind == RecipientKind.Caregiver);
         var both = recipient with { ContactPoints = [.. recipient.ContactPoints, new ContactPoint { Channel = NotificationChannel.Email, Address = CaregiverInbox }] };
         var attempts = await Sender(_store.Clock, Enabled("Email", "Sms"), _email, sms).SendAsync(
             scheduled.CaseId, both, NotificationRouter.CaregiverTemplateKey, nameof(AppointmentScheduled),
@@ -255,12 +318,13 @@ public sealed class NotificationRouterTests : IDisposable
         var coordinator = new CaseOwner { Reference = "SYN-QUEUE-COORD", Role = "coordinator", FacilityId = "SYN-FAC-A", IsQueue = true };
         var acknowledgedAt = new DateTimeOffset(2026, 11, 14, 9, 40, 0, TimeSpan.Zero);
 
-        await RouteAsync(Escalation(@case, 1, TestData.FacilityLeadQueue()));
-        await RouteAsync(Escalation(@case, 2, coordinator) with { AcknowledgedByRole = "facility-lead", AcknowledgedAt = acknowledgedAt });
+        var dubai = new MessageFormat(new NotificationOptions { TimeZone = "Asia/Dubai" });
+        await RouteAsync(Escalation(@case, 1, TestData.FacilityLeadQueue()), format: dubai);
+        await RouteAsync(Escalation(@case, 2, coordinator) with { AcknowledgedByRole = "facility-lead", AcknowledgedAt = acknowledgedAt }, format: dubai);
 
         Assert.Equal(2, _email.Sent.Count);
         Assert.DoesNotContain("acknowledged", _email.Sent[0].Body, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.", _email.Sent[1].Body);
+        Assert.Contains("The facility lead acknowledged level 1 at 13:40 on Saturday 14 November.", _email.Sent[1].Body);
     }
 
     [Fact]
@@ -292,18 +356,43 @@ public sealed class NotificationRouterTests : IDisposable
     }
 
     [Fact]
-    public async Task Patient_refusal_on_one_channel_is_not_recorded_while_another_channel_accepted()
+    public async Task Patient_refusal_on_one_channel_does_not_mark_unreachable_while_another_channel_is_on_its_way()
     {
-        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false) { Reach = _ => true };
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false)
+        {
+            Answer = _ => new SendResult { Accepted = false, FailureReason = "PLACEHOLDER: gateway down" },
+        };
         var requested = await _store.ReviewedCaseAsync();
+        var before = await _store.TheCaseAsync();
 
         await RouteAsync(requested, sms);
 
         Assert.Single(_email.Sent);
         var @case = await _store.TheCaseAsync();
-        Assert.Empty(@case.Notification!.Attempts);
+        Assert.Equal(NotificationAttemptStatus.Failed, Assert.Single(@case.Notification!.Attempts, a => a.Channel == NotificationChannel.Sms).Status);
+        Assert.Equal(NotificationAttemptStatus.Sent, Assert.Single(@case.Notification.Attempts, a => a.Channel == NotificationChannel.Email).Status);
         Assert.Equal(NotificationStatus.Sent, @case.Notification.Status);
         Assert.False(@case.Exceptions.HasFlag(CaseExceptions.Unreachable));
+        Assert.Equal(before.NextAction, @case.NextAction);
+    }
+
+    [Fact]
+    public async Task Every_reachable_channel_is_on_the_track_before_anything_is_sent()
+    {
+        var requested = await _store.ReviewedCaseAsync();
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false);
+        IReadOnlyList<Guid> knownWhenSmsWasSent = [];
+        sms.Answer = m =>
+        {
+            // What a delivery report arriving during this send would be judged against.
+            knownWhenSmsWasSent = [.. _store.TheCaseAsync().GetAwaiter().GetResult().Notification!.Attempts.Select(a => a.Id)];
+            return new SendResult { Accepted = true };
+        };
+
+        await RouteAsync(requested, sms);
+
+        Assert.Equal(2, knownWhenSmsWasSent.Count);
+        Assert.Contains(_email.Sent[0].AttemptId, knownWhenSmsWasSent);
     }
 
     private const string CaregiverInbox = "SYN-CAREGIVER-INBOX-0001";
@@ -331,7 +420,7 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(NotificationRouter.StaffTemplateKey, message.TemplateKey);
     }
 
-    private async Task RouteAsync(IDomainEvent domainEvent, FakeProvider? sms = null)
+    private async Task RouteAsync(IDomainEvent domainEvent, FakeProvider? sms = null, MessageFormat? format = null)
     {
         await using var db = _store.NewContext();
         var router = new NotificationRouter(
@@ -340,7 +429,8 @@ public sealed class NotificationRouterTests : IDisposable
             _log,
             _store.Ingestor(db),
             db,
-            NullLogger<NotificationRouter>.Instance);
+            NullLogger<NotificationRouter>.Instance,
+            format);
         await router.HandleAsync(domainEvent, CancellationToken.None);
     }
 }

@@ -14,7 +14,7 @@ namespace PatientChannelSimulator.Inbound;
 /// if this is the notification the patient responds to
 /// (<see cref="PatientBehaviour.RespondToNotification"/>), it waits
 /// <see cref="PatientBehaviour.RespondAfter"/> and then sends the reply through
-/// <see cref="ReplySender"/>, exactly as typing it in the inbox would: 1 for "I will come", 2 to
+/// <see cref="ReplySender"/>, exactly as typing it in the inbox would: 1 for "I got this message", 2 to
 /// ask for a call.
 /// </para>
 /// <para>

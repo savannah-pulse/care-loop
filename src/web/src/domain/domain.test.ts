@@ -50,17 +50,17 @@ describe('display stages (decision 19)', () => {
 })
 
 describe('timeline (C3)', () => {
-  it('names where each entry came from in plain words', () => {
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'careloop' })))).toBe('CareLoop')
-    expect(
-      sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'fhc-his', eventType: 'NotificationUpdated', actorRole: 'system' }))),
-    ).toBe('Text message or email')
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'his-simulator' })))).toBe('Hospital system')
+  it('names where each entry came from, as the API reports it', () => {
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'careloop' })))).toBe('CareLoop')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'sms', eventType: 'NotificationUpdated' })))).toBe('Text message')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'email', eventType: 'NotificationUpdated' })))).toBe('Email')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'hospital', sourceSystem: 'his-simulator' })))).toBe('Hospital system')
   })
 
-  it('shows what a nurse recorded after a call as recorded in CareLoop, not as a message from the patient', () => {
+  it('shows what a nurse recorded after a call as recorded in CareLoop, whatever system the case came from', () => {
     const recorded = timelineEntry({
       sourceSystem: 'fhc-his',
+      origin: 'careloop',
       eventType: 'NotificationUpdated',
       actorReference: 'huda-saleh',
       actorRole: 'nurse-navigator',
@@ -68,11 +68,9 @@ describe('timeline (C3)', () => {
     expect(sourceLabel(timelineSource(recorded))).toBe('CareLoop')
   })
 
-  it('names no patient app, portal or channel as a source', () => {
-    for (const system of ['patient-channel', 'health-app', 'portal']) {
-      expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: system, eventType: 'ClinicalReviewCompleted' })))).toBe(
-        'Hospital system',
-      )
+  it('reads an origin it does not know as a hospital system, never as a patient app or portal', () => {
+    for (const origin of ['patient-channel', 'health-app', 'portal']) {
+      expect(sourceLabel(timelineSource(timelineEntry({ origin })))).toBe('Hospital system')
     }
   })
 

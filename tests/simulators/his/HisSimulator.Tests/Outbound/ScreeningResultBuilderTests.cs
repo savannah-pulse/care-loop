@@ -30,7 +30,11 @@ public sealed class ScreeningResultBuilderTests
     {
         var builder = new ScreeningResultBuilder(Microsoft.Extensions.Options.Options.Create(new ContactOptions { PatientChannel = channel }));
         Assert.Throws<InvalidOperationException>(() => builder.Build(SimulatorTestData.Request()));
+        Assert.False(ContactOptions.IsValid(new ContactOptions { PatientChannel = channel }));
     }
+    [Theory] [InlineData("sms")] [InlineData(" Email ")]
+    public void A_text_message_or_email_patient_channel_passes_the_start_up_check(string channel) =>
+        Assert.True(ContactOptions.IsValid(new ContactOptions { PatientChannel = channel }));
     [Fact] public void Build_contains_observations_referenced_from_result()
     {
         var report = _builder.Build(SimulatorTestData.Request());

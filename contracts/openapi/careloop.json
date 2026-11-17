@@ -1469,8 +1469,6 @@
         "required": [
           "caseId",
           "sourceSystem",
-          "sourceResultId",
-          "patientReference",
           "displayLabel",
           "escalations",
           "pathwayId",
@@ -1495,12 +1493,18 @@
             "description": "Identifier of the system that produced the result."
           },
           "sourceResultId": {
-            "type": "string",
-            "description": "The source system's identifier of the actionable result."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The source system's identifier of the actionable result. `null` for the coordinator, who sees no one's identity."
           },
           "patientReference": {
-            "type": "string",
-            "description": "Source-system reference of the patient. Never a name."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity."
           },
           "patientDisplayName": {
             "type": [
@@ -1687,7 +1691,6 @@
       "CaseSummaryResponse": {
         "required": [
           "caseId",
-          "patientReference",
           "facilityId",
           "displayLabel",
           "createdAt",
@@ -1706,8 +1709,11 @@
             "format": "uuid"
           },
           "patientReference": {
-            "type": "string",
-            "description": "Source-system reference of the patient. Never a name."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity."
           },
           "patientDisplayName": {
             "type": [
@@ -2085,7 +2091,6 @@
       "ExceptionItemResponse": {
         "required": [
           "caseId",
-          "patientReference",
           "facilityId",
           "pathwayId",
           "displayLabel",
@@ -2103,8 +2108,11 @@
             "format": "uuid"
           },
           "patientReference": {
-            "type": "string",
-            "description": "Source-system reference of the patient. Never a name."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity."
           },
           "patientDisplayName": {
             "type": [
@@ -3031,7 +3039,8 @@
           "sourceTimestamp",
           "receivedTimestamp",
           "newStage",
-          "reason"
+          "reason",
+          "origin"
         ],
         "type": "object",
         "properties": {
@@ -3095,6 +3104,10 @@
               "string"
             ],
             "description": "Reference to the supporting evidence, when there is any."
+          },
+          "origin": {
+            "type": "string",
+            "description": "Where the entry came from: `hospital` (the case's source system), `careloop` (CareLoop itself, including\na call a nurse recorded), `sms` or `email` (a delivery report or the patient's reply on that channel)."
           }
         },
         "description": "One audit entry in a case timeline, returned by `GET /cases/{caseId}/timeline`."
