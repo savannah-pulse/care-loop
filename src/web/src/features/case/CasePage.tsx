@@ -125,13 +125,15 @@ export function CasePage({ caseId }: CasePageProps) {
   const read = useCase(caseId, reason)
   const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
-  const [recorded, setRecorded] = useState<CaseDetail>()
+  // The case as the API returned it after a call outcome, tied to the read it replaced: any newer read
+  // (another person signing in, a retry) is a different object and wins, so the snapshot never outlives it.
+  const [recorded, setRecorded] = useState<{ readonly base: CaseDetail; readonly detail: CaseDetail }>()
   const [toast, setToast] = useState<string>()
   const dismissToast = useCallback(() => setToast(undefined), [])
   const retryTimeline = timeline.retry
   const onCallRecorded = useCallback(
-    (detail: CaseDetail) => {
-      setRecorded(detail)
+    (base: CaseDetail, detail: CaseDetail) => {
+      setRecorded({ base, detail })
       setToast(t('callOutcome.recordedToast'))
       retryTimeline()
     },
@@ -170,11 +172,11 @@ export function CasePage({ caseId }: CasePageProps) {
         >
           {(detail) => (
             <CaseView
-              detail={recorded?.caseId === detail.caseId ? recorded : detail}
+              detail={recorded?.base === detail ? recorded.detail : detail}
               timeline={timeline}
               reason={reason}
               now={now}
-              onCallRecorded={onCallRecorded}
+              onCallRecorded={(updated) => onCallRecorded(detail, updated)}
             />
           )}
         </ReadView>

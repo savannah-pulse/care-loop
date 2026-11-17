@@ -84,6 +84,9 @@ public static class RecordCallOutcome
         if (request.Understood) outcomes.Add((NotificationUpdateKind.Understood, null));
         if (request.Confidence is { } rating) outcomes.Add((NotificationUpdateKind.ConfidenceRated, rating));
 
+        // Each outcome is its own event, so one can be refused after another was applied; the answer then says
+        // which were recorded, so the nurse does not take the whole call as lost. Sending them again is harmless.
+        var recorded = new List<NotificationUpdateKind>();
         try
         {
             foreach (var (kind, confidence) in outcomes)
@@ -106,15 +109,21 @@ public static class RecordCallOutcome
                     },
                 }, ct);
                 if (result.Outcome != IngestOutcome.Applied)
-                    return Results.Problem(result.Reason ?? "The outcome could not be recorded.", statusCode: 409);
+                    return Results.Problem(PartlyRecorded(result.Reason ?? "The outcome could not be recorded.", recorded), statusCode: 409);
+                recorded.Add(kind);
             }
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Results.Problem("The case changed while recording the call. Refresh and try again.", statusCode: 409);
+            return Results.Problem(PartlyRecorded("The case changed while recording the call. Refresh and try again.", recorded), statusCode: 409);
         }
 
         var updated = await repository.GetAsync(caseId, ct);
         return updated is null ? Results.NotFound() : Results.Ok(CaseReadMapping.Detail(updated, actor, pathways));
     }
+
+    private static string PartlyRecorded(string reason, IReadOnlyList<NotificationUpdateKind> recorded) =>
+        recorded.Count == 0
+            ? reason
+            : $"{reason} Already recorded from this call: {string.Join(", ", recorded)}.";
 }

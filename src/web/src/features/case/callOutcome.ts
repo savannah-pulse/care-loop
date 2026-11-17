@@ -8,7 +8,10 @@ export const MIN_CONFIDENCE = 1
 export const MAX_CONFIDENCE = 5
 
 /** The ratings a nurse can choose from, lowest first. */
-export const CONFIDENCE_RATINGS: readonly number[] = [1, 2, 3, 4, 5]
+export const CONFIDENCE_RATINGS: readonly number[] = Array.from(
+  { length: MAX_CONFIDENCE - MIN_CONFIDENCE + 1 },
+  (_, index) => MIN_CONFIDENCE + index,
+)
 
 /** What a nurse has ticked on the call-outcome card and not yet recorded. */
 export interface CallOutcomeDraft {

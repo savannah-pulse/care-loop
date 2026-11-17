@@ -118,10 +118,11 @@ public sealed class InboxReplyTests : IDisposable
         Assert.False(reaction.Automatic);
         Assert.Equal(422, reaction.HttpStatusCode);
 
-        // The refused reply was never recorded, so the next one takes the same identifier.
+        // CareLoop may have stored the refused reply under its identifier, so the next one takes a new
+        // identifier; reusing it would get the new reply dropped as a resend.
         _simulator.CareLoop.AnswerWith(HttpStatusCode.OK);
         Assert.Equal(HttpStatusCode.OK, (await _simulator.ReplyAsync("1")).StatusCode);
-        Assert.Equal($"{TestData.MessageId}-r1", Assert.Single((await _simulator.InboxMessageAsync()).Replies).ReplyId);
+        Assert.Equal($"{TestData.MessageId}-r2", Assert.Single((await _simulator.InboxMessageAsync()).Replies).ReplyId);
     }
 
     [Fact]

@@ -72,7 +72,11 @@ public sealed class ReplySender
         }
 
         var now = _clock.UtcNow;
-        var replyId = $"{message.MessageId}-r{message.Replies.Count + 1}";
+        // Every earlier attempt uses up its identifier, accepted or not: CareLoop may have stored one whose
+        // answer never arrived, and a new reply under the same identifier would be dropped as a resend.
+        var earlierAttempts = _store.GetReactions([message.To])
+            .Count(r => r.MessageId == message.MessageId && r.Reaction == PatientReactionKind.Replied && r.SourceEventId is not null);
+        var replyId = $"{message.MessageId}-r{Math.Max(message.Replies.Count, earlierAttempts) + 1}";
         var callback = SimulatorCallback.Reply(message, replyId, text, now);
 
         CallbackSendResult send;
