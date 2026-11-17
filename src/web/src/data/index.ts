@@ -17,6 +17,15 @@ export {
   identityHeaders,
 } from './client'
 export type { CareLoopClient, CareLoopClientOptions } from './client'
+export {
+  draftImpactSummary,
+  draftPatientMessage,
+  draftRoleBriefing,
+  useImpactSummary,
+  usePatientMessageDraft,
+  useRoleBriefing,
+} from './agents'
+export type { PatientMessageQuery } from './agents'
 export { recordCallOutcome } from './callOutcome'
 export {
   DETAIL_READS_AT_ONCE,

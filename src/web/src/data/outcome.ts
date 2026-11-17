@@ -11,7 +11,8 @@ import type { NotImplemented, Problem } from './types'
  *   outside their team and no reason was given.
  * - `conflict`: HTTP 409; the case changed first. For a handoff summary, AI is off or a summary is
  *   already approved; for an escalation, it was already acknowledged or a newer one replaced it.
- * - `unavailable`: HTTP 503; for a handoff summary, AI could not produce a valid draft.
+ * - `unavailable`: HTTP 503; for a handoff summary, AI could not produce a valid draft; for an AI
+ *   agent's words, the agent could not write them this time.
  * - `invalid`: HTTP 400 or 422; the request was refused as malformed.
  * - `aborted`: the read was cancelled because its answer was no longer wanted; screens ignore it.
  * - `error`: anything else, including a network failure.

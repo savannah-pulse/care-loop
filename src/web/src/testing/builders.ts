@@ -7,7 +7,16 @@
  * test states only what it is about. Nothing in the app imports this module.
  */
 
-import type { CaseDetail, CaseSummary, Escalation, HandoffSummary, Owner, Programme, TimelineEntry } from '../data'
+import type {
+  AiText,
+  CaseDetail,
+  CaseSummary,
+  Escalation,
+  HandoffSummary,
+  Owner,
+  Programme,
+  TimelineEntry,
+} from '../data'
 
 /** The moment the test cases describe: Thursday 12 November 2026, 09:00 in Abu Dhabi. */
 export const TEST_NOW = new Date('2026-11-12T05:00:00Z')
@@ -215,6 +224,21 @@ export function handoffSummary(overrides: Partial<HandoffSummary> = {}): Handoff
     rejectedBy: null,
     rejectedAt: null,
     rejectionReason: null,
+    ...overrides,
+  }
+}
+
+/**
+ * Builds words an AI agent wrote, as the three AI endpoints return them.
+ *
+ * @param overrides - Fields to change.
+ * @returns One sentence from the role-briefing agent, received at {@link TEST_NOW}, unless overridden.
+ */
+export function aiText(overrides: Partial<AiText> = {}): AiText {
+  return {
+    agent: 'role-briefing',
+    text: 'One case is late and already escalated, so start there.',
+    generatedAt: TEST_NOW.toISOString(),
     ...overrides,
   }
 }

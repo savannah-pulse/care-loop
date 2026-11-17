@@ -9,11 +9,12 @@ import { Icon, type IconName } from './Icon'
  *
  * @remarks
  * - `lines`: a few lines of text, as in a timeline.
+ * - `line`: one line of text, as for a sentence written by AI.
  * - `list`: a short list of cases, as on the worklist.
  * - `cards`: a row of number cards, as on the impact screen.
  * - `page`: a heading block over a card, as on a case.
  */
-export type SkeletonShape = 'lines' | 'list' | 'cards' | 'page'
+export type SkeletonShape = 'lines' | 'line' | 'list' | 'cards' | 'page'
 
 /** Props for {@link LoadingState}. */
 export interface LoadingStateProps {
@@ -41,6 +42,8 @@ function Shape({ shape }: { readonly shape: SkeletonShape }) {
   switch (shape) {
     case 'lines':
       return <Lines />
+    case 'line':
+      return <Bar size="86%" />
     case 'list':
       return (
         <>

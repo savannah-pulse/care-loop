@@ -2852,3 +2852,90 @@ a.name:focus-visible {
 .call-current {
   font-weight: 600;
 }
+
+/*
+ * Words AI wrote: "Start here today" on the worklist, "What the numbers say" on Impact and the
+ * message preview on a case. AI text is marked by one small accent chip and always captioned in
+ * words; the cards around it never depend on it, and a failure is a calm grey note, never red.
+ */
+.ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.ai-chip svg.i {
+  inline-size: 12px;
+  block-size: 12px;
+}
+
+.ai-words {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-words.with-chip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: start;
+}
+
+.ai-words.with-chip > .ai-chip {
+  grid-row: 1 / span 2;
+  margin-block-start: 2px;
+}
+
+.ai-words.with-chip > .ai-text,
+.ai-words.with-chip > .ai-caption {
+  grid-column: 2;
+}
+
+.ai-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.ai-caption {
+  font-size: 14px;
+  color: var(--ink3);
+}
+
+.ai-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  background: var(--soft);
+  color: var(--ink2);
+  font-size: 14px;
+}
+
+.ai-note svg.i {
+  inline-size: 18px;
+  block-size: 18px;
+  margin-block-start: 1px;
+  color: var(--ink3);
+}
+
+.ai-quiet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink2);
+}

@@ -83,5 +83,18 @@ export type ClosureReason = NonNullable<Schemas['ClosureReason']>
 /** Body of an HTTP 501 answer from an endpoint that is not built yet. */
 export type NotImplemented = Schemas['NotImplementedResponse']
 
+/**
+ * Words an AI agent wrote for staff to read, as returned by `POST /ai/role-briefing`,
+ * `POST /ai/impact-summary` and `POST /cases/{caseId}/patient-message-draft`.
+ *
+ * @remarks
+ * A draft: shown labelled as written by AI and never acted on. The API answers 503, with no text,
+ * when the agent could not write it, so this only ever holds words the agent wrote.
+ */
+export type AiText = Schemas['AiTextResponse']
+
+/** How a message reaches a patient: `Sms` (a text message) or `Email`. */
+export type MessageChannel = Schemas['NotificationChannel']
+
 /** An RFC 9457 problem description, as the API returns with most errors. */
 export type Problem = Schemas['ProblemDetails']
