@@ -13,8 +13,10 @@ import type {
   CaseSummary,
   Escalation,
   HandoffSummary,
+  Metrics,
   Owner,
   Programme,
+  RateMeasure,
   TimelineEntry,
 } from '../data'
 
@@ -224,6 +226,59 @@ export function handoffSummary(overrides: Partial<HandoffSummary> = {}): Handoff
     rejectedBy: null,
     rejectedAt: null,
     rejectionReason: null,
+    ...overrides,
+  }
+}
+
+function rate(numerator: number, denominator: number): RateMeasure {
+  return { numerator, denominator, rate: denominator === 0 ? null : numerator / denominator }
+}
+
+/**
+ * Builds the loop-closure numbers, as `GET /metrics` returns them.
+ *
+ * @param overrides - Fields to change.
+ * @returns The numbers of a team with 24 cases, 20 of them open and 3 past their deadline, every
+ * measure with what it counts and what it is out of, unless overridden.
+ */
+export function metrics(overrides: Partial<Metrics> = {}): Metrics {
+  return {
+    generatedAt: TEST_NOW.toISOString(),
+    totalCases: 24,
+    openCases: 20,
+    closedCases: 4,
+    casesByStage: { ReviewPending: 6, FollowUpActive: 12, ClosureReview: 2 },
+    casesByException: { Overdue: 3, Rejected: 1, Unreachable: 1, Unacknowledged: 0, Unassigned: 1 },
+    overdueCases: 3,
+    escalatedCases: 1,
+    unassignedCases: 1,
+    acknowledgementRate: 0.8,
+    closureRate: 4 / 24,
+    medianTimeToClosure: '5.00:00:00',
+    measures: {
+      acknowledgement: rate(16, 20),
+      closure: rate(4, 24),
+      understanding: rate(12, 16),
+      nextStepOnTime: rate(17, 20),
+      referralAcceptedAndAttended: rate(5, 6),
+      appointmentsAttended: rate(9, 10),
+      treatmentStartedOnTime: rate(2, 3),
+      signedEvidence: rate(4, 4),
+    },
+    timeToStep: {
+      acknowledgement: { denominator: 16, median: '1.04:00:00' },
+      consultation: { denominator: 8, median: '2.00:00:00' },
+      appointment: { denominator: 9, median: '6.00:00:00' },
+      careStarted: { denominator: 3, median: '9.00:00:00' },
+      closure: { denominator: 4, median: '5.00:00:00' },
+    },
+    closuresByReason: { Treated: 3, NegativeOnConfirmation: 1 },
+    casesReachingDisplayLabel: { CaseOpened: rate(24, 24), FollowUp: rate(14, 24) },
+    casesByDisplayLabel: { OwnerAssigned: 6, PatientNotified: 4, FollowUp: 8, ClosureReview: 2, Closed: 4 },
+    confidenceRate: 0.25,
+    confidenceDenominator: 20,
+    confidenceResponses: 5,
+    averageConfidence: 3.8,
     ...overrides,
   }
 }

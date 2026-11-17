@@ -636,7 +636,15 @@
     "comparisonNotAvailable": "The comparison with reminders and escalation switched off will show here once it is switched on.",
     "comparisonUnavailableTitle": "The comparison isn't available right now",
     "comparisonUnavailableBody": "The rest of the numbers on this page are up to date. Check again later.",
-    "footnote": "These numbers show how CareLoop works. They are not evidence of real-world results."
+    "footnote": "These numbers show how CareLoop works. They are not evidence of real-world results.",
+    "ai": {
+      "title": "What the numbers say",
+      "caption": "Written by AI from the numbers on this page. Check them before you act on it.",
+      "loading": "Loading what the numbers say",
+      "notReady": "Not ready yet. This will show here once it is switched on.",
+      "notReadyNote": "Every number on this page is up to date.",
+      "failed": "AI could not write it this time. Every number on this page is still up to date."
+    }
   },
   "programmesPage": {
     "title": "Programmes",

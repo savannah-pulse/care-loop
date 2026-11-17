@@ -1,6 +1,15 @@
 import { useId, type ReactNode } from 'react'
 import { Icon, LoadingState, NotAvailableState, ReadView } from '../../components'
-import { useMetrics, useSimulation, type Metrics, type Read, type SimulationArm, type SimulationResult } from '../../data'
+import {
+  useImpactSummary,
+  useMetrics,
+  useSimulation,
+  type AiText,
+  type Metrics,
+  type Read,
+  type SimulationArm,
+  type SimulationResult,
+} from '../../data'
 import { DISPLAY_LABELS, EXCEPTION_NAMES, displayLabelText, exceptionLabel, isDisplayLabel } from '../../domain'
 import {
   facilityName,
@@ -25,6 +34,7 @@ import {
   type BarItem,
   type MeasureKey,
 } from './impact'
+import { NumbersSayCard } from './NumbersSayCard'
 
 const CLOSURE_REASONS = [
   'Treated',
@@ -120,7 +130,7 @@ function RateRows({ metrics, keys }: { readonly metrics: Metrics; readonly keys:
   )
 }
 
-function MetricsView({ metrics }: { readonly metrics: Metrics }) {
+function MetricsView({ metrics, words }: { readonly metrics: Metrics; readonly words: Read<AiText> }) {
   const total = toCount(metrics.totalCases)
   const open = toCount(metrics.openCases)
   const closed = toCount(metrics.closedCases)
@@ -182,6 +192,7 @@ function MetricsView({ metrics }: { readonly metrics: Metrics }) {
           }
         />
       </div>
+      <NumbersSayCard read={words} />
       <div className="grid-even">
         <Card title={t('impact.stepsTitle')} aside={t('impact.stepsAside')}>
           <table className="mini">
@@ -395,13 +406,16 @@ function ComparisonBody({ read, labelledBy }: { readonly read: Read<SimulationRe
  * an empty population says "not measured yet" instead of 0%. Times to each step are medians of
  * clock time from the result. The comparison comes from `POST /metrics/simulation`, which replays a
  * cohort with reminders and escalation on and off; while it is not built (501) it says so calmly,
- * and any other failure says it is not available right now. These numbers show how CareLoop works;
- * they are not evidence of real-world results.
+ * and any other failure says it is not available right now. Under the headline numbers, "What the
+ * numbers say" shows a few sentences from `POST /ai/impact-summary`, read beside the numbers so they
+ * never wait for it, and captioned as written by AI from them (see {@link NumbersSayCard}). These
+ * numbers show how CareLoop works; they are not evidence of real-world results.
  */
 export function ImpactPage() {
   useDocumentTitle(t('impact.title'))
   const me = useSignedInStaff()
   const metrics = useMetrics()
+  const words = useImpactSummary()
   const simulation = useSimulation()
   const comparisonId = useId()
   const data = metrics.state.status === 'ready' ? metrics.state.data : undefined
@@ -428,7 +442,7 @@ export function ImpactPage() {
         notAvailable={t('impact.notAvailable')}
         errorTitle={t('impact.errorTitle')}
       >
-        {(loaded) => <MetricsView metrics={loaded} />}
+        {(loaded) => <MetricsView metrics={loaded} words={words} />}
       </ReadView>
       <section className="card" aria-labelledby={comparisonId}>
         <h2 className="card-title" id={comparisonId}>
