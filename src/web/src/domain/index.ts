@@ -34,7 +34,7 @@ export { CASE_STATUS_KINDS, caseStatus, needsAttention } from './status'
 export type { CaseStatus, CaseStatusInput, CaseStatusKind } from './status'
 export {
   GENERIC_REASONS,
-  SOURCE_SYSTEMS,
+  ORIGINS,
   groupByDay,
   hasOwnReason,
   newestFirst,

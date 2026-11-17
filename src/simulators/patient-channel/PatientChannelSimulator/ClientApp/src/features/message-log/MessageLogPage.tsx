@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { listFhirLog } from '../../api';
+import { listMessageLog } from '../../api';
 import { SimulatedBadge } from '../../components';
 import { formatJson, formatTime } from '../../format';
 import { useLoad } from '../../hooks';
@@ -13,16 +13,17 @@ export interface MessageLogPageProps {
 }
 
 /**
- * The log of every FHIR exchange between this simulator and CareLoop.
+ * The log of every exchange between this simulator and CareLoop.
  *
  * @remarks
- * Exists so a demo audience can see exactly what crossed the boundary: each notification request
- * CareLoop sent, each delivery report and patient response sent back, and each case-status read.
- * Selecting a row shows its FHIR JSON. The log is read when the screen opens and on "Refresh".
+ * Exists so a demo audience can see exactly what an SMS or email service would be sent and what
+ * it would send back: each text message and email from CareLoop, and each delivery report and
+ * reply returned to it. Selecting a row shows its JSON. The log is read when the screen opens
+ * and on "Refresh".
  */
 export function MessageLogPage({ maxEntries }: MessageLogPageProps) {
   const { t } = useTranslation();
-  const { data, error, loading, reload } = useLoad(listFhirLog);
+  const { data, error, loading, reload } = useLoad(listMessageLog);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const entries = maxEntries === undefined ? (data ?? []) : (data ?? []).slice(0, maxEntries);
@@ -51,7 +52,7 @@ export function MessageLogPage({ maxEntries }: MessageLogPageProps) {
               <th scope="col">{t('messageLog.columns.at')}</th>
               <th scope="col">{t('messageLog.columns.direction')}</th>
               <th scope="col">{t('messageLog.columns.request')}</th>
-              <th scope="col">{t('messageLog.columns.resource')}</th>
+              <th scope="col">{t('messageLog.columns.kind')}</th>
               <th scope="col">{t('messageLog.columns.status')}</th>
               <th scope="col">{t('messageLog.columns.marker')}</th>
             </tr>
@@ -66,7 +67,7 @@ export function MessageLogPage({ maxEntries }: MessageLogPageProps) {
                     type="button"
                     className="link-button"
                     aria-label={t('messageLog.show', {
-                      resource: entry.resourceType,
+                      kind: t(`messageLog.kind.${entry.kind}`, { defaultValue: entry.kind }),
                       method: entry.method,
                       time: formatTime(entry.at),
                     })}
@@ -76,8 +77,8 @@ export function MessageLogPage({ maxEntries }: MessageLogPageProps) {
                   </button>
                 </td>
                 <td>
-                  {entry.resourceType}
-                  {entry.resourceId ? `/${entry.resourceId}` : ''}
+                  {t(`messageLog.kind.${entry.kind}`, { defaultValue: entry.kind })}
+                  {entry.messageId ? ` ${entry.messageId}` : ''}
                 </td>
                 <td>{entry.statusCode ?? t('messageLog.noResponse')}</td>
                 <td>{entry.simulated && <SimulatedBadge />}</td>
@@ -93,7 +94,7 @@ export function MessageLogPage({ maxEntries }: MessageLogPageProps) {
           {!selected && <p>{t('messageLog.selectHint')}</p>}
           {selected && !selected.body && <p>{t('messageLog.noBody')}</p>}
           {selected?.body && (
-            <pre className="fhir-json" data-testid="fhir-json">
+            <pre className="exchange-json" data-testid="exchange-json">
               {formatJson(selected.body)}
             </pre>
           )}

@@ -186,6 +186,35 @@ public sealed class NotificationSender
         return attempts;
     }
 
+    /// <summary>
+    /// Lists the channels a notification to this recipient would be sent on.
+    /// </summary>
+    /// <param name="recipient">Who to notify.</param>
+    /// <param name="domainEventName">Name of the domain event; selects a per-event provider override.</param>
+    /// <returns>Each enabled channel whose provider can reach the recipient, in channel order, as <see cref="SendAsync"/> would use them.</returns>
+    /// <remarks>A provider that fails while checking the recipient is left out: <see cref="SendAsync"/> records it as a failed attempt.</remarks>
+    public IReadOnlyList<NotificationChannel> ReachableChannels(Recipient recipient, string domainEventName)
+    {
+        ArgumentNullException.ThrowIfNull(recipient);
+        var channels = new List<NotificationChannel>();
+        foreach (var provider in EnabledProviders(domainEventName))
+        {
+            try
+            {
+                if (provider.CanReach(recipient) && recipient.ContactPoints.Any(c => c.Channel == provider.Channel))
+                {
+                    channels.Add(provider.Channel);
+                }
+            }
+            catch (Exception)
+            {
+                // Recorded as a failed attempt when the message is sent.
+            }
+        }
+
+        return channels;
+    }
+
     private NotificationAttempt Failed(Guid id, NotificationChannel channel, bool smsSafe, string reason) => new()
     {
         Id = id,

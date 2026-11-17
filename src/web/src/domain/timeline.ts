@@ -26,38 +26,40 @@ export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)
 }
 
-/** Where a timeline entry came from: CareLoop itself, a hospital system or the patient channel. */
-export type TimelineSource = 'careLoop' | 'hospital' | 'patientChannel'
+/** Where a timeline entry came from: CareLoop itself, a hospital system, a text message or an email. */
+export type TimelineSource = 'careLoop' | 'hospital' | 'sms' | 'email'
 
 /**
- * Source systems the dashboard names, by the key the API reports in `sourceSystem`.
+ * Where an entry came from, by the `origin` the API reports for it.
  *
  * @remarks
- * CareLoop records its own events (deadlines, escalations, acknowledgements and approved summaries)
- * as `careloop`. Every other system that reaches CareLoop is a hospital system, through its FHIR
- * boundary, unless it is listed here as the patient channel.
+ * The API says it plainly: `careloop` for CareLoop itself (deadlines, escalations, acknowledgements, approved
+ * summaries, a call a nurse recorded, and CareLoop's record of what it sent), `sms` or `email` for a delivery
+ * report or the patient's reply on that channel, and `hospital` for the case's hospital system. Nothing is guessed
+ * from the event type or the actor.
  */
-export const SOURCE_SYSTEMS: Readonly<Record<string, TimelineSource>> = {
+export const ORIGINS: Readonly<Record<string, TimelineSource>> = {
   careloop: 'careLoop',
-  'patient-channel': 'patientChannel',
+  sms: 'sms',
+  email: 'email',
+  hospital: 'hospital',
 }
 
 /**
  * Works out where a timeline entry came from (C3).
  *
- * @param entry - The entry, with the source system the API joined from the stored event.
- * @returns `careLoop` for CareLoop's own events, `patientChannel` for the patient channel and
- * `hospital` for any other system.
+ * @param entry - The entry, with the origin the API reports.
+ * @returns `careLoop`, `sms`, `email` or `hospital`; an origin the dashboard does not know reads as a hospital system.
  */
-export function timelineSource(entry: Pick<TimelineEntry, 'sourceSystem'>): TimelineSource {
-  return SOURCE_SYSTEMS[entry.sourceSystem.trim().toLowerCase()] ?? 'hospital'
+export function timelineSource(entry: Pick<TimelineEntry, 'origin'>): TimelineSource {
+  return ORIGINS[entry.origin.trim().toLowerCase()] ?? 'hospital'
 }
 
 /**
  * Names where a timeline entry came from, in plain words.
  *
  * @param source - Where the entry came from.
- * @returns `CareLoop`, `Hospital system` or `Patient channel`.
+ * @returns `CareLoop`, `Hospital system` or `Text message or email`.
  */
 export function sourceLabel(source: TimelineSource): string {
   return t(`timeline.sources.${source}`)

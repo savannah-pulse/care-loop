@@ -8,7 +8,7 @@
       "id": "SYN-PT-0001",
       "identifier": [ { "system": "https://careloop.invalid/fhir/sid/mrn", "value": "SYN-MRN-0001" } ],
       "name": [ { "use": "official", "text": "SYNTHETIC Patient One" } ],
-      "telecom": [ { "system": "other", "value": "SYN-INBOX-0001" } ],
+      "telecom": [ { "system": "sms", "value": "SYN-TEL-0001" } ],
       "communication": [ { "language": { "coding": [ { "system": "urn:ietf:bcp:47", "code": "en" } ] }, "preferred": true } ]
     }
   ],

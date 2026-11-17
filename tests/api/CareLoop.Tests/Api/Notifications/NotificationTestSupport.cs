@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Features.Events.Handlers;
 using CareLoop.Api.Features.Notifications;
+using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Contracts.Events;
@@ -172,6 +173,30 @@ internal static class NotificationTestSupport
         new(providers, ShippedTemplates(), Options.Create(options), clock);
 
     public static NotificationOptions Enabled(params string[] providers) => new() { EnabledProviders = [.. providers] };
+
+    /// <summary>The address every staff role is reached at in these tests.</summary>
+    public const string StaffAddress = "SYN-STAFF-TEAM";
+
+    /// <summary>A resolver whose staff roles are all reached at <see cref="StaffAddress"/> on <paramref name="staffChannel"/>.</summary>
+    public static RecipientResolver Resolver(CareLoopDbContext db, NotificationChannel staffChannel = NotificationChannel.Sms)
+    {
+        var contacts = new StaffContactOptions();
+        contacts.ByRole[StaffContactOptions.DefaultKey] = new StaffContact { Channel = staffChannel, Address = StaffAddress };
+        return new RecipientResolver(db, Options.Create(contacts));
+    }
+
+    /// <summary>The same simulator settings for every channel.</summary>
+    public static IOptionsMonitor<SimulatorNotificationOptions> Simulator(string? baseUrl = null, string? inboundSecret = null) =>
+        new FixedOptions<SimulatorNotificationOptions>(new SimulatorNotificationOptions { BaseUrl = baseUrl, InboundSecret = inboundSecret });
+
+    private sealed class FixedOptions<T>(T value) : IOptionsMonitor<T>
+    {
+        public T CurrentValue => value;
+
+        public T Get(string? name) => value;
+
+        public IDisposable? OnChange(Action<T, string?> listener) => null;
+    }
 
     public static Recipient Patient(params NotificationChannel[] channels) => new()
     {

@@ -16,7 +16,6 @@ public class PatientBehaviourTests
 
         Assert.Equal(DeliveryBehaviour.Deliver, behaviour.Delivery);
         Assert.Equal(PatientResponseBehaviour.None, behaviour.Response);
-        Assert.Null(behaviour.Confidence);
         Assert.True(behaviour.Simulated);
     }
 
@@ -33,20 +32,20 @@ public class PatientBehaviourTests
     }
 
     [Fact]
-    public async Task Deliver_sends_a_completed_communication_and_marks_the_message_delivered()
+    public async Task Deliver_sends_a_delivered_report_and_marks_the_message_delivered()
     {
         using var simulator = new SimulatorFactory();
 
         await simulator.NotifyAsync();
 
         var report = Assert.Single(simulator.CareLoop.Callbacks);
-        Assert.Equal("delivery-status", report.Category);
-        Assert.Equal("completed", report.Status);
+        Assert.Equal("delivery", report.Type);
+        Assert.Equal("delivered", report.Status);
         Assert.Equal(DeliveryState.Delivered, (await simulator.InboxMessageAsync()).Delivery);
     }
 
     [Fact]
-    public async Task Fail_sends_a_not_done_communication_with_the_behaviour_reason()
+    public async Task Fail_sends_a_failed_report_with_the_behaviour_reason()
     {
         using var simulator = new SimulatorFactory();
         simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: handset unreachable"));
@@ -54,9 +53,9 @@ public class PatientBehaviourTests
         await simulator.NotifyAsync();
 
         var report = Assert.Single(simulator.CareLoop.Callbacks);
-        Assert.Equal("delivery-status", report.Category);
-        Assert.Equal("not-done", report.Status);
-        Assert.Equal("SIMULATED: handset unreachable", report.Json.GetProperty("statusReason").GetProperty("text").GetString());
+        Assert.Equal("delivery", report.Type);
+        Assert.Equal("failed", report.Status);
+        Assert.Equal("SIMULATED: handset unreachable", report.Json.GetProperty("reason").GetString());
         var message = await simulator.InboxMessageAsync();
         Assert.Equal(DeliveryState.Failed, message.Delivery);
         Assert.Equal("SIMULATED: handset unreachable", message.DeliveryFailureReason);
@@ -82,28 +81,28 @@ public class PatientBehaviourTests
         simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Deliver, PatientResponseBehaviour.Acknowledge), "SYN-PT-0001");
         simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: unreachable"), "SYN-PT-0002");
 
-        await simulator.NotifyAsync(requestId: "one", patientId: "SYN-PT-0001");
-        await simulator.NotifyAsync(requestId: "two", patientId: "SYN-PT-0002");
-        await simulator.NotifyAsync(requestId: "three", patientId: "SYN-PT-0003");
+        await simulator.NotifyAsync(messageId: "one", to: "SYN-PT-0001");
+        await simulator.NotifyAsync(messageId: "two", to: "SYN-PT-0002");
+        await simulator.NotifyAsync(messageId: "three", to: "SYN-PT-0003");
 
         var one = await simulator.InboxMessageAsync("one");
         var two = await simulator.InboxMessageAsync("two");
         var three = await simulator.InboxMessageAsync("three");
-        Assert.Equal((DeliveryState.Delivered, ResponseState.Acknowledged), (one.Delivery, one.Response));
-        Assert.Equal((DeliveryState.Failed, ResponseState.None), (two.Delivery, two.Response));
-        Assert.Equal((DeliveryState.Delivered, ResponseState.None), (three.Delivery, three.Response));
+        Assert.Equal((DeliveryState.Delivered, 1), (one.Delivery, one.Replies.Count));
+        Assert.Equal((DeliveryState.Failed, 0), (two.Delivery, two.Replies.Count));
+        Assert.Equal((DeliveryState.Delivered, 0), (three.Delivery, three.Replies.Count));
     }
 
     [Fact]
     public async Task Changing_a_behaviour_does_not_affect_messages_already_in_the_inbox()
     {
         using var simulator = new SimulatorFactory();
-        await simulator.NotifyAsync(requestId: "before");
+        await simulator.NotifyAsync(messageId: "before");
 
         var put = await simulator.CreateClient().PutAsJsonAsync(
             $"/api/patient-behaviours/{TestData.PatientId}",
             new { delivery = "Fail", response = "None", failureReason = "SIMULATED: unreachable" });
-        await simulator.NotifyAsync(requestId: "after");
+        await simulator.NotifyAsync(messageId: "after");
 
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         Assert.Equal(DeliveryState.Delivered, (await simulator.InboxMessageAsync("before")).Delivery);
@@ -171,16 +170,16 @@ public class PatientBehaviourTests
         simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.Fail, PatientResponseBehaviour.None, "SIMULATED: unreachable"), "SYN-PT-0002");
         simulator.SetBehaviour(new PatientBehaviour(DeliveryBehaviour.StaySilent, PatientResponseBehaviour.None), "SYN-PT-0003");
 
-        await simulator.NotifyAsync(requestId: "one", patientId: "SYN-PT-0001");
-        await simulator.NotifyAsync(requestId: "two", patientId: "SYN-PT-0002");
-        await simulator.NotifyAsync(requestId: "three", patientId: "SYN-PT-0003");
+        await simulator.NotifyAsync(messageId: "one", to: "SYN-PT-0001");
+        await simulator.NotifyAsync(messageId: "two", to: "SYN-PT-0002");
+        await simulator.NotifyAsync(messageId: "three", to: "SYN-PT-0003");
 
         var delivered = simulator.Reactions("SYN-PT-0001")[0];
         Assert.Equal(PatientReactionKind.Delivered, delivered.Reaction);
         Assert.True(delivered.Automatic);
         Assert.True(delivered.Succeeded);
         Assert.Equal(200, delivered.HttpStatusCode);
-        Assert.Equal("Communication/one-delivery/_history/1", delivered.SourceEventId);
+        Assert.Equal("one/delivery/delivered", delivered.SourceEventId);
 
         Assert.Equal(PatientReactionKind.DeliveryFailed, Assert.Single(simulator.Reactions("SYN-PT-0002")).Reaction);
 
@@ -198,7 +197,7 @@ public class PatientBehaviourTests
 
         var put = await client.PutAsJsonAsync(
             "/api/patient-behaviours/SYN-PT-0009",
-            new { delivery = "Deliver", response = "Acknowledge", respondAfter = "00:00:02", respondToNotification = 2, confidence = 4 });
+            new { delivery = "Deliver", response = "Acknowledge", respondAfter = "00:00:02", respondToNotification = 2 });
         var assignment = await put.Content.ReadFromJsonAsync<PatientBehaviourAssignment>(SimulatorFactory.Json);
         var listed = await client.GetFromJsonAsync<List<PatientBehaviourAssignment>>("/api/patient-behaviours", SimulatorFactory.Json);
         var defaultPut = await client.PutAsJsonAsync("/api/patient-behaviours/default", new { delivery = "StaySilent", response = "None" });
@@ -207,7 +206,6 @@ public class PatientBehaviourTests
         Assert.Equal(HttpStatusCode.OK, put.StatusCode);
         Assert.Equal(TimeSpan.FromSeconds(2), assignment!.Behaviour.RespondAfter);
         Assert.Equal(2, assignment.Behaviour.RespondToNotification);
-        Assert.Equal(4, assignment.Behaviour.Confidence);
         Assert.Null(assignment.ScenarioName);
         Assert.Equal("SYN-PT-0009", Assert.Single(listed!).PatientSyntheticId);
         Assert.Equal(HttpStatusCode.OK, defaultPut.StatusCode);
@@ -219,8 +217,9 @@ public class PatientBehaviourTests
 
     [Theory]
     [InlineData("""{"delivery":"Deliver","response":"RateConfidence"}""")]
-    [InlineData("""{"delivery":"Deliver","response":"Acknowledge","confidence":6}""")]
-    [InlineData("""{"delivery":"Deliver","response":"None","confidence":3}""")]
+    [InlineData("""{"delivery":"Deliver","response":"Understand"}""")]
+    [InlineData("""{"delivery":"Fail","response":"None"}""")]
+    [InlineData("""{"delivery":"StaySilent","response":"Acknowledge"}""")]
     [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondToNotification":0}""")]
     [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondAfter":"-00:00:01"}""")]
     [InlineData("""{"delivery":"Deliver","response":"Acknowledge","respondAfter":"366.00:00:00"}""")]

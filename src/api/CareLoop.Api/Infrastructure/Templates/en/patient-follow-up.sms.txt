@@ -1,1 +1,1 @@
-[PLACEHOLDER] You have a message from your screening provider. Please open the patient channel to read it.
+[PLACEHOLDER] Your screening provider has a follow-up step for you and will be in touch about it. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Reference: {{caseReference}}

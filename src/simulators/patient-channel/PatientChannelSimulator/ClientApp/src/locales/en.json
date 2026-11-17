@@ -1,18 +1,17 @@
 {
   "app": {
-    "title": "Patient-channel simulator",
-    "documentTitle": "CareLoop patient-channel simulator (simulated)"
+    "title": "SMS and email simulator",
+    "documentTitle": "CareLoop SMS and email simulator (simulated)"
   },
   "banner": {
-    "simulated": "Simulated data. Every patient, message and case shown here is synthetic."
+    "simulated": "Simulated data. Every person, message and case shown here is synthetic. No text message or email is really sent."
   },
   "nav": {
     "label": "Simulator screens",
-    "inbox": "Patient inbox",
-    "caseStatus": "Case status",
+    "inbox": "Inboxes",
     "patientBehaviours": "Patient behaviours",
     "scenarioRunner": "Scenario runner",
-    "messageLog": "FHIR message log"
+    "messageLog": "Message log"
   },
   "common": {
     "simulated": "Simulated",
@@ -26,70 +25,52 @@
     "notJson": "The simulator's answer was not understood."
   },
   "inbox": {
-    "title": "Patient inbox",
-    "description": "What CareLoop sent, shown the way each channel shows it, with the actions a patient can take. A delivered message is not an acknowledgement: only the patient's own action is.",
-    "channelsLabel": "Inbox channels",
-    "channel": {
-      "App": "Health app",
-      "Portal": "Patient portal",
-      "Sms": "Basic phone",
-      "Email": "Caregiver email"
+    "title": "Inboxes",
+    "description": "Every text message and email CareLoop sent, shown the way a basic phone and a mailbox show them. CareLoop reaches patients, caregivers and staff by text message and email only. A delivered message is not an acknowledgement: only the patient's own reply is.",
+    "inboxesLabel": "Inboxes",
+    "inbox": {
+      "PatientSms": "Patient text messages",
+      "PatientEmail": "Patient email",
+      "Caregiver": "Caregiver",
+      "Staff": "Staff"
     },
-    "channelTab": "{{channel}} ({{count}})",
-    "empty": "No messages in this inbox yet. A message appears here when CareLoop sends a notification.",
+    "channel": {
+      "Sms": "Text message",
+      "Email": "Email"
+    },
+    "inboxTab": "{{inbox}} ({{count}})",
+    "empty": "No messages in this inbox yet. A message appears here when CareLoop sends one.",
     "messagesLabel": "Messages in this inbox",
-    "messageItem": "{{name}}, received {{time}}",
-    "notAnswerable": "This message did not reach the patient, so the patient cannot respond to it.",
-    "app": {
-      "appName": {
-        "App": "Your health app",
-        "Portal": "Your patient portal"
-      },
-      "language": "English",
-      "hello": "Hello, {{name}}",
-      "nextStep": "Your next step",
-      "acknowledge": "I will come",
-      "anotherTime": "I need another time",
-      "talk": "Need to talk to someone?",
-      "talkBody": "Your care team can call you and explain anything again.",
-      "callMe": "Call me back",
-      "yourCase": "Your follow-up",
-      "caseStatusLink": "See where your follow-up stands",
-      "home": "Home",
-      "thanks": "Thank you, {{name}}",
-      "thanksAcknowledged": "We have told the clinic you will come.",
-      "thanksCallRequested": "We have asked your care team to call you.",
-      "teachBackLabel": "One question, so we know we explained it well",
-      "teachBackQuestion": "What will you do next?",
-      "answer": {
-        "understand": "Follow the next step in my message",
-        "wait": "Wait for the hospital to call me",
-        "unsure": "I am not sure"
-      },
-      "rateHeading": "How sure do you feel about what happens next?",
-      "rate": "Rate {{rating}} out of 5",
-      "rateLow": "Not sure",
-      "rateHigh": "Very sure",
-      "send": "Send"
+    "messageItem": "{{name}}, {{channel}}, received {{time}}",
+    "notAnswerable": "This message did not reach the patient, so the patient cannot reply to it.",
+    "readOnly": {
+      "Caregiver": "A caregiver's message. Only the patient replies to the clinic, so there is nothing here to answer and nothing the caregiver does is reported as the patient's.",
+      "Staff": "A staff notice. It carries no patient detail, and nobody replies to it here: staff act on the case in CareLoop."
     },
     "sms": {
+      "deviceLabel": "Basic phone",
       "from": "Text message",
       "reply": "Reply",
       "back": "Back",
       "key": "Key {{key}}",
       "draft": "Reply: {{text}}",
       "keypadLabel": "Phone keypad",
-      "caption": "A text message on a basic phone with no internet. Reply 1 to say you will come, or 2 to ask for a call. Any other reply is refused and nothing is sent to CareLoop."
+      "caption": "A text message on a basic phone with no internet. Reply 1 to confirm you got the message, or 2 to ask for a call. The reply is sent to CareLoop as typed; CareLoop reads any other reply as a request for a call."
     },
     "email": {
+      "deviceLabel": "Email",
       "from": "From",
       "fromValue": "CareLoop notification (simulated)",
       "to": "To",
+      "subject": "Subject",
+      "noSubject": "(no subject)",
       "sent": "Sent",
-      "readOnly": "A caregiver's copy. Only the patient can reply to the clinic, so there is nothing here to answer and nothing the caregiver does is reported as the patient's."
+      "replyLabel": "Reply",
+      "send": "Send reply",
+      "caption": "An email with no links. Reply 1 to confirm you got the message, or 2 to ask for a call. The reply is sent to CareLoop as typed; CareLoop reads any other reply as a request for a call."
     },
     "records": {
-      "heading": "What CareLoop records",
+      "heading": "What CareLoop is told",
       "delivery": {
         "Pending": "Delivery not reported yet",
         "Delivered": "Delivered",
@@ -102,51 +83,33 @@
         "Failed": "{{reason}}",
         "Silent": "The channel stayed silent, so CareLoop's own deadline has to notice."
       },
-      "response": {
-        "None": "Not acknowledged",
-        "Acknowledged": "Acknowledged",
-        "Understood": "Understood",
-        "CallRequested": "Call requested"
+      "noReply": "No reply",
+      "noReplyDetail": "The patient has not replied, so the message is not acknowledged.",
+      "replied": "Replied \"{{text}}\"",
+      "meaning": {
+        "WillCome": "CareLoop reads 1 as: the patient got the message. This is the acknowledgement.",
+        "CallMe": "CareLoop reads 2 as: the patient asks for a call. This is not an acknowledgement.",
+        "Other": "CareLoop reads any other reply as a request for a call. This is not an acknowledgement."
       },
-      "responseDetail": {
-        "None": "The patient has not responded.",
-        "Acknowledged": "The patient said they will come.",
-        "Understood": "The patient said the next step back.",
-        "CallRequested": "The patient asked for a call. This is not an acknowledgement."
-      },
-      "confidence": "Confidence {{rating}} out of 5",
-      "confidenceNone": "Not rated",
-      "confidenceDetail": "A rating is a measure, not an acknowledgement.",
-      "caregiver": "Only the patient replies",
-      "caregiverDetail": "Nothing a caregiver does is recorded as the patient's."
+      "byNurse": "Understanding and confidence",
+      "byNurseDetail": "Not recorded here. A nurse records them in CareLoop after a call.",
+      "onlyPatient": "Only the patient replies",
+      "onlyPatientDetail": {
+        "Caregiver": "Nothing a caregiver does is recorded as the patient's.",
+        "Staff": "A staff notice is not part of the patient's record of being notified."
+      }
     }
-  },
-  "caseStatus": {
-    "title": "Case status",
-    "description": "What the patient can see about their follow-up, read from the CareLoop case Task. It shows where the follow-up stands and never any clinical detail.",
-    "taskIdLabel": "Case Task identifier",
-    "lookUp": "Look up",
-    "notFound": "CareLoop has no case with that identifier.",
-    "fields": {
-      "taskId": "Case",
-      "taskStatus": "Status",
-      "stage": "Stage",
-      "statusReason": "Reason",
-      "dueBy": "Next step due by",
-      "lastUpdated": "Last updated"
-    },
-    "notStated": "Not stated"
   },
   "patientBehaviours": {
     "title": "Patient behaviours",
-    "description": "Choose how each simulated patient reacts when CareLoop notifies them. A patient only reacts to a notification that arrives, and delivery is never an acknowledgement.",
+    "description": "Choose how each simulated patient reacts when CareLoop sends them a text message or an email. A patient only reacts to a message that arrives, and delivery is never an acknowledgement.",
     "defaultHeading": "Default behaviour",
     "defaultDescription": "Used for every patient that has no behaviour of their own.",
     "listHeading": "Patients with their own behaviour",
     "listEmpty": "No patient has a behaviour of their own. Every patient gets the default.",
     "addHeading": "Set a patient's behaviour",
     "patientIdLabel": "Patient identifier",
-    "patientIdHint": "Must be synthetic: it starts with SYN-.",
+    "patientIdHint": "Must be synthetic: it starts with SYN-. It is also the address the patient's messages are sent to.",
     "columns": {
       "patient": "Patient",
       "delivery": "Delivery",
@@ -158,7 +121,6 @@
     "setByHand": "By hand",
     "setByScenario": "Scenario {{name}}",
     "timing": "After {{seconds}} s, on notification {{notification}}",
-    "responseWithRating": "{{response}}, then rates {{rating}}",
     "remove": "Remove behaviour of {{patient}}",
     "save": "Save",
     "saveDefault": "Save default",
@@ -168,8 +130,7 @@
       "failureReason": "Failure reason",
       "response": "Patient response",
       "respondAfter": "Respond after (seconds)",
-      "respondToNotification": "Respond to notification number",
-      "confidence": "Confidence rating"
+      "respondToNotification": "Respond to notification number"
     },
     "delivery": {
       "Deliver": "Delivered",
@@ -178,16 +139,12 @@
     },
     "response": {
       "None": "Does nothing",
-      "Acknowledge": "Acknowledges",
-      "Understand": "Confirms understanding",
-      "CallMe": "Asks for a call",
-      "RateConfidence": "Only rates confidence"
+      "Acknowledge": "Replies 1 (got the message)",
+      "CallMe": "Replies 2 (asks for a call)"
     },
-    "confidenceNone": "No rating",
     "validation": {
       "patientId": "The patient identifier must start with SYN-.",
       "failureReason": "A delivery that fails needs a reason.",
-      "confidence": "A patient who only rates confidence needs a rating.",
       "respondAfter": "The delay must be zero or more seconds.",
       "respondToNotification": "The notification number must be 1 or more."
     },
@@ -228,11 +185,8 @@
       "Delivered": "Delivery reported",
       "DeliveryFailed": "Delivery failure reported",
       "NoDeliveryReport": "Nothing reported",
-      "Acknowledged": "Acknowledged",
-      "Understood": "Understood",
-      "CallRequested": "Call requested",
-      "NoResponse": "No response",
-      "ConfidenceRated": "Confidence rated"
+      "Replied": "Replied",
+      "NoResponse": "No reply"
     },
     "automatic": "Behaviour",
     "manual": "Inbox action",
@@ -241,14 +195,14 @@
     "failed": "Failed: {{error}}"
   },
   "messageLog": {
-    "title": "FHIR message log",
-    "description": "Every FHIR exchange between this simulator and CareLoop, newest first.",
+    "title": "Message log",
+    "description": "Every exchange between this simulator and CareLoop, newest first: the text messages and emails CareLoop sent, and the delivery reports and replies sent back.",
     "empty": "Nothing has been exchanged yet.",
     "columns": {
       "at": "Time",
       "direction": "Direction",
       "request": "Request",
-      "resource": "Resource",
+      "kind": "What",
       "status": "Status",
       "marker": "Marker"
     },
@@ -257,9 +211,14 @@
       "Outbound": "To CareLoop"
     },
     "noResponse": "No response",
-    "show": "Show {{resource}} {{method}} at {{time}}",
-    "detailHeading": "FHIR JSON",
+    "show": "Show {{kind}} {{method}} at {{time}}",
+    "detailHeading": "JSON",
     "noBody": "This exchange had no body.",
-    "selectHint": "Select an exchange to see its FHIR JSON."
+    "selectHint": "Select an exchange to see its JSON.",
+    "kind": {
+      "message": "Message",
+      "delivery": "Delivery report",
+      "reply": "Reply"
+    }
   }
 }

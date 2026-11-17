@@ -421,6 +421,10 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Origin")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("text");

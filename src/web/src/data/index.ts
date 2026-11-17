@@ -17,6 +17,7 @@ export {
   identityHeaders,
 } from './client'
 export type { CareLoopClient, CareLoopClientOptions } from './client'
+export { recordCallOutcome } from './callOutcome'
 export {
   DETAIL_READS_AT_ONCE,
   acknowledgeEscalation,

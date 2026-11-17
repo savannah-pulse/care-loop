@@ -37,9 +37,30 @@ services:
       # The demo pathway's deadlines last seconds, so the sweep must run about once a second.
       DeadlineWorker__Interval: "00:00:01"
       ExternalSystems__Systems__his-simulator__BaseUrl: http://his-simulator:8080
-      Notifications__Simulator__PatientChannelBaseUrl: http://patient-channel-simulator:8080
-      Notifications__Simulator__StaffInboxBaseUrl: http://his-simulator:8080
-      Notifications__Simulator__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
+      # Patients, caregivers and staff are reached by text message and email only. Both channels go to the
+      # SMS and email simulator (the patient-channel-simulator service), which calls back signed with the secret.
+      Notifications__Sms__BaseUrl: http://patient-channel-simulator:8080
+      Notifications__Sms__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
+      Notifications__Email__BaseUrl: http://patient-channel-simulator:8080
+      Notifications__Email__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
+      # Messages give local dates and times, and name the facility in staff notices.
+      Notifications__TimeZone: Asia/Dubai
+      Notifications__FacilityNames__family-health-centre: Family Health Centre
+      Notifications__FacilityNames__general-hospital: General Hospital
+      Notifications__FacilityNames__regional-hospital: Regional Hospital
+      # Where each staff role is notified. Synthetic addresses, one per role.
+      Notifications__StaffContacts__nurse-navigator__Channel: Email
+      Notifications__StaffContacts__nurse-navigator__Address: SYN-EMAIL-NURSE-NAVIGATORS
+      Notifications__StaffContacts__clinician__Channel: Email
+      Notifications__StaffContacts__clinician__Address: SYN-EMAIL-CLINICIANS
+      Notifications__StaffContacts__receiving-clinician__Channel: Email
+      Notifications__StaffContacts__receiving-clinician__Address: SYN-EMAIL-RECEIVING-CLINICIANS
+      Notifications__StaffContacts__lab__Channel: Email
+      Notifications__StaffContacts__lab__Address: SYN-EMAIL-LAB
+      Notifications__StaffContacts__facility-lead__Channel: Email
+      Notifications__StaffContacts__facility-lead__Address: SYN-EMAIL-FACILITY-LEADS
+      Notifications__StaffContacts__coordinator__Channel: Email
+      Notifications__StaffContacts__coordinator__Address: SYN-EMAIL-COORDINATORS
       Ai__Provider: ${AI_PROVIDER:-NoOp}
       Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
       Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}
@@ -85,6 +106,8 @@ services:
     environment:
       ASPNETCORE_URLS: http://+:8080
       CareLoop__FhirBaseUrl: http://api:8080/fhir
+      # How every simulated patient is reached: sms or email.
+      Contacts__PatientChannel: ${PATIENT_CONTACT_CHANNEL:-sms}
       Scenarios__Directory: /app/scenarios
       Scenarios__RealSecondsPerScenarioHour: "2"
     ports:
@@ -95,15 +118,16 @@ services:
       timeout: 3s
       retries: 10
 
+  # The SMS and email simulator. The service keeps its patient-channel name.
   patient-channel-simulator:
     build:
       context: .
       dockerfile: src/simulators/patient-channel/Dockerfile
     environment:
       ASPNETCORE_URLS: http://+:8080
-      CareLoop__FhirBaseUrl: http://api:8080/fhir
-      CareLoop__NotificationCallbackUrl: http://api:8080/notifications/inbound/simulator
-      # Signs every callback; must equal the API's Notifications__Simulator__InboundSecret above.
+      # Delivery reports and replies go to {CallbackBaseUrl}/sms or /email.
+      CareLoop__CallbackBaseUrl: http://api:8080/notifications/inbound
+      # Signs every callback; must equal the API's Notifications__Sms__InboundSecret and Notifications__Email__InboundSecret above.
       CareLoop__InboundSecret: ${SIMULATOR_INBOUND_SECRET:-}
       Scenarios__Directory: /app/scenarios
       Scenarios__RealSecondsPerScenarioHour: "2"

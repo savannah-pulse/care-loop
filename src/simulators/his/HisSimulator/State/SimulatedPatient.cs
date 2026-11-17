@@ -7,7 +7,7 @@ namespace HisSimulator.State;
 /// <param name="DisplayName">Visibly synthetic display name; always starts with <c>Synthetic</c>.</param>
 /// <param name="Language">BCP 47 language tag CareLoop uses to pick message templates.</param>
 /// <param name="SecondaryIdentifier">Optional synthetic MRN; otherwise a deterministic synthetic MRN is generated.</param>
-/// <param name="ContactAddress">Optional simulator-channel address; defaults to the synthetic patient identifier.</param>
+/// <param name="ContactAddress">Optional synthetic phone number or email address; defaults to the synthetic patient identifier.</param>
 public sealed record SimulatedPatient(string SyntheticId, string DisplayName, string Language,
     string? SecondaryIdentifier = null, string? ContactAddress = null)
 {

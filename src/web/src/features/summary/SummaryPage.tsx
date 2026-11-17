@@ -351,7 +351,9 @@ function DraftView({ detail, accessReason, initial, me }: DraftViewProps) {
             </ul>
             <p className="note linkrow">{t('summary.keptNote')}</p>
           </section>
-          <OtherScreeningCard detail={detail} reason={accessReason} />
+          {detail.patientReference ? (
+            <OtherScreeningCard detail={detail} patientReference={detail.patientReference} reason={accessReason} />
+          ) : null}
         </div>
       </div>
 
@@ -470,7 +472,9 @@ function SummaryWorkspace({ detail, reason }: WorkspaceProps) {
           <p className="meta">
             {patient.identifier && !patient.hidden ? <span>{patient.identifier}</span> : null}
             <span title={detail.pathwayId}>{programmeName(detail.pathwayId)}</span>
-            <span title={detail.sourceSystem}>{t('case.resultFrom', { result: detail.sourceResultId })}</span>
+            {detail.sourceResultId ? (
+              <span title={detail.sourceSystem}>{t('case.resultFrom', { result: detail.sourceResultId })}</span>
+            ) : null}
           </p>
         </div>
       </div>

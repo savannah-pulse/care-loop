@@ -25,7 +25,7 @@ public sealed class ConsentMapperTests
         var payload = Assert.IsType<ConsentPayload>(envelope.Payload);
         Assert.Equal(ConsentUpdateKind.Granted, payload.Kind);
         Assert.Equal("Consent/SYN-CONSENT-0001", payload.ConsentReference);
-        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Simulator, Address = "SYN-CG-INBOX-0001" }, payload.CaregiverContactPoint);
+        Assert.Equal(new CareLoop.Domain.Recipients.ContactPoint { Channel = NotificationChannel.Email, Address = "SYN-CG-EMAIL-0001" }, payload.CaregiverContactPoint);
     }
 
     [Theory]

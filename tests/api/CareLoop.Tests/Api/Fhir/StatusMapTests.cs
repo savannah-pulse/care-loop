@@ -2,6 +2,7 @@ using CareLoop.Api.Features.Fhir;
 using CareLoop.Contracts.Events.Payloads;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
+using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Tracks;
 using CareLoop.Tests.Fakes;
 using Hl7.Fhir.Model;
@@ -100,38 +101,20 @@ public sealed class StatusMapTests
         Assert.Equal(AppointmentStatus.Missed, StatusMap.ToAppointmentStatus(FhirAppointmentStatus.Noshow));
     }
 
-    [Theory]
-    [InlineData(StatusMap.DeliveryStatusCategory, EventStatus.Completed, NotificationUpdateKind.Delivered)]
-    [InlineData(StatusMap.DeliveryStatusCategory, EventStatus.NotDone, NotificationUpdateKind.Failed)]
-    [InlineData(StatusMap.AcknowledgementCategory, EventStatus.Completed, NotificationUpdateKind.Acknowledged)]
-    [InlineData(StatusMap.TeachBackCategory, EventStatus.Completed, NotificationUpdateKind.Understood)]
-    [InlineData(StatusMap.CallMeCategory, EventStatus.Completed, NotificationUpdateKind.CallRequested)]
-    [InlineData(StatusMap.ConfidenceRatingCategory, EventStatus.Completed, NotificationUpdateKind.ConfidenceRated)]
-    public void Communication_category_and_status_map_to_a_notification_update(string category, EventStatus status, NotificationUpdateKind expected)
-    {
-        var communication = Communication(category, status);
-
-        Assert.Equal(expected, StatusMap.ToNotificationUpdateKind(communication));
-    }
-
     [Fact]
-    public void A_delivery_report_is_never_an_acknowledgement()
+    public void Only_text_message_and_email_contact_points_are_ways_to_reach_someone()
     {
-        foreach (var status in Enum.GetValues<EventStatus>())
+        Assert.Equal(NotificationChannel.Sms, StatusMap.ToNotificationChannel(Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Sms));
+        Assert.Equal(NotificationChannel.Email, StatusMap.ToNotificationChannel(Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Email));
+        foreach (var system in Enum.GetValues<Hl7.Fhir.Model.ContactPoint.ContactPointSystem>())
         {
-            var kind = StatusMap.ToNotificationUpdateKind(Communication(StatusMap.DeliveryStatusCategory, status));
-            Assert.NotEqual(NotificationUpdateKind.Acknowledged, kind);
+            if (system is not (Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Sms or Hl7.Fhir.Model.ContactPoint.ContactPointSystem.Email))
+            {
+                Assert.Null(StatusMap.ToNotificationChannel(system));
+            }
         }
-    }
 
-    [Fact]
-    public void Confidence_rating_carries_its_value()
-    {
-        var communication = Communication(StatusMap.ConfidenceRatingCategory, EventStatus.Completed);
-        communication.Payload.Add(new Communication.PayloadComponent { Content = new FhirString("4") });
-
-        Assert.Equal(4, StatusMap.ToConfidence(communication));
-        Assert.Null(StatusMap.ToConfidence(Communication(StatusMap.ConfidenceRatingCategory, EventStatus.Completed)));
+        Assert.Null(StatusMap.ToNotificationChannel(null));
     }
 
     [Fact]
@@ -147,14 +130,5 @@ public sealed class StatusMapTests
         Assert.Null(StatusMap.ToConsultationStatus(FhirTaskStatus.Draft));
         Assert.Null(StatusMap.ToReferralStatus(null));
         Assert.Null(StatusMap.ToAppointmentStatus(FhirAppointmentStatus.Cancelled));
-        Assert.Null(StatusMap.ToNotificationUpdateKind(Communication("no-such-category", EventStatus.Completed)));
-        Assert.Null(StatusMap.ToNotificationUpdateKind(Communication(StatusMap.AcknowledgementCategory, EventStatus.InProgress)));
     }
-
-    private static Communication Communication(string category, EventStatus status) => new()
-    {
-        Id = "SYN-COMM-0001",
-        Status = status,
-        Category = [new CodeableConcept(StatusMap.CommunicationCategorySystem, category)],
-    };
 }

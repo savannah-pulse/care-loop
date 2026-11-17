@@ -2,9 +2,23 @@
  * Case (screen 2): everything about one case on one page. The patient's name and MRN, the ten
  * display stages, the single next action with its owner, due time and escalation ladder, the four
  * tracks, the timeline with each entry's source and, for clinicians, the patient's other screening
- * and the way into the AI handoff summary. A case at another facility asks why first.
+ * and the way into the AI handoff summary. A nurse navigator records what the patient said on a
+ * call. A case at another facility asks why first.
  */
 
+export { CallOutcomeCard } from './CallOutcomeCard'
+export type { CallOutcomeCardProps } from './CallOutcomeCard'
+export {
+  CONFIDENCE_RATINGS,
+  EMPTY_CALL_OUTCOME,
+  MAX_CONFIDENCE,
+  MIN_CONFIDENCE,
+  callOutcomeOffer,
+  canRecord,
+  recordedConfidence,
+  toCallOutcome,
+} from './callOutcome'
+export type { CallOutcomeDraft, CallOutcomeOffer } from './callOutcome'
 export { CasePage } from './CasePage'
 export type { CasePageProps } from './CasePage'
 export { NextActionCard } from './NextActionCard'

@@ -37,7 +37,7 @@ public sealed class ConsentBuilder
             var caregiver = new RelatedPerson
             {
                 Id = FhirSupport.Id(@case.CaseRef + "/caregiver"), Patient = new ResourceReference("Patient/" + @case.Patient.SyntheticId),
-                Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Other, Value = address }],
+                Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Email, Value = address }],
             };
             consent.Contained.Add(caregiver);
             var provision = consent.Provision ?? throw new InvalidOperationException("The consent provision is missing.");

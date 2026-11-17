@@ -8,10 +8,32 @@ namespace HisSimulator.Outbound;
 /// </summary>
 /// <remarks>
 /// A new report opens a case in CareLoop. The report carries references and placeholder codes only;
-/// the result category comes from <c>Params["resultCategory"]</c> and is never invented here.
+/// the result category comes from <c>Params["resultCategory"]</c> and is never invented here. The
+/// contained <c>Patient</c> carries one contact point, a text-message or email contact
+/// (<see cref="ContactOptions"/>), because those are the only ways CareLoop reaches a patient.
 /// </remarks>
 public sealed class ScreeningResultBuilder
 {
+    private readonly ContactOptions _contacts;
+
+    /// <summary>
+    /// Creates a builder that gives every patient a text-message contact.
+    /// </summary>
+    public ScreeningResultBuilder()
+        : this(Microsoft.Extensions.Options.Options.Create(new ContactOptions()))
+    {
+    }
+
+    /// <summary>
+    /// Creates the builder.
+    /// </summary>
+    /// <param name="contacts">Says whether patients are reached by text message or by email.</param>
+    public ScreeningResultBuilder(Microsoft.Extensions.Options.IOptions<ContactOptions> contacts)
+    {
+        ArgumentNullException.ThrowIfNull(contacts);
+        _contacts = contacts.Value;
+    }
+
     /// <summary>
     /// Builds the screening <c>DiagnosticReport</c> for a new case.
     /// </summary>
@@ -26,6 +48,7 @@ public sealed class ScreeningResultBuilder
     /// contained resources referenced from <c>result</c>, and a simulated-data tag in <c>meta.tag</c>.
     /// </returns>
     /// <exception cref="ArgumentException">A required value (patient, result category or facility) is missing.</exception>
+    /// <exception cref="InvalidOperationException">The configured patient contact channel is neither text message nor email.</exception>
     public DiagnosticReport Build(OutboundEventRequest request)
     {
         var source = request.Patient;
@@ -42,7 +65,7 @@ public sealed class ScreeningResultBuilder
         {
             Id = source.SyntheticId, Name = [new HumanName { Text = source.DisplayName }],
             Identifier = [new Identifier(FhirSupport.Base + "/sid/mrn", source.Mrn)],
-            Telecom = [new ContactPoint { System = ContactPoint.ContactPointSystem.Other, Value = source.ContactAddress ?? source.SyntheticId }],
+            Telecom = [new ContactPoint { System = _contacts.PatientSystem(), Value = source.ContactAddress ?? source.SyntheticId }],
             Communication = [new Patient.CommunicationComponent
             {
                 Language = new CodeableConcept("urn:ietf:bcp:47", source.Language), Preferred = true,

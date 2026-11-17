@@ -8,7 +8,7 @@
       "resourceType": "RelatedPerson",
       "id": "SYN-CG-0001",
       "patient": { "reference": "Patient/SYN-PT-0001" },
-      "telecom": [ { "system": "other", "value": "SYN-CG-INBOX-0001" } ]
+      "telecom": [ { "system": "email", "value": "SYN-CG-EMAIL-0001" } ]
     }
   ],
   "status": "active",

@@ -78,6 +78,16 @@ internal static class HandlerSupport
         Task.FromResult(new EventHandlingResult { Case = @case, Applied = true, EvidenceReference = evidenceReference });
 
     /// <summary>
+    /// Builds the result for an event that changed the case, with a plain-words summary for the audit trail.
+    /// </summary>
+    /// <param name="case">The changed case.</param>
+    /// <param name="evidenceReference">The evidence the event carried, if any.</param>
+    /// <param name="summary">What the event recorded; never patient detail.</param>
+    /// <returns>An applied result.</returns>
+    public static Task<EventHandlingResult> Applied(Case @case, string? evidenceReference, string summary) =>
+        Task.FromResult(new EventHandlingResult { Case = @case, Applied = true, EvidenceReference = evidenceReference, Summary = summary });
+
+    /// <summary>
     /// Builds the result for an event a rule refused. The case is unchanged and the reason is audited.
     /// </summary>
     /// <param name="case">The unchanged case.</param>

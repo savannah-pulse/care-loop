@@ -129,6 +129,7 @@ export function timelineEntry(overrides: Partial<TimelineEntry> = {}): TimelineE
     newStage: 'FollowUpActive',
     reason: 'Deadline warning raised',
     evidenceReference: null,
+    origin: 'careloop',
     ...overrides,
   }
 }

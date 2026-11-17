@@ -17,6 +17,6 @@ public sealed record ScenarioPatient
     /// <summary>BCP 47 language tag used to pick message templates.</summary>
     public required string Language { get; init; }
 
-    /// <summary>How the patient reacts when CareLoop notifies them. This is the only part of a scenario the patient channel acts on.</summary>
+    /// <summary>How the patient reacts when CareLoop notifies them. This is the only part of a scenario this simulator acts on.</summary>
     public required ScenarioPatientBehaviour Behaviour { get; init; }
 }

@@ -30,11 +30,44 @@ public sealed class TemplateRendererTests
 
         Assert.True(sms.IsSmsSafe);
         Assert.Null(sms.Subject);
-        Assert.Contains("open the patient channel", sms.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("AB12CD34", sms.Body);
+        Assert.StartsWith("[PLACEHOLDER] ", sms.Body);
+        Assert.Contains("Reference: AB12CD34", sms.Body);
         Assert.Equal("A follow-up step is waiting for you", standard.Subject);
         Assert.Contains("Reference: AB12CD34", standard.Body);
         Assert.Contains("[PLACEHOLDER WORDING, NOT APPROVED]", standard.Body);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Patient_message_asks_for_a_reply_and_points_at_no_app_portal_or_link(bool smsSafe)
+    {
+        var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
+
+        Assert.Contains("Reply 1 to confirm you got this message", body);
+        Assert.DoesNotContain("will come", body);
+        Assert.Contains("Reply 2 if you would like your care team to call you", body);
+        foreach (var notThere in new[] { "patient channel", "health app", "the app", "your app", "portal", "http", "www.", "log in", "open " })
+        {
+            Assert.DoesNotContain(notThere, body, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Theory]
+    [InlineData("caregiver-appointment", "Place: SYN Clinic")]
+    [InlineData("caregiver-appointment-place-tbc", "Place: to be confirmed")]
+    public void Caregiver_text_message_says_the_same_as_the_email(string templateKey, string place)
+    {
+        var values = new Dictionary<string, string> { ["appointmentDate"] = "2026-11-17", ["appointmentTime"] = "09:30", ["place"] = "SYN Clinic" };
+
+        foreach (var smsSafe in new[] { false, true })
+        {
+            var body = ShippedTemplates().Render(templateKey, "en", smsSafe, values).Body;
+            Assert.Contains("2026-11-17", body);
+            Assert.Contains("09:30", body);
+            Assert.Contains(place, body);
+            Assert.Contains("agreed that you may be told", body);
+        }
     }
 
     [Fact]
@@ -84,13 +117,14 @@ public sealed class TemplateRendererTests
     public void Staff_notice_shows_the_previous_acknowledgement_only_when_there_was_one(bool smsSafe)
     {
         var renderer = ShippedTemplates();
-        const string Acknowledgement = "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.";
+        const string Acknowledgement = "The facility lead acknowledged level 1 at 13:40 on Saturday 14 November.";
 
-        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = Acknowledgement });
-        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = string.Empty });
+        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["facility"] = "Family Health Centre", ["previousAcknowledgement"] = Acknowledgement });
+        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["facility"] = "Family Health Centre", ["previousAcknowledgement"] = string.Empty });
 
         Assert.Contains(Acknowledgement, acknowledged.Body);
         Assert.DoesNotContain("acknowledged", none.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("Task/SYN", none.Body);
+        Assert.EndsWith("A case at Family Health Centre needs your action. Open CareLoop and look for case AB12CD34.", none.Body);
+        Assert.DoesNotContain("Task/", none.Body);
     }
 }

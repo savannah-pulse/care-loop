@@ -2,8 +2,9 @@ using PatientChannelSimulator;
 using PatientChannelSimulator.Inbound;
 using PatientChannelSimulator.Scenarios;
 
-// Patient-channel simulator (WS8). SYNTHETIC DATA ONLY.
-// Stands in for the patient-facing channel and talks to CareLoop only through FHIR R4.
+// SMS and email simulator (WS8; the project keeps its patient-channel name). SYNTHETIC DATA ONLY.
+// Stands in for an SMS and email service: CareLoop posts text messages and emails as plain JSON,
+// and the simulator calls back with delivery reports and replies. No FHIR crosses it.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,14 +42,13 @@ app.UseStaticFiles();
 
 app.MapGet("/health", () => TypedResults.Ok(new HealthResponse("ok", "patient-channel-simulator")))
     .WithName("GetHealth")
-    .WithSummary("Liveness probe for the patient-channel simulator (SIMULATED service).")
+    .WithSummary("Liveness probe for the SMS and email simulator (SIMULATED service).")
     .WithTags("Health");
 
-app.MapFhirInboundEndpoints();
+app.MapMessageEndpoints();
 app.MapInboxEndpoints();
 app.MapPatientBehaviourEndpoints();
 app.MapMessageLogEndpoints();
-app.MapCaseStatusEndpoints();
 app.MapScenarioEndpoints();
 
 // Single-page-app fallback: unknown GET paths return the ClientApp shell so client-side routes

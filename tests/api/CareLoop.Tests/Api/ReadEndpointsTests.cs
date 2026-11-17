@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CareLoop.Api.Features.Cases;
 using CareLoop.Api.Features.Events;
+using CareLoop.Api.Features.Events.Handlers;
 using CareLoop.Api.Features.Exceptions;
 using CareLoop.Api.Features.Metrics;
 using CareLoop.Api.Features.Programmes;
@@ -271,9 +272,16 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(escalated.Id, summary.CaseId);
         Assert.Null(summary.PatientDisplayName);
         Assert.Null(summary.PatientSecondaryIdentifier);
+        Assert.Null(summary.PatientReference);
         var detail = Value<CaseDetailResponse>(await GetAsync(escalated.Id, coordinator));
         Assert.Null(detail.PatientDisplayName);
         Assert.Null(detail.PatientSecondaryIdentifier);
+        Assert.Null(detail.PatientReference);
+        Assert.Null(detail.SourceResultId);
+        // Staff on the case's own team still see both.
+        var lead = Value<CaseDetailResponse>(await GetAsync(escalated.Id, Identity("facility-lead", "SYN-FAC-B")));
+        Assert.NotNull(lead.PatientReference);
+        Assert.NotNull(lead.SourceResultId);
         Assert.Equal(2, Value<MetricsResponse>(await MetricsAsync(coordinator)).TotalCases);
     }
 
@@ -346,6 +354,199 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(4, audit.Count);
         Assert.Equal(1, audit.Count(a => a.Disposition == SourceEventDisposition.Applied));
         Assert.Equal(3, audit.Count(a => a.Disposition == SourceEventDisposition.Rejected));
+    }
+
+    [Fact]
+    public async Task Nurse_records_what_the_patient_said_on_a_call_without_changing_who_is_responsible()
+    {
+        var before = await NotifiedCaseAsync();
+
+        var result = Value<CaseDetailResponse>(await RecordCallAsync(before.Id, new CallOutcomeRequest { Acknowledged = true, Understood = true, Confidence = 4 }));
+
+        Assert.Equal(before.Owner.Reference, result.Owner.Reference);
+        Assert.Equal(4, result.Confidence);
+        var after = await ReadCaseAsync(before.Id);
+        Assert.Equal(NotificationStatus.Understood, after.Notification!.Status);
+        Assert.Equal(4, after.Notification.Confidence);
+        Assert.Equal(before.Owner, after.Owner);
+        Assert.Empty(after.Notification.Attempts);
+
+        using var scope = _services.CreateScope();
+        var recorded = await Db(scope).SourceEvents.AsNoTracking()
+            .Where(e => e.CaseId == before.Id && e.SourceEventId.StartsWith("call-outcome/")).ToListAsync();
+        Assert.Equal(3, recorded.Count);
+        Assert.All(recorded, e => Assert.Equal(CaseEventType.NotificationUpdated, e.Type));
+        Assert.All(recorded, e => Assert.Equal(SourceEventDisposition.Applied, e.Disposition));
+        Assert.All(recorded, e => Assert.Equal(DemoRoles.NurseNavigator, e.Actor!.Role));
+        Assert.All(recorded, e => Assert.Equal("SYN-STAFF-1", e.Actor!.Reference));
+        Assert.All(recorded, e => Assert.DoesNotContain("\"channel\":\"", e.PayloadJson));
+        Assert.Equal(3, await Db(scope).AuditEvents.CountAsync(a => a.CaseId == before.Id && a.ActorRole == DemoRoles.NurseNavigator));
+    }
+
+    [Fact]
+    public async Task Understanding_and_a_rating_are_recorded_apart_from_an_acknowledgement()
+    {
+        var @case = await NotifiedCaseAsync();
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Confidence = 2 })));
+        var ratedOnly = await ReadCaseAsync(@case.Id);
+        Assert.Equal(NotificationStatus.Sent, ratedOnly.Notification!.Status);
+        Assert.Equal(2, ratedOnly.Notification.Confidence);
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true })));
+        var understood = await ReadCaseAsync(@case.Id);
+        Assert.Equal(NotificationStatus.Understood, understood.Notification!.Status);
+        Assert.Equal(2, understood.Notification.Confidence);
+
+        // A later "she will come" on another call changes nothing that is already known, and is still accepted.
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Acknowledged = true, Confidence = 5 })));
+        var later = await ReadCaseAsync(@case.Id);
+        Assert.Equal(NotificationStatus.Understood, later.Notification!.Status);
+        Assert.Equal(5, later.Notification.Confidence);
+    }
+
+    [Theory]
+    [InlineData("clinician")]
+    [InlineData("receiving-clinician")]
+    [InlineData("facility-lead")]
+    [InlineData("coordinator")]
+    [InlineData("lab")]
+    public async Task Only_a_nurse_navigator_may_record_a_call_outcome(string role)
+    {
+        var before = await NotifiedCaseAsync();
+
+        var refused = await RecordCallAsync(before.Id, new CallOutcomeRequest { Acknowledged = true }, Identity(role, role == "coordinator" ? null : "SYN-FAC-A"));
+
+        Assert.Equal(403, Status(refused));
+        var after = await ReadCaseAsync(before.Id);
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(NotificationStatus.Sent, after.Notification!.Status);
+    }
+
+    [Fact]
+    public async Task Call_outcome_must_record_something_and_a_rating_must_be_from_1_to_5()
+    {
+        var before = await NotifiedCaseAsync();
+
+        Assert.Equal(400, Status(await RecordCallAsync(before.Id, new CallOutcomeRequest())));
+        Assert.Equal(400, Status(await RecordCallAsync(before.Id, new CallOutcomeRequest { Confidence = 0 })));
+        Assert.Equal(400, Status(await RecordCallAsync(before.Id, new CallOutcomeRequest { Understood = true, Confidence = 6 })));
+        Assert.Equal(401, Status(await RecordCallAsync(before.Id, new CallOutcomeRequest { Understood = true }, new DefaultHttpContext())));
+        Assert.Equal(404, Status(await RecordCallAsync(Guid.NewGuid(), new CallOutcomeRequest { Understood = true })));
+
+        Assert.Equal(before.Version, (await ReadCaseAsync(before.Id)).Version);
+    }
+
+    [Fact]
+    public async Task Call_outcome_for_a_case_at_another_facility_needs_a_reason()
+    {
+        var @case = await NotifiedCaseAsync();
+        var elsewhere = Identity(DemoRoles.NurseNavigator, "SYN-FAC-B");
+
+        var withoutReason = await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true }, elsewhere);
+        Assert.NotEqual(200, Status(withoutReason));
+        Assert.Equal(NotificationStatus.Sent, (await ReadCaseAsync(@case.Id)).Notification!.Status);
+
+        var withReason = await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true }, elsewhere, "SYN covering the clinic's calls today");
+        Assert.Equal(200, Status(withReason));
+
+        // The answer is the whole case, so both attempts are in the read audit, the second with its reason.
+        using var scope = _services.CreateScope();
+        var reads = await Db(scope).CaseReads.AsNoTracking().Where(r => r.CaseId == @case.Id && r.View.StartsWith(RecordCallOutcome.AuditView)).ToListAsync();
+        Assert.Equal(2, reads.Count);
+        Assert.All(reads, r => Assert.True(r.OutsideTeam));
+        Assert.Single(reads, r => r.View == RecordCallOutcome.AuditView + "-denied" && r.Reason is null);
+        Assert.Single(reads, r => r.View == RecordCallOutcome.AuditView && r.Reason == "SYN covering the clinic's calls today");
+    }
+
+    [Fact]
+    public async Task Recording_a_call_answers_the_patients_request_for_one()
+    {
+        var @case = await NotifiedCaseAsync();
+        var asked = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.CallRequested));
+        Assert.Equal(NotificationUpdateHandler.CallPatientAction, asked.NextAction);
+        Assert.True(asked.Notification!.CallRequested);
+        using (var outbox = _services.CreateScope())
+        {
+            // The pathway names the nurse navigator for the call, so they are told, whoever owns the case.
+            var raised = Assert.Single(await Db(outbox).OutboxMessages.AsNoTracking().Where(m => m.CaseId == @case.Id && m.EventType == "CallRequested").ToListAsync());
+            Assert.Contains("\"callerRole\":\"nurse-navigator\"", raised.PayloadJson);
+        }
+
+        // A text-message "will come" after asking for a call does not ring the patient back.
+        var replied = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        Assert.Equal(NotificationUpdateHandler.CallPatientAction, replied.NextAction);
+        Assert.True(replied.Notification!.CallRequested);
+
+        _clock.Advance(TimeSpan.FromMinutes(30));
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true })));
+
+        var after = await ReadCaseAsync(@case.Id);
+        Assert.False(after.Notification!.CallRequested);
+        Assert.Equal(HandlerSupport.ArrangeFollowUpAction, after.NextAction);
+        Assert.True(after.DueAt > asked.DueAt);
+        Assert.Equal(@case.Owner, after.Owner);
+    }
+
+    [Fact]
+    public async Task A_call_with_only_a_rating_goes_back_to_waiting_for_the_acknowledgement()
+    {
+        var @case = await NotifiedCaseAsync();
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.CallRequested));
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Confidence = 3 })));
+
+        var after = await ReadCaseAsync(@case.Id);
+        Assert.False(after.Notification!.CallRequested);
+        Assert.False(after.Notification.IsComplete());
+        Assert.Equal(@case.NextAction, after.NextAction);
+        Assert.Equal(3, after.Notification.Confidence);
+    }
+
+    [Fact]
+    public async Task The_timeline_says_where_each_entry_came_from()
+    {
+        var @case = await NotifiedCaseAsync();
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Delivered) with { Origin = EventOrigins.Sms });
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Confidence = 4 })));
+
+        var entries = Rows<TimelineEntryResponse>(await TimelineAsync(@case.Id));
+
+        Assert.Equal(EventOrigins.Hospital, entries.First(e => e.EventType == CaseEventType.ScreeningResultReceived).Origin);
+        Assert.Contains(entries, e => e.EventType == CaseEventType.NotificationUpdated && e.Origin == EventOrigins.Sms);
+        Assert.Contains(entries, e => e.EventType == CaseEventType.NotificationUpdated && e.Origin == EventOrigins.CareLoop && e.ActorRole == DemoRoles.NurseNavigator);
+        Assert.All(entries, e => Assert.Contains(e.Origin, new[] { EventOrigins.Hospital, EventOrigins.CareLoop, EventOrigins.Sms, EventOrigins.Email }));
+    }
+
+    [Fact]
+    public async Task The_timeline_says_what_each_call_outcome_recorded()
+    {
+        var @case = await NotifiedCaseAsync();
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Acknowledged = true, Understood = true, Confidence = 4 })));
+
+        using var scope = _services.CreateScope();
+        var reasons = await Db(scope).AuditEvents.AsNoTracking()
+            .Where(a => a.CaseId == @case.Id && a.ActorRole == DemoRoles.NurseNavigator).Select(a => a.Reason).ToListAsync();
+        Assert.Equal(3, reasons.Count);
+        Assert.Contains("On a call, the patient said they will come.", reasons);
+        Assert.Contains("On a call, the patient said the next step back in their own words.", reasons);
+        Assert.Contains("On a call, the patient rated their confidence 4 out of 5.", reasons);
+    }
+
+    [Fact]
+    public async Task Call_outcome_is_refused_and_audited_when_the_patient_was_never_notified()
+    {
+        var notNotified = await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        Assert.Null(notNotified.Notification);
+
+        var refused = await RecordCallAsync(notNotified.Id, new CallOutcomeRequest { Acknowledged = true, Understood = true });
+
+        Assert.Equal(409, Status(refused));
+        using var scope = _services.CreateScope();
+        var attempt = Assert.Single(await Db(scope).SourceEvents.AsNoTracking().Where(e => e.SourceEventId.StartsWith("call-outcome/")).ToListAsync());
+        Assert.Equal(SourceEventDisposition.Rejected, attempt.Disposition);
+        Assert.Null((await ReadCaseAsync(notNotified.Id)).Notification);
     }
 
     [Fact]
@@ -472,6 +673,25 @@ public sealed class ReadEndpointsTests : IDisposable
         using var scope = _services.CreateScope();
         return await AcknowledgeEscalation.Handle(caseId, escalationId, reason, context,
             scope.ServiceProvider.GetRequiredService<ICaseRepository>(), _pathways, _clock, CancellationToken.None);
+    }
+
+    /// <summary>A reviewed case, so its patient notification has been requested and nothing has come back yet.</summary>
+    private async Task<Case> NotifiedCaseAsync()
+    {
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        _clock.Advance(TimeSpan.FromHours(1));
+        var reviewed = await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        _clock.Advance(TimeSpan.FromMinutes(5));
+        Assert.Equal(NotificationStatus.Sent, reviewed.Notification!.Status);
+        return reviewed;
+    }
+
+    private async Task<IResult> RecordCallAsync(Guid caseId, CallOutcomeRequest request, HttpContext? context = null, string? reason = null)
+    {
+        using var scope = _services.CreateScope();
+        return await RecordCallOutcome.Handle(caseId, reason, request, context ?? Identity(DemoRoles.NurseNavigator),
+            scope.ServiceProvider.GetRequiredService<ICaseRepository>(), scope.ServiceProvider.GetRequiredService<EventIngestor>(),
+            Db(scope), _pathways, _clock, CancellationToken.None);
     }
 
     private async Task<Case> SeedAsync(Case? @case = null)

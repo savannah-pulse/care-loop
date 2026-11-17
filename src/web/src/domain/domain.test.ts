@@ -50,10 +50,28 @@ describe('display stages (decision 19)', () => {
 })
 
 describe('timeline (C3)', () => {
-  it('names where each entry came from in plain words', () => {
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'careloop' })))).toBe('CareLoop')
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'patient-channel' })))).toBe('Patient channel')
-    expect(sourceLabel(timelineSource(timelineEntry({ sourceSystem: 'his-simulator' })))).toBe('Hospital system')
+  it('names where each entry came from, as the API reports it', () => {
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'careloop' })))).toBe('CareLoop')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'sms', eventType: 'NotificationUpdated' })))).toBe('Text message')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'email', eventType: 'NotificationUpdated' })))).toBe('Email')
+    expect(sourceLabel(timelineSource(timelineEntry({ origin: 'hospital', sourceSystem: 'his-simulator' })))).toBe('Hospital system')
+  })
+
+  it('shows what a nurse recorded after a call as recorded in CareLoop, whatever system the case came from', () => {
+    const recorded = timelineEntry({
+      sourceSystem: 'fhc-his',
+      origin: 'careloop',
+      eventType: 'NotificationUpdated',
+      actorReference: 'huda-saleh',
+      actorRole: 'nurse-navigator',
+    })
+    expect(sourceLabel(timelineSource(recorded))).toBe('CareLoop')
+  })
+
+  it('reads an origin it does not know as a hospital system, never as a patient app or portal', () => {
+    for (const origin of ['patient-channel', 'health-app', 'portal']) {
+      expect(sourceLabel(timelineSource(timelineEntry({ origin })))).toBe('Hospital system')
+    }
   })
 
   it('never shows a refused acknowledgement as an acknowledgement', () => {

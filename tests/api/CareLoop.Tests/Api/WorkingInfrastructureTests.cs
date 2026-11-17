@@ -1,14 +1,12 @@
 using CareLoop.Api.Features.Summaries;
 using CareLoop.Api.Infrastructure.Ai;
-using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Time;
-using CareLoop.Domain.Recipients;
 
 namespace CareLoop.Tests.Api;
 
 /// <summary>
-/// The pieces that must work in the scaffold: the system clock, the no-op AI provider and the
-/// not-yet-built SMS and email providers refusing to send.
+/// The pieces that must work in the scaffold: the system clock and the no-op AI provider. The text-message
+/// and email providers are built; <c>SimulatorNotificationProviderTests</c> covers them.
 /// </summary>
 public sealed class WorkingInfrastructureTests
 {
@@ -40,26 +38,5 @@ public sealed class WorkingInfrastructureTests
 
         Assert.False(provider.IsEnabled);
         Assert.Null(await provider.DraftHandoffSummaryAsync(request, CancellationToken.None));
-    }
-
-    [Fact]
-    public void Sms_provider_is_a_stub_that_never_carries_sensitive_content()
-    {
-        var provider = new SmsNotificationProvider();
-        var recipient = new Recipient { Reference = "SYN-PT-0001", Kind = RecipientKind.Patient, Language = "en", ContactPoints = [] };
-
-        Assert.Equal(NotificationChannel.Sms, provider.Channel);
-        Assert.False(provider.AllowsSensitiveContent);
-        Assert.Throws<NotSupportedException>(() => provider.CanReach(recipient));
-    }
-
-    [Fact]
-    public void Email_provider_is_a_stub()
-    {
-        var provider = new EmailNotificationProvider();
-        var recipient = new Recipient { Reference = "SYN-PT-0001", Kind = RecipientKind.Patient, Language = "en", ContactPoints = [] };
-
-        Assert.Equal(NotificationChannel.Email, provider.Channel);
-        Assert.Throws<NotSupportedException>(() => provider.CanReach(recipient));
     }
 }

@@ -61,8 +61,8 @@ Migrations are applied at startup only when `Database:MigrateOnStartup` is `true
 ## Configuration
 
 The base `appsettings.json` configures no external system and no simulator address. `appsettings.Development.json`,
-used by `dotnet run`, adds the HIS simulator as the one external system and points the simulator notification provider
-at both simulators; Docker Compose sets the same through environment variables. Production supplies its own entries.
+used by `dotnet run`, adds the HIS simulator as the one external system, points the `Sms` and `Email` providers at the
+SMS and email simulator and gives each staff role a synthetic address; Docker Compose sets the same through environment variables. Production supplies its own entries.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -70,10 +70,12 @@ at both simulators; Docker Compose sets the same through environment variables. 
 | `Database:MigrateOnStartup` | `false` | Apply migrations when the API starts. |
 | `Pathways:Directory` | `Infrastructure/Pathways` | Folder the pathway definitions are loaded from. Development and Docker Compose use `Infrastructure/Pathways/demo`, which has the same rules with deadlines shortened for live demos. |
 | `ExternalSystems:Systems:{systemId}:BaseUrl` | none | Address of one system of record (HIS, EMR, lab system). Any number may be configured. The key must equal the source system identifier that system sends; messages about a case go back to the system the case came from. |
-| `Notifications:Simulator:PatientChannelBaseUrl` | none | Where the simulator provider sends patient messages (the patient-channel simulator). |
-| `Notifications:Simulator:StaffInboxBaseUrl` | none | Where the simulator provider sends staff messages (the HIS simulator's staff inbox). |
-| `Notifications:Simulator:InboundSecret` | none | Secret shared with the patient-channel simulator. Every message to `POST /notifications/inbound/simulator` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
-| `Notifications:EnabledProviders` | `[ "Simulator" ]` | Enabled notification providers. SMS and email are stubs and must stay off. |
+| `Notifications:Sms:BaseUrl`, `Notifications:Email:BaseUrl` | none | Where each provider posts its messages, as JSON to `{BaseUrl}/messages`. In the prototype both are the SMS and email simulator. CareLoop reaches patients, caregivers and staff by text message and email only. |
+| `Notifications:Sms:InboundSecret`, `Notifications:Email:InboundSecret` | none | Secret each channel's callbacks are signed with. Every message to `POST /notifications/inbound/sms` or `/email` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
+| `Notifications:StaffContacts:{role}:Channel`, `…:Address` | none | How each staff role is notified: `Sms` or `Email`, and its address. An optional `default` entry covers roles with none. A role with neither cannot be reached, and its notices are retried. |
+| `Notifications:TimeZone` | `Asia/Dubai` (UTC when empty) | The IANA time zone messages give dates and times in: appointment times for patients and caregivers, and when the previous escalation level was acknowledged. An unknown zone stops start-up. |
+| `Notifications:FacilityNames:{facilityId}` | none | The name a staff message gives a facility ("A case at Family Health Centre needs your action"). A facility with no entry is named by its identifier in words. |
+| `Notifications:EnabledProviders` | `[ "Sms", "Email" ]` | Enabled notification providers. Only `Sms` and `Email` are accepted; any other name stops the host at start-up. |
 | `Notifications:PerEventOverrides` | `{ }` | Optional provider list per domain event name. |
 | `Outbox:Enabled` | `false` (on in `appsettings.json`) | Run the outbox dispatcher. Test hosts leave it off. |
 | `Outbox:PollInterval` | `00:00:02` | How often the dispatcher looks for due deliveries. |
@@ -127,6 +129,7 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | GET | `/cases/{caseId}` | WS6 |
 | GET | `/cases/{caseId}/timeline` | WS6 |
 | POST | `/cases/{caseId}/escalations/{escalationId}/acknowledgement` | WS6 |
+| POST | `/cases/{caseId}/call-outcome` | WS6 |
 | GET | `/exceptions` | WS6 |
 | GET | `/metrics` | WS6 |
 | GET | `/programmes` | WS6 |
@@ -136,7 +139,9 @@ dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~DeadlinePolicy
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/approval` | WS9 |
 | POST | `/cases/{caseId}/handoff-summary/{summaryId}/rejection` | WS9 |
 
-External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard.
+External systems use `/fhir/...` only. The plain REST routes are for the CareLoop dashboard. Delivery reports and
+replies to text messages and emails arrive at `POST /notifications/inbound/sms` and `/notifications/inbound/email`,
+signed by the service that sent them.
 
 ### Read access and acknowledgement (WS6)
 
@@ -147,7 +152,16 @@ unsupported roles are 403 and malformed headers/filters are 400.
 Staff reads default to their facility (the current team boundary). An explicit different `facilityId`, or a case
 outside that facility, requires a nonblank `reason` of at most 1000 characters. Coordinators have global aggregate
 metrics, but their case reads are limited to cases with an open escalation addressed to the coordinator.
-Names and MRNs are null on coordinator case, detail and exception responses.
+Names, MRNs, patient references and the hospital's result identifier are null on coordinator case, detail and
+exception responses: the coordinator sees CareLoop's case number only.
+
+Each timeline entry has an `origin`: `hospital` (the case's source system), `careloop` (CareLoop itself, including a
+call a nurse recorded and CareLoop's record of what it sent), `sms` or `email` (a delivery report or the patient's reply
+on that channel). Each applied patient-contact entry also says in plain words what it recorded.
+
+Recording a call (`POST /cases/{caseId}/call-outcome`) answers the patient's request for one: the case moves on to
+arranging the follow-up, or, after a rating alone, back to waiting for the acknowledgement. A text reply of `1` never
+cancels a call the patient asked for. The access is written to the read audit with its reason, like a case read.
 Each authorized-identity read records one `CaseReadRecord`; denied facility/role reads use a denied view name.
 Read audits do not change case state and are not timeline events.
 
@@ -178,7 +192,8 @@ Measures use applied audit snapshots only, including source-received progress ra
 - Treatment timeliness uses cases with `treatment-plan` as denominator and subsequent `treatment-started` at or
   before that plan's captured `start-treatment` deadline as numerator. A referral is not completed care.
 - Current and historically reached display-label counts, closure reasons and open exception counts remain distinct.
-- `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
+- A confidence rating is recorded by a nurse navigator after a call (`POST /cases/{caseId}/call-outcome`), never by a
+  text or email reply. `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
   separately averages each case's latest 1-5 rating.
 
 Empty populations have null rates/medians, not zero success. The API does not add simulation labels, a working-hours

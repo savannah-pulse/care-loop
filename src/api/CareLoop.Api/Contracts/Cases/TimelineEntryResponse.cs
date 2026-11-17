@@ -43,4 +43,10 @@ public sealed record TimelineEntryResponse
 
     /// <summary>Reference to the supporting evidence, when there is any.</summary>
     public string? EvidenceReference { get; init; }
+
+    /// <summary>
+    /// Where the entry came from: <c>hospital</c> (the case's source system), <c>careloop</c> (CareLoop itself, including
+    /// a call a nurse recorded), <c>sms</c> or <c>email</c> (a delivery report or the patient's reply on that channel).
+    /// </summary>
+    public required string Origin { get; init; }
 }

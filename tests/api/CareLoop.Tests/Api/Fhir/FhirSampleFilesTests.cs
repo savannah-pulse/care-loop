@@ -29,7 +29,7 @@ public sealed class FhirSampleFilesTests
     {
         string[] expected =
         [
-            "Appointment", "Communication", "CommunicationRequest", "Consent", "DiagnosticReport", "DocumentReference",
+            "Appointment", "Consent", "DiagnosticReport", "DocumentReference",
             "Observation", "Patient", "Procedure", "Provenance", "ServiceRequest", "Task",
         ];
 

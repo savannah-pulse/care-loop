@@ -1,30 +1,18 @@
 namespace PatientChannelSimulator.State;
 
 /// <summary>
-/// The simulated patient-facing channel a message was presented on.
+/// The channel a simulated message arrived on.
 /// </summary>
 /// <remarks>
-/// CareLoop treats channels as system configuration, not patient preference, and may send the
-/// same notification on several channels at once. The simulator keeps the channel on each inbox
-/// message so the UI can show that redundancy and so SMS-safe content can be recognised.
+/// CareLoop reaches patients, caregivers and staff by text message and email only: there is no
+/// health app and no patient portal. It treats channels as system configuration, not preference,
+/// and may send the same notification on both at once.
 /// </remarks>
 public enum InboxChannel
 {
-    /// <summary>A simulated in-app message. May carry the standard (non SMS-safe) template.</summary>
-    App,
-
-    /// <summary>
-    /// A simulated SMS. Only the SMS-safe template is expected here: it carries no sensitive
-    /// detail, only a prompt to open a secure channel.
-    /// </summary>
+    /// <summary>A simulated text message. It has no subject line.</summary>
     Sms,
 
-    /// <summary>A simulated patient-portal message. May carry the standard template.</summary>
-    Portal,
-
-    /// <summary>
-    /// A simulated email. Caregiver copies land here (C13): they are read-only, and nothing done
-    /// with them is ever reported as the patient's.
-    /// </summary>
+    /// <summary>A simulated email, with a subject line.</summary>
     Email,
 }

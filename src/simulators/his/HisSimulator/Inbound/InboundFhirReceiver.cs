@@ -18,8 +18,11 @@ namespace HisSimulator.Inbound;
 /// A notice is filed first and CareLoop's case <c>Task</c> is then read best-effort to learn its id: a failed read never
 /// refuses the notice.</description></item>
 /// <item><description><c>DocumentReference</c>: the approved handoff summary; its text is kept with the inbox item.</description></item>
-/// <item><description><c>CommunicationRequest</c>: a staff notification, if CareLoop sends those as FHIR.</description></item>
 /// </list>
+/// <para>
+/// Direct staff notifications ("a case needs your action") do not arrive here: CareLoop sends those by
+/// text message or email, not as FHIR. What arrives here is what the hospital system is told about a case.
+/// </para>
 /// <para>
 /// Receiving a message never accepts a handoff or acknowledges anything: a notification is not an
 /// acknowledgement. Acceptance or rejection only happens when a person acts and the simulator sends
@@ -77,8 +80,8 @@ public sealed class InboundFhirReceiver
             resource = FhirSupport.Parse(json);
             if (resource.TypeName != resourceType || resourceId is not null && resource.Id != resourceId)
                 throw new ArgumentException("The FHIR resource type and id must match the URL.");
-            if (resource is not (FhirTask or DocumentReference or CommunicationRequest))
-                throw new NotSupportedException("The simulated HIS accepts Task, DocumentReference and CommunicationRequest.");
+            if (resource is not (FhirTask or DocumentReference))
+                throw new NotSupportedException("The simulated HIS accepts Task and DocumentReference.");
             if (resource is FhirTask incomingCase && string.IsNullOrWhiteSpace(incomingCase.Id)
                 && incomingCase.Code?.Coding.Any(c => c.System == FhirSupport.Base + "/CodeSystem/task-code" && c.Code == "case") == true)
                 throw new ArgumentException("A CareLoop case Task must carry its actual logical id.");
@@ -90,7 +93,7 @@ public sealed class InboundFhirReceiver
             string? role = null;
             string? subject = null;
             string? link = null;
-            var kind = StaffInboxItemKind.StaffNotification;
+            var kind = StaffInboxItemKind.Other;
             if (resource is FhirTask task)
             {
                 var code = task.Code?.Coding.FirstOrDefault(c => c.System == FhirSupport.Base + "/CodeSystem/task-code")?.Code;
@@ -104,11 +107,9 @@ public sealed class InboundFhirReceiver
                     "case" when task.Status == FhirTask.TaskStatus.Requested => StaffInboxItemKind.HandoffProposed,
                     "case" when task.Status == FhirTask.TaskStatus.Rejected => StaffInboxItemKind.HandoffRejected,
                     "case" when task.StatusReason?.Coding.Any(c => c.Code == "rejected") == true => StaffInboxItemKind.ReferralRejected,
-                    _ => StaffInboxItemKind.StaffNotification,
+                    _ => StaffInboxItemKind.Other,
                 };
                 recipient = task.Owner?.Identifier?.Value ?? ReferenceId(task.Owner);
-                if (code == "staff-notice" && (string.IsNullOrWhiteSpace(recipient) || string.IsNullOrWhiteSpace(task.Description)))
-                    throw new ArgumentException("A staff notice needs an addressed recipient and message.");
                 role = (task.Owner?.Extension.FirstOrDefault(e => e.Url == FhirSupport.Base + "/StructureDefinition/actor-role")?.Value as Code)?.Value;
                 subject = task.Description ?? task.Code?.Text ?? code ?? task.TypeName;
                 taskId = code == "case" ? task.Id : ReferenceId(task.Focus, "Task");
@@ -122,13 +123,6 @@ public sealed class InboundFhirReceiver
                 taskId = document.Context?.Related.Select(r => ReferenceId(r, "Task")).FirstOrDefault(id => id is not null);
                 var data = document.Content.Select(c => c.Attachment?.Data).FirstOrDefault(d => d is not null);
                 content = data is null ? null : System.Text.Encoding.UTF8.GetString(data);
-            }
-            else if (resource is CommunicationRequest communication)
-            {
-                recipient = communication.Recipient.Select(r => r.Identifier?.Value ?? ReferenceId(r)).FirstOrDefault(id => id is not null);
-                subject = communication.Payload.Select(p => (p.Content as FhirString)?.Value).FirstOrDefault(text => text is not null)
-                    ?? communication.TypeName;
-                taskId = communication.About.Select(r => ReferenceId(r, "Task")).FirstOrDefault(id => id is not null);
             }
             var suppliedLink = System.Text.RegularExpressions.Regex.Match(subject ?? "", @"https?://[^\s]+");
             if (suppliedLink.Success) link = suppliedLink.Value;

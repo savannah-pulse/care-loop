@@ -1,0 +1,1 @@
+[PLACEHOLDER] Your appointment has been booked. Date: {{appointmentDate}}. Time: {{appointmentTime}}. Place: {{place}}. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Reference: {{caseReference}}

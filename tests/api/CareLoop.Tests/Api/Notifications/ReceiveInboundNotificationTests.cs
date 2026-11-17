@@ -1,11 +1,11 @@
 using System.Text;
-using CareLoop.Api.Features.Fhir;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Contracts.Events;
 using CareLoop.Domain.Recipients;
 using CareLoop.Domain.Tracks;
-using Hl7.Fhir.Model;
+using CareLoop.Contracts.Events.Payloads;
+using CareLoop.Tests.Fakes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
@@ -24,11 +24,11 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     public void Dispose() => _store.Dispose();
 
     [Fact]
-    public async System.Threading.Tasks.Task Message_for_an_enabled_provider_is_translated_and_ingested()
+    public async Task Message_for_an_enabled_provider_is_translated_and_ingested()
     {
         var caseId = await PatientNotifiedAsync();
 
-        var status = await PostAsync("simulator", Report(caseId, StatusMap.DeliveryStatusCategory));
+        var status = await PostAsync("sms", Delivery(caseId));
 
         Assert.Equal(StatusCodes.Status200OK, status);
         var @case = await _store.TheCaseAsync();
@@ -37,14 +37,14 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Redelivered_message_is_deduplicated()
+    public async Task Redelivered_message_is_deduplicated()
     {
         var caseId = await PatientNotifiedAsync();
-        var body = Report(caseId, StatusMap.AcknowledgementCategory);
+        var body = Reply(caseId, "1");
 
-        Assert.Equal(StatusCodes.Status200OK, await PostAsync("Simulator", body));
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("Sms", body));
         var afterFirst = await _store.TheCaseAsync();
-        Assert.Equal(StatusCodes.Status200OK, await PostAsync("Simulator", body));
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("Sms", body));
 
         var afterSecond = await _store.TheCaseAsync();
         Assert.Equal(NotificationStatus.Acknowledged, afterSecond.Notification!.Status);
@@ -52,34 +52,62 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Unknown_provider_returns_404()
+    public async Task Unknown_provider_returns_404()
     {
         var caseId = await PatientNotifiedAsync();
-        var body = Report(caseId, StatusMap.AcknowledgementCategory);
+        var body = Reply(caseId, "1");
 
         Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("pigeon", body));
-        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("0", body));
+        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("simulator", body));
+        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("1", body));
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Provider_that_is_not_enabled_returns_404()
+    public async Task Provider_that_is_not_enabled_returns_404()
     {
         var caseId = await PatientNotifiedAsync();
-        var body = Report(caseId, StatusMap.AcknowledgementCategory);
+        var body = Reply(caseId, "1");
 
-        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("simulator", body, enabled: ["Sms"]));
-        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("sms", body, enabled: ["Simulator", "Sms"]));
+        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("sms", body, enabled: ["Email"]));
+        Assert.Equal(StatusCodes.Status404NotFound, await PostAsync("email", body, enabled: ["Sms"]));
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Message_that_cannot_be_verified_returns_401()
+    public async Task Provider_switched_on_only_for_one_event_still_hears_back()
+    {
+        var caseId = await PatientNotifiedAsync();
+        var overrides = new Dictionary<string, List<string>> { ["NotificationRequested"] = ["Sms"] };
+
+        // SMS is not enabled in general, but patient notifications go out by SMS, so their replies must be heard.
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Reply(caseId, "1"), enabled: ["Email"], overrides: overrides));
+    }
+
+    [Theory]
+    [InlineData(" Sms ")]
+    [InlineData("Sms, Email")]
+    [InlineData("1")]
+    [InlineData("Simulator")]
+    public void A_provider_name_that_is_not_exactly_a_channel_is_refused_at_start_up(string name)
+    {
+        Assert.False(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { EnabledProviders = [name] }));
+        Assert.False(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { PerEventOverrides = new() { ["EscalationRaised"] = [name] } }));
+    }
+
+    [Fact]
+    public void Channel_names_are_accepted_in_any_case()
+    {
+        Assert.True(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { EnabledProviders = ["sms", "EMAIL"] }));
+    }
+
+    [Fact]
+    public async Task Message_that_cannot_be_verified_returns_401()
     {
         await using var db = _store.NewContext();
         var result = await ReceiveInboundNotification.Handle(
-            "simulator",
+            "sms",
             Request("{}"),
-            [new UnverifiableHandler()],
-            Options.Create(new NotificationOptions { EnabledProviders = ["Simulator"] }),
+            [new StubHandler(() => throw new UnauthorizedAccessException("The signature does not match."))],
+            Options.Create(new NotificationOptions { EnabledProviders = ["Sms"] }),
             _store.Ingestor(db),
             CancellationToken.None);
 
@@ -87,12 +115,12 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Unsigned_simulator_message_returns_401_and_changes_nothing()
+    public async Task Unsigned_simulator_message_returns_401_and_changes_nothing()
     {
         var caseId = await PatientNotifiedAsync();
         var before = await _store.TheCaseAsync();
 
-        Assert.Equal(StatusCodes.Status401Unauthorized, await PostAsync("simulator", Report(caseId, StatusMap.AcknowledgementCategory), signed: false));
+        Assert.Equal(StatusCodes.Status401Unauthorized, await PostAsync("sms", Reply(caseId, "1"), signed: false));
 
         var after = await _store.TheCaseAsync();
         Assert.Equal(before.Version, after.Version);
@@ -100,53 +128,93 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Message_in_the_wrong_format_returns_400()
+    public async Task Message_in_the_wrong_format_returns_400()
     {
-        await _store.ReviewedCaseAsync();
+        var caseId = await PatientNotifiedAsync();
 
-        Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync("simulator", "{ not json"));
-        Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync("simulator", FhirJsonCodec.Serialize(new Patient { Id = "SYN-PT-0001" })));
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync("sms", "{ not json"));
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync("sms", """{ "resourceType": "Communication", "type": "reply" }"""));
+        Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync("sms", Reply(caseId, "1", from: "SYN-TEL-9999")));
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Event_refused_by_a_rule_returns_422()
+    public async Task Event_refused_by_a_rule_returns_422()
     {
         // A confidence rating outside 1 to 5 is refused by the notification rule.
+        await PatientNotifiedAsync();
+        var refused = Envelopes.Notification(_store.Clock.UtcNow, NotificationUpdateKind.ConfidenceRated, confidence: 9);
+        await using var db = _store.NewContext();
+
+        var result = await ReceiveInboundNotification.Handle(
+            "sms",
+            Request("{}"),
+            [new StubHandler(() => [refused])],
+            Options.Create(new NotificationOptions { EnabledProviders = ["Sms"] }),
+            _store.Ingestor(db),
+            CancellationToken.None);
+
+        Assert.Equal(StatusCodes.Status422UnprocessableEntity, StatusOf(result));
+    }
+
+    [Fact]
+    public async Task A_reply_to_the_appointment_message_counts_and_its_delivery_does_not_touch_the_track()
+    {
         var caseId = await PatientNotifiedAsync();
+        await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled,
+            scheduledFor: _store.Clock.UtcNow.AddDays(3), location: "SYN Breast Imaging Clinic"));
+        var scheduled = Assert.Single(await _store.RaisedAsync<CareLoop.Domain.Events.DomainEvents.AppointmentScheduled>());
+        var patient = (await _store.TheCaseAsync()).PatientReference;
+        _attemptId = NotificationSender.AttemptIdFor(scheduled.EventId, patient, NotificationChannel.Sms);
+        var before = await _store.TheCaseAsync();
 
-        var status = await PostAsync("simulator", Report(caseId, StatusMap.ConfidenceRatingCategory, payload: "9"));
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Delivery(caseId)));
+        Assert.Equal(before.Version, (await _store.TheCaseAsync()).Version);
 
-        Assert.Equal(StatusCodes.Status422UnprocessableEntity, status);
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Reply(caseId, "1")));
+        Assert.Equal(NotificationStatus.Acknowledged, (await _store.TheCaseAsync()).Notification!.Status);
     }
 
     /// <summary>Reviews a case so its patient notification goes out, and points <see cref="_attemptId"/> at that attempt.</summary>
-    private async System.Threading.Tasks.Task<Guid> PatientNotifiedAsync()
+    private async Task<Guid> PatientNotifiedAsync()
     {
         var requested = await _store.ReviewedCaseAsync();
-        _attemptId = NotificationSender.AttemptIdFor(requested.EventId, requested.PatientReference, NotificationChannel.Simulator);
+        _attemptId = NotificationSender.AttemptIdFor(requested.EventId, requested.PatientReference, NotificationChannel.Sms);
         return requested.CaseId;
     }
 
-    private string Report(Guid caseId, string category, string? payload = null) => FhirJsonCodec.Serialize(new Communication
+    private string Delivery(Guid caseId) => Body(new SimulatorCallback
     {
-        Payload = payload is null ? [] : [new Communication.PayloadComponent { Content = new FhirString(payload) }],
-        Id = $"SYN-COMM-{category}",
-        Meta = new Meta { VersionId = "1" },
-        Status = EventStatus.Completed,
-        Category = [new CodeableConcept(StatusMap.CommunicationCategorySystem, category)],
-        BasedOn = [new ResourceReference($"CommunicationRequest/{_attemptId:D}")],
-        About = [new ResourceReference($"Task/{caseId:D}")],
-        SentElement = new FhirDateTime(_store.Clock.UtcNow),
+        Type = "delivery",
+        MessageId = _attemptId.ToString("D"),
+        Status = "delivered",
+        At = _store.Clock.UtcNow,
+        Metadata = new SimulatorMetadata { CaseId = caseId.ToString("D"), Audience = "patient" },
     });
 
-    private async System.Threading.Tasks.Task<int> PostAsync(string provider, string body, string[]? enabled = null, bool signed = true)
+    private string Reply(Guid caseId, string text, string from = Envelopes.PatientPhone) => Body(new SimulatorCallback
+    {
+        Type = "reply",
+        ReplyId = $"{_attemptId:D}-r1",
+        InReplyTo = _attemptId.ToString("D"),
+        From = from,
+        Text = text,
+        At = _store.Clock.UtcNow,
+        Metadata = new SimulatorMetadata { CaseId = caseId.ToString("D"), Audience = "patient" },
+    });
+
+    private static string Body(SimulatorCallback callback) =>
+        System.Text.Json.JsonSerializer.Serialize(callback, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+    private async Task<int> PostAsync(string provider, string body, string[]? enabled = null, bool signed = true, Dictionary<string, List<string>>? overrides = null)
     {
         await using var db = _store.NewContext();
+        var simulator = NotificationTestSupport.Simulator(inboundSecret: Secret);
+        var recipients = NotificationTestSupport.Resolver(db);
         var result = await ReceiveInboundNotification.Handle(
             provider,
             Request(body, signed ? SimulatorInboundNotificationHandler.SignatureFor(body, Secret) : null),
-            [new SimulatorInboundNotificationHandler(db, Options.Create(new SimulatorNotificationOptions { InboundSecret = Secret }))],
-            Options.Create(new NotificationOptions { EnabledProviders = [.. enabled ?? ["Simulator"]] }),
+            [new SmsInboundNotificationHandler(db, recipients, simulator), new EmailInboundNotificationHandler(db, recipients, simulator)],
+            Options.Create(new NotificationOptions { EnabledProviders = [.. enabled ?? ["Sms", "Email"]], PerEventOverrides = overrides ?? [] }),
             _store.Ingestor(db),
             CancellationToken.None);
         return StatusOf(result);
@@ -158,7 +226,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     private static HttpRequest Request(string body, string? signature = null)
     {
         var context = new DefaultHttpContext();
-        context.Request.ContentType = FhirEndpoints.FhirJson;
+        context.Request.ContentType = "application/json";
         if (signature is not null)
         {
             context.Request.Headers[SimulatorInboundNotificationHandler.SignatureHeader] = signature;
@@ -168,11 +236,11 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
         return context.Request;
     }
 
-    private sealed class UnverifiableHandler : IInboundNotificationHandler
+    private sealed class StubHandler(Func<IReadOnlyList<EventEnvelope>> translate) : IInboundNotificationHandler
     {
-        public NotificationChannel Channel => NotificationChannel.Simulator;
+        public NotificationChannel Channel => NotificationChannel.Sms;
 
-        public System.Threading.Tasks.Task<IReadOnlyList<EventEnvelope>> TranslateAsync(InboundNotificationMessage message, CancellationToken ct) =>
-            throw new UnauthorizedAccessException("The signature does not match.");
+        public Task<IReadOnlyList<EventEnvelope>> TranslateAsync(InboundNotificationMessage message, CancellationToken ct) =>
+            Task.FromResult(translate());
     }
 }

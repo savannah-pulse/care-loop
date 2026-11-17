@@ -442,7 +442,8 @@ h1 {
   border-color: var(--accent-ink);
 }
 
-.btn:disabled {
+.btn:disabled,
+.btn[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.6;
 }
@@ -2785,4 +2786,69 @@ a.name:focus-visible {
 
 .rules-more .rules {
   margin-block-start: 8px;
+}
+
+/* Call outcome: what a nurse navigator records after a call with the patient */
+.call-card .card-title {
+  margin-block-end: 4px;
+}
+
+.call-form {
+  display: grid;
+  gap: 12px;
+  margin-block: 12px;
+}
+
+.call-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-block-size: var(--target);
+  cursor: pointer;
+}
+
+.call-check input,
+.call-rating input {
+  flex: none;
+  inline-size: 20px;
+  block-size: 20px;
+  margin-block-start: 2px;
+  accent-color: var(--accent);
+}
+
+.call-rating {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.call-rating legend {
+  padding: 0;
+  margin-block-end: 8px;
+  font-weight: 600;
+}
+
+/* "Not asked" sits on its own line, so 1 to 5 always reads as one scale on one row. */
+.call-rating-options {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px 14px;
+}
+
+.call-not-asked,
+.call-rating-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-block-size: var(--target);
+  cursor: pointer;
+}
+
+.call-form .btn {
+  justify-self: start;
+}
+
+.call-current {
+  font-weight: 600;
 }

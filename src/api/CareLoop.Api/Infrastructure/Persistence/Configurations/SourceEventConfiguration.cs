@@ -26,6 +26,7 @@ public sealed class SourceEventConfiguration : IEntityTypeConfiguration<SourceEv
         builder.Property(e => e.Disposition).HasConversion<string>().HasMaxLength(40);
         builder.Property(e => e.DispositionReason).HasMaxLength(1000);
         builder.Property(e => e.EvidenceReference).HasMaxLength(200);
+        builder.Property(e => e.Origin).HasMaxLength(20);
         builder.Property(e => e.PayloadJson).IsRequired();
 
         builder.HasIndex(e => new { e.SourceSystem, e.SourceEventId }).IsUnique();

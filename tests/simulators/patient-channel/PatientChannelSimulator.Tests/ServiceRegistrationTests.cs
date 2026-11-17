@@ -23,18 +23,12 @@ public class ServiceRegistrationTests
         var services = scope.ServiceProvider;
 
         Assert.NotNull(services.GetRequiredService<SimulatorStore>());
-        Assert.NotNull(services.GetRequiredService<CareLoopFhirClient>());
-        Assert.NotNull(services.GetRequiredService<DeliveredCommunicationBuilder>());
-        Assert.NotNull(services.GetRequiredService<DeliveryFailedCommunicationBuilder>());
-        Assert.NotNull(services.GetRequiredService<AcknowledgementCommunicationBuilder>());
-        Assert.NotNull(services.GetRequiredService<TeachBackCommunicationBuilder>());
-        Assert.NotNull(services.GetRequiredService<CallMeCommunicationBuilder>());
-        Assert.NotNull(services.GetRequiredService<PatientResponseSender>());
-        Assert.NotNull(services.GetRequiredService<CaseStatusReader>());
-        Assert.NotNull(services.GetRequiredService<CommunicationRequestMapper>());
+        Assert.NotNull(services.GetRequiredService<CareLoopCallbackClient>());
+        Assert.NotNull(services.GetRequiredService<ReplySender>());
         Assert.NotNull(services.GetRequiredService<DeliverySimulator>());
         Assert.NotNull(services.GetRequiredService<AutomaticResponder>());
-        Assert.NotNull(services.GetRequiredService<CommunicationRequestReceiver>());
+        Assert.NotNull(services.GetRequiredService<DeliveryReportRetrier>());
+        Assert.NotNull(services.GetRequiredService<MessageReceiver>());
         Assert.NotNull(services.GetRequiredService<ScenarioLoader>());
         Assert.NotNull(services.GetRequiredService<ScenarioRunner>());
     }

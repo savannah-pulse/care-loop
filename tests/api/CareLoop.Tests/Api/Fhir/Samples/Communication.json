@@ -1,9 +1,0 @@
-{
-  "resourceType": "Communication",
-  "id": "SYN-COMM-0001",
-  "meta": { "tag": [ { "system": "https://careloop.invalid/fhir/CodeSystem/data-origin", "code": "simulated", "display": "SIMULATED - synthetic data" } ] },
-  "status": "completed",
-  "category": [ { "text": "PLACEHOLDER - synthetic, not a clinical code" } ],
-  "subject": { "reference": "Patient/SYN-PT-0001" },
-  "sent": "2026-01-01T10:00:00Z"
-}
