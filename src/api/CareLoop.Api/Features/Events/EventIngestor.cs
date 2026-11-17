@@ -137,7 +137,7 @@ public sealed class EventIngestor
             ReceivedAt = _clock.UtcNow,
             PayloadJson = JsonSerializer.Serialize(envelope.Payload, envelope.Payload.GetType(), PayloadSerializerOptions),
             Disposition = result.Applied ? SourceEventDisposition.Applied : SourceEventDisposition.Rejected,
-            DispositionReason = result.RejectionReason,
+            DispositionReason = result.Applied ? result.Summary : result.RejectionReason,
             EvidenceReference = result.EvidenceReference,
         };
 

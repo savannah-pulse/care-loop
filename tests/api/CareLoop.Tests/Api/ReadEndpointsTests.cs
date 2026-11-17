@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using CareLoop.Api.Features.Cases;
 using CareLoop.Api.Features.Events;
+using CareLoop.Api.Features.Events.Handlers;
 using CareLoop.Api.Features.Exceptions;
 using CareLoop.Api.Features.Metrics;
 using CareLoop.Api.Features.Programmes;
@@ -441,6 +442,68 @@ public sealed class ReadEndpointsTests : IDisposable
 
         var withReason = await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true }, elsewhere, "SYN covering the clinic's calls today");
         Assert.Equal(200, Status(withReason));
+
+        // The answer is the whole case, so both attempts are in the read audit, the second with its reason.
+        using var scope = _services.CreateScope();
+        var reads = await Db(scope).CaseReads.AsNoTracking().Where(r => r.CaseId == @case.Id && r.View.StartsWith(RecordCallOutcome.AuditView)).ToListAsync();
+        Assert.Equal(2, reads.Count);
+        Assert.All(reads, r => Assert.True(r.OutsideTeam));
+        Assert.Single(reads, r => r.View == RecordCallOutcome.AuditView + "-denied" && r.Reason is null);
+        Assert.Single(reads, r => r.View == RecordCallOutcome.AuditView && r.Reason == "SYN covering the clinic's calls today");
+    }
+
+    [Fact]
+    public async Task Recording_a_call_answers_the_patients_request_for_one()
+    {
+        var @case = await NotifiedCaseAsync();
+        var asked = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.CallRequested));
+        Assert.Equal(NotificationUpdateHandler.CallPatientAction, asked.NextAction);
+        Assert.True(asked.Notification!.CallRequested);
+
+        // A text-message "will come" after asking for a call does not ring the patient back.
+        var replied = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        Assert.Equal(NotificationUpdateHandler.CallPatientAction, replied.NextAction);
+        Assert.True(replied.Notification!.CallRequested);
+
+        _clock.Advance(TimeSpan.FromMinutes(30));
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Understood = true })));
+
+        var after = await ReadCaseAsync(@case.Id);
+        Assert.False(after.Notification!.CallRequested);
+        Assert.Equal(HandlerSupport.ArrangeFollowUpAction, after.NextAction);
+        Assert.True(after.DueAt > asked.DueAt);
+        Assert.Equal(@case.Owner, after.Owner);
+    }
+
+    [Fact]
+    public async Task A_call_with_only_a_rating_goes_back_to_waiting_for_the_acknowledgement()
+    {
+        var @case = await NotifiedCaseAsync();
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.CallRequested));
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Confidence = 3 })));
+
+        var after = await ReadCaseAsync(@case.Id);
+        Assert.False(after.Notification!.CallRequested);
+        Assert.False(after.Notification.IsComplete());
+        Assert.Equal(@case.NextAction, after.NextAction);
+        Assert.Equal(3, after.Notification.Confidence);
+    }
+
+    [Fact]
+    public async Task The_timeline_says_what_each_call_outcome_recorded()
+    {
+        var @case = await NotifiedCaseAsync();
+
+        Assert.Equal(200, Status(await RecordCallAsync(@case.Id, new CallOutcomeRequest { Acknowledged = true, Understood = true, Confidence = 4 })));
+
+        using var scope = _services.CreateScope();
+        var reasons = await Db(scope).AuditEvents.AsNoTracking()
+            .Where(a => a.CaseId == @case.Id && a.ActorRole == DemoRoles.NurseNavigator).Select(a => a.Reason).ToListAsync();
+        Assert.Equal(3, reasons.Count);
+        Assert.Contains("On a call, the patient said they will come.", reasons);
+        Assert.Contains("On a call, the patient said the next step back in their own words.", reasons);
+        Assert.Contains("On a call, the patient rated their confidence 4 out of 5.", reasons);
     }
 
     [Fact]
@@ -600,7 +663,7 @@ public sealed class ReadEndpointsTests : IDisposable
         using var scope = _services.CreateScope();
         return await RecordCallOutcome.Handle(caseId, reason, request, context ?? Identity(DemoRoles.NurseNavigator),
             scope.ServiceProvider.GetRequiredService<ICaseRepository>(), scope.ServiceProvider.GetRequiredService<EventIngestor>(),
-            _pathways, _clock, CancellationToken.None);
+            Db(scope), _pathways, _clock, CancellationToken.None);
     }
 
     private async Task<Case> SeedAsync(Case? @case = null)

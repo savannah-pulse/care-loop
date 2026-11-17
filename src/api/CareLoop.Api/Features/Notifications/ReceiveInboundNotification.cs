@@ -10,7 +10,8 @@ namespace CareLoop.Api.Features.Notifications;
 /// </summary>
 /// <remarks>
 /// Finds the <see cref="IInboundNotificationHandler"/> of the named provider, but only when that
-/// provider is listed in <see cref="NotificationOptions.EnabledProviders"/>, passes it the raw request,
+/// provider is switched on for some message (<see cref="NotificationOptions.IsUsed"/>: enabled, or named in a
+/// per-event override), passes it the raw request,
 /// and hands every resulting envelope to <c>EventIngestor</c>. The slice holds no business logic and
 /// never changes a case itself. This is the only way a delivery report or a patient reply enters
 /// CareLoop; it is not a general event endpoint, because the handler accepts only its own provider's format.
@@ -62,7 +63,7 @@ public static class ReceiveInboundNotification
         var enabled = Enum.TryParse<NotificationChannel>(provider, ignoreCase: true, out var channel)
             && Enum.IsDefined(channel)
             && !int.TryParse(provider, out _)
-            && options.Value.EnabledProviders.Contains(channel.ToString(), StringComparer.OrdinalIgnoreCase);
+            && options.Value.IsUsed(channel);
         var handler = enabled ? handlers.FirstOrDefault(h => h.Channel == channel) : null;
         if (handler is null)
         {

@@ -30,9 +30,18 @@ public sealed class NotificationOptions
         return options.EnabledProviders.Concat(options.PerEventOverrides.Values.SelectMany(v => v)).All(IsKnown);
     }
 
+    /// <summary>
+    /// Tells whether a channel is switched on for any message: named in <see cref="EnabledProviders"/> or in any
+    /// <see cref="PerEventOverrides"/> entry.
+    /// </summary>
+    /// <param name="channel">The channel to check.</param>
+    /// <returns><see langword="true"/> when some message may be sent on it, so its delivery reports and replies must be heard.</returns>
+    public bool IsUsed(CareLoop.Domain.Recipients.NotificationChannel channel) =>
+        EnabledProviders.Concat(PerEventOverrides.Values.SelectMany(v => v))
+            .Contains(channel.ToString(), StringComparer.OrdinalIgnoreCase);
+
+    // Exactly a channel's name, ignoring case only, as the sender and the inbound endpoint compare it:
+    // Enum.TryParse would also accept " Sms " or "Sms, Email", which then match no provider.
     private static bool IsKnown(string name) =>
-        !string.IsNullOrWhiteSpace(name)
-        && !int.TryParse(name, out _)
-        && Enum.TryParse<CareLoop.Domain.Recipients.NotificationChannel>(name, ignoreCase: true, out var channel)
-        && Enum.IsDefined(channel);
+        Enum.GetNames<CareLoop.Domain.Recipients.NotificationChannel>().Contains(name, StringComparer.OrdinalIgnoreCase);
 }

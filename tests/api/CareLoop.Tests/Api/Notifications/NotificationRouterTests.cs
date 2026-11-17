@@ -98,7 +98,8 @@ public sealed class NotificationRouterTests : IDisposable
         {
             Assert.Equal(NotificationRouter.StaffTemplateKey, message.TemplateKey);
             var text = $"{message.Subject} {message.Body}";
-            Assert.Contains(NotificationRouter.HisLinkFor(@case.Id), text);
+            Assert.Contains(NotificationRouter.CaseReferenceFor(@case.Id), text);
+            Assert.DoesNotContain("Task/", text);
             foreach (var patientDetail in new[] { "SYN-PT-0001", "SYNTHETIC Patient One", "SYN-MRN-0001", Envelopes.PatientPhone, Envelopes.PatientEmail, Envelopes.ResultId, "out of area" })
             {
                 Assert.DoesNotContain(patientDetail, text);
@@ -132,7 +133,10 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(before.DueAt, after.DueAt);
         Assert.Equal(before.NextAction, after.NextAction);
         Assert.Equal(before.Notification!.Status, after.Notification!.Status);
-        Assert.Equal(before.Version, after.Version);
+        // The one thing written is the send itself, recorded on the track before it went out.
+        var sent = Assert.Single(after.Notification.Attempts);
+        Assert.Equal(NotificationAttemptStatus.Sent, sent.Status);
+        Assert.Equal(_email.Sent[0].AttemptId, sent.Id);
     }
 
     [Fact]
@@ -292,18 +296,43 @@ public sealed class NotificationRouterTests : IDisposable
     }
 
     [Fact]
-    public async Task Patient_refusal_on_one_channel_is_not_recorded_while_another_channel_accepted()
+    public async Task Patient_refusal_on_one_channel_does_not_mark_unreachable_while_another_channel_is_on_its_way()
     {
-        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false) { Reach = _ => true };
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false)
+        {
+            Answer = _ => new SendResult { Accepted = false, FailureReason = "PLACEHOLDER: gateway down" },
+        };
         var requested = await _store.ReviewedCaseAsync();
+        var before = await _store.TheCaseAsync();
 
         await RouteAsync(requested, sms);
 
         Assert.Single(_email.Sent);
         var @case = await _store.TheCaseAsync();
-        Assert.Empty(@case.Notification!.Attempts);
+        Assert.Equal(NotificationAttemptStatus.Failed, Assert.Single(@case.Notification!.Attempts, a => a.Channel == NotificationChannel.Sms).Status);
+        Assert.Equal(NotificationAttemptStatus.Sent, Assert.Single(@case.Notification.Attempts, a => a.Channel == NotificationChannel.Email).Status);
         Assert.Equal(NotificationStatus.Sent, @case.Notification.Status);
         Assert.False(@case.Exceptions.HasFlag(CaseExceptions.Unreachable));
+        Assert.Equal(before.NextAction, @case.NextAction);
+    }
+
+    [Fact]
+    public async Task Every_reachable_channel_is_on_the_track_before_anything_is_sent()
+    {
+        var requested = await _store.ReviewedCaseAsync();
+        var sms = new FakeProvider(NotificationChannel.Sms, allowsSensitiveContent: false);
+        IReadOnlyList<Guid> knownWhenSmsWasSent = [];
+        sms.Answer = m =>
+        {
+            // What a delivery report arriving during this send would be judged against.
+            knownWhenSmsWasSent = [.. _store.TheCaseAsync().GetAwaiter().GetResult().Notification!.Attempts.Select(a => a.Id)];
+            return new SendResult { Accepted = true };
+        };
+
+        await RouteAsync(requested, sms);
+
+        Assert.Equal(2, knownWhenSmsWasSent.Count);
+        Assert.Contains(_email.Sent[0].AttemptId, knownWhenSmsWasSent);
     }
 
     private const string CaregiverInbox = "SYN-CAREGIVER-INBOX-0001";

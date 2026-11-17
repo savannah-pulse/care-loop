@@ -73,6 +73,33 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     }
 
     [Fact]
+    public async Task Provider_switched_on_only_for_one_event_still_hears_back()
+    {
+        var caseId = await PatientNotifiedAsync();
+        var overrides = new Dictionary<string, List<string>> { ["NotificationRequested"] = ["Sms"] };
+
+        // SMS is not enabled in general, but patient notifications go out by SMS, so their replies must be heard.
+        Assert.Equal(StatusCodes.Status200OK, await PostAsync("sms", Reply(caseId, "1"), enabled: ["Email"], overrides: overrides));
+    }
+
+    [Theory]
+    [InlineData(" Sms ")]
+    [InlineData("Sms, Email")]
+    [InlineData("1")]
+    [InlineData("Simulator")]
+    public void A_provider_name_that_is_not_exactly_a_channel_is_refused_at_start_up(string name)
+    {
+        Assert.False(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { EnabledProviders = [name] }));
+        Assert.False(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { PerEventOverrides = new() { ["EscalationRaised"] = [name] } }));
+    }
+
+    [Fact]
+    public void Channel_names_are_accepted_in_any_case()
+    {
+        Assert.True(NotificationOptions.NamesOnlyKnownProviders(new NotificationOptions { EnabledProviders = ["sms", "EMAIL"] }));
+    }
+
+    [Fact]
     public async Task Message_that_cannot_be_verified_returns_401()
     {
         await using var db = _store.NewContext();
@@ -160,7 +187,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
     private static string Body(SimulatorCallback callback) =>
         System.Text.Json.JsonSerializer.Serialize(callback, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
 
-    private async Task<int> PostAsync(string provider, string body, string[]? enabled = null, bool signed = true)
+    private async Task<int> PostAsync(string provider, string body, string[]? enabled = null, bool signed = true, Dictionary<string, List<string>>? overrides = null)
     {
         await using var db = _store.NewContext();
         var simulator = NotificationTestSupport.Simulator(inboundSecret: Secret);
@@ -169,7 +196,7 @@ public sealed class ReceiveInboundNotificationTests : IDisposable
             provider,
             Request(body, signed ? SimulatorInboundNotificationHandler.SignatureFor(body, Secret) : null),
             [new SmsInboundNotificationHandler(db, recipients, simulator), new EmailInboundNotificationHandler(db, recipients, simulator)],
-            Options.Create(new NotificationOptions { EnabledProviders = [.. enabled ?? ["Sms", "Email"]] }),
+            Options.Create(new NotificationOptions { EnabledProviders = [.. enabled ?? ["Sms", "Email"]], PerEventOverrides = overrides ?? [] }),
             _store.Ingestor(db),
             CancellationToken.None);
         return StatusOf(result);

@@ -55,17 +55,32 @@ describe('call outcome card', () => {
     expect(screen.getByRole('button', { name: 'Record call outcome' })).toBeDisabled()
   })
 
-  it('keeps what was ticked and says why when the API refuses', async () => {
+  it('keeps what was ticked, says why and has the timeline read again when the API refuses', async () => {
     record.mockResolvedValue({ ok: false, failure: { kind: 'conflict', status: 409 } })
     const onRecorded = vi.fn()
-    render(<CallOutcomeCard detail={detail} offer="open" onRecorded={onRecorded} />)
+    const onConflict = vi.fn()
+    render(<CallOutcomeCard detail={detail} offer="open" onRecorded={onRecorded} onConflict={onConflict} />)
 
     await userEvent.click(screen.getByRole('checkbox', { name: /will come/ }))
     await userEvent.click(screen.getByRole('button', { name: 'Record call outcome' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('This could not be recorded.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Not everything was recorded.')
+    expect(screen.getByRole('alert')).toHaveTextContent('on the timeline below')
     expect(screen.getByRole('checkbox', { name: /will come/ })).toBeChecked()
     expect(onRecorded).not.toHaveBeenCalled()
+    expect(onConflict).toHaveBeenCalledOnce()
+  })
+
+  it('does not read the timeline again for a refusal that saved nothing', async () => {
+    record.mockResolvedValue({ ok: false, failure: { kind: 'forbidden', status: 403 } })
+    const onConflict = vi.fn()
+    render(<CallOutcomeCard detail={detail} offer="open" onRecorded={vi.fn()} onConflict={onConflict} />)
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /will come/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Record call outcome' }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Only a nurse navigator')
+    expect(onConflict).not.toHaveBeenCalled()
   })
 
   it('shows the rating already on record', () => {

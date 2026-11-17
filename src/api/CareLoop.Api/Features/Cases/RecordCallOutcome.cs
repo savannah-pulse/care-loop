@@ -1,6 +1,7 @@
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Infrastructure.Auth;
+using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Cases;
 using CareLoop.Contracts.Events;
 using CareLoop.Contracts.Events.Payloads;
@@ -33,6 +34,9 @@ namespace CareLoop.Api.Features.Cases;
 /// </remarks>
 public static class RecordCallOutcome
 {
+    /// <summary>The view key the access is recorded under in the read audit; a refused attempt appends <c>-denied</c>.</summary>
+    public const string AuditView = "call-outcome";
+
     /// <summary>Maps the call-outcome route.</summary>
     /// <param name="routes">The route builder.</param>
     /// <returns>The same route builder.</returns>
@@ -51,6 +55,7 @@ public static class RecordCallOutcome
     /// <param name="context">The staff identity.</param>
     /// <param name="repository">Reads the case to check access and to answer with its new state.</param>
     /// <param name="ingestor">The single intake pipeline the outcomes are recorded through.</param>
+    /// <param name="db">Records the access to the case, as every read of a case is recorded.</param>
     /// <param name="pathways">The display-label rules.</param>
     /// <param name="clock">The time the outcome is recorded at.</param>
     /// <param name="ct">Cancels the request.</param>
@@ -60,7 +65,7 @@ public static class RecordCallOutcome
     /// rule refused an outcome (for example no notification was ever requested for the case).
     /// </returns>
     public static async Task<IResult> Handle(Guid caseId, [FromQuery] string? reason, [FromBody] CallOutcomeRequest request,
-        HttpContext context, ICaseRepository repository, EventIngestor ingestor, IPathwayProvider pathways, IClock clock, CancellationToken ct)
+        HttpContext context, ICaseRepository repository, EventIngestor ingestor, CareLoopDbContext db, IPathwayProvider pathways, IClock clock, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
@@ -74,7 +79,12 @@ public static class RecordCallOutcome
 
         var @case = await repository.GetAsync(caseId, ct);
         if (@case is null) return Results.NotFound();
-        if (ReadAccess.CasePermission(@case, actor, reason) is { } refusal) return refusal;
+
+        // The answer is the full case, so the access is recorded, with its reason, exactly as a read of the case is.
+        var outside = actor.Role != DemoRoles.Coordinator && @case.FacilityId != actor.FacilityId;
+        var refusal = ReadAccess.CasePermission(@case, actor, reason);
+        await ReadAccess.AuditAsync(db, actor, clock, refusal is null ? AuditView : AuditView + "-denied", caseId, outside, reason, null, ct);
+        if (refusal is not null) return refusal;
 
         // The same call, so the same time and the same reference; one event per outcome keeps them apart.
         var now = clock.UtcNow;

@@ -71,9 +71,11 @@ interface CaseViewProps {
   readonly reason?: string
   readonly now: Date
   readonly onCallRecorded: (detail: CaseDetail) => void
+  /** Called when recording a call outcome was refused in part; reads the timeline again. */
+  readonly onCallConflict: () => void
 }
 
-function CaseView({ detail, timeline, reason, now, onCallRecorded }: CaseViewProps) {
+function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflict }: CaseViewProps) {
   const me = useSignedInStaff()
   const escalated = openEscalations(detail.escalations).length > 0
   const callOffer = callOutcomeOffer(detail, me.role)
@@ -94,7 +96,13 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded }: CaseViewPro
         <div className="side">
           <TracksCard tracks={detail.tracks} />
           {callOffer === 'hidden' ? null : (
-            <CallOutcomeCard detail={detail} offer={callOffer} reason={reason} onRecorded={onCallRecorded} />
+            <CallOutcomeCard
+              detail={detail}
+              offer={callOffer}
+              reason={reason}
+              onRecorded={onCallRecorded}
+              onConflict={onCallConflict}
+            />
           )}
           {isClinicianRole(me.role) ? <OtherScreeningCard detail={detail} reason={reason} /> : null}
         </div>
@@ -177,6 +185,7 @@ export function CasePage({ caseId }: CasePageProps) {
               reason={reason}
               now={now}
               onCallRecorded={(updated) => onCallRecorded(detail, updated)}
+              onCallConflict={retryTimeline}
             />
           )}
         </ReadView>

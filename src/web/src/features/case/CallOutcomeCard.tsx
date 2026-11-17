@@ -21,6 +21,11 @@ export interface CallOutcomeCardProps {
   readonly reason?: string
   /** Called with the case as it now stands, after the API recorded the outcome. */
   readonly onRecorded: (detail: CaseDetail) => void
+  /**
+   * Called when the API refused part of the call (409). Some outcomes may already be saved, since each is its
+   * own event, so the page reads the timeline again to show which.
+   */
+  readonly onConflict?: () => void
 }
 
 const FAILURES: Partial<Record<FailureKind, MessageKey>> = {
@@ -40,9 +45,10 @@ const FAILURES: Partial<Record<FailureKind, MessageKey>> = {
  * next step back is not the same as agreeing to come, and a rating is a measure, never an
  * acknowledgement. Posts `POST /cases/{caseId}/call-outcome`; recording never changes who is
  * responsible for the case. The API allows nurse navigators only and the screen shows the card to
- * them only. Nothing is ticked for the nurse, and the button stays off until something is.
+ * them only. Nothing is ticked for the nurse, and the button stays off until something is. When
+ * the API refuses part of a call, what was already saved shows on the timeline, which is read again.
  */
-export function CallOutcomeCard({ detail, offer, reason, onRecorded }: CallOutcomeCardProps) {
+export function CallOutcomeCard({ detail, offer, reason, onRecorded, onConflict }: CallOutcomeCardProps) {
   const headingId = useId()
   const ratingName = useId()
   const [draft, setDraft] = useState<CallOutcomeDraft>(EMPTY_CALL_OUTCOME)
@@ -66,6 +72,9 @@ export function CallOutcomeCard({ detail, offer, reason, onRecorded }: CallOutco
       return
     }
     setFailure(outcome.failure.kind)
+    if (outcome.failure.kind === 'conflict') {
+      onConflict?.()
+    }
   }
 
   return (

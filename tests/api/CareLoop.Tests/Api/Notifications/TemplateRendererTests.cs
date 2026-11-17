@@ -118,11 +118,12 @@ public sealed class TemplateRendererTests
         var renderer = ShippedTemplates();
         const string Acknowledgement = "Level 1 was acknowledged by facility-lead at 09:40 UTC on 2026-11-14.";
 
-        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = Acknowledgement });
-        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["hisLink"] = "Task/SYN", ["previousAcknowledgement"] = string.Empty });
+        var acknowledged = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["previousAcknowledgement"] = Acknowledgement });
+        var none = renderer.Render("staff-action-needed", "en", smsSafe, new Dictionary<string, string> { ["caseReference"] = "AB12CD34", ["previousAcknowledgement"] = string.Empty });
 
         Assert.Contains(Acknowledgement, acknowledged.Body);
         Assert.DoesNotContain("acknowledged", none.Body, StringComparison.OrdinalIgnoreCase);
-        Assert.EndsWith("Task/SYN", none.Body);
+        Assert.EndsWith("Open case AB12CD34 in the HIS.", none.Body);
+        Assert.DoesNotContain("Task/", none.Body);
     }
 }

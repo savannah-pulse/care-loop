@@ -98,6 +98,20 @@ public sealed class NotificationTrackTests
     }
 
     [Fact]
+    public void A_call_made_answers_the_call_request_and_acknowledges_nothing()
+    {
+        var track = new NotificationTrack(_clock.UtcNow);
+        track.Advance(NotificationStatus.Delivered, _clock.UtcNow, null);
+        track.RecordCallRequest(_clock.UtcNow, "SYN-COMM-0004");
+
+        track.RecordCallMade(_clock.UtcNow.AddMinutes(30), "call-outcome/SYN");
+
+        Assert.False(track.CallRequested);
+        Assert.Equal(NotificationStatus.Delivered, track.Status);
+        Assert.False(track.IsComplete());
+    }
+
+    [Fact]
     public void Each_send_is_recorded_as_its_own_attempt()
     {
         var track = new NotificationTrack(_clock.UtcNow);

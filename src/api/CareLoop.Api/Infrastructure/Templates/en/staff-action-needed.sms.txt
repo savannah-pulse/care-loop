@@ -1,1 +1,1 @@
-[PLACEHOLDER] A case needs your action. Open the HIS: {{hisLink}} {{previousAcknowledgement}}
+[PLACEHOLDER] A case needs your action. Open case {{caseReference}} in the HIS. {{previousAcknowledgement}}

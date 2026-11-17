@@ -1,6 +1,6 @@
 [PLACEHOLDER WORDING, NOT APPROVED]
 Subject: A case needs your action
 
-A case needs your action. Open it in the HIS: {{hisLink}}
+A case needs your action. Open case {{caseReference}} in the HIS.
 
 {{previousAcknowledgement}}
