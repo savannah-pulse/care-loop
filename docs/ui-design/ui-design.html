@@ -421,6 +421,7 @@ code.role{margin-top:6px}
 .ropts{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:15px}
 .ropts>span{display:inline-flex;align-items:center;gap:8px}
 .ropts .radio{margin-top:0}
+.ropts.notasked{margin-bottom:8px}
 .rate .note{margin-top:8px}
 .callform .btn{align-self:flex-start}</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -483,7 +484,7 @@ code.role{margin-top:6px}
 <div class="cell pt">A short text: "Please expect our call." Then a call from Huda in Arabic, at the time she chose.</div>
 <div class="cell pt">On a call with Huda, she says the next step back in her own words. She can reply 2 for a call at any time.</div>
 <div class="cell e"></div>
-<div class="cell pt">A text with the day and place. She replies 1 to say she will come. Saeed gets the day, time and place, as she asked.</div>
+<div class="cell pt">A text with the day and place. She replies 1 when she gets it. Saeed gets the day, time and place, as she asked.</div>
 <div class="cell pt">Told in person. A printed care plan in large type and a new named contact.</div>
 <div class="cell e"></div>
 <div class="cell pt">Chemotherapy, radiotherapy and tablets, each with a named owner. Then yearly checks.</div>
@@ -665,7 +666,7 @@ code.role{margin-top:6px}
 <ul class="check">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood the next step</b><span>Said it back on a call with Huda Saleh, Tue 10 Nov</span></div><span class="r">Done</span></li>
 <li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>A receiving clinician accepted the referral</b><span>Declined by Regional Hospital: no capacity</span></div><span class="r red">Missing</span></li>
-<li><span class="mk todo"></span><div><b>Appointment booked, and Hessa says she will come</b><span>By her reply of 1, or on a call. Saeed cannot answer for her.</span></div><span class="r">Waiting</span></li>
+<li><span class="mk todo"></span><div><b>Appointment booked, and Hessa has the details</b><span>She replies 1 when she gets the text. Saeed cannot answer for her.</span></div><span class="r">Waiting</span></li>
 <li><span class="mk todo"></span><div><b>The clinic recorded that she attended</b><span>A booking or a reminder does not count</span></div><span class="r">Waiting</span></li>
 <li><span class="mk todo"></span><div><b>Outcome recorded by the responsible clinician</b><span>With a link to the clinical record</span></div><span class="r">Waiting</span></li>
 </ul>
@@ -679,7 +680,7 @@ code.role{margin-top:6px}
 <li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
 <li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
 <li><time>Tue 10 Nov, 11:20</time><div><b>On a call, Hessa said the next step back</b><span class="by">Recorded by Huda Saleh, with her confidence: 4 out of 5</span></div><span class="src">CareLoop</span></li>
-<li><time>Tue 10 Nov, 10:00</time><div><b>Text delivered: please expect our call</b><span class="by">To her basic phone</span></div><span class="src">Text message or email</span></li>
+<li><time>Tue 10 Nov, 10:00</time><div><b>Text delivered: please expect our call</b><span class="by">To her basic phone</span></div><span class="src">Text message</span></li>
 </ul>
 <div class="linkrow">Show 6 earlier events</div>
 </div>
@@ -696,13 +697,14 @@ code.role{margin-top:6px}
 </div>
 <div class="card callcard">
 <h3>After a call with the patient</h3>
-<p class="note">Record what the patient told you on the phone.</p>
+<p class="note">A text message or email reply can only say "I got this message" or ask for a call. Record here what the patient told you on the phone.</p>
 <p class="cur">Confidence on record: 4 out of 5.</p>
 <div class="callform">
 <div class="ck"><span class="cbox off"></span><span>The patient said they will come</span></div>
 <div class="ck"><span class="cbox off"></span><span>The patient said the next step back in their own words</span></div>
 <div class="rate"><b>How sure does the patient feel about what happens next?</b>
-<div class="ropts"><span><span class="radio on"></span>Not asked</span><span><span class="radio"></span>1</span><span><span class="radio"></span>2</span><span><span class="radio"></span>3</span><span><span class="radio"></span>4</span><span><span class="radio"></span>5</span></div>
+<div class="ropts notasked"><span><span class="radio on"></span>Not asked</span></div>
+<div class="ropts"><span><span class="radio"></span>1</span><span><span class="radio"></span>2</span><span><span class="radio"></span>3</span><span><span class="radio"></span>4</span><span><span class="radio"></span>5</span></div>
 <p class="note">1 is not sure, 5 is very sure.</p></div>
 <span class="btn primary off" role="button" aria-disabled="true">Record call outcome</span>
 </div>
@@ -724,7 +726,7 @@ code.role{margin-top:6px}
 </div>
 </div>
 </div>
-<p class="note">Only Hessa's care team can open this case, and every view is recorded. Reports, images and notes stay in the hospital system.</p>
+<p class="note">Only Hessa's care team can open this case. Reports, images and notes stay in the hospital system. Every view, and every call you record here, is kept.</p>
 </div>
 </div>
 </section>
@@ -1135,8 +1137,8 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b09" data-file="09-basic-phone">
-<div class="cap"><span class="n">9</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts carry only dates and places. A reply of 1 means she will come; 2, or any other reply, asks for a call.</p>
-<div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
+<div class="cap"><span class="n">9</span><div><h2>Basic phone, no internet</h2><p>Hessa has a basic phone and no internet. A person gives her the result. Texts carry only dates and places. A reply of 1 means she got the message; 2, or any other reply, asks for a call.</p>
+<div class="meta"><span>For: patients without a smartphone or internet</span><span>Built in: messaging simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span></div></div></div>
 <div class="cols3" style="grid-template-columns:minmax(0,1fr) 300px minmax(0,1fr)">
 <div class="card">
 <h3><svg class="i"><use href="#i-phone"/></svg>Call from her nurse<span class="r small muted">Tue 10 Nov, 11:15</span></h3>
@@ -1155,13 +1157,13 @@ code.role{margin-top:6px}
 <div class="pcol">
 <div class="fphone">
 <div class="fspk"></div>
-<div class="fscr"><div class="fhead"><span>02 000 0001</span><span>10:30</span></div>Hessa, you have an appointment on Mon 16 Nov at 10:30 am, General Hospital, Building 2. Reply 1 if you will come, or 2 for a call. Help: 02 000 0000</div>
+<div class="fscr"><div class="fhead"><span>02 000 0001</span><span>10:30</span></div>Hessa, you have an appointment on Mon 16 Nov at 10:30 am, General Hospital, Building 2. Reply 1 when you get this message, or 2 for a call. Help: 02 000 0000</div>
 <div class="fsoft"><span>Reply</span><span>Back</span></div>
 <div class="fkeys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>*</span><span>0</span><span>#</span></div>
 </div>
 <ul class="recs">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Sent and delivered, Thu 10:30</li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Hessa replied 1 at 10:41: she will come</li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span>Hessa replied 1 at 10:41: she got the message</li>
 </ul>
 <p class="pcap">Text message, in English in the prototype. Arabic follows once a qualified reviewer approves the wording. It comes from a number she can reply to, and works on any phone with no internet.</p>
 </div>
@@ -1171,10 +1173,10 @@ code.role{margin-top:6px}
 <ul class="script">
 <li>Hello. This call is for Hessa Al Dhaheri. If you are Hessa, press 1. If not, please ask her to call 02 000 0000.</li>
 <li>Thank you. This is General Hospital. You have an appointment on Monday the 16th of November, at half past ten in the morning, in Building 2.</li>
-<li>Press 1 if you will come. Press 2 to talk to a person. Press 9 to hear this again.</li>
+<li>Press 1 to say you got this message. Press 2 to talk to a person. Press 9 to hear this again.</li>
 </ul>
-<div class="keys"><span>1 I will come</span><span>2 Talk to a person</span><span>9 Repeat</span></div>
-<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>She will come.</b> Hessa pressed 1 at 10:01.</span></div>
+<div class="keys"><span>1 Got it</span><span>2 Talk to a person</span><span>9 Repeat</span></div>
+<div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>She got the message.</b> Hessa pressed 1 at 10:01.</span></div>
 <p class="note" style="margin-top:8px">No answer after two tries creates a task for Huda to call her.</p>
 </div>
 </div>
@@ -1183,13 +1185,13 @@ code.role{margin-top:6px}
 <div class="rule"><svg class="i"><use href="#i-link"/></svg><span>No links: nothing to click and nothing to install</span></div>
 <div class="rule"><svg class="i"><use href="#i-tag"/></svg><span>Neutral place names, such as "Building 2", never the clinic's name</span></div>
 <div class="rule"><svg class="i"><use href="#i-lang"/></svg><span>In her language, at the time of day she chose</span></div>
-<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 if you will come. 2, or any other reply, asks for a call.</span></div>
+<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 when you get a message. 2, or any other reply, asks for a call.</span></div>
 </div>
 </section>
 
 <section class="board" id="b10" data-file="10-patient-email">
 <div class="cap" style="max-width:1258px"><span class="n">10</span><div><h2>Patient email</h2><p>A patient with an email address on record gets the same message as screen 9 by email, with a subject. It carries the date, the place and how to ask for a call, with no links and no result: a person gives the result. Shown with Amna Al Ameri, 48, from Khalifa City.</p>
-<div class="meta"><span>For: patients reached by email</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
+<div class="meta"><span>For: patients reached by email</span><span>Built in: messaging simulator</span><span>Stories: US02, US03, US05</span><span>Requirements: FR-04</span></div></div></div>
 <div class="cols3 emailrow" style="min-height:816.86px">
 <div class="pcol">
 <div class="mail mwin">
@@ -1199,7 +1201,7 @@ code.role{margin-top:6px}
 <div class="mb">
 <p>Dear Amna,</p>
 <p>You have an appointment on Friday 13 November at 9:00 am at General Hospital, Building 2, Clinic B.</p>
-<p class="ask">Reply 1 if you will come, 2 if you would like a call.</p>
+<p class="ask">Reply 1 when you get this message, 2 if you would like a call.</p>
 <p>Your nurse is Latifa Al Mazrouei. You can also call her on 02 000 0003, Monday to Friday, 8:00 am to 4:00 pm.</p>
 <p>Family Health Centre<br>Reference: 5172</p>
 <p class="note">Any other reply also asks your nurse to call you. We never send results by email.</p>
@@ -1214,31 +1216,31 @@ code.role{margin-top:6px}
 <span class="lbl" style="display:block;margin-top:16px;margin-bottom:8px">What CareLoop records</span>
 <ul class="check">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Email delivered</b><span>To the address in her hospital record</span></div><span class="r">10:30</span></li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Amna will come</b><span>Recorded as acknowledged, and nothing more</span></div><span class="r">10:52</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Amna got the message</b><span>Recorded as acknowledged, and nothing more</span></div><span class="r">10:52</span></li>
 </ul>
 </div>
 <div class="card">
 <h3>If she replies 2, or anything else</h3>
 <div class="rmail"><div class="rh"><b>Amna Al Ameri</b><span>Re: Your appointment on Friday 13 November</span></div><div class="rb">Can I come later in the day?</div></div>
-<div class="result todo"><svg class="i"><use href="#i-phone"/></svg><span><b>Asks for a call.</b> Latifa gets a task to call her back. Only a reply of 1 counts as "I will come".</span></div>
+<div class="result todo"><svg class="i"><use href="#i-phone"/></svg><span><b>Asks for a call.</b> Latifa gets a task to call her back. Only a reply of 1 counts as "I got this message".</span></div>
 </div>
 <div class="card">
 <h3><svg class="i"><use href="#i-phone"/></svg>Asked on a call, not by email</h3>
-<p class="callnote">Whether Amna can say the next step back, and how sure she feels from 1 to 5, are never asked by email. Latifa asks on a call and records both on the case (screen 2).</p>
+<p class="callnote">Email never asks whether Amna will come, whether she can say the next step back, or how sure she feels from 1 to 5. Latifa asks on a call and records the answers on the case (screen 2).</p>
 </div>
 </div>
 </div>
 <div class="rules emailrules">
 <div class="rule"><svg class="i"><use href="#i-lock"/></svg><span>No results, diagnoses or body parts: a person gives the result</span></div>
 <div class="rule"><svg class="i"><use href="#i-link"/></svg><span>No links: nothing to click and nothing to install</span></div>
-<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 if you will come; 2, or any other reply, asks for a call</span></div>
+<div class="rule"><svg class="i"><use href="#i-key"/></svg><span>Reply 1 when you get a message; 2, or any other reply, asks for a call</span></div>
 <div class="rule"><svg class="i"><use href="#i-msg"/></svg><span>The same message as the text, with a subject and a named nurse</span></div>
 </div>
 </section>
 
 <section class="board" id="b11" data-file="11-arabic">
 <div class="cap"><span class="n">11</span><div><h2>Arabic, right to left</h2><p>The target design for Arabic, deferred: the prototype runs in English until a qualified reviewer approves the Arabic wording. The email and the text message read right to left, while numbers stay as 0 to 9.</p>
-<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: SMS and email simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span><span>Hackathon: deferred</span></div></div></div>
+<div class="meta"><span>For: Arabic-speaking patients and families</span><span>Built in: messaging simulator</span><span>Stories: US02, US03</span><span>Requirements: FR-04</span><span>Hackathon: deferred</span></div></div></div>
 <div class="phones">
 <div class="pcol">
 <div class="mail mwin arwin" dir="rtl" lang="ar">
@@ -1248,7 +1250,7 @@ code.role{margin-top:6px}
 <div class="mb">
 <p>عزيزتي آمنة،</p>
 <p>لديكِ موعد يوم الجمعة 13 نوفمبر الساعة 9:00 صباحاً في المستشفى العام، المبنى 2، العيادة ب.</p>
-<p class="ask">ردّي 1 إذا كنتِ ستحضرين، أو 2 إذا كنتِ ترغبين في مكالمة.</p>
+<p class="ask">ردّي 1 عند استلام هذه الرسالة، أو 2 إذا كنتِ ترغبين في مكالمة.</p>
 <p>ممرضتكِ هي لطيفة المزروعي. يمكنكِ أيضاً الاتصال بها على <span dir="ltr" style="white-space:nowrap">02 000 0003</span>، من الاثنين إلى الجمعة، من 8:00 صباحاً إلى 4:00 مساءً.</p>
 <p>مركز صحة العائلة<br>الرقم المرجعي: 5172</p>
 <p class="note">أي ردّ آخر يطلب من ممرضتكِ الاتصال بكِ. لا نرسل النتائج بالبريد الإلكتروني أبداً.</p>
@@ -1259,11 +1261,11 @@ code.role{margin-top:6px}
 <div class="pcol">
 <div class="fphone">
 <div class="fspk"></div>
-<div class="fscr ar" dir="rtl" lang="ar"><div class="fhead"><span dir="ltr">02 000 0001</span><span>10:30</span></div>حصة، لديك موعد يوم الاثنين 16 نوفمبر الساعة 10:30 صباحاً في المستشفى العام، المبنى 2. ردّي 1 إذا كنتِ ستحضرين، أو 2 لطلب مكالمة.</div>
+<div class="fscr ar" dir="rtl" lang="ar"><div class="fhead"><span dir="ltr">02 000 0001</span><span>10:30</span></div>حصة، لديك موعد يوم الاثنين 16 نوفمبر الساعة 10:30 صباحاً في المستشفى العام، المبنى 2. ردّي 1 عند استلام الرسالة، أو 2 لطلب مكالمة.</div>
 <div class="fsoft" dir="rtl" lang="ar"><span>رد</span><span>رجوع</span></div>
 <div class="fkeys"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>*</span><span>0</span><span>#</span></div>
 </div>
-<div class="pcap"><b>Text message in Arabic</b>The reminder from screen 9: 128 characters, sent as two messages.</div>
+<div class="pcap"><b>Text message in Arabic</b>The reminder from screen 9: 130 characters, sent as two messages.</div>
 </div>
 <div class="card" style="width:440px">
 <h3>Rules for Arabic</h3>
@@ -1279,8 +1281,8 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b12" data-file="12-caregiver-and-email">
-<div class="cap"><span class="n">12</span><div><h2>Caregiver and email</h2><p>Hessa signed a form so that her son, Saeed, gets the day, time and place of her appointments. Only Hessa can reply to or change them, and Saeed never sees her results. In the prototype the email is shown in the SMS and email simulator, not sent.</p>
-<div class="meta"><span>For: family members a patient has named</span><span>Built in: SMS and email simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
+<div class="cap"><span class="n">12</span><div><h2>Caregiver and email</h2><p>Hessa signed a form so that her son, Saeed, gets the day, time and place of her appointments. Only Hessa can reply to or change them, and Saeed never sees her results. In the prototype the email is shown in the messaging simulator, not sent.</p>
+<div class="meta"><span>For: family members a patient has named</span><span>Built in: messaging simulator</span><span>Stories: US04, US10</span><span>Requirements: FR-04, FR-10</span></div></div></div>
 <div class="cols3" style="grid-template-columns:600px minmax(0,1fr);width:1200px">
 <div class="stack">
 <div class="mail">
@@ -1303,7 +1305,7 @@ code.role{margin-top:6px}
 <ul class="check">
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa's written consent</b><span>Form 4471, signed Mon 9 Nov and recorded by Dr. Sara Al Hammadi: appointment details only, to Saeed</span></div><span class="r"></span></li>
 <li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Email delivered to Saeed</b><span>The day, time and place only</span></div><span class="r">10:32</span></li>
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa will come</b><span>She replied 1 to her own text message</span></div><span class="r">10:41</span></li>
+<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa got her text</b><span>She replied 1 to her own text message</span></div><span class="r">10:41</span></li>
 </ul>
 <p class="note" style="margin-top:12px">To withdraw, Hessa tells anyone in her care team. They record it in the hospital system, and the emails to Saeed stop at once.</p>
 </div>
@@ -1390,16 +1392,16 @@ code.role{margin-top:6px}
 <thead><tr><th>Person</th><th>Sees</th><th>Can do</th><th>Cannot</th></tr></thead>
 <tbody>
 <tr class="grp"><td colspan="4">The patient and her family: text messages and email only. There is no patient app or portal.</td></tr>
-<tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by text message on a basic phone. Amna, by email.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse, by text message or email. A person gives her the result.</td><td>Reply 1 to say she will come, or 2 for a call. On a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
+<tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by text message on a basic phone. Amna, by email.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse, by text message or email. A person gives her the result.</td><td>Reply 1 to say she got a message, or 2 for a call. On a call, say whether she will come, the next step back and how sure she feels. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
 <tr><td><b>Saeed Al Dhaheri</b><span class="l2">Her son, named by Hessa in writing</span><code class="role">recipient: caregiver</code></td><td>The day, time and place of her appointments, by email</td><td>Help her get there. Nothing in CareLoop.</td><td>See results or the reason for the visit. Reply for her or change anything.</td></tr>
-<tr class="grp"><td colspan="4">Care team: notices about their cases come by email or text message, never with results</td></tr>
+<tr class="grp"><td colspan="4">Care team: notices come by email or text message, with only the case number to look for in CareLoop: no link and no patient details</td></tr>
 <tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved</td><td>Call patients and record what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
 <tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span><code class="role">clinician</code></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
 <tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span><code class="role">receiving-clinician</code></td><td>Referrals sent to her unit: the request, the approved summary, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
 <tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span><code class="role">lab</code></td><td>Test requests sent to them, and what each test needs</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
 <tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span><code class="role">facility-lead</code></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, and acknowledge escalations</td><td>See reports, images or notes, or cases at other facilities</td></tr>
 <tr class="grp"><td colspan="4">Oversight and systems</td></tr>
-<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case only when it is escalated to him.</td><td>Approve the impact summary and act on escalations</td><td>See named lists of patients</td></tr>
+<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Approve the impact summary and act on escalations</td><td>See named lists of patients</td></tr>
 <tr><td><b>AI drafting</b><span class="l2">Part of CareLoop</span></td><td>The facts of one case, only while drafting</td><td>Draft plain words and summaries for a person to approve</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
 <tr><td><b>Engineers and support</b><span class="l2">The CareLoop team</span></td><td>Synthetic data only</td><td>Build, test and fix CareLoop</td><td>See real patient data, unless it is approved and recorded</td></tr>
 </tbody></table>
@@ -1780,7 +1782,7 @@ code.role{margin-top:6px}
 <div class="card next">
 <div class="top"><span class="lbl">Next appointment</span><span class="badge green">On track</span></div>
 <h2>Chemotherapy, cycle 5</h2>
-<p class="why">Mon 22 Mar 2027 at 09:00, chemotherapy unit, Cancer Centre. Hessa replied by text that she will come, and hospital transport is booked.</p>
+<p class="why">Mon 22 Mar 2027 at 09:00, chemotherapy unit, Cancer Centre. Hessa told Mariam on a call that she will come, and hospital transport is booked.</p>
 <div class="kv">
 <div><small>Responsible</small><b>Dr. Karim Nassar</b><span>Medical oncologist</span></div>
 <div><small>Before it</small><b>Blood test, Fri 19 Mar</b><span>Booked at the Family Health Centre</span></div>
