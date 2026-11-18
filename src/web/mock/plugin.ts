@@ -619,6 +619,11 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
   if (path === '/ai/role-briefing') {
     expect('POST')
     checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
+    const { caseIds } = await readJson(req)
+    // As the API: from 1 to 1000 cases, the most the dashboard's case list reads.
+    if (!Array.isArray(caseIds) || caseIds.length === 0 || caseIds.length > 1000 || caseIds.some((id) => typeof id !== 'string')) {
+      throw new HttpError(400, 'Name from 1 to 1000 cases to brief on.')
+    }
     await answerAi(state, req, res, 'RoleBriefing', 'role-briefing', () => roleBriefingWords(who.role === 'coordinator'))
     return true
   }

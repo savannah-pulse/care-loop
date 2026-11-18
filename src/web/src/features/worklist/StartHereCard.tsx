@@ -53,17 +53,24 @@ function StartRow({ item, position, now }: { readonly item: StartHereItem; reado
   )
 }
 
+/** Props for {@link BriefingLine}. */
+interface BriefingLineProps {
+  /** The cases the card is about: the person's "My cases", every one of them, not only those it lists. */
+  readonly caseIds: readonly string[]
+}
+
 /**
- * The one optional sentence the role-briefing agent writes about the person's worklist.
+ * The one optional sentence the role-briefing agent writes about the person's own cases.
  *
  * @remarks
- * Asks `POST /ai/role-briefing` when it mounts. While AI is switched off (409) it shows nothing; while
- * it loads, one skeleton line; when the agent could not write it (503, or any other failure), a small
- * calm note. The cases above never depend on it. Under the words, in small muted text, it names the
- * agent and prompt versions that wrote them.
+ * Asks `POST /ai/role-briefing` about exactly those cases when it mounts, so its numbers are the
+ * card's. While AI is switched off (409) it shows nothing; while it loads, one skeleton line; when
+ * the agent could not write it (503, or any other failure), a small calm note. The cases above never
+ * depend on it. Under the words, in small muted text, it names the agent and prompt versions that
+ * wrote them.
  */
-function BriefingLine() {
-  const { state } = useRoleBriefing()
+function BriefingLine({ caseIds }: BriefingLineProps) {
+  const { state } = useRoleBriefing(caseIds)
   if (state.status === 'loading') {
     return (
       <div className="start-ai">
@@ -97,8 +104,9 @@ function BriefingLine() {
  *
  * @remarks
  * CareLoop works the list out from the worklist it already loaded (see `startHere`), so the card
- * works without AI. When it lists cases, one sentence from the role-briefing agent may sum them up,
- * captioned as written by AI from the worklist; AI is never asked when there is nothing to sum up.
+ * works without AI. When it lists cases, one sentence from the role-briefing agent may sum up the
+ * person's own cases, the same "My cases" the card picks from, captioned as written by AI from the
+ * worklist; AI is never asked when there is nothing to sum up.
  * When none of the person's cases is overdue, escalated, urgent or due today, it says so in one calm
  * line, with their next deadline when they have one. Names follow the role: the programme
  * coordinator sees case numbers only.
@@ -106,8 +114,9 @@ function BriefingLine() {
 export function StartHereCard({ rows, now }: StartHereCardProps) {
   const me = useSignedInStaff()
   const headingId = useId()
+  const mine = rows.filter((row) => isMine(row, me))
   const items = startHere(rows, me, now)
-  const mineNext = items.length === 0 ? nextDeadline(rows.filter((row) => isMine(row, me))) : undefined
+  const mineNext = items.length === 0 ? nextDeadline(mine) : undefined
   return (
     <section className="card start-here" aria-labelledby={headingId}>
       <div className="start-head">
@@ -133,7 +142,7 @@ export function StartHereCard({ rows, now }: StartHereCardProps) {
               <StartRow key={item.row.summary.caseId} item={item} position={index + 1} now={now} />
             ))}
           </ol>
-          <BriefingLine />
+          <BriefingLine caseIds={mine.map((row) => row.summary.caseId)} />
         </>
       )}
     </section>

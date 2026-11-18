@@ -271,7 +271,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Asks the role-briefing agent to sum up the reader's worklist in a few plain words. */
+        /** Asks the role-briefing agent to sum up the cases the dashboard names, the reader's own, in a few plain words. */
         post: operations["DraftRoleBriefing"];
         delete?: never;
         options?: never;
@@ -990,6 +990,11 @@ export interface components {
         RejectSummaryRequest: {
             /** @description Why the reviewer turned the draft down. Stored with the rejection and read when the drafts are evaluated. */
             reason: string;
+        };
+        /** @description Body of `POST /ai/role-briefing`: the cases the briefing is about. */
+        RoleBriefingRequest: {
+            /** @description The cases to brief on: from 1 to 1000, the most the dashboard's case list reads. A case named twice counts once. */
+            caseIds: string[];
         };
         /** @description The result of replaying the cohort under one condition (with or without escalation). */
         SimulationArmResponse: {
@@ -2010,7 +2015,12 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Cancels the request. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RoleBriefingRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

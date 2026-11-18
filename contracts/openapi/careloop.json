@@ -1169,7 +1169,7 @@
         "tags": [
           "Ai"
         ],
-        "summary": "Asks the role-briefing agent to sum up the reader's worklist in a few plain words.",
+        "summary": "Asks the role-briefing agent to sum up the cases the dashboard names, the reader's own, in a few plain words.",
         "operationId": "DraftRoleBriefing",
         "parameters": [
           {
@@ -1189,6 +1189,17 @@
             }
           }
         ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleBriefingRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -3152,6 +3163,23 @@
           }
         },
         "description": "Body of the request rejecting a drafted handoff summary."
+      },
+      "RoleBriefingRequest": {
+        "required": [
+          "caseIds"
+        ],
+        "type": "object",
+        "properties": {
+          "caseIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "The cases to brief on: from 1 to 1000, the most the dashboard's case list reads. A case named twice counts once."
+          }
+        },
+        "description": "Body of `POST /ai/role-briefing`: the cases the briefing is about."
       },
       "SimulationArmResponse": {
         "required": [

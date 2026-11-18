@@ -151,7 +151,7 @@ AI attaches to backend-owned stages; it never advances a stage. A case advances 
 **User:** Any staff member reading their worklist: clinician, receiving clinician, nurse navigator, facility lead, lab or programme coordinator.
 **Purpose:** A headline and a few short sentences above the worklist ("Start here today") that say where the reader might start, so they need not read the whole list first. It informs (L0); it decides nothing.
 
-**Inputs**, built by the API from the reader's worklist scope only, as the role-briefing agent's `<input_json>` (see [integration.md](integration.md#what-each-agent-expects-and-returns)):
+**Inputs**, built by the API from the cases the dashboard's "Start here today" card is about (the reader's "My cases", which the dashboard names), and only those the reader may read in the worklist's scope, as the role-briefing agent's `<input_json>` (see [integration.md](integration.md#what-each-agent-expects-and-returns)):
 
 - The reader's role, the time, the working-day calendar and the clock configuration, and counts of items by band: act now (overdue or escalated), due today, information for the role (urgent tier or needing an owner), and the next five working days.
 - Every open case in those bands, already chosen, banded and ordered by the backend, each from its coordination state: a token made up for that one prompt, the next action, the display step, the deadline and working days left, the urgency tier, who acts next, how contact with the patient stands and the open escalation's level, role and acknowledgement. The API puts the case number back in place of each token after the answer.

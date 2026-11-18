@@ -266,7 +266,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         var input = Facts(Assert.Single(_agents.Calls));
         Assert.Equal("clinician", input.GetProperty("role").GetString());
-        Assert.Equal("SYN Family Health Centre, the reader's team", input.GetProperty("scope").GetString());
+        Assert.Equal("SYN Family Health Centre, the reader's own cases", input.GetProperty("scope").GetString());
         Assert.Equal("2026-01-02T10:00+00:00", input.GetProperty("as_of").GetString());
         Assert.Equal(DraftRoleBriefing.WorkingDayCalendar, input.GetProperty("calendar_version").GetString());
         Assert.Equal("provisional", input.GetProperty("clock_config").GetProperty("status").GetString());
@@ -353,6 +353,51 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Equal("""{"level":2,"to":"programme coordinator","acknowledged":false}""", item.GetProperty("escalation").GetRawText());
     }
 
+    [Fact]
+    public async Task The_briefing_covers_only_the_cases_the_dashboard_names_and_ignores_any_the_reader_may_not_read()
+    {
+        var mine = await SeedAsync(NewCase("SYN-RESULT-MINE-1", "SYN-FAC-A", due: _clock.UtcNow.AddHours(-1)));
+        var alsoMine = await SeedAsync(NewCase("SYN-RESULT-MINE-2", "SYN-FAC-A", due: _clock.UtcNow.AddHours(2)));
+        await SeedAsync(NewCase("SYN-RESULT-COLLEAGUE", "SYN-FAC-A", due: _clock.UtcNow.AddHours(-3)));
+        var elsewhere = await SeedAsync(NewCase("SYN-RESULT-ELSEWHERE", "SYN-FAC-B", due: _clock.UtcNow.AddHours(-5)));
+
+        Assert.Equal(200, Status(await BriefingAsync(caseIds: [mine.Id, alsoMine.Id, mine.Id, elsewhere.Id, Guid.NewGuid()])));
+
+        var call = Assert.Single(_agents.Calls);
+        var input = Facts(call);
+        Assert.Equal("""{"P1":1,"P2":1,"info":0,"P3":0}""", input.GetProperty("counts").GetRawText());
+        Assert.Equal(2, input.GetProperty("items").GetArrayLength());
+        Assert.Equal("SYN Family Health Centre, the reader's own cases", input.GetProperty("scope").GetString());
+        Assert.Contains(_logs.Lines, line => line.StartsWith("Role briefing ignored 2 of 4 named cases", StringComparison.Ordinal));
+        Assert.DoesNotContain(mine.Id.ToString(), call.Prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(_logs.Lines, line => line.Contains(elsewhere.Id.ToString(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(DraftRoleBriefing.MaxCaseIds + 1)]
+    public async Task The_briefing_needs_from_1_to_1000_cases_named_and_asks_no_agent_otherwise(int count)
+    {
+        var result = await BriefingAsync(caseIds: Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToList());
+
+        Assert.Equal(400, Status(result));
+        Assert.Empty(_agents.Calls);
+    }
+
+    [Fact]
+    public async Task When_none_of_the_named_cases_is_open_and_the_readers_to_read_no_agent_is_asked_and_nothing_is_recorded()
+    {
+        var elsewhere = await SeedAsync(NewCase("SYN-RESULT-ELSEWHERE", "SYN-FAC-B", due: _clock.UtcNow.AddHours(-5)));
+        var facilityLevel = await SeedAsync(NewCase("SYN-RESULT-LEAD", "SYN-FAC-A", due: _clock.UtcNow.AddHours(-2)));
+        await ChangeAsync(facilityLevel.Id, c => c.Escalate(Escalation(1, DemoRoles.FacilityLead, "SYN-FAC-A")));
+
+        Assert.Equal(400, Status(await BriefingAsync(caseIds: [elsewhere.Id, Guid.NewGuid()])));
+        Assert.Equal(400, Status(await BriefingAsync(Identity(DemoRoles.Coordinator, facility: null), caseIds: [facilityLevel.Id])));
+
+        Assert.Empty(_agents.Calls);
+        using var scope = _services.CreateScope();
+        Assert.Empty(await Db(scope).CaseReads.ToListAsync());
+    }
     [Fact]
     public async Task The_briefing_says_which_cases_the_reader_acts_on_whether_or_not_the_header_names_a_FHIR_type()
     {
@@ -612,11 +657,13 @@ public sealed class AiAgentEndpointsTests : IDisposable
         return context;
     }
 
-    private async Task<IResult> BriefingAsync(HttpContext? context = null, string? facilityId = null, string? reason = null)
+    /// <summary>Asks for a briefing on the cases named, or on every case stored when none are named, as the dashboard would for a role whose own list is its team's.</summary>
+    private async Task<IResult> BriefingAsync(HttpContext? context = null, string? facilityId = null, string? reason = null, IReadOnlyList<Guid>? caseIds = null)
     {
         using var scope = _services.CreateScope();
-        return await DraftRoleBriefing.Handle(facilityId, reason, context ?? Identity(), Db(scope), _pathways, _format, _agents,
-            Options.Create(_options), _clock, _logs, CancellationToken.None);
+        var named = caseIds ?? await Db(scope).Cases.Select(c => c.Id).ToListAsync();
+        return await DraftRoleBriefing.Handle(new RoleBriefingRequest { CaseIds = named }, facilityId, reason, context ?? Identity(), Db(scope),
+            _pathways, _format, _agents, Options.Create(_options), _clock, _logs, CancellationToken.None);
     }
 
     private async Task<IResult> ImpactAsync(HttpContext? context = null, string? facilityId = null, string? reason = null)

@@ -26,8 +26,11 @@ namespace CareLoop.Api.Features.Agents;
 /// <para>
 /// The agent (AG1 in the Foundry project) reads a worklist the backend has already scoped, banded and ordered, inside
 /// <c>&lt;input_json&gt;</c>: the reader's role, the time, the working-day calendar and clock configuration, counts by
-/// band and one item per case. The scope is the worklist's: the reader's facility, or another facility with a documented
-/// reason, and for the programme coordinator only the cases escalated to that role. Bands: <c>P1</c> overdue or
+/// band and one item per case. The cases are the ones the dashboard names in the request, the reader's "My cases" that
+/// its "Start here today" card is about, so the briefing and the card count the same cases; the API keeps no rule of its
+/// own about whose a case is. Of those, it briefs only the open cases the reader may read in the worklist's scope (the
+/// reader's facility, or another facility with a documented reason, and for the programme coordinator only the cases
+/// escalated to that role), and ignores the rest. Bands: <c>P1</c> overdue or
 /// escalated; <c>P2</c> due today, or on a non-working day before the next working day; <c>info</c> urgent tier or
 /// needing an owner; <c>P3</c> due on one of the next <see cref="LookaheadDays"/> working days, a deadline on a
 /// non-working day counting on the working day before it. Each item carries the next action, the step, the deadline
@@ -58,6 +61,9 @@ public static partial class DraftRoleBriefing
 
     /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
     public const string PromptVersion = "role-briefing-v3";
+
+    /// <summary>Most cases one request may name: as many as the dashboard's case list reads.</summary>
+    public const int MaxCaseIds = 1000;
 
     /// <summary>Most items the agent lists in each section; it counts the rest.</summary>
     public const int MaxItemsPerSection = 5;
@@ -98,7 +104,8 @@ public static partial class DraftRoleBriefing
         return routes;
     }
 
-    /// <summary>Asks the role-briefing agent to sum up the reader's worklist in a few plain words.</summary>
+    /// <summary>Asks the role-briefing agent to sum up the cases the dashboard names, the reader's own, in a few plain words.</summary>
+    /// <param name="briefing">The cases to brief on; those the reader may not read, and closed ones, are ignored.</param>
     /// <param name="facilityId">Facility to brief on; defaults to the staff reader's facility, and every facility for the coordinator.</param>
     /// <param name="reason">Reason required to brief on another facility's cases, recorded with the read.</param>
     /// <param name="context">The caller-stated staff identity.</param>
@@ -108,21 +115,24 @@ public static partial class DraftRoleBriefing
     /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
     /// <param name="options">Whether the agents are on, the agent version and which urgency codes mean urgent.</param>
     /// <param name="clock">The current time, for deadlines and the read audit.</param>
-    /// <param name="loggerFactory">Records the reason code when the agent declines.</param>
+    /// <param name="loggerFactory">Records the reason code when the agent declines, and how many named cases were ignored.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
-    /// 200 with the agent's text; 400, 401 or 403 as for the worklist reads; 409 while the agents are switched off
-    /// (<c>Ai:Agents:Enabled</c> is <see langword="false"/> or <c>Ai:Provider</c> is <c>NoOp</c>); 503 when the agent
-    /// could not write it.
+    /// 200 with the agent's text; 400 when no case, or more than <see cref="MaxCaseIds"/>, is named, or when none of the
+    /// named cases is open and the reader's to read; 401 or 403 as for the worklist reads; 409 while the agents are
+    /// switched off (<c>Ai:Agents:Enabled</c> is <see langword="false"/> or <c>Ai:Provider</c> is <c>NoOp</c>); 503 when
+    /// the agent could not write it.
     /// </returns>
-    public static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason, HttpContext context,
-        CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents, IOptions<AgentOptions> options,
-        IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
+    public static async Task<IResult> Handle([FromBody] RoleBriefingRequest briefing, [FromQuery] string? facilityId, [FromQuery] string? reason,
+        HttpContext context, CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents,
+        IOptions<AgentOptions> options, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
     {
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
         if (ReadAccess.ValidateReason(reason) is { } reasonError) return reasonError;
         if (facilityId?.Length > 100 || facilityId is not null && string.IsNullOrWhiteSpace(facilityId))
             return Results.Problem("Invalid facility filter.", statusCode: 400);
+        if (briefing.CaseIds is not { Count: > 0 and <= MaxCaseIds } named)
+            return Results.Problem($"Name from 1 to {MaxCaseIds} cases to brief on.", statusCode: 400);
         if (!AgentReplies.IsOn(options.Value, agents)) return AgentReplies.SwitchedOff("RoleBriefing", options.Value);
 
         var scopeFacility = facilityId ?? (actor.Role == DemoRoles.Coordinator ? null : actor.FacilityId);
@@ -134,8 +144,19 @@ public static partial class DraftRoleBriefing
             return denied;
         }
 
+        var logger = loggerFactory.CreateLogger(typeof(DraftRoleBriefing));
+        var wanted = named.Distinct().ToList();
         var cases = await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, facilityId)
-            .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct);
+            .Where(c => c.Stage != CaseStage.Closed && wanted.Contains(c.Id)).ToListAsync(ct);
+        if (cases.Count < wanted.Count)
+        {
+            logger.LogInformation("Role briefing ignored {Ignored} of {Named} named cases: closed, unknown or outside the reader's scope",
+                wanted.Count - cases.Count, wanted.Count);
+        }
+
+        if (cases.Count == 0)
+            return Results.Problem("None of the named cases is open and yours to read, so there is nothing to brief on.", statusCode: 400);
+
         var input = BuildInput(actor, scopeFacility, outside, cases, pathways, options.Value.UrgentCodes, format, clock.UtcNow);
         var request = new AgentRequest
         {
@@ -143,8 +164,7 @@ public static partial class DraftRoleBriefing
             CorrelationId = Guid.NewGuid(),
         };
         await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
-        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock,
-            loggerFactory.CreateLogger(typeof(DraftRoleBriefing)), ct);
+        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock, logger, ct);
     }
 
     /// <summary>
@@ -434,7 +454,7 @@ public static partial class DraftRoleBriefing
             return $"{place}; only the cases escalated to the programme coordinator";
         }
 
-        return outsideTeam ? $"{place}, another team's cases" : $"{place}, the reader's team";
+        return outsideTeam ? $"{place}, another team's cases" : $"{place}, the reader's own cases";
     }
 
     private static bool IsReaders(CaseOwner owner, Actor reader) =>

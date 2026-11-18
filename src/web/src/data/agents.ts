@@ -23,17 +23,24 @@ export function isAiSwitchedOff(kind: FailureKind): boolean {
 /**
  * Asks the role-briefing agent for a few words on where the signed-in person should start today.
  *
+ * @param caseIds - The cases to sum up: the ones the "Start here today" card is about, the person's
+ * "My cases" (see `isMine`), so the agent's words and the card count the same cases.
  * @param signal - Cancels the call.
  * @param client - The client to call with; the dashboard's own by default.
  * @returns The agent's text, with the agent and prompt versions that wrote it. Fails with `conflict`
  * while AI is switched off (HTTP 409) and `unavailable` when the agent could not write it (HTTP 503).
  *
  * @remarks
- * Side effect: posts to `POST /ai/role-briefing` for the reader's own team. The API builds the
- * prompt from the worklist's numbers and case numbers, never from names, and records the read.
+ * Side effect: posts the case identifiers to `POST /ai/role-briefing`. The API briefs only those of
+ * them the person may read, from each case's coordination state, never from names; it sends the
+ * agent no identifier and records the read.
  */
-export function draftRoleBriefing(signal?: AbortSignal, client: CareLoopClient = api): Promise<ApiOutcome<AiText>> {
-  return callApi(() => client.POST('/ai/role-briefing', { signal }))
+export function draftRoleBriefing(
+  caseIds: readonly string[],
+  signal?: AbortSignal,
+  client: CareLoopClient = api,
+): Promise<ApiOutcome<AiText>> {
+  return callApi(() => client.POST('/ai/role-briefing', { body: { caseIds: [...caseIds] }, signal }))
 }
 
 /**
@@ -95,16 +102,20 @@ export function draftPatientMessage(
 }
 
 /**
- * Reads the role briefing for the signed-in person.
+ * Reads the role briefing for the signed-in person's cases.
  *
+ * @param caseIds - The cases to sum up, as {@link draftRoleBriefing} takes them.
  * @returns The read of `POST /ai/role-briefing`.
  *
  * @remarks
- * Side effects: posts to the API on mount, on `retry` and when someone else signs in. Mount the
- * component that uses it only when there is something to sum up, so no agent is asked for nothing.
+ * Side effects: posts to the API on mount, when the set of cases changes, on `retry` and when
+ * someone else signs in. The same cases in another order are the same set and ask nothing new. Mount
+ * the component that uses it only when there is something to sum up, so no agent is asked for
+ * nothing.
  */
-export function useRoleBriefing(): Read<AiText> {
-  const load = useCallback((signal: AbortSignal) => draftRoleBriefing(signal), [])
+export function useRoleBriefing(caseIds: readonly string[]): Read<AiText> {
+  const key = [...caseIds].sort().join(',')
+  const load = useCallback((signal: AbortSignal) => draftRoleBriefing(key === '' ? [] : key.split(','), signal), [key])
   return useApiRead(load)
 }
 

@@ -95,7 +95,7 @@ describe('start here today', () => {
     expect(startHere(queued, person('rekha-varghese'), TEST_NOW)).toEqual([])
   })
 
-  it('links each case and adds one sentence written by AI, asked for with the person’s identity', async () => {
+  it('links each case and adds one sentence written by AI about all of the person’s own cases, asked for with their identity', async () => {
     answer(BRIEFING, json(aiText({ text: 'One case is late and already escalated, so start there.' })))
     const region = await openAsRekha()
 
@@ -119,6 +119,25 @@ describe('start here today', () => {
     expect(request.headers.get('X-Demo-Role')).toBe('clinician')
     expect(request.headers.get('X-Demo-Facility')).toBe('family-health-centre')
     expect(request.query.toString()).toBe('')
+    // Every case "My cases" lists, not only the three on the card, and none of Dr. Sara's.
+    expect(JSON.parse(request.body)).toEqual({
+      caseIds: [LATE, URGENT, TODAY, LATER_TODAY, NEXT_WEEK].map((summary) => summary.caseId).sort(),
+    })
+  })
+
+  it('names the same cases however the case list orders them', async () => {
+    answer(BRIEFING, json(aiText()))
+    answer('GET /cases', json([NEXT_WEEK, SARAS, TODAY, LATER_TODAY, URGENT, LATE]))
+    const app = renderApp({ at: '#/', as: 'rekha-varghese' })
+    await within(await screen.findByRole('region', { name: 'Start here today' })).findByRole('figure', { name: CAPTION })
+    expect(sentRequests(BRIEFING)).toHaveLength(1)
+
+    answer('GET /cases', json([LATE, URGENT, LATER_TODAY, TODAY, SARAS, NEXT_WEEK]))
+    app.unmount()
+    renderApp({ at: '#/', as: 'rekha-varghese' })
+    await within(await screen.findByRole('region', { name: 'Start here today' })).findByRole('figure', { name: CAPTION })
+    const [first, second] = sentRequests(BRIEFING)
+    expect(second.body).toBe(first.body)
   })
 
   it('shows a skeleton line while AI writes, and the cases straight away', async () => {
@@ -175,6 +194,7 @@ describe('start here today', () => {
     expect(region.textContent).not.toMatch(/Hessa|MRN/)
     expect(await within(region).findByRole('figure', { name: CAPTION })).toHaveTextContent('One escalated case is waiting for you.')
     expect(sentRequests(BRIEFING)[0].headers.has('X-Demo-Facility')).toBe(false)
+    expect(JSON.parse(sentRequests(BRIEFING)[0].body)).toEqual({ caseIds: [LATE.caseId] })
     expect(card()).toBe(region)
   })
 })
