@@ -88,6 +88,8 @@ Every exported component, hook, function, type, interface and constant has TSDoc
 npm run generate:api
 ```
 
+CI does the same in the `web` job ("API types match the contract") and fails when the result differs from the committed file, so commit both together. A change to the contract alone also runs that job.
+
 `scripts/generate-api.mjs` runs `openapi-typescript`, a dev dependency. TypeScript stays on 5.9 because `openapi-typescript` and the ESLint TypeScript parser need its compiler API. `src/data/` wraps the generated types in an `openapi-fetch` client and small read hooks; nothing hand-written goes in `src/api/`. The identity headers are not in the OpenAPI document, so the client adds them in a middleware.
 
 ## Code
