@@ -341,6 +341,17 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const limitNote = list.complete ? null : (
     <p className="note">{t('worklist.limited', { limit: CASE_LIST_LIMIT })}</p>
   )
+  const showing = tp('worklist.showing', rows.length, { shown: visible.length })
+
+  // Screen readers hear how many cases are shown when the person changes what the list shows, never
+  // when a quiet read changes the list under them: then the words go, rather than say something stale.
+  const choice = [scope, filter, programme, query].join('\n')
+  const [announced, setAnnounced] = useState({ choice, text: '' })
+  if (announced.choice !== choice) {
+    setAnnounced({ choice, text: showing })
+  } else if (announced.text !== '' && announced.text !== showing) {
+    setAnnounced({ choice, text: '' })
+  }
 
   const clearFilters = (): void => {
     setFilter('all')
@@ -453,8 +464,11 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
         })}
       </div>
 
-      <p className="showing" aria-live="polite">
-        {tp('worklist.showing', rows.length, { shown: visible.length })}
+      <p className="showing">
+        {showing}
+      </p>
+      <p className="visually-hidden" role="status">
+        {announced.text}
       </p>
 
       {sections.length === 0 ? (
@@ -527,7 +541,9 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
  *
  * @remarks
  * Read-only; reads `GET /cases` page by page (up to {@link CASE_LIST_LIMIT} cases) and says how many
- * it shows. The API limits the list to the signed-in person's facility, and to the cases escalated
+ * it shows. It reads the list again quietly every 30 seconds while the page is visible, keeping
+ * filters, search and focus; the count is announced only when the person changes what is shown.
+ * The API limits the list to the signed-in person's facility, and to the cases escalated
  * to them for the programme coordinator, whose list shows no names. Staff can look at another
  * team's cases after saying why; the reason goes with every read and with each case they open from
  * that list. On wide screens each group is a table, with a separate status column from 1200 px and
@@ -543,7 +559,7 @@ export function WorklistPage() {
   const me = useSignedInStaff()
   const [scope, setScope] = useState<TeamScope>()
   const [choosing, setChoosing] = useState(false)
-  const read = useCaseList(scope ? { facilityId: scope.facilityId, reason: scope.reason } : {})
+  const read = useCaseList(scope ? { facilityId: scope.facilityId, reason: scope.reason } : {}, { live: true })
   const now = useNow()
 
   useEffect(() => {

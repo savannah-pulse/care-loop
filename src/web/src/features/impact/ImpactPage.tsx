@@ -390,8 +390,9 @@ function ComparisonBody({ read, labelledBy }: { readonly read: Read<SimulationRe
  * with what it counts and what it is out of, and what reminders and escalation change.
  *
  * @remarks
- * Read-only. The cards and tables come from `GET /metrics`: the facility of the signed-in person,
- * or every facility for the programme coordinator. Rates show their numerator and denominator, and
+ * Read-only. The cards and tables come from `GET /metrics`, read again quietly every 30 seconds
+ * while the page is visible: the facility of the signed-in person, or every facility for the
+ * programme coordinator. Rates show their numerator and denominator, and
  * an empty population says "not measured yet" instead of 0%. Times to each step are medians of
  * clock time from the result. The comparison comes from `POST /metrics/simulation`, which replays a
  * cohort with reminders and escalation on and off; while it is not built (501) it says so calmly,

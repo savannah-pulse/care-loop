@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Icon, OutsideTeamCard, ReadView, Toast } from '../../components'
 import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type TimelineEntry } from '../../data'
-import { describePatient, openEscalations, programmeName, resultSourceText } from '../../domain'
+import { describePatient, latestCase, openEscalations, programmeName, resultSourceText, type CaseChange } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
 import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
@@ -120,14 +120,17 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
  * other screening for clinicians, and what has happened.
  *
  * @remarks
- * Reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`. The one thing recorded here is
+ * Reads `GET /cases/{caseId}` and `GET /cases/{caseId}/timeline`, and both again quietly every 30
+ * seconds while the page is visible, so the case keeps up with what happens to it while nothing on
+ * the page moves and a half-filled call outcome stays as it is. The one thing recorded here is
  * what a patient said on a call, by a nurse navigator (`POST /cases/{caseId}/call-outcome`), after
- * which the case shows as the API returned it and the timeline is read again. Staff see the patient's
- * name and MRN; the programme coordinator sees a case number and a note that names and hospital
- * record numbers are hidden for their role, and the result reads as coming from the hospital
- * system, without its number. A case at another facility opens only after the person says why
- * (board 14): the API refuses the read without a reason, the screen asks for one, and the reason
- * then goes with every read of the case. Any other refusal says calmly that the case is not open to
+ * which the case shows as the API returned it until a newer read arrives (see `latestCase`), and
+ * the timeline is read again. Staff see the patient's name and MRN; the programme coordinator sees
+ * a case number and a note that names and hospital record numbers are hidden for their role, and
+ * the result reads as coming from the hospital system, without its number. A case at another
+ * facility opens only after the person says why (board 14): the API refuses the read without a
+ * reason, the screen asks for one, and the reason then goes with every read of the case. Any other
+ * refusal says calmly that the case is not open to
  * the person. Clinicians reach the AI handoff summary from the next action when a referral is due.
  */
 export function CasePage({ caseId }: CasePageProps) {
@@ -136,9 +139,9 @@ export function CasePage({ caseId }: CasePageProps) {
   const read = useCase(caseId, reason)
   const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
-  // The case as the API returned it after a call outcome, tied to the read it replaced: any newer read
-  // (another person signing in, a retry) is a different object and wins, so the snapshot never outlives it.
-  const [recorded, setRecorded] = useState<{ readonly base: CaseDetail; readonly detail: CaseDetail }>()
+  // The case as the API returned it after a call outcome, and the read it was made on. It shows until a
+  // newer read arrives, and a read that was already on its way, older than the call, never replaces it.
+  const [recorded, setRecorded] = useState<CaseChange>()
   const [toast, setToast] = useState<string>()
   const dismissToast = useCallback(() => setToast(undefined), [])
   const retryTimeline = timeline.retry
@@ -195,7 +198,7 @@ export function CasePage({ caseId }: CasePageProps) {
         >
           {(detail) => (
             <CaseView
-              detail={recorded?.base === detail ? recorded.detail : detail}
+              detail={latestCase(detail, recorded)}
               timeline={timeline}
               reason={reason}
               now={now}

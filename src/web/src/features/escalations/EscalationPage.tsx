@@ -18,10 +18,12 @@ import {
   describePatient,
   escalationTarget,
   isAddressedTo,
+  latestCase,
   nextActionText,
   nextActionWhy,
   noticeActor,
   programmeName,
+  type CaseChange,
 } from '../../domain'
 import { describeDue, formatWhen, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
@@ -238,11 +240,14 @@ function EscalationView({ detail, timeline, reason, now, onChanged, onStale }: E
  *
  * @remarks
  * Reads `GET /cases/{caseId}` and its timeline, like the case screen, with the reason given for a
- * case outside the reader's team. "Acknowledge" shows only for the role the latest open escalation
- * went to, at the case's facility, and asks for a confirmation first: acknowledging records that
- * the person has seen it, and changes neither who is responsible nor the deadline, and does not
- * stop the clock. It posts `POST /cases/{caseId}/escalations/{escalationId}/acknowledgement` for
- * exactly the escalation on screen. If it was acknowledged or replaced meanwhile (409), or the role
+ * case outside the reader's team, and reads both again quietly every 30 seconds while the page is
+ * visible, so a newer escalation or someone else's acknowledgement shows without anything on the
+ * page moving and an open confirmation stays open. "Acknowledge" shows only for the role the latest
+ * open escalation went to, at the case's facility, and asks for a confirmation first: acknowledging
+ * records that the person has seen it, and changes neither who is responsible nor the deadline, and
+ * does not stop the clock. It posts `POST /cases/{caseId}/escalations/{escalationId}/acknowledgement`
+ * for exactly the escalation on screen, and the case then shows as the API returned it until a newer
+ * read arrives (see `latestCase`). If it was acknowledged or replaced meanwhile (409), or the role
  * may not (403), the dialog says so calmly and the screen reads the case again.
  */
 export function EscalationPage({ caseId }: EscalationPageProps) {
@@ -251,9 +256,9 @@ export function EscalationPage({ caseId }: EscalationPageProps) {
   const read = useCase(caseId, reason)
   const timeline = useCaseTimeline(caseId, reason)
   const now = useNow()
-  const [updated, setUpdated] = useState<CaseDetail>()
+  const [updated, setUpdated] = useState<CaseChange>()
   const ready = read.state.status === 'ready'
-  const detail = updated ?? (read.state.status === 'ready' ? read.state.data : undefined)
+  const detail = read.state.status === 'ready' ? latestCase(read.state.data, updated) : undefined
   const patient = detail ? describePatient(detail, me.role) : undefined
   const current = detail ? currentEscalation(detail.escalations) : undefined
   const toMe = current ? isAddressedTo(current.escalatedTo, me) && !current.acknowledgedAt : false
@@ -312,12 +317,12 @@ export function EscalationPage({ caseId }: EscalationPageProps) {
           {(data) =>
             ready ? (
               <EscalationView
-                detail={updated ?? data}
+                detail={latestCase(data, updated)}
                 timeline={timeline}
                 reason={reason}
                 now={now}
                 onChanged={(next) => {
-                  setUpdated(next)
+                  setUpdated({ base: data, detail: next })
                   timeline.retry()
                 }}
                 onStale={reread}

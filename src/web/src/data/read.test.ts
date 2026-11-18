@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { answer, json, sentRequests } from '../testing/api'
 import type { ApiOutcome } from './outcome'
 import { FRESH_READ_MS, LIVE_REFRESH_MS, useApiRead, type Loader, type ReadOptions, type ReadState } from './read'
+import { useMetrics, useSimulation } from './reads'
 
 /** One call of a {@link scriptedLoader}: the signal it was given, and a way to answer it. */
 interface Call<T> {
@@ -195,5 +197,19 @@ describe('keeping a read up to date', () => {
     showPage('visible')
     focusWindow()
     expect(calls).toHaveLength(1)
+  })
+
+  it('keeps Impact’s numbers up to date, but never repeats the comparison, which replays a whole cohort', async () => {
+    answer('GET /metrics', json({}))
+    answer('POST /metrics/simulation', json({}))
+    renderHook(() => [useMetrics(), useSimulation()])
+    await wait(1)
+    expect(sentRequests('GET /metrics')).toHaveLength(1)
+
+    await wait(LIVE_REFRESH_MS)
+    expect(sentRequests('GET /metrics')).toHaveLength(2)
+    await wait(5 * LIVE_REFRESH_MS)
+    focusWindow()
+    expect(sentRequests('POST /metrics/simulation')).toHaveLength(1)
   })
 })
