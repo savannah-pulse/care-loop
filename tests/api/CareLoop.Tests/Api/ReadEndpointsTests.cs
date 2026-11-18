@@ -658,6 +658,58 @@ public sealed class ReadEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stage_counts_as_reached_when_its_event_happened_even_if_the_case_moved_on_at_once()
+    {
+        // Completed care: the outcome arrives once every required track is complete, so it goes straight to closure review.
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Attended, _clock.UtcNow));
+        await IngestAsync(Envelopes.Outcome(_clock.UtcNow));
+        await IngestAsync(Envelopes.Closure(_clock.UtcNow));
+
+        // A result still waiting for its review.
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: "SYN-RESULT-0002", namedOwner: Envelopes.Clinician()));
+
+        // An outcome recorded before the appointment, then a closure by documented exception: never in closure review.
+        const string declined = "SYN-RESULT-0003";
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: declined, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow, resultId: declined));
+        await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Scheduled, _clock.UtcNow.AddDays(1), resultId: declined));
+        await IngestAsync(Envelopes.Outcome(_clock.UtcNow, resultId: declined));
+        await IngestAsync(Envelopes.Closure(_clock.UtcNow, ClosureReason.Declined, evidenceReference: null,
+            exceptionNote: "SYN the patient declined further care", resultId: declined));
+
+        var reached = Value<MetricsResponse>(await MetricsAsync()).CasesReachingDisplayLabel;
+
+        Assert.Equal(new Dictionary<string, int>
+        {
+            ["ResultReceived"] = 3, ["CaseOpened"] = 3, ["OwnerAssigned"] = 3, ["PatientNotified"] = 2,
+            ["PatientAcknowledged"] = 1, ["Consultation"] = 0, ["FollowUp"] = 2, ["OutcomeRecorded"] = 2,
+            ["ClosureReview"] = 1, ["Closed"] = 2,
+        }, reached.ToDictionary(p => p.Key, p => p.Value.Numerator));
+        Assert.All(reached.Values, r => Assert.Equal(3, r.Denominator));
+    }
+
+    [Fact]
+    public async Task An_optional_stage_counts_when_it_happened_even_if_a_further_step_hid_it()
+    {
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Referral(_clock.UtcNow, ReferralStatus.Sent));
+        await IngestAsync(Envelopes.Consultation(_clock.UtcNow, ConsultationStatus.Requested));
+        var @case = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        Assert.Equal(CaseDisplayLabel.FollowUp, CaseDisplayLabels.From(@case, _pathways.Get(@case.PathwayId)));
+
+        var reached = Value<MetricsResponse>(await MetricsAsync()).CasesReachingDisplayLabel;
+
+        Assert.Equal(1, reached["PatientAcknowledged"].Numerator);
+        Assert.Equal(1, reached["Consultation"].Numerator);
+        Assert.Equal(1, reached["FollowUp"].Numerator);
+        Assert.Equal(0, reached["OutcomeRecorded"].Numerator);
+    }
+
+    [Fact]
     public async Task A_step_dated_before_its_screening_result_is_left_out_of_that_measure_not_fatal()
     {
         await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow.AddHours(1), namedOwner: Envelopes.Clinician()));

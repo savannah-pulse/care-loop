@@ -105,8 +105,12 @@ public static class GetMetrics
             AddDuration(steps["careStarted"], events.FirstOrDefault(e => e.Type == CaseEventType.OutcomeRecorded
                 && e.Projection.OutcomeEvidenceKind is "treatment-started" or "surveillance-started")?.At, start, @case.Id, exclude);
             AddDuration(steps["closure"], @case.Closure?.DecidedAt, start, @case.Id, exclude);
-            var reached = events.Select(e => Label(e.Projection, pathway))
-                .Append(CaseDisplayLabels.From(@case, pathway)).Distinct();
+            var reached = events.SelectMany(e => Reached(Label(e.Projection, pathway), e.Projection.Stage,
+                    e.Projection.Notification?.IsComplete == true, e.Projection.Consultation is not null,
+                    e.Projection.Referral is not null || e.Projection.Appointment is not null))
+                .Concat(Reached(CaseDisplayLabels.From(@case, pathway), @case.Stage, @case.Notification?.IsComplete() == true,
+                    @case.Consultation is not null, @case.Referral is not null || @case.Appointment is not null))
+                .Distinct();
             foreach (var label in reached) labelsReached[label.ToString()]++;
 
             var episodes = DeadlineEpisodes(events);
@@ -177,6 +181,35 @@ public static class GetMetrics
                 TrackKind.Appointment => p.Appointment?.IsComplete == true,
                 _ => throw new InvalidOperationException($"Unknown required track {t.Kind}."),
             }));
+
+    /// <summary>
+    /// The display labels a case had reached at one point in its history: the one it was at, every step before it that
+    /// no case can skip, and each optional step whose event had arrived.
+    /// </summary>
+    /// <remarks>
+    /// One event can pass several labels. The screening result receives the result, opens the case and moves it to
+    /// review at once, and an outcome that arrives when every required track is complete goes straight to closure
+    /// review. Those steps were still reached. The optional steps (the patient acknowledging, a consultation, a referral
+    /// or appointment, and closure review, which a closure by documented exception can bypass) count only when they
+    /// happened, even if a further step hid them from the label.
+    /// </remarks>
+    private static IEnumerable<CaseDisplayLabel> Reached(CaseDisplayLabel label, CaseStage stage, bool acknowledged,
+        bool consultation, bool referralOrAppointment)
+    {
+        yield return label;
+        yield return CaseDisplayLabel.ResultReceived;
+        if (stage is not CaseStage.Received)
+        {
+            yield return CaseDisplayLabel.CaseOpened;
+            yield return CaseDisplayLabel.OwnerAssigned;
+        }
+
+        if (stage is CaseStage.FollowUpActive or CaseStage.ClosureReview or CaseStage.Closed) yield return CaseDisplayLabel.PatientNotified;
+        if (acknowledged) yield return CaseDisplayLabel.PatientAcknowledged;
+        if (consultation) yield return CaseDisplayLabel.Consultation;
+        if (referralOrAppointment) yield return CaseDisplayLabel.FollowUp;
+        if (stage is CaseStage.ClosureReview or CaseStage.Closed) yield return CaseDisplayLabel.OutcomeRecorded;
+    }
 
     private static List<DeadlineEpisode> DeadlineEpisodes(List<HistoryEntry> history)
     {

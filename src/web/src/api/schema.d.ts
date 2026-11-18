@@ -796,7 +796,11 @@ export interface components {
             closuresByReason: {
                 [key: string]: number | string;
             };
-            /** @description Cases that actually reached each display label in an applied audit projection; no skipped labels are inferred. */
+            /**
+             * @description Cases that reached each display label. A label counts once the event that puts a case there was applied, even when
+             *     the case moved on at once, as it does from result received to owner assigned; an optional step (patient acknowledged,
+             *     consultation, follow-up or closure review) counts only for cases where it happened.
+             */
             casesReachingDisplayLabel: {
                 [key: string]: components["schemas"]["RateMeasureResponse"];
             };
