@@ -632,7 +632,6 @@
     "methodTitle": "How this is worked out",
     "methodBody": "We replay the same cases twice: once with reminders and escalation, and once without them. Everything else stays the same, so the difference shows what reminders and escalation change. It shows how CareLoop works; it is not evidence of real-world results.",
     "comparisonLoading": "Running the comparison",
-    "comparisonNotAvailable": "The comparison with reminders and escalation switched off will show here once it is switched on.",
     "comparisonUnavailableTitle": "The comparison isn't available right now",
     "comparisonUnavailableBody": "The rest of the numbers on this page are up to date. Check again later.",
     "footnote": "These numbers show how CareLoop works. They are not evidence of real-world results."

@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { Icon, LoadingState, NotAvailableState, ReadView } from '../../components'
 import { useMetrics, useSimulation, type Metrics, type Read, type SimulationArm, type SimulationResult } from '../../data'
 import { DISPLAY_LABELS, EXCEPTION_NAMES, displayLabelText, exceptionLabel, isDisplayLabel } from '../../domain'
@@ -373,15 +373,50 @@ function ComparisonBody({ read, labelledBy }: { readonly read: Read<SimulationRe
   if (state.status === 'ready') {
     return <Comparison result={state.data} labelledBy={labelledBy} />
   }
-  if (state.failure.kind === 'notAvailable') {
-    return <NotAvailableState body={t('impact.comparisonNotAvailable')} onCheckAgain={retry} />
-  }
   return (
     <NotAvailableState
       title={t('impact.comparisonUnavailableTitle')}
       body={t('impact.comparisonUnavailableBody')}
       onCheckAgain={retry}
     />
+  )
+}
+
+/** Props for {@link ComparisonCard}. */
+export interface ComparisonCardProps {
+  /** The read of `POST /metrics/simulation`, from `useSimulation`. */
+  readonly read: Read<SimulationResult>
+}
+
+/**
+ * The card "What reminders and escalation change": a cohort replayed with reminders and escalation
+ * on and off, side by side.
+ *
+ * @remarks
+ * Left out entirely until the API answers with the comparison, and for as long as it answers that
+ * the comparison is not built yet (HTTP 501, WS10), so the page never shows a placeholder for it.
+ * Any other failure shows the card with a calm "isn't available right now" and a way to check
+ * again, and the card stays in place while the comparison runs again. The comparison is never
+ * repeated by itself, because each run replays a whole cohort.
+ */
+export function ComparisonCard({ read }: ComparisonCardProps) {
+  const headingId = useId()
+  const [shown, setShown] = useState(false)
+  const { state } = read
+  const answered = state.status === 'ready' || (state.status === 'failed' && state.failure.kind !== 'notAvailable')
+  if (answered && !shown) {
+    setShown(true)
+  }
+  if (!answered && !(shown && state.status === 'loading')) {
+    return null
+  }
+  return (
+    <section className="card" aria-labelledby={headingId}>
+      <h2 className="card-title" id={headingId}>
+        {t('impact.comparisonTitle')}
+      </h2>
+      <ComparisonBody read={read} labelledBy={headingId} />
+    </section>
   )
 }
 
@@ -395,7 +430,7 @@ function ComparisonBody({ read, labelledBy }: { readonly read: Read<SimulationRe
  * programme coordinator. Rates show their numerator and denominator, and
  * an empty population says "not measured yet" instead of 0%. Times to each step are medians of
  * clock time from the result. The comparison comes from `POST /metrics/simulation`, which replays a
- * cohort with reminders and escalation on and off; while it is not built (501) it says so calmly,
+ * cohort with reminders and escalation on and off; while it is not built (501) the card is left out,
  * and any other failure says it is not available right now. These numbers show how CareLoop works;
  * they are not evidence of real-world results.
  */
@@ -404,7 +439,6 @@ export function ImpactPage() {
   const me = useSignedInStaff()
   const metrics = useMetrics()
   const simulation = useSimulation()
-  const comparisonId = useId()
   const data = metrics.state.status === 'ready' ? metrics.state.data : undefined
   const generatedAt = data ? parseInstant(data.generatedAt) : undefined
   const scope = me.facilityId ? facilityName(me.facilityId) : t('impact.allFacilities')
@@ -431,12 +465,7 @@ export function ImpactPage() {
       >
         {(loaded) => <MetricsView metrics={loaded} />}
       </ReadView>
-      <section className="card" aria-labelledby={comparisonId}>
-        <h2 className="card-title" id={comparisonId}>
-          {t('impact.comparisonTitle')}
-        </h2>
-        <ComparisonBody read={simulation} labelledBy={comparisonId} />
-      </section>
+      <ComparisonCard read={simulation} />
       <p className="note">{t('impact.footnote')}</p>
     </div>
   )
