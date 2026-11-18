@@ -58,6 +58,24 @@ An environment is a parameter file. `deploy.sh <name>` reads `environments/<name
 
 The switches are parameters of `main.bicep`: `privateNetworking`, `deploySimulators`, `deployAi`, `deployMonitoring`, plus `exposeApi`, `exposeSimulators` and `allowedIpRanges` for what is reachable from the internet.
 
+## Addresses
+
+Each app's address is `https://<app>.<environment domain>`, for example `https://web.<environment domain>`. The
+environment domain is given to the Container Apps environment when it is created, so:
+
+- **Every redeployment keeps the same addresses.** A new build, a changed setting or a new revision does not touch them.
+- **Deleting the environment loses them.** Removing the Container Apps environment (or the whole resource group) and
+  deploying again gives a new, different domain, and every address changes. To keep the addresses, never delete
+  `cae-<prefix>-<environment>`; redeploy over it.
+- **Addresses that survive a rebuild need a custom domain**, a name you own with DNS records pointing at the web app.
+  That is not set up here.
+
+`deploy.sh` prints the addresses at the end of every run, and they can be read at any time:
+
+```bash
+az deployment sub show --name careloop-dev --query "properties.outputs.{dashboard:webUrl.value, api:apiUrl.value, his:hisSimulatorUrl.value, messaging:messagingSimulatorUrl.value}" -o table
+```
+
 ## What is reachable from the internet
 
 This is a prototype, so by default everything with a screen or an endpoint is public and nothing is restricted by address:

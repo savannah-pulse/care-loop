@@ -12,6 +12,7 @@
 # Environment variables (all optional):
 #   AZURE_LOCATION            region, default uaenorth
 #   ASSIGN_ROLES              false when you are Contributor only: no role assignments are made (see the README)
+#   DEMO_TIMING               false runs the real pathway (deadlines in hours and days) instead of the demo one
 #   POSTGRES_LOCATION         region of the database, default AZURE_LOCATION
 #   POSTGRES_SKU_NAME, POSTGRES_SKU_TIER
 #                             database size where the parameter file reads them, default Standard_B1ms and Burstable
@@ -29,7 +30,7 @@
 set -euo pipefail
 
 usage() {
-  sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 

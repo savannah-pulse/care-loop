@@ -19,6 +19,11 @@ param privateNetworking = false
 param deploySimulators = true
 param deployMonitoring = true
 
+// Demo timing: the demo pathway (deadlines in seconds) and a one-second deadline sweep, to match the
+// simulators' scenarios. Set DEMO_TIMING=false to run the real pathway, whose deadlines last hours and
+// days, so that open cases stay on time long enough to be looked at (see infra/demo/README.md).
+param demoTiming = toLower(readEnvironmentVariable('DEMO_TIMING', 'true')) == 'true'
+
 // The AI workflow service is deployed and pointed at the team's existing Foundry project, named by
 // the environment variables below. To create a Foundry here instead, for a subscription that has
 // none, set CREATE_FOUNDRY=true (and AZURE_AI_LOCATION for a region that offers the model).

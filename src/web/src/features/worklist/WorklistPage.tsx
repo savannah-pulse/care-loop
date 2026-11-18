@@ -10,9 +10,12 @@ import { navigate, routeHref } from '../../routing'
 import {
   FILTER_TONES,
   WORKLIST_FILTERS,
+  WORKLIST_SCOPES,
   countByFilter,
   countOpen,
   groupRows,
+  hasOwnWorklist,
+  isMine,
   matchesFilter,
   matchesProgramme,
   matchesSearch,
@@ -22,6 +25,7 @@ import {
   type WorklistCounts,
   type WorklistFilter,
   type WorklistRow,
+  type WorklistScope,
   type WorklistSection,
 } from './worklist'
 
@@ -306,13 +310,20 @@ interface WorklistBodyProps {
   readonly list: CaseList
   readonly now: Date
   readonly toolbarExtra?: ReactNode
+  /** `true` while the list is the person's own team's, where "My cases" means something. */
+  readonly ownTeam: boolean
 }
 
-function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
+function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const me = useSignedInStaff()
   const wide = useMediaQuery(WIDE_LAYOUT_QUERY)
   const roomy = useMediaQuery(ROOMY_LAYOUT_QUERY)
-  const rows = useMemo(() => toWorklistRows(list.cases, me.role), [list.cases, me.role])
+  const teamRows = useMemo(() => toWorklistRows(list.cases, me.role), [list.cases, me.role])
+  const mineRows = useMemo(() => teamRows.filter((row) => isMine(row, me)), [teamRows, me])
+  const canNarrow = ownTeam && hasOwnWorklist(me.role)
+  const [chosenScope, setChosenScope] = useState<WorklistScope>('mine')
+  const scope: WorklistScope = canNarrow ? chosenScope : 'team'
+  const rows = scope === 'mine' ? mineRows : teamRows
   const [filter, setFilter] = useState<WorklistFilter>('all')
   const [programme, setProgramme] = useState('')
   const [query, setQuery] = useState('')
@@ -337,13 +348,35 @@ function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
     setQuery('')
   }
 
+  const scopeBar = canNarrow ? (
+    <div className="chips" role="group" aria-label={t('worklist.scopeLabel')}>
+      {WORKLIST_SCOPES.map((id) => (
+        <button
+          key={id}
+          type="button"
+          className="chip"
+          aria-pressed={scope === id}
+          onClick={() => {
+            setChosenScope(id)
+            setShowAll(false)
+          }}
+        >
+          {t(`worklist.scopes.${id}`)} <b>{id === 'mine' ? mineRows.length : teamRows.length}</b>
+        </button>
+      ))}
+    </div>
+  ) : null
+
   if (rows.length === 0 || (allOnTrack && !showAll)) {
     const deadline = nextDeadline(rows)
+    const noneOfMine = rows.length === 0 && scope === 'mine' && teamRows.length > 0
     const body =
       rows.length === 0
-        ? me.role === 'coordinator'
-          ? t('worklist.emptyNothingEscalated')
-          : t('worklist.emptyNoCases')
+        ? noneOfMine
+          ? tp('worklist.emptyNoneOfMine', teamRows.length)
+          : me.role === 'coordinator'
+            ? t('worklist.emptyNothingEscalated')
+            : t('worklist.emptyNoCases')
         : deadline
           ? tp('worklist.emptyAllOnTrack', rows.length, { date: formatWhen(deadline, now) })
           : tp('worklist.emptyAllOnTrackNoDeadline', rows.length)
@@ -351,6 +384,7 @@ function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
       <>
         <Greeting now={now} summary={summary} />
         {toolbarExtra}
+        {scopeBar}
         <EmptyState
           icon="positive"
           title={t('worklist.emptyTitle')}
@@ -359,6 +393,10 @@ function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
             rows.length > 0 ? (
               <button type="button" className="btn" onClick={() => setShowAll(true)}>
                 {t('worklist.showAll')}
+              </button>
+            ) : noneOfMine ? (
+              <button type="button" className="btn" onClick={() => setChosenScope('team')}>
+                {t('worklist.showTeam')}
               </button>
             ) : undefined
           }
@@ -372,6 +410,7 @@ function WorklistBody({ list, now, toolbarExtra }: WorklistBodyProps) {
     <>
       <Greeting now={now} summary={summary} />
       {toolbarExtra}
+      {scopeBar}
       <div className="toolbar">
         <label className="field search" htmlFor={`${ids}-search`}>
           <Icon name="search" />
@@ -475,9 +514,14 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
 }
 
 /**
- * Screen 1, the worklist: a greeting and a one-line summary, then every open case of the person's
- * team grouped into "Needs action now", "Due today" and "Coming up", each with one next action, one
- * person responsible and one due time.
+ * Screen 1, the worklist: a greeting and a one-line summary, then the open cases grouped into
+ * "Needs action now", "Due today" and "Coming up", each with one next action, one person
+ * responsible and one due time.
+ *
+ * It opens on "My cases", the cases that wait for the signed-in person (see `isMine`), and
+ * "Whole team" shows every open case at their facility. The summary line and the counts follow
+ * whichever is showing. The programme coordinator has no such choice: their list is already the
+ * cases escalated to them.
  *
  * @remarks
  * Read-only; reads `GET /cases` page by page (up to {@link CASE_LIST_LIMIT} cases) and says how many
@@ -533,7 +577,7 @@ export function WorklistPage() {
         errorTitle={t('worklist.errorTitle')}
         forbidden={{ title: t('worklist.forbiddenTitle'), body: t('worklist.forbiddenBody') }}
       >
-        {(list) => <WorklistBody list={list} now={now} toolbarExtra={teamBar} />}
+        {(list) => <WorklistBody list={list} now={now} toolbarExtra={teamBar} ownTeam={!scope} />}
       </ReadView>
       <p className="note">{t('worklist.note')}</p>
       {me.facilityId ? (

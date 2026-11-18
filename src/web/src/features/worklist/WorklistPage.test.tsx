@@ -53,7 +53,8 @@ describe('worklist', () => {
     ['on cards, on a narrow screen', 640],
   ])('names every case by its patient and MRN %s, so no two share a name', async (_layout, width) => {
     answer('GET /cases', json([HESSA, NOURA, UNNAMED, MARIAM, MARIAM_BOWEL, NAMESAKE]))
-    renderApp({ at: '#/', as: 'huda-saleh', width })
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh', width })
+    await user.click(await screen.findByRole('button', { name: /^Whole team/ }))
     await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })
 
     expect(screen.queryAllByRole('table').length > 0).toBe(width >= 900)
@@ -91,6 +92,7 @@ describe('worklist', () => {
       return json(facilityId === 'regional-hospital' ? [theirs] : [HESSA])
     })
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+    await user.click(await screen.findByRole('button', { name: /^Whole team/ }))
     await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })
 
     await user.click(screen.getByRole('button', { name: "View another team's cases" }))
@@ -121,6 +123,48 @@ describe('worklist', () => {
         'I am covering for a colleague there today',
       ])
     }
+  })
+
+  it('opens on the signed-in person’s own cases, with the whole team one press away', async () => {
+    const rekhas = caseSummary({ ...HESSA, owner: owner({ reference: 'rekha-varghese' }) })
+    const saras = caseSummary({ ...NOURA, owner: owner({ reference: 'sara-al-hammadi' }) })
+    const callBack = caseSummary({ ...MARIAM, nextAction: 'call-patient', owner: owner({ reference: 'sara-al-hammadi' }) })
+    answer('GET /cases', json([rekhas, saras, callBack]))
+    const { user } = renderApp({ at: '#/', as: 'rekha-varghese' })
+
+    expect(await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })).toBeInTheDocument()
+    expect(caseLinks()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^My cases\s*1$/ })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: /^Whole team\s*3$/ }))
+    expect(caseLinks()).toHaveLength(3)
+    expect(sentRequests('GET /cases').every((request) => !request.query.has('ownerReference'))).toBe(true)
+  })
+
+  it('shows the nurse navigator the patients waiting for a call, and the facility lead what is escalated or unowned', async () => {
+    const callBack = caseSummary({ ...MARIAM, nextAction: 'call-patient' })
+    const escalated = caseSummary({ ...NOURA, isEscalated: true, exceptions: ['Overdue'] })
+    const unowned = caseSummary({ ...NAMESAKE, exceptions: ['Unassigned'], owner: owner({ reference: 'facility-lead:family-health-centre', isQueue: true }) })
+    answer('GET /cases', json([HESSA, callBack, escalated, unowned]))
+
+    const nurse = renderApp({ at: '#/', as: 'huda-saleh' })
+    expect(await screen.findByRole('link', { name: `Mariam Al Mansoori, ${mrn('100245894')}` })).toBeInTheDocument()
+    expect(caseLinks()).toHaveLength(1)
+    nurse.unmount()
+
+    renderApp({ at: '#/', as: 'joy-bautista' })
+    expect(await screen.findByRole('link', { name: `Noura Al Shamsi, ${mrn('100245892')}` })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: `Mariam Al Mansoori, ${mrn('100245896')}` })).toBeInTheDocument()
+    expect(caseLinks()).toHaveLength(2)
+  })
+
+  it('says so when nothing waits for the person, and offers the team’s list', async () => {
+    answer('GET /cases', json([HESSA]))
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+
+    expect(await screen.findByText('No open case is waiting for you. Your team has 1 open case.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show the whole team' }))
+    expect(await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })).toBeInTheDocument()
   })
 
   it('lets the programme coordinator search by case number, and never shows or searches names', async () => {

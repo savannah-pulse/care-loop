@@ -94,10 +94,12 @@ is open to anyone with these addresses. Never enter real patient data.
 | HIS simulator | <https://his-simulator.greendune-d4715603.eastus2.azurecontainerapps.io> |
 | Messaging simulator | <https://messaging-simulator.greendune-d4715603.eastus2.azurecontainerapps.io> |
 
-It uses the demo timing, so pathway deadlines elapse in seconds. The first request after a quiet spell can take about
-twenty seconds. How it was deployed, and how to deploy your own, is in
-[`infra/azure/DEPLOY-FROM-LOCAL.md`](infra/azure/DEPLOY-FROM-LOCAL.md). The addresses change if the environment is
-rebuilt from scratch; update this table when that happens.
+It holds seeded demonstration cases for each person on the dashboard's sign-in list (see
+[`infra/demo/README.md`](infra/demo/README.md)) and runs the real pathway timing, so open cases stay on time for about a
+day. The first request after a quiet spell can take about twenty seconds. How it was deployed, and how to deploy your own, is in
+[`infra/azure/DEPLOY-FROM-LOCAL.md`](infra/azure/DEPLOY-FROM-LOCAL.md). These addresses are stable: they stay the same through every redeployment, because they belong to the Container Apps
+environment, not to a build. They change only if that environment is deleted and created again, so do not delete it;
+update this table if that ever happens.
 
 ## Start everything
 

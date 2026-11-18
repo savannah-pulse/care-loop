@@ -12,6 +12,7 @@ import {
   type Tone,
 } from '../../domain'
 import { isSameDay, parseInstant } from '../../format'
+import { sameReference } from '../../identity'
 
 /**
  * The worklist's filter chips: all open cases, then one per exception queue.
@@ -51,6 +52,71 @@ const FILTER_EXCEPTIONS: Readonly<Partial<Record<WorklistFilter, string>>> = {
   notReached: 'Unreachable',
   notAcknowledged: 'Unacknowledged',
   needsOwner: 'Unassigned',
+}
+
+/**
+ * Whose cases the worklist shows: the signed-in person's own, or the whole team's.
+ *
+ * @remarks
+ * The worklist opens on `mine`, so that a person first sees what waits for them, and the whole
+ * team's list is one press away. See {@link isMine} for what "mine" means for each role.
+ */
+export const WORKLIST_SCOPES = ['mine', 'team'] as const
+
+/** One of the worklist's scopes. */
+export type WorklistScope = (typeof WORKLIST_SCOPES)[number]
+
+/** The person reading the worklist, as far as deciding which cases are theirs needs. */
+export interface WorklistViewer {
+  /** Their role key, for example `clinician`. */
+  readonly role: string
+  /** The reference cases name them by as owner, for example `rekha-varghese`. */
+  readonly reference: string
+}
+
+/** The next action that is a nurse navigator's to do: calling a patient who asked for a call. */
+const CALL_PATIENT_ACTION = 'call-patient'
+
+/**
+ * Tells whether a role has a list of its own, narrower than its team's.
+ *
+ * @param role - A role key.
+ * @returns `true` for clinicians, the nurse navigator and the facility lead. The programme
+ * coordinator's list is already limited by the API to the cases escalated to them, and other roles
+ * see their team's.
+ */
+export function hasOwnWorklist(role: string): boolean {
+  return ['clinician', 'receiving-clinician', 'nurse-navigator', 'facility-lead'].includes(role)
+}
+
+/**
+ * Tells whether a case waits for the person reading, rather than for someone else on their team.
+ *
+ * @remarks
+ * - A clinician: the cases they are responsible for.
+ * - The nurse navigator: the patients waiting for a call back, whoever is responsible for the case,
+ *   because the call is the navigator's to make.
+ * - The facility lead: the cases escalated, and the cases with no named owner, which sit in the
+ *   lead's queue.
+ * - Anyone else: every case they are shown.
+ *
+ * @param row - A worklist row.
+ * @param viewer - The person reading.
+ * @returns `true` when the case belongs on that person's own list.
+ */
+export function isMine(row: WorklistRow, viewer: WorklistViewer): boolean {
+  const { owner, nextAction, isEscalated } = row.summary
+  switch (viewer.role) {
+    case 'clinician':
+    case 'receiving-clinician':
+      return !owner.isQueue && sameReference(owner.reference, viewer.reference)
+    case 'nurse-navigator':
+      return nextAction === CALL_PATIENT_ACTION
+    case 'facility-lead':
+      return isEscalated || owner.isQueue
+    default:
+      return true
+  }
 }
 
 /**

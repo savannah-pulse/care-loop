@@ -264,6 +264,16 @@
     "emptyNoCases": "There are no open cases.",
     "emptyNothingEscalated": "No case is escalated to you. A case shows here while an escalation is with the programme coordinator.",
     "showAll": "Show all cases",
+    "scopeLabel": "Whose cases",
+    "scopes": {
+      "mine": "My cases",
+      "team": "Whole team"
+    },
+    "emptyNoneOfMine": {
+      "one": "No open case is waiting for you. Your team has {count} open case.",
+      "other": "No open case is waiting for you. Your team has {count} open cases."
+    },
+    "showTeam": "Show the whole team",
     "filterEmptyTitle": "No cases match these filters",
     "filterEmptyBody": "Try another filter, or clear them to see every open case.",
     "clearFilters": "Clear filters",
