@@ -21,6 +21,7 @@ export {
   draftImpactSummary,
   draftPatientMessage,
   draftRoleBriefing,
+  isAiSwitchedOff,
   useImpactSummary,
   usePatientMessageDraft,
   useRoleBriefing,

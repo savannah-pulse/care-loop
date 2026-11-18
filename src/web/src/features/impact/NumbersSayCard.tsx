@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { AiChip, AiWords, Icon, LoadingState } from '../../components'
-import type { AiText, Read } from '../../data'
+import { isAiSwitchedOff, type AiText, type Read } from '../../data'
 import { t } from '../../i18n'
 
 /** Props for {@link NumbersSayCard}. */
@@ -15,9 +15,16 @@ function Body({ read }: NumbersSayCardProps) {
     return <LoadingState label={t('impact.ai.loading')} />
   }
   if (state.status === 'ready') {
-    return <AiWords text={state.data.text} caption={t('impact.ai.caption')} className="numbers-say-words" />
+    return (
+      <AiWords
+        text={state.data.text}
+        caption={t('impact.ai.caption')}
+        className="numbers-say-words"
+        versions={state.data}
+      />
+    )
   }
-  if (state.failure.kind === 'notAvailable') {
+  if (isAiSwitchedOff(state.failure.kind)) {
     return (
       <div className="ai-quiet" role="status">
         <p>{t('impact.ai.notReady')}</p>
@@ -40,10 +47,11 @@ function Body({ read }: NumbersSayCardProps) {
  *
  * @remarks
  * CareLoop works out every number on the page; the agent only puts them into words, from the totals,
- * never from a case or a name. The card loads on its own, so the numbers never wait for it. While it
- * loads it shows a skeleton; while AI is switched off (501) one calm line that it is not ready yet;
- * when the agent could not write it (503, or any other failure) a calm note that every number is
- * still up to date. No half-written text is ever shown.
+ * never from a case or a name, with small numbers hidden before they are sent. The card loads on its
+ * own, so the numbers never wait for it. While it loads it shows a skeleton; while AI is switched off
+ * (409) one calm line that it is not ready yet; when the agent could not write it (503, or any other
+ * failure) a calm note that every number is still up to date. No half-written text is ever shown.
+ * Under the words, in small muted text, it names the agent and prompt versions that wrote them.
  */
 export function NumbersSayCard({ read }: NumbersSayCardProps) {
   const headingId = useId()

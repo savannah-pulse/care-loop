@@ -112,6 +112,7 @@ describe('start here today', () => {
 
     const words = await within(region).findByRole('figure', { name: CAPTION })
     expect(words).toHaveTextContent('One case is late and already escalated, so start there.')
+    expect(within(words).getByText('Agent role-briefing, version 2. Prompt role-briefing-v2.')).toHaveClass('ai-versions')
     const [request, ...more] = sentRequests(BRIEFING)
     expect(more).toHaveLength(0)
     expect(request.headers.get('X-Demo-User')).toBe('rekha-varghese')
@@ -131,8 +132,8 @@ describe('start here today', () => {
     expect(await within(region).findByRole('figure', { name: CAPTION })).toBeInTheDocument()
   })
 
-  it('leaves the AI line out while AI is switched off (501)', async () => {
-    answer(BRIEFING, problem(501, 'RoleBriefing is switched off here.'))
+  it('leaves the AI line out while AI is switched off (409)', async () => {
+    answer(BRIEFING, problem(409, 'RoleBriefing is switched off here.'))
     const region = await openAsRekha()
 
     await screen.findByText('Case 1A2B3C4D')

@@ -288,7 +288,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Asks the impact-summary agent to say in plain words what the aggregate numbers show. */
+        /** Asks the impact-summary agent to say in plain, neutral words what the aggregate numbers show. */
         post: operations["DraftImpactSummary"];
         delete?: never;
         options?: never;
@@ -402,6 +402,10 @@ export interface components {
         AiTextResponse: {
             /** @description The agent that wrote the text, as named in the Foundry project, for example `role-briefing`. */
             agent: string;
+            /** @description The agent version that wrote it, as pinned in `Ai:Agents`, for example `2`. */
+            agentVersion: string;
+            /** @description The version of the prompt's wording that asked for it, for example `role-briefing-v2`. */
+            promptVersion: string;
             /** @description The text exactly as the agent wrote it, trimmed. Plain text, never markup to render. */
             text: string;
             /**
@@ -2044,13 +2048,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Service Unavailable */
@@ -2114,13 +2118,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Service Unavailable */
@@ -2194,13 +2198,13 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Service Unavailable */

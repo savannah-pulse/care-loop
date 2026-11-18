@@ -1377,11 +1377,14 @@ export function roleBriefingWords(coordinator: boolean): string {
     : 'One case is late and already escalated, so start there. The urgent one is due at noon, and the last one by the end of the day.'
 }
 
-/** What the impact-summary agent writes in the mock: a few sentences on the numbers, with no numbers in them. */
+/**
+ * What the impact-summary agent writes in the mock: a few neutral sentences on the numbers, with no numbers in them
+ * and no reasons why.
+ */
 export const IMPACT_SUMMARY_WORDS = [
-  'Most next steps are being done by their deadline, and most patients who were called said their next step back.',
-  'Where cases are waiting, it is mostly for a unit to accept a referral, often after another unit declined for lack of capacity.',
-  'A few appointments whose time has passed have no outcome recorded yet, which is worth checking before reading the attendance figure.',
+  'Next steps done by their deadline are the larger share, and understanding is recorded for most patients who acknowledged.',
+  'Open cases wait mostly at the referral step, where acceptance is not yet recorded; some of these follow a referral another unit declined.',
+  'Some appointments whose time has passed have no outcome recorded yet, which is worth checking before reading the attendance figure.',
 ].join('\n\n')
 
 /**
@@ -1389,15 +1392,15 @@ export const IMPACT_SUMMARY_WORDS = [
  *
  * @param channel - `Sms` for a text message, `Email` for an email.
  * @param facility - The care team's facility, by name.
- * @returns A synthetic draft with `{first name}` where the name goes and the two reply codes at the end. It never
- * mentions a result.
+ * @returns A synthetic draft with `{first name}` where the name goes, the patient-safe step "your care team would
+ * like to talk with you" and the two reply codes at the end. It never mentions a result.
  */
 export function patientMessageWords(channel: 'Sms' | 'Email', facility: string): string {
   return channel === 'Sms'
-    ? `{first name}, this is your care team at ${facility}. We have a follow-up step for you and will be in touch about it soon. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.`
+    ? `{first name}, this is your care team at ${facility}. We would like to talk with you, and someone from the team will be in touch soon. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.`
     : [
-        'Subject: A follow-up step from your care team',
-        `Dear {first name},\n\nThis is your care team at ${facility}. We have a follow-up step for you, and someone from the team will be in touch about it soon.`,
+        'Subject: Your care team would like to talk with you',
+        `Dear {first name},\n\nThis is your care team at ${facility}. We would like to talk with you, and someone from the team will be in touch soon.`,
         'Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.',
         `Your care team at ${facility}`,
       ].join('\n\n')

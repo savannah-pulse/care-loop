@@ -8,7 +8,7 @@
 export { AccessReasonForm } from './AccessReasonForm'
 export type { AccessReasonFormProps } from './AccessReasonForm'
 export { AiChip, AiWords } from './AiWords'
-export type { AiChipProps, AiWordsProps } from './AiWords'
+export type { AiChipProps, AiWordsProps, AiWordsVersions } from './AiWords'
 export { AppHeader } from './AppHeader'
 export type { AppHeaderProps } from './AppHeader'
 export { Dialog } from './Dialog'

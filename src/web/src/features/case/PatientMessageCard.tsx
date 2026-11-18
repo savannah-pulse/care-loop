@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { AiWords, Dialog, Icon, LoadingState } from '../../components'
-import { usePatientMessageDraft, type MessageChannel } from '../../data'
+import { isAiSwitchedOff, usePatientMessageDraft, type MessageChannel } from '../../data'
 import { t } from '../../i18n'
 
 /** Props for {@link PatientMessageCard}. */
@@ -25,7 +25,8 @@ function Preview({ caseId, reason, onClose }: PreviewProps) {
   const [channel, setChannel] = useState<MessageChannel>('Sms')
   const { state, retry } = usePatientMessageDraft({ caseId, channel, reason })
   const kind = state.status === 'failed' ? state.failure.kind : undefined
-  const canAskAgain = state.status === 'ready' || (kind !== undefined && kind !== 'notAvailable' && kind !== 'forbidden')
+  const off = kind !== undefined && isAiSwitchedOff(kind)
+  const canAskAgain = state.status === 'ready' || (kind !== undefined && !off && kind !== 'forbidden')
   return (
     <>
       <fieldset className="channel-choice">
@@ -46,9 +47,15 @@ function Preview({ caseId, reason, onClose }: PreviewProps) {
       <div className="preview-body">
         {state.status === 'loading' ? <LoadingState label={t('case.message.loading')} /> : null}
         {state.status === 'ready' ? (
-          <AiWords text={state.data.text} caption={t('case.message.caption')} chip={t('ai.draftChip')} className="preview" />
+          <AiWords
+            text={state.data.text}
+            caption={t('case.message.caption')}
+            chip={t('ai.draftChip')}
+            className="preview"
+            versions={state.data}
+          />
         ) : null}
-        {kind === 'notAvailable' ? (
+        {off ? (
           <p className="ai-quiet" role="status">
             {t('case.message.notReady')}
           </p>
@@ -64,7 +71,7 @@ function Preview({ caseId, reason, onClose }: PreviewProps) {
             {t('case.message.forbidden')}
           </p>
         ) : null}
-        {kind !== undefined && kind !== 'notAvailable' && kind !== 'unavailable' && kind !== 'forbidden' ? (
+        {kind !== undefined && !off && kind !== 'unavailable' && kind !== 'forbidden' ? (
           <p className="ai-note" role="status">
             <Icon name="alert" />
             <span>{t('case.message.error')}</span>
@@ -93,10 +100,12 @@ function Preview({ caseId, reason, onClose }: PreviewProps) {
  * The button opens a dialog that asks `POST /cases/{caseId}/patient-message-draft` for a preview, as
  * a text message first; the person can switch to an email or ask again. The draft is captioned as
  * written by AI and not sent: patient messages go out from approved templates, and this preview is
- * neither sent nor stored. The agent is given no name: it writes `{first name}` where the name goes.
- * While AI is switched off (501) the dialog says so in one calm line; when the agent could not write
- * it (503) it says nothing was sent. Focus moves into the dialog when it opens and back to the button
- * when it closes.
+ * neither sent nor stored. The agent is given no name and no place: it writes `{first name}` and
+ * `{place}` where they go, and it is given a patient-safe step, never the case's next action. While
+ * AI is switched off (409) the dialog says so in one calm line; when the agent could not write it
+ * (503) it says nothing was sent. Under the draft, in small muted text, it names the agent and prompt
+ * versions that wrote it. Focus moves into the dialog when it opens and back to the button when it
+ * closes.
  */
 export function PatientMessageCard({ caseId, reason }: PatientMessageCardProps) {
   const headingId = useId()

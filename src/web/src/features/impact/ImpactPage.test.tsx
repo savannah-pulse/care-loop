@@ -26,6 +26,8 @@ describe('what the numbers say', () => {
       json(
         aiText({
           agent: 'impact-summary',
+          agentVersion: '4',
+          promptVersion: 'impact-summary-v2',
           text: 'Most next steps are done by their deadline.\n\nWhere cases wait, it is mostly for a unit to accept a referral.',
         }),
       ),
@@ -37,6 +39,7 @@ describe('what the numbers say', () => {
       'Most next steps are done by their deadline.',
       'Where cases wait, it is mostly for a unit to accept a referral.',
     ])
+    expect(within(words).getByText('Agent impact-summary, version 4. Prompt impact-summary-v2.')).toHaveClass('ai-versions')
     expect(within(region).getByRole('heading', { level: 2, name: 'What the numbers say' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: 'Next care step done by the deadline' })).toBeInTheDocument()
     const [request, ...more] = sentRequests(SUMMARY)
@@ -57,8 +60,8 @@ describe('what the numbers say', () => {
     expect(await within(region).findByRole('figure', { name: CAPTION })).toBeInTheDocument()
   })
 
-  it('says in one calm line that it is not ready yet while AI is switched off (501)', async () => {
-    openImpact(problem(501, 'ImpactSummary is switched off here.'))
+  it('says in one calm line that it is not ready yet while AI is switched off (409)', async () => {
+    openImpact(problem(409, 'ImpactSummary is switched off here.'))
 
     const region = await card()
     expect(await within(region).findByText('Not ready yet. This will show here once it is switched on.')).toBeInTheDocument()

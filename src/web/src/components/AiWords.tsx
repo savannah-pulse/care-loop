@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { t } from '../i18n'
 import { Icon } from './Icon'
 
 /** Props for {@link AiChip}. */
@@ -23,6 +24,16 @@ export function AiChip({ label }: AiChipProps) {
   )
 }
 
+/** Which agent version and which prompt wording wrote the words, as the API returned them. */
+export interface AiWordsVersions {
+  /** The agent's name in the Foundry project, for example `role-briefing`. */
+  readonly agent: string
+  /** The agent version CareLoop pinned, for example `2`. */
+  readonly agentVersion: string
+  /** The version of the prompt's wording, for example `role-briefing-v2`. */
+  readonly promptVersion: string
+}
+
 /** Props for {@link AiWords}. */
 export interface AiWordsProps {
   /** What the agent wrote, exactly as the API returned it. Plain text: a blank line starts a new paragraph. */
@@ -33,6 +44,8 @@ export interface AiWordsProps {
   readonly chip?: string
   /** An extra class for the figure, for its layout on one screen. */
   readonly className?: string
+  /** The agent and prompt versions, shown in small muted words under the caption; none when absent. */
+  readonly versions?: AiWordsVersions
 }
 
 /**
@@ -41,9 +54,12 @@ export interface AiWordsProps {
  * @remarks
  * The caption names the figure (`aria-labelledby`), so the words and the label that AI wrote them
  * are read as one. The text is shown as text, never as markup, and only ever arrives complete: when
- * an agent could not write it, the API answers 503 and the screen shows a calm note instead.
+ * an agent could not write it, the API answers 503 and the screen shows a calm note instead. Under
+ * the caption, in small muted words that are not part of the figure's name, it says which agent
+ * version and which prompt wording wrote it, so a reader can tell when the wording behind the words
+ * changed.
  */
-export function AiWords({ text, caption, chip, className }: AiWordsProps) {
+export function AiWords({ text, caption, chip, className, versions }: AiWordsProps) {
   const captionId = useId()
   const paragraphs = text
     .split(/\n\s*\n/)
@@ -59,8 +75,17 @@ export function AiWords({ text, caption, chip, className }: AiWordsProps) {
           <p key={index}>{paragraph}</p>
         ))}
       </div>
-      <figcaption className="ai-caption" id={captionId}>
-        {caption}
+      <figcaption className="ai-caption">
+        <span id={captionId}>{caption}</span>
+        {versions ? (
+          <span className="ai-versions">
+            {t('ai.versions', {
+              agent: versions.agent,
+              agentVersion: versions.agentVersion,
+              promptVersion: versions.promptVersion,
+            })}
+          </span>
+        ) : null}
       </figcaption>
     </figure>
   )

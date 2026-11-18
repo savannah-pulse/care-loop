@@ -1,6 +1,6 @@
 import { useId } from 'react'
 import { AiWords, Badge, Icon, LoadingState } from '../../components'
-import { useRoleBriefing } from '../../data'
+import { isAiSwitchedOff, useRoleBriefing } from '../../data'
 import { caseNumber, nextActionText } from '../../domain'
 import { describeDue, formatWhen } from '../../format'
 import { useSignedInStaff } from '../../identity'
@@ -57,9 +57,10 @@ function StartRow({ item, position, now }: { readonly item: StartHereItem; reado
  * The one optional sentence the role-briefing agent writes about the person's worklist.
  *
  * @remarks
- * Asks `POST /ai/role-briefing` when it mounts. While AI is switched off (501) it shows nothing; while
+ * Asks `POST /ai/role-briefing` when it mounts. While AI is switched off (409) it shows nothing; while
  * it loads, one skeleton line; when the agent could not write it (503, or any other failure), a small
- * calm note. The cases above never depend on it.
+ * calm note. The cases above never depend on it. Under the words, in small muted text, it names the
+ * agent and prompt versions that wrote them.
  */
 function BriefingLine() {
   const { state } = useRoleBriefing()
@@ -73,11 +74,11 @@ function BriefingLine() {
   if (state.status === 'ready') {
     return (
       <div className="start-ai">
-        <AiWords text={state.data.text} caption={t('worklist.start.aiCaption')} chip={t('ai.chip')} />
+        <AiWords text={state.data.text} caption={t('worklist.start.aiCaption')} chip={t('ai.chip')} versions={state.data} />
       </div>
     )
   }
-  if (state.failure.kind === 'notAvailable' || state.failure.kind === 'aborted') {
+  if (isAiSwitchedOff(state.failure.kind) || state.failure.kind === 'aborted') {
     return null
   }
   return (

@@ -1,17 +1,32 @@
 import { useCallback } from 'react'
 import { api, type CareLoopClient } from './client'
-import { callApi, type ApiOutcome } from './outcome'
+import { callApi, type ApiOutcome, type FailureKind } from './outcome'
 import { useApiRead, type Read } from './read'
 import { reasonParameter } from './reads'
 import type { AiText, MessageChannel } from './types'
+
+/**
+ * Tells whether a failed AI call means AI is switched off here, rather than that the agent failed.
+ *
+ * @param kind - The kind of failure the call ended in.
+ * @returns `true` for `conflict` (HTTP 409, the API's answer while `Ai:Agents:Enabled` is false or
+ * `Ai:Provider` is `NoOp`) and for `notAvailable` (HTTP 501, from an API that predates the 409).
+ *
+ * @remarks
+ * Switched off is a calm state, not a failure: the screens say so in one quiet line, or say nothing,
+ * and never offer to try again.
+ */
+export function isAiSwitchedOff(kind: FailureKind): boolean {
+  return kind === 'conflict' || kind === 'notAvailable'
+}
 
 /**
  * Asks the role-briefing agent for a few words on where the signed-in person should start today.
  *
  * @param signal - Cancels the call.
  * @param client - The client to call with; the dashboard's own by default.
- * @returns The agent's text. Fails with `notAvailable` while AI is switched off (HTTP 501) and
- * `unavailable` when the agent could not write it (HTTP 503).
+ * @returns The agent's text, with the agent and prompt versions that wrote it. Fails with `conflict`
+ * while AI is switched off (HTTP 409) and `unavailable` when the agent could not write it (HTTP 503).
  *
  * @remarks
  * Side effect: posts to `POST /ai/role-briefing` for the reader's own team. The API builds the
@@ -26,8 +41,8 @@ export function draftRoleBriefing(signal?: AbortSignal, client: CareLoopClient =
  *
  * @param signal - Cancels the call.
  * @param client - The client to call with; the dashboard's own by default.
- * @returns The agent's text. Fails with `notAvailable` while AI is switched off (HTTP 501) and
- * `unavailable` when the agent could not write it (HTTP 503).
+ * @returns The agent's text, with the agent and prompt versions that wrote it. Fails with `conflict`
+ * while AI is switched off (HTTP 409) and `unavailable` when the agent could not write it (HTTP 503).
  *
  * @remarks
  * Side effect: posts to `POST /ai/impact-summary`, for the same team as `GET /metrics`. The API
@@ -54,14 +69,14 @@ export interface PatientMessageQuery {
  * @param query - The case, the channel and any reason given for a case outside the reader's team.
  * @param signal - Cancels the call.
  * @param client - The client to call with; the dashboard's own by default.
- * @returns The draft. Fails with `forbidden` for a role other than nurse navigator or clinician,
- * `notAvailable` while AI is switched off (HTTP 501) and `unavailable` when the agent could not
- * write it (HTTP 503).
+ * @returns The draft, with the agent and prompt versions that wrote it. Fails with `forbidden` for a
+ * role other than nurse navigator or clinician, `conflict` while AI is switched off (HTTP 409) and
+ * `unavailable` when the agent could not write it (HTTP 503).
  *
  * @remarks
  * Side effect: posts to `POST /cases/{caseId}/patient-message-draft`, which records the read like
  * a case read. The preview is never sent or stored: patient messages go out from approved
- * templates.
+ * templates. The API sends the agent a patient-safe step, never the case's next action.
  */
 export function draftPatientMessage(
   query: PatientMessageQuery,

@@ -49,7 +49,7 @@ function caseLinks(): HTMLElement[] {
 
 /** Answers the role briefing the "Start here today" card asks for when it lists cases: AI is switched off. */
 function briefingSwitchedOff(): void {
-  answer('POST /ai/role-briefing', problem(501, 'RoleBriefing is switched off here.'))
+  answer('POST /ai/role-briefing', problem(409, 'RoleBriefing is switched off here.'))
 }
 
 function mrn(digits: string): string {

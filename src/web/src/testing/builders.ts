@@ -292,6 +292,8 @@ export function metrics(overrides: Partial<Metrics> = {}): Metrics {
 export function aiText(overrides: Partial<AiText> = {}): AiText {
   return {
     agent: 'role-briefing',
+    agentVersion: '2',
+    promptVersion: 'role-briefing-v2',
     text: 'One case is late and already escalated, so start there.',
     generatedAt: TEST_NOW.toISOString(),
     ...overrides,

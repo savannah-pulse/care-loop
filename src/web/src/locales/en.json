@@ -10,7 +10,8 @@
   },
   "ai": {
     "chip": "AI",
-    "draftChip": "AI draft"
+    "draftChip": "AI draft",
+    "versions": "Agent {agent}, version {agentVersion}. Prompt {promptVersion}."
   },
   "nav": {
     "label": "Main",

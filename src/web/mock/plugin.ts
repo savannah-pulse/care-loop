@@ -7,9 +7,10 @@
  * default scope, a recorded reason for anything outside it, the programme coordinator's view
  * (cases escalated to them only, without names), the clinician-only patient search, paging limits,
  * and who may acknowledge an escalation. Drafted, approved and rejected summaries and
- * acknowledgements last until the server stops. The three AI endpoints answer with synthetic words,
- * or as switched off (501) or failing (503), as `CARELOOP_MOCK_AI` or an `X-Mock-AI` request header
- * says (see `AI_MODES`). It is never part of the built app: the app knows nothing about it.
+ * acknowledgements last until the server stops. The three AI endpoints answer with synthetic words
+ * and the agent and prompt versions, or as switched off (409) or failing (503), as
+ * `CARELOOP_MOCK_AI` or an `X-Mock-AI` request header says (see `AI_MODES`). It is never part of the
+ * built app: the app knows nothing about it.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -40,14 +41,13 @@ type Problem = Schemas['ProblemDetails']
 type CaseDetail = Schemas['CaseDetailResponse']
 type CaseSummary = Schemas['CaseSummaryResponse']
 type AiText = Schemas['AiTextResponse']
-type NotImplemented = Schemas['NotImplementedResponse']
 
 /**
  * How the mock's three AI endpoints answer.
  *
  * @remarks
  * - `on`: with synthetic words, at once (the default).
- * - `off`: 501, as the API does while `Ai:Agents:Enabled` is false.
+ * - `off`: 409, as the API does while `Ai:Agents:Enabled` is false or `Ai:Provider` is `NoOp`.
  * - `fail`: 503, as the API does when an agent refuses or times out.
  * - `slow`: with the words after four seconds, to see the loading state.
  *
@@ -60,6 +60,13 @@ type AiMode = (typeof AI_MODES)[number]
 
 /** How long `slow` waits before answering. */
 const SLOW_AI_MS = 4000
+
+/** The agent version and prompt version each agent answers with, as the API's defaults pin them. */
+const AI_VERSIONS: Readonly<Record<string, Pick<AiText, 'agentVersion' | 'promptVersion'>>> = {
+  'role-briefing': { agentVersion: '2', promptVersion: 'role-briefing-v2' },
+  'impact-summary': { agentVersion: '4', promptVersion: 'impact-summary-v2' },
+  'patient-notification': { agentVersion: '2', promptVersion: 'patient-message-v2' },
+}
 
 /** Roles that may preview a message to a patient, as in the API. */
 const MESSAGE_PREVIEW_ROLES: readonly string[] = ['nurse-navigator', 'clinician']
@@ -521,12 +528,13 @@ function aiModeOf(value: string | undefined): AiMode | undefined {
 }
 
 /**
- * Answers one of the three AI endpoints as the API would: words from an agent, 501 while AI is off, or a calm 503.
+ * Answers one of the three AI endpoints as the API would: words from an agent with its versions, 409 while AI is off,
+ * or a calm 503.
  *
  * @param state - The mock's state, with the server-wide AI mode.
  * @param req - The request; an `X-Mock-AI` header overrides the mode for it.
  * @param res - The response to write.
- * @param feature - The endpoint's feature name, for the 501 body.
+ * @param feature - The endpoint's feature name, for the 409 problem.
  * @param agent - The agent's name, for the answer.
  * @param words - Writes the agent's synthetic words.
  */
@@ -540,12 +548,10 @@ async function answerAi(
 ): Promise<void> {
   const mode = aiModeOf(header(req, 'X-Mock-AI')) ?? state.ai
   if (mode === 'off') {
-    const body: NotImplemented = {
-      workstream: 'AI agents',
+    send(res, 409, {
+      ...problem(409, 'AI is switched off', `${feature} is switched off here: Ai:Agents:Enabled is false. Nothing was sent.`),
       feature,
-      message: `${feature} is switched off here: Ai:Agents:Enabled is false.`,
-    }
-    send(res, 501, body)
+    })
     return
   }
   if (mode === 'fail') {
@@ -558,7 +564,8 @@ async function answerAi(
   if (mode === 'slow') {
     await new Promise((resolve) => setTimeout(resolve, SLOW_AI_MS))
   }
-  const text: AiText = { agent, text: words(), generatedAt: mockNow().toISOString() }
+  const versions = AI_VERSIONS[agent] ?? { agentVersion: '1', promptVersion: `${agent}-v1` }
+  const text: AiText = { agent, ...versions, text: words(), generatedAt: mockNow().toISOString() }
   send(res, 200, text)
 }
 

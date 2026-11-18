@@ -89,7 +89,8 @@ export type NotImplemented = Schemas['NotImplementedResponse']
  *
  * @remarks
  * A draft: shown labelled as written by AI and never acted on. The API answers 503, with no text,
- * when the agent could not write it, so this only ever holds words the agent wrote.
+ * when the agent could not write it, so this only ever holds words the agent wrote. It names the
+ * agent version and the prompt version that wrote it.
  */
 export type AiText = Schemas['AiTextResponse']
 

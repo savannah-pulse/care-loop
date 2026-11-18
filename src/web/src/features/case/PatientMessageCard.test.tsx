@@ -10,8 +10,8 @@ const DRAFT = `POST /cases/${CASE.caseId}/patient-message-draft`
 const BUTTON = 'Preview a message to the patient'
 const CAPTION = 'Draft written by AI. Not sent: messages go out from approved templates.'
 const SMS_WORDS =
-  '{first name}, this is your care team at Family Health Centre. We have a follow-up step for you. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.'
-const EMAIL_WORDS = 'Subject: A follow-up step from your care team\n\nDear {first name},\n\nWe have a follow-up step for you.'
+  '{first name}, this is your care team at Family Health Centre. We would like to talk with you. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.'
+const EMAIL_WORDS = 'Subject: Your care team would like to talk with you\n\nDear {first name},\n\nWe would like to talk with you.'
 
 function answerCase(detail = CASE): void {
   answer(`GET /cases/${detail.caseId}`, json(detail))
@@ -45,7 +45,14 @@ describe('preview a message to the patient', () => {
 
   it('opens a dialog with the draft as a text message, captioned as AI and not sent, and moves focus in and back out', async () => {
     answer(DRAFT, (request) =>
-      json(aiText({ agent: 'patient-notification', text: request.query.get('channel') === 'Email' ? EMAIL_WORDS : SMS_WORDS })),
+      json(
+        aiText({
+          agent: 'patient-notification',
+          agentVersion: '2',
+          promptVersion: 'patient-message-v2',
+          text: request.query.get('channel') === 'Email' ? EMAIL_WORDS : SMS_WORDS,
+        }),
+      ),
     )
     const { user, dialog } = await openPreview()
 
@@ -55,6 +62,7 @@ describe('preview a message to the patient', () => {
     const words = await within(dialog).findByRole('figure', { name: CAPTION })
     expect(words).toHaveTextContent(SMS_WORDS)
     expect(words.textContent).not.toMatch(/Hessa|100245891/)
+    expect(within(words).getByText('Agent patient-notification, version 2. Prompt patient-message-v2.')).toHaveClass('ai-versions')
     const [first] = sentRequests(DRAFT)
     expect(first.query.get('channel')).toBe('Sms')
     expect(first.query.has('reason')).toBe(false)
@@ -63,7 +71,7 @@ describe('preview a message to the patient', () => {
     expect(first.headers.get('X-Demo-Facility')).toBe('family-health-centre')
 
     await user.click(within(dialog).getByRole('radio', { name: 'Email' }))
-    await waitFor(() => expect(within(dialog).getByRole('figure', { name: CAPTION })).toHaveTextContent('Subject: A follow-up step'))
+    await waitFor(() => expect(within(dialog).getByRole('figure', { name: CAPTION })).toHaveTextContent('Subject: Your care team would like to talk with you'))
     expect(sentRequests(DRAFT).map((request) => request.query.get('channel'))).toEqual(['Sms', 'Email'])
 
     await user.click(within(dialog).getByRole('button', { name: 'Close' }))
@@ -86,8 +94,8 @@ describe('preview a message to the patient', () => {
     expect(screen.getByRole('button', { name: BUTTON })).toHaveFocus()
   })
 
-  it('says in one calm line that it is not ready yet while AI is switched off (501)', async () => {
-    answer(DRAFT, problem(501, 'PatientMessageDraft is switched off here.'))
+  it('says in one calm line that it is not ready yet while AI is switched off (409)', async () => {
+    answer(DRAFT, problem(409, 'PatientMessageDraft is switched off here.'))
     const { dialog } = await openPreview()
 
     expect(await within(dialog).findByText('Not ready yet. Previews will show here once AI is switched on.')).toBeInTheDocument()
