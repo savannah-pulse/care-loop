@@ -296,9 +296,10 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var prompt = DraftPatientMessage.BuildInput(@case, placeNamed: true, NotificationChannel.Sms, _format, _clock.UtcNow).Prompt;
 
         using var facts = AgentInput.Facts(prompt);
-        var step = Assert.Single(facts.RootElement.GetProperty("facts").EnumerateArray(), f => f.GetProperty("fact_type").GetString() == "next_step")
-            .GetProperty("value").GetString()!;
-        Assert.Contains(step, DraftPatientMessage.PatientSafeSteps);
+        var step = Assert.Single(facts.RootElement.GetProperty("template").GetProperty("spans").EnumerateArray(), s => s.GetProperty("span_id").GetString() == "next_step");
+        Assert.Equal("locked", step.GetProperty("kind").GetString());
+        Assert.Contains(step.GetProperty("text").GetString()!, DraftPatientMessage.PatientSafeSteps);
+        Assert.DoesNotContain(facts.RootElement.GetProperty("facts").EnumerateArray(), f => f.GetProperty("fact_type").GetString() == "next_step");
         foreach (var action in _pathways.Get("breast-screening").Deadlines.Select(d => d.NextAction).Distinct())
         {
             Assert.DoesNotContain(action, prompt, StringComparison.OrdinalIgnoreCase);
@@ -307,7 +308,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         if (ResultBearing.Contains(nextAction) || nextAction.StartsWith("SYN-", StringComparison.Ordinal))
         {
-            Assert.Equal(DraftPatientMessage.PatientSafeSteps[0], step);
+            Assert.Equal(DraftPatientMessage.PatientSafeSteps[0], step.GetProperty("text").GetString());
         }
 
         Assert.Equal(DraftPatientMessage.PatientSafeSteps[0], DraftPatientMessage.PatientStepFor(null));
@@ -518,13 +519,11 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Equal(("subject", "locked", DraftPatientMessage.EmailSubject), (spans[0].GetProperty("span_id").GetString(), spans[0].GetProperty("kind").GetString(), spans[0].GetProperty("text").GetString()));
         Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked" && s.GetProperty("text").GetString() == DraftPatientMessage.ReplyCodes);
         Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked" && s.GetProperty("text").GetString() == ". Place: {place}.");
+        Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked" && s.GetProperty("text").GetString() == "this is your care team at SYN Family Health Centre.");
+        Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked"
+            && s.GetProperty("text").GetString() == "Your care team sent you a message and would like to know that you got it.");
         var facts = input.GetProperty("facts").EnumerateArray().ToDictionary(f => f.GetProperty("fact_type").GetString()!, f => f.GetProperty("value").GetString());
-        Assert.Equal(new Dictionary<string, string?>
-        {
-            ["first_name"] = "{first name}", ["care_team"] = "SYN Family Health Centre",
-            ["next_step"] = "Your care team sent you a message and would like to know that you got it.",
-            ["appointment_time"] = "Sunday 4 January 2026 at 10:30",
-        }, facts);
+        Assert.Equal(new Dictionary<string, string?> { ["first_name"] = "{first name}", ["appointment_time"] = "Sunday 4 January 2026 at 10:30" }, facts);
         Assert.All(input.GetProperty("facts").EnumerateArray(), f => Assert.Equal("final", f.GetProperty("review_status").GetString()));
         Assert.DoesNotContain("Make sure the patient has the message", call.Prompt);
         Assert.StartsWith($"{DraftPatientMessage.EmailSubject}\n\nHello {{first name}}, this is your care team at SYN Family Health Centre.", draft.Text);

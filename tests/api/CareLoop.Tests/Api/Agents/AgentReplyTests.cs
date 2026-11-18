@@ -8,9 +8,10 @@ using CareLoop.Tests.Fakes;
 namespace CareLoop.Tests.Api.Agents;
 
 /// <summary>
-/// Reading the agents' answers, with answers recorded from the live pinned agents on 18 November 2026: a refusal in any
-/// of its shapes is declined with its reason code, a briefing gets case numbers in place of its tokens, an impact summary
-/// keeps its limits note, and a patient message is accepted only when every locked span and slot is exactly as sent.
+/// Reading the agents' answers, with answers recorded from the live pinned agents on 18 and 19 November 2026: a refusal in
+/// any of its shapes is declined with its reason code, a briefing gets case numbers in place of its tokens, an impact
+/// summary keeps its limits note, and a patient message, in JSON or plain text, is accepted only when every locked span
+/// and slot is exactly as sent.
 /// </summary>
 public sealed class AgentReplyTests
 {
@@ -125,15 +126,61 @@ public sealed class AgentReplyTests
     [Theory]
     [InlineData(Recorded.PatientMessageKeyedBySpan)]
     [InlineData(Recorded.PatientMessageSpanArray)]
+    [InlineData(Recorded.PatientMessageBetweenNotes)]
+    [InlineData(Recorded.PatientMessageAsOneString)]
     public void The_patient_message_is_put_together_from_its_spans_whatever_shape_they_come_in(string answer)
     {
         var text = DraftPatientMessage.Read(answer, MessageInput(NotificationChannel.Sms));
 
+        Assert.Equal(SmsPreview, text);
+    }
+
+    [Fact]
+    public void A_plain_text_email_that_is_the_template_filled_in_is_read_from_its_spans()
+    {
+        var input = MessageInput(NotificationChannel.Email, new DateTimeOffset(2026, 11, 25, 2, 46, 0, TimeSpan.Zero));
+
+        var text = DraftPatientMessage.Read(Recorded.PatientEmailPlainText, input);
+
         Assert.Equal(
-            "Hello {first name}, this is your care team at Family Health Centre. Your care team will call you back, as you asked. "
-            + "Your appointment is on Wednesday 25 November 2026 at 10:00. Place: {place}. "
-            + "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.",
+            "Subject: A message from your care team\n\nHello {first name}, this is your care team at Family Health Centre. "
+            + "Your care team will call you back, as you asked. Your appointment is on Wednesday 25 November 2026 at 02:46. "
+            + "Place: to be confirmed. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.",
             text);
+    }
+
+    [Fact]
+    public void Markdown_bold_on_the_message_s_words_is_dropped()
+    {
+        var at = new DateTimeOffset(2026, 11, 25, 3, 46, 0, TimeSpan.Zero);
+
+        var sms = DraftPatientMessage.Read(Recorded.PatientMessageInBold, MessageInput(NotificationChannel.Sms, at));
+        var email = DraftPatientMessage.Read(Recorded.PatientEmailWithBoldSubject, MessageInput(NotificationChannel.Email, at));
+
+        Assert.Equal(SmsPreview.Replace("03:10", "03:46", StringComparison.Ordinal), sms);
+        Assert.StartsWith("Subject: A message from your care team\n\nHello {first name}, this is your care team at Family Health Centre. Your care team", email);
+        Assert.DoesNotContain("*", sms + email, StringComparison.Ordinal);
+    }
+    [Theory]
+    [InlineData("Reply 1 to confirm", "Reply 1 to say")]
+    [InlineData("call you back, as you asked.", "call you back today.")]
+    [InlineData("Thank you.\n\n---", "Thank you, or call 800 123.\n\n---")]
+    [InlineData("Thank you.\n\n---", "Thank you. Please review this draft and let us know if anything should change.\n\n---")]
+    [InlineData("Place: to be confirmed. ", "")]
+    public void Plain_text_that_changes_a_word_of_the_template_adds_a_number_or_leaves_a_span_out_is_declined(string from, string to)
+    {
+        var answer = Recorded.PatientMessageBetweenNotes.Replace(from, to, StringComparison.Ordinal);
+        Assert.NotEqual(Recorded.PatientMessageBetweenNotes, answer);
+
+        Assert.Equal("NOT_JSON", Assert.Throws<AgentDeclinedException>(() => DraftPatientMessage.Read(answer, MessageInput(NotificationChannel.Sms))).ReasonCode);
+    }
+
+    [Fact]
+    public void Plain_text_that_leaves_out_the_next_step_is_declined()
+    {
+        var input = MessageInput(NotificationChannel.Sms, new DateTimeOffset(2026, 11, 25, 10, 0, 0, TimeSpan.Zero));
+
+        Assert.Equal("NOT_JSON", Assert.Throws<AgentDeclinedException>(() => DraftPatientMessage.Read(Recorded.PatientMessagePlainTextWithoutTheStep, input)).ReasonCode);
     }
 
     [Fact]
@@ -145,9 +192,12 @@ public sealed class AgentReplyTests
 
         Assert.EndsWith("Reply 2 if you would like your care team to call you.", text);
     }
+
     [Theory]
     [InlineData("\"reply_codes\":\"Reply 1 to confirm", "\"reply_codes\":\"Reply 1 to say", "LOCKED_SPAN_CHANGED")]
-    [InlineData("you back, as you asked.\"", "you back today.\"", "SLOT_VALUE_CHANGED")]
+    [InlineData("\"care_team\":\"this is your care team at Family", "\"care_team\":\"this is your clinic at Family", "LOCKED_SPAN_CHANGED")]
+    [InlineData("you back, as you asked.\"", "you back today.\"", "LOCKED_SPAN_CHANGED")]
+    [InlineData("2026 at 03:10\"", "2026 at 03:15\"", "SLOT_VALUE_CHANGED")]
     [InlineData("\"closing\":\"Thank you.\"", "\"closing\":\"Call 800 123 if you need us.\"", "ADAPTED_SPAN_ADDED_NUMBER")]
     [InlineData(",\"closing\":\"Thank you.\"", "", "MISSING_OUTPUT_FIELD")]
     public void A_patient_message_that_changes_the_template_or_its_facts_is_declined(string from, string to, string code)
@@ -167,16 +217,22 @@ public sealed class AgentReplyTests
         Assert.Equal("SPANS_CHANGED", Assert.Throws<AgentDeclinedException>(() => DraftPatientMessage.Read(answer, MessageInput(NotificationChannel.Sms))).ReasonCode);
     }
 
-    private DraftPatientMessage.MessageInput MessageInput(NotificationChannel channel)
+    /// <summary>The preview the recorded text-message answers of 19 November all give.</summary>
+    private const string SmsPreview =
+        "Hello {first name}, this is your care team at Family Health Centre. Your care team will call you back, as you asked. "
+        + "Your appointment is on Wednesday 25 November 2026 at 03:10. Place: to be confirmed. "
+        + "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.";
+
+    // The case behind the recorded answers: a call-back at the Family Health Centre, with an appointment whose place is not yet known.
+    private DraftPatientMessage.MessageInput MessageInput(NotificationChannel channel, DateTimeOffset? appointment = null)
     {
         var @case = new Case(Guid.NewGuid(), TestData.SourceSystem, "SYN-RESULT-0001", "SYN-PT-0001", "breast-screening", "family-health-centre",
             TestData.Clinician() with { FacilityId = "family-health-centre" }, Now.AddDays(-2), null, null);
         @case.SetNextAction("call-patient", Now.AddHours(5), Now.AddDays(-1));
-        @case.ScheduleAppointment("SYN-APPT-1", new DateTimeOffset(2026, 11, 25, 10, 0, 0, TimeSpan.Zero), Now.AddHours(-1), "SYN Clinic room");
+        @case.ScheduleAppointment("SYN-APPT-1", appointment ?? new DateTimeOffset(2026, 11, 25, 3, 10, 0, TimeSpan.Zero), Now.AddHours(-1));
         Assert.Equal(AppointmentStatus.Scheduled, @case.Appointment!.Status);
-        return DraftPatientMessage.BuildInput(@case, placeNamed: true, channel, _format, Now);
+        return DraftPatientMessage.BuildInput(@case, placeNamed: false, channel, _format, Now);
     }
-
     private static DraftRoleBriefing.BriefingInput Briefing(params string[] bands) =>
         new("SYN prompt", bands.Select((band, i) => new DraftRoleBriefing.BriefingItem($"W-{i + 1}", $"P-{i + 1}", band, TestData.NewCase(Now))).ToList());
 
@@ -273,14 +329,32 @@ public sealed class AgentReplyTests
             }
             """;
 
-        /// <summary>patient-notification:2 (model-router chose gpt-4o-mini), given patient-message-v3: one object keyed by span ID.</summary>
+        /// <summary>patient-notification:2 (model-router chose gpt-4o-mini) on 19 November, given patient-message-v3: one object keyed by span ID.</summary>
         public const string PatientMessageKeyedBySpan =
-            "{\"greeting\":\"Hello\",\"first_name\":\"{first name}\",\"greeting_end\":\",\",\"care_team_intro\":\"this is your care team at\",\"care_team\":\"Family Health Centre\",\"care_team_end\":\".\",\"next_step\":\"Your care team will call you back, as you asked.\",\"appointment_intro\":\"Your appointment is on\",\"appointment_time\":\"Wednesday 25 November 2026 at 10:00\",\"appointment_place\":\". Place: {place}.\",\"reply_codes\":\"Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.\",\"closing\":\"Thank you.\"}";
+            "{\"greeting\":\"Hello\",\"first_name\":\"{first name}\",\"greeting_end\":\",\",\"care_team\":\"this is your care team at Family Health Centre.\",\"next_step\":\"Your care team will call you back, as you asked.\",\"appointment_intro\":\"Your appointment is on\",\"appointment_time\":\"Wednesday 25 November 2026 at 03:10\",\"appointment_place\":\". Place: to be confirmed.\",\"reply_codes\":\"Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.\",\"closing\":\"Thank you.\"}";
 
-        /// <summary>patient-notification:2 (gpt-4o-mini), given patient-message-v3: the spans under "message".</summary>
+        /// <summary>The same answer as <see cref="PatientMessageKeyedBySpan"/>, in the shape the agent used on 18 November: the spans as an array under "message".</summary>
         public const string PatientMessageSpanArray =
-            "{\"message\":[{\"span_id\":\"greeting\",\"text\":\"Hello\"},{\"span_id\":\"first_name\",\"text\":\"{first name}\",\"fact_id\":\"F1\"},{\"span_id\":\"greeting_end\",\"text\":\",\"},{\"span_id\":\"care_team_intro\",\"text\":\"this is your care team at\"},{\"span_id\":\"care_team\",\"text\":\"Family Health Centre\",\"fact_id\":\"F2\"},{\"span_id\":\"care_team_end\",\"text\":\".\"},{\"span_id\":\"next_step\",\"text\":\"Your care team will call you back, as you asked.\",\"fact_id\":\"F3\"},{\"span_id\":\"appointment_intro\",\"text\":\"Your appointment is on\"},{\"span_id\":\"appointment_time\",\"text\":\"Wednesday 25 November 2026 at 10:00\",\"fact_id\":\"F4\"},{\"span_id\":\"appointment_place\",\"text\":\". Place: {place}.\"},{\"span_id\":\"reply_codes\",\"text\":\"Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.\"},{\"span_id\":\"closing\",\"text\":\"Thank you.\"}]}";
+            "{\"message\":[{\"span_id\":\"greeting\",\"text\":\"Hello\"},{\"span_id\":\"first_name\",\"text\":\"{first name}\",\"fact_id\":\"F1\"},{\"span_id\":\"greeting_end\",\"text\":\",\"},{\"span_id\":\"care_team\",\"text\":\"this is your care team at Family Health Centre.\"},{\"span_id\":\"next_step\",\"text\":\"Your care team will call you back, as you asked.\"},{\"span_id\":\"appointment_intro\",\"text\":\"Your appointment is on\"},{\"span_id\":\"appointment_time\",\"text\":\"Wednesday 25 November 2026 at 03:10\",\"fact_id\":\"F2\"},{\"span_id\":\"appointment_place\",\"text\":\". Place: to be confirmed.\"},{\"span_id\":\"reply_codes\",\"text\":\"Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.\"},{\"span_id\":\"closing\",\"text\":\"Thank you.\"}]}";
 
+        /// <summary>patient-notification:2 (gpt-4o-mini) on 19 November: the message in plain text between two notes to the reader.</summary>
+        public const string PatientMessageBetweenNotes =
+            "Here’s the draft message based on the provided template and facts:\n\n---\n\nHello {first name}, this is your care team at Family Health Centre. Your care team will call you back, as you asked. Your appointment is on Wednesday 25 November 2026 at 03:10. Place: to be confirmed. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.\n\n--- \n\nPlease review for approval or edits.";
+
+        /// <summary>patient-notification:2 (gpt-4o-mini) on 19 November: the message between notes, with some spans in Markdown bold.</summary>
+        public const string PatientMessageInBold =
+            "Here’s the draft based on the provided input:\n\n---\n\n**Hello {first name},**  \nthis is your care team at Family Health Centre.  \nYour care team will call you back, as you asked.  \nYour appointment is on **Wednesday 25 November 2026 at 03:46**. Place: to be confirmed.  \nReply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.  \n**Thank you.**\n\n--- \n\nPlease ensure the placeholders are filled accurately before sending.";
+
+        /// <summary>patient-notification:2 (gpt-4o-mini) on 19 November: an email between notes, its subject's label in Markdown bold.</summary>
+        public const string PatientEmailWithBoldSubject =
+            "Here's the drafted message based on the provided template and facts:\n\n---\n\n**Subject:** A message from your care team\n\nHello {first name},\n\nthis is your care team at Family Health Centre. \n\nYour care team will call you back, as you asked. \n\nYour appointment is on Wednesday 25 November 2026 at 03:46. Place: to be confirmed. \n\nReply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.\n\nThank you.\n\n--- \n\nPlease review for approval.";
+        /// <summary>patient-notification:2 (gpt-4o-mini) on 19 November: the whole message as one JSON string.</summary>
+        public const string PatientMessageAsOneString =
+            "{\"stage\":\"patient_contact\",\"language\":\"en\",\"channel\":\"sms\",\"message\":\"Hello {first name}, this is your care team at Family Health Centre. Your care team will call you back, as you asked. Your appointment is on Wednesday 25 November 2026 at 03:10. Place: to be confirmed. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.\"}";
+
+        /// <summary>patient-notification:2 (gpt-4o-mini) on 19 November: an email in plain text, with Markdown line breaks.</summary>
+        public const string PatientEmailPlainText =
+            "Subject: A message from your care team  \nHello {first name},  \nthis is your care team at Family Health Centre. Your care team will call you back, as you asked.  \nYour appointment is on Wednesday 25 November 2026 at 02:46. Place: to be confirmed.  \nReply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.  \nThank you.";
         /// <summary>patient-notification:2 (gpt-4o-mini), given patient-message-v3: plain text, with the next step left out.</summary>
         public const string PatientMessagePlainTextWithoutTheStep =
             "Here's your patient message draft:\n\n---\n\nHello {first name}, this is your care team at Family Health Centre. Your appointment is on Wednesday 25 November 2026 at 10:00. Place: {place}. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you.\n\n--- \n\nPlease review for approval or edits.";

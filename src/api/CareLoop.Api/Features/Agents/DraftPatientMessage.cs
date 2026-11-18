@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Ai;
@@ -38,17 +39,18 @@ namespace CareLoop.Api.Features.Agents;
 /// <para>
 /// The agent (AG2 in the Foundry project) fills in one template inside <c>&lt;input_json&gt;</c>: CareLoop builds a
 /// category A template, without result content, from locked spans it copies word for word, slots it fills with facts
-/// and two adaptable spans (the greeting and the closing). The facts are the facility's name, the patient-safe step, an
-/// upcoming appointment's day and time in local time, and <c>{first name}</c> in place of the name; the two reply codes
-/// (1 means "I got this message", 2 asks for a call) and <c>{place}</c> in place of the appointment's place are locked
-/// text. The answer is accepted only when every locked span is word for word, every slot is exactly its fact and no
+/// and two adaptable spans (the greeting and the closing). The facts are an upcoming appointment's day and time in local
+/// time and <c>{first name}</c> in place of the name. The facility's name, the patient-safe step, the two reply codes (1
+/// means "I got this message", 2 asks for a call) and <c>{place}</c> in place of the appointment's place are locked text:
+/// the agent may name a clinic in a text message only in locked text, and it copies locked text more faithfully than it
+/// fills a slot. The answer is accepted only when every locked span is word for word, every slot is exactly its fact and no
 /// number appears in an adaptable span; otherwise, or on a refusal, it is the calm 503, with the reason code in the log.
 /// It carries no name, contact detail, record number, patient reference, result, and no free text from the hospital
 /// system. Access follows the case reads, and the read is recorded like one, with the agent version, prompt version and
 /// correlation identifier.
 /// </para>
 /// </remarks>
-public static class DraftPatientMessage
+public static partial class DraftPatientMessage
 {
     /// <summary>The view key the read is recorded under; a refused read appends <c>-denied</c>.</summary>
     public const string AuditView = "patient-message-draft";
@@ -197,12 +199,7 @@ public static class DraftPatientMessage
     {
         var sms = channel == NotificationChannel.Sms;
         var recorded = AgentInput.Moment(format.InLocalTime(now));
-        var facts = new List<MessageFact>
-        {
-            new("F1", "first_name", FirstNamePlaceholder),
-            new("F2", "care_team", format.Facility(@case.FacilityId)),
-            new("F3", "next_step", PatientStepFor(@case.NextAction)),
-        };
+        var facts = new List<MessageFact> { new("F1", "first_name", FirstNamePlaceholder) };
         var spans = new List<MessageSpan>();
         if (!sms)
         {
@@ -214,14 +211,14 @@ public static class DraftPatientMessage
             MessageSpan.Adaptable("greeting", "Hello"),
             MessageSpan.Slot("first_name", "first_name"),
             MessageSpan.Locked("greeting_end", ","),
-            MessageSpan.Locked("care_team_intro", "this is your care team at"),
-            MessageSpan.Slot("care_team", "care_team"),
-            MessageSpan.Locked("care_team_end", "."),
-            MessageSpan.Slot("next_step", "next_step"),
+            // Locked, because a category A text message may name a clinic only in locked text; as a slot, the agent refused it.
+            MessageSpan.Locked("care_team", $"this is your care team at {format.Facility(@case.FacilityId)}."),
+            // Locked too: the step is one of a few fixed sentences, and sent as a slot the agent left it out about one answer in four.
+            MessageSpan.Locked("next_step", PatientStepFor(@case.NextAction)),
         ]);
         if (@case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now)
         {
-            facts.Add(new MessageFact("F4", "appointment_time", $"{format.Date(at)} at {format.Time(at)}"));
+            facts.Add(new MessageFact("F2", "appointment_time", $"{format.Date(at)} at {format.Time(at)}"));
             spans.Add(MessageSpan.Locked("appointment_intro", "Your appointment is on"));
             spans.Add(MessageSpan.Slot("appointment_time", "appointment_time"));
             spans.Add(MessageSpan.Locked("appointment_place", placeNamed ? $". Place: {PlacePlaceholder}." : ". Place: to be confirmed."));
@@ -257,12 +254,32 @@ public static class DraftPatientMessage
     /// <returns>The message as staff read it; for email, the subject on its own line first.</returns>
     /// <exception cref="AgentDeclinedException">The agent declined, or its spans do not match the template
     /// (<c>SPANS_CHANGED</c>, <c>LOCKED_SPAN_CHANGED</c>, <c>SLOT_VALUE_CHANGED</c>, <c>ADAPTED_SPAN_ADDED_NUMBER</c>), or
-    /// the message is over the channel's limit (<c>TOO_LONG</c>).</exception>
+    /// the message is over the channel's limit (<c>TOO_LONG</c>), or it is plain text that is not the template filled in
+    /// (<c>NOT_JSON</c>).</exception>
+    /// <remarks>
+    /// The spans may come as JSON in any of the shapes the agent has used, or as the filled-in message in plain text, on
+    /// its own, between lines of <c>---</c> with a note to the reader around it, with Markdown bold, or as the
+    /// <c>message</c> of a JSON answer: the agent version has no response schema, and the same version has answered all
+    /// of them. The message is accepted from plain text only when it is exactly the template's spans in order, every
+    /// locked span word for word and every slot its fact, with nothing before, after or between them but white space and
+    /// the adaptable spans (letters and light punctuation, no digits, no line breaks, at most a little longer than the
+    /// template's words). Whatever the agent wrote around it is dropped, and the preview is put together from the spans
+    /// either way.
+    /// </remarks>
     internal static string Read(string answer, MessageInput input)
     {
-        var root = AgentReply.Read(answer);
         var sent = input.Template.Spans;
-        var written = WrittenSpans(root, sent);
+        List<(string SpanId, string Text)> written;
+        try
+        {
+            var root = AgentReply.Read(answer);
+            written = WrittenSpans(root, sent) ?? MessageProperty(root, input) ?? throw new AgentDeclinedException("MISSING_OUTPUT_FIELD");
+        }
+        catch (AgentDeclinedException ex) when (ex.ReasonCode == "NOT_JSON")
+        {
+            written = SpansInPlainText(answer, input) ?? throw new AgentDeclinedException("NOT_JSON");
+        }
+
         if (written.Count != sent.Count)
         {
             throw new AgentDeclinedException("SPANS_CHANGED");
@@ -307,10 +324,68 @@ public static class DraftPatientMessage
         var message = subject is null ? body.ToString() : $"{subject}\n\n{body}";
         return message.Length > input.MaxChars ? throw new AgentDeclinedException("TOO_LONG") : message;
     }
+
+    // Reads a plain-text answer as the template filled in: the whole answer, or one of its parts between separator lines
+    // (---, ***, ___ or a code fence), which is where the agent puts the message when it adds a note around it. Markdown
+    // bold (**) is dropped first: it changes no word. Gives null when no part is exactly the template filled in.
+    private static List<(string SpanId, string Text)>? SpansInPlainText(string answer, MessageInput input)
+    {
+        var text = AgentReply.Unfenced(answer);
+        return new[] { text }.Concat(Separator().Split(text))
+            .Select(part => Filled(part.Replace("**", string.Empty, StringComparison.Ordinal), input))
+            .FirstOrDefault(spans => spans is not null);
+    }
+
+    // A JSON answer that holds the filled-in message as one string, as {"message": "Hello {first name}, …"}.
+    private static List<(string SpanId, string Text)>? MessageProperty(JsonElement root, MessageInput input) =>
+        new[] { "message", "text", "draft", "body", "content" }
+            .Select(name => AgentReply.Text(root, name) is { } message ? SpansInPlainText(message, input) : null)
+            .FirstOrDefault(spans => spans is not null);
+
+    private static List<(string SpanId, string Text)>? Filled(string text, MessageInput input)
+    {
+        var spans = input.Template.Spans;
+        var pattern = new StringBuilder(@"\A\s*");
+        for (var i = 0; i < spans.Count; i++)
+        {
+            pattern.Append(i == 0 ? string.Empty : @"\s*");
+            pattern.Append(spans[i].Kind == "adaptable"
+                ? $"(?<a{i}>{AdaptableText}{{0,{Math.Max(20, (2 * spans[i].Text!.Length) + 10)}}}?)"
+                : Exact(FixedText(spans[i], input)));
+        }
+
+        pattern.Append(@"\s*\z");
+        Match match;
+        try
+        {
+            match = Regex.Match(text, pattern.ToString(), RegexOptions.None, TimeSpan.FromMilliseconds(250));
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
+
+        return match.Success
+            ? spans.Select((span, i) => (span.SpanId, span.Kind == "adaptable"
+                ? Regex.Replace(match.Groups[$"a{i}"].Value, @"\s+", " ").Trim()
+                : FixedText(span, input))).ToList()
+            : null;
+    }
+
+    // The text a locked span or a slot must hold, word for word.
+    private static string FixedText(MessageSpan span, MessageInput input) =>
+        span.Kind == "slot" ? input.Facts.Single(f => f.FactType == span.SlotName).Value : span.Text!;
+
+    // Matches a text word for word, allowing only a different run of white space between the words.
+    private static string Exact(string text) => string.Join(@"\s+", text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(Regex.Escape));
+
+    // What an adaptable span may hold in a plain-text answer: letters and light punctuation, no digits and no line breaks.
+    private const string AdaptableText = @"[\p{L}\p{M} '’,.!?-]";
+
     // The agent's spans: an array of {span_id, text} objects, under "spans" or another name, or one object keyed by span
     // ID. The shape varies while the agent version has no response schema (see docs/ai-design/integration.md); what the
     // spans say is checked the same way whatever the shape.
-    private static List<(string SpanId, string Text)> WrittenSpans(JsonElement root, IReadOnlyList<MessageSpan> sent)
+    private static List<(string SpanId, string Text)>? WrittenSpans(JsonElement root, IReadOnlyList<MessageSpan> sent)
     {
         var array = root.TryGetProperty("spans", out var spans) && spans.ValueKind == JsonValueKind.Array
             ? spans
@@ -328,8 +403,11 @@ public static class DraftPatientMessage
 
         return sent.All(s => root.TryGetProperty(s.SpanId, out var value) && value.ValueKind == JsonValueKind.String)
             ? sent.Select(s => (s.SpanId, root.GetProperty(s.SpanId).GetString()!.Trim())).ToList()
-            : throw new AgentDeclinedException("MISSING_OUTPUT_FIELD");
+            : null;
     }
+
+    [GeneratedRegex(@"^[ \t]*(?:-{3,}|\*{3,}|_{3,}|```[A-Za-z]*)[ \t]*$", RegexOptions.Multiline)]
+    private static partial Regex Separator();
 
     /// <summary>
     /// Tells whether the hospital system named a place for the booked appointment, from its latest applied booking.
@@ -382,7 +460,7 @@ public static class DraftPatientMessage
 
     /// <summary>One fact a slot may take; every fact is final, and none is a result.</summary>
     /// <param name="FactId">For example <c>F1</c>.</param>
-    /// <param name="FactType">The slot it fills, for example <c>next_step</c>.</param>
+    /// <param name="FactType">The slot it fills, for example <c>appointment_time</c>.</param>
     /// <param name="Value">The words, exactly as the slot must hold them.</param>
     internal sealed record MessageFact(string FactId, string FactType, string Value);
 
