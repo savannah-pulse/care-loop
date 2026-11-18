@@ -21,6 +21,7 @@ Use a Microsoft Foundry-deployed large language model (LLM) to make already-reco
 | AG4 English-to-UAE-Arabic translation (extension) | Python AI service | Translate approved English text; bilingual and clinical approval required before use |
 | AG5 reply triage (proposed extension) | Deterministic reply checks first; AI may add classifications or flags | Never answer the patient or remove a deterministic flag; a nurse confirms routing |
 | AG6 periodic stage insights (extension) | Backend computes measures; Python AI drafts a narrative | Describe pre-aggregated patterns and limitations; no causal claims or individual scoring |
+| AG7 role briefing (proposed extension, see §2.9) | Backend chooses and orders the reader's cases; a Foundry agent words them | Put cases the backend already chose into one to three sentences for staff; no ordering, advice or action |
 
 AG1 is the core FR-11 deliverable. The other agents are extensions and must not delay it. AG3 may draft patient messages, but only the approved patient-channel provider dispatches text after a human approval event. The team approved AG5 for implementation; its deterministic clinical checks remain API-owned and must run before the AI service is called.
 
@@ -139,10 +140,32 @@ AI attaches to backend-owned stages; it never advances a stage. A case advances 
 
 | Level | Meaning | Capabilities |
 |---|---|---|
-| L0: inform | AI drafts or summarizes; a person reads and acts | AG1, AG2, AG6 |
+| L0: inform | AI drafts or summarizes; a person reads and acts | AG1, AG2, AG6, AG7 (proposed) |
 | L1: propose with approval | AI prepares text or a routing proposal; a named person approves it before any action | AG3, AG4, AG5 |
 | L2: act within limits | A deterministic system acts and logs the action | Backend API and worker only; never AI |
 | L3: prohibited | Diagnosis, BI-RADS or urgency assignment, result disclosure without the responsible physician, clinical advice, provider/test choice, consent, closure, source/case mutation, or message dispatch | AI; no AI capability may do these |
+
+### 2.9 Role briefing (AG7, proposed extension)
+
+**Status:** Proposal. Built behind `Ai:Agents` and off by default (see [integration.md](integration.md#foundry-agents-role-briefing-impact-summary-patient-message-draft)); not yet agreed by the team or reviewed by a clinical adviser.
+**User:** Any staff member reading their worklist: clinician, receiving clinician, nurse navigator, facility lead, lab or programme coordinator.
+**Purpose:** One to three plain sentences above the worklist ("Start here today") that say where the reader might start, so they need not read the whole list first. It informs (L0); it decides nothing.
+
+**Inputs**, built by the API from the reader's worklist scope only:
+
+- The reader's role and facility, and counts of open cases: open, overdue, escalated, urgent, due today, needing an owner.
+- Up to five cases the backend has already chosen and ordered (overdue or escalated, then clinician-reviewed urgent, then due today), each from its coordination state: case number, programme, stage and display step, next action, the owner's role, due and overdue state, urgency, exception flags, the open escalation's level and acknowledgement, each track's status, how contact with the patient stands, understanding and confidence where recorded, and the preferred language for messages.
+- Never names, record numbers, patient references, contact details, source identifiers, staff references or free text.
+
+**It may not:**
+
+- choose, reorder or add cases, or change a count, deadline or urgency: the backend owns the order;
+- give clinical advice, interpret a result, or suggest a diagnosis, test, treatment or provider;
+- assign, accept or hand over work, or say that something has been done;
+- address a patient, or be stored, sent or published;
+- name, rank or blame a person or a team.
+
+When the agent fails, nothing is shown in its place; the worklist and the cases it lists work without it.
 
 ## 3. Microsoft Foundry endpoint and Python integration
 
