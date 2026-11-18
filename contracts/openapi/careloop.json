@@ -1258,7 +1258,7 @@
         "tags": [
           "Ai"
         ],
-        "summary": "Asks the impact-summary agent to say in plain words what the aggregate numbers show.",
+        "summary": "Asks the impact-summary agent to say in plain, neutral words what the aggregate numbers show.",
         "operationId": "DraftImpactSummary",
         "parameters": [
           {

@@ -10,6 +10,7 @@ using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Contracts.Ai;
 using CareLoop.Contracts.Events;
+using CareLoop.Contracts.Metrics;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Pathways;
 using CareLoop.Domain.Recipients;
@@ -34,7 +35,7 @@ namespace CareLoop.Tests.Api.Agents;
 /// prompt versions, a failing agent is a calm 503, access follows the reads, each call is audited with its agent version,
 /// prompt version and correlation identifier, and no prompt ever carries a patient's name, record number, reference,
 /// contact details, the hospital's identifiers or free text; the patient message prompt never carries a next action
-/// that would reveal a result.
+/// that would reveal a result, and the impact summary hides small numbers.
 /// </summary>
 public sealed class AiAgentEndpointsTests : IDisposable
 {
@@ -124,7 +125,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         Assert.Equal(("role-briefing", "2", "role-briefing-v1", "SYN words from role-briefing."),
             (briefing.Agent, briefing.AgentVersion, briefing.PromptVersion, briefing.Text));
-        Assert.Equal(("impact-summary", "4", "impact-summary-v1", "SYN words from impact-summary."),
+        Assert.Equal(("impact-summary", "4", "impact-summary-v2", "SYN words from impact-summary."),
             (impact.Agent, impact.AgentVersion, impact.PromptVersion, impact.Text));
         Assert.Equal(("patient-notification", "2", "patient-message-v2", "SYN words from patient-notification."),
             (draft.Agent, draft.AgentVersion, draft.PromptVersion, draft.Text));
@@ -348,19 +349,72 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_impact_prompt_holds_totals_only()
+    public async Task The_impact_prompt_holds_totals_only_with_small_numbers_hidden_and_says_what_they_cover()
     {
         var @case = await NamedCaseAsync();
 
         Assert.Equal(200, Status(await ImpactAsync()));
 
         var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("Scope: SYN Family Health Centre.", prompt);
-        Assert.Contains("Cases: 1 in total, 1 open and 0 closed.", prompt);
-        Assert.Contains("Open cases past their deadline: 1", prompt);
-        Assert.Contains("- Patients who acknowledged the message: 0 of 1 patients told (0%).", prompt);
+        Assert.Contains("Cohort: every case at SYN Family Health Centre, open and closed, on every programme.", prompt);
+        Assert.Contains("Period: cases opened from Thursday 1 January 2026 up to Friday 2 January 2026, 10:00, local time.", prompt);
+        Assert.Contains("Measure definitions: version metrics-v1", prompt);
+        Assert.Contains("synthetic data only", prompt);
+        Assert.Contains("open governance decision", prompt);
+        Assert.Contains("Cases: fewer than 5 in total, fewer than 5 open and 0 closed.", prompt);
+        Assert.Contains("Open cases past their deadline: fewer than 5", prompt);
+        Assert.Contains("- Patients who acknowledged the message: not given, fewer than 5 patients told.", prompt);
+        Assert.DoesNotContain("going well", prompt);
         Assert.DoesNotContain(Number(@case), prompt);
         Assert.DoesNotContain("Case ", prompt);
+    }
+
+    [Fact]
+    public void The_impact_prompt_gives_counts_and_rates_from_5_and_hides_anything_smaller_on_either_side()
+    {
+        var metrics = new MetricsResponse
+        {
+            GeneratedAt = _clock.UtcNow, TotalCases = 40, OpenCases = 37, ClosedCases = 3,
+            CasesByStage = new Dictionary<string, int>(), CasesByException = new Dictionary<string, int> { ["Overdue"] = 6, ["Unreachable"] = 2 },
+            OverdueCases = 6, EscalatedCases = 1, UnassignedCases = 0,
+            Measures = new Dictionary<string, RateMeasureResponse>
+            {
+                ["acknowledgement"] = new() { Numerator = 12, Denominator = 20 },
+                ["closure"] = new() { Numerator = 3, Denominator = 40 },
+                ["appointmentsAttended"] = new() { Numerator = 18, Denominator = 20 },
+                ["understanding"] = new() { Numerator = 2, Denominator = 3 },
+            },
+            TimeToStep = new Dictionary<string, DurationMeasureResponse>
+            {
+                ["acknowledgement"] = new() { Denominator = 12, Median = TimeSpan.FromHours(5) },
+                ["closure"] = new() { Denominator = 3, Median = TimeSpan.FromDays(2) },
+            },
+            ClosuresByReason = new Dictionary<string, int> { [nameof(ClosureReason.Declined)] = 1, [nameof(ClosureReason.Treated)] = 0 },
+            CasesReachingDisplayLabel = new Dictionary<string, RateMeasureResponse>(),
+            CasesByDisplayLabel = new Dictionary<string, int> { ["FollowUp"] = 30, ["Consultation"] = 4 },
+            ConfidenceDenominator = 20, ConfidenceResponses = 3, AverageConfidence = 4.0,
+        };
+
+        var prompt = DraftImpactSummary.BuildPrompt(metrics, "SYN Family Health Centre", _format);
+
+        Assert.Contains("Cases: 40 in total, 37 open and fewer than 5 closed.", prompt);
+        Assert.Contains("Open cases past their deadline: 6", prompt);
+        Assert.Contains("Open cases escalated: fewer than 5", prompt);
+        Assert.Contains("Why open cases are waiting: overdue 6, not reached fewer than 5.", prompt);
+        Assert.Contains("Cases at each step now: follow-up 30, consultation fewer than 5.", prompt);
+        Assert.Contains("- Patients who acknowledged the message: 12 of 20 patients told (60%).", prompt);
+        Assert.Contains("- Cases closed: not given, fewer than 5 on one side, out of 40 cases.", prompt);
+        Assert.Contains("- Appointments attended: not given, fewer than 5 on one side, out of 20 appointments due.", prompt);
+        Assert.Contains("- Understood their next step: not given, fewer than 5 patients who acknowledged.", prompt);
+        Assert.Contains("- to patient acknowledged: 5 hours, over 12 cases.", prompt);
+        Assert.Contains("- to case closed: not given, fewer than 5 cases.", prompt);
+        Assert.Contains("Closures by reason: declined by the patient fewer than 5.", prompt);
+        Assert.Contains("Confidence ratings after a call: not given, fewer than 5 on one side, out of 20 patients told.", prompt);
+        Assert.Contains("Period: no case opened", prompt);
+        foreach (var hidden in new[] { "and 3 closed", "not reached 2", "escalated: 1", "patient 1", "consultation 4", "3 of 40", "18 of 20", "2 of 3", "3 of 20", "(8%)", "(90%)", "(67%)", "4.0" })
+        {
+            Assert.DoesNotContain(hidden, prompt);
+        }
     }
 
     [Fact]

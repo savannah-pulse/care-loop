@@ -24,8 +24,16 @@ namespace CareLoop.Api.Features.Agents;
 /// <para>
 /// The prompt is built from the aggregate measures only, computed exactly as <c>GET /metrics</c> computes them for the
 /// same reader and scope: counts, rates with what each is out of, median times and closures by reason. No case, case
-/// number, name or identifier is in it. CareLoop works out every number; the agent only puts into words what they
-/// show, and is asked not to repeat them, because the screen shows them beside its text.
+/// number, name or identifier is in it. CareLoop works out every number; the agent only describes what they show, in
+/// neutral words and without saying why, and is asked not to repeat them, because the screen shows them beside its text.
+/// </para>
+/// <para>
+/// Small numbers are hidden before anything is sent (ai-spec §4.3): a count from 1 to 4 is
+/// written "fewer than 5", and a rate, median or average resting on fewer than
+/// <see cref="SmallCountThreshold"/> cases, or with fewer than that on either side, is not given. The threshold is a
+/// placeholder: the real one is an open governance decision. The prompt also names the period, the cohort, the version
+/// of the measure definitions (<see cref="GetMetrics.DefinitionVersion"/>) and that the agents may be sent synthetic
+/// data only, until the checks under "Before real data" are complete.
 /// </para>
 /// <para>
 /// Access follows <c>GET /metrics</c>: staff see their facility unless they give a reason for another, and the
@@ -42,7 +50,10 @@ public static class DraftImpactSummary
     public const string Purpose = "impact_summary";
 
     /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
-    public const string PromptVersion = "impact-summary-v1";
+    public const string PromptVersion = "impact-summary-v2";
+
+    /// <summary>The smallest count sent as it is; smaller ones are hidden. A placeholder until the governance decision on small-cell suppression.</summary>
+    public const int SmallCountThreshold = 5;
 
     private static readonly IReadOnlyDictionary<string, (string Name, string Of)> MeasureWords = new Dictionary<string, (string, string)>
     {
@@ -88,7 +99,7 @@ public static class DraftImpactSummary
         return routes;
     }
 
-    /// <summary>Asks the impact-summary agent to say in plain words what the aggregate numbers show.</summary>
+    /// <summary>Asks the impact-summary agent to say in plain, neutral words what the aggregate numbers show.</summary>
     /// <param name="facilityId">Optional facility, as for <c>GET /metrics</c>; the coordinator otherwise gets every facility.</param>
     /// <param name="reason">Reason for staff reading another facility's numbers, recorded with the read.</param>
     /// <param name="context">The caller-stated staff identity.</param>
@@ -124,12 +135,14 @@ public static class DraftImpactSummary
             return denied;
         }
 
-        var metrics = await GetMetrics.MeasureAsync(ReadAccess.FacilityScope(db.Cases.AsNoTracking(), actor, facilityId),
-            db, pathways, clock.UtcNow, loggerFactory.CreateLogger(typeof(DraftImpactSummary)), ct);
+        var scope = ReadAccess.FacilityScope(db.Cases.AsNoTracking(), actor, facilityId);
+        var metrics = await GetMetrics.MeasureAsync(scope, db, pathways, clock.UtcNow, loggerFactory.CreateLogger(typeof(DraftImpactSummary)), ct);
+        var opened = await scope.Select(c => c.CreatedAt).ToListAsync(ct);
         var request = new AgentRequest
         {
             Purpose = Purpose, Agent = options.Value.ImpactSummaryAgent(), PromptVersion = PromptVersion,
-            Prompt = BuildPrompt(metrics, scopeFacility is null ? "every facility" : format.Facility(scopeFacility), format),
+            Prompt = BuildPrompt(metrics, scopeFacility is null ? "every facility" : format.Facility(scopeFacility), format,
+                opened.Count == 0 ? null : opened.Min()),
             CorrelationId = Guid.NewGuid(),
         };
         await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
@@ -137,26 +150,33 @@ public static class DraftImpactSummary
     }
 
     /// <summary>
-    /// Writes the impact-summary prompt from aggregate measures.
+    /// Writes the impact-summary prompt from aggregate measures, with small numbers hidden.
     /// </summary>
     /// <param name="metrics">The measures, as <c>GET /metrics</c> returns them.</param>
     /// <param name="scope">The facility's name, or <c>every facility</c>.</param>
     /// <param name="format">Gives local dates and times.</param>
-    /// <returns>The plain-text prompt. It holds totals only, never a case.</returns>
-    internal static string BuildPrompt(MetricsResponse metrics, string scope, MessageFormat format)
+    /// <param name="firstOpened">When the earliest case in the cohort was opened, or <see langword="null"/> when there is none.</param>
+    /// <returns>The plain-text prompt. It holds totals only, never a case, and no count under <see cref="SmallCountThreshold"/>.</returns>
+    internal static string BuildPrompt(MetricsResponse metrics, string scope, MessageFormat format, DateTimeOffset? firstOpened = null)
     {
         var prompt = new StringBuilder();
         prompt.AppendLine($"CareLoop impact summary, prompt version {PromptVersion}.");
-        prompt.AppendLine("Write a few short sentences on what these numbers say about follow-up: what is going well, where cases are waiting, and anything worth checking.");
-        prompt.AppendLine("Use only the figures below and do not repeat them: the numbers are shown beside your words. Use plain words and British spelling. Describe what the numbers show; do not give clinical advice or claim real-world results.");
+        prompt.AppendLine("Write a few short sentences on what these numbers say about follow-up: which steps have higher or lower completion, where open cases are waiting, and which recorded gaps are worth checking.");
+        prompt.AppendLine("Describe only what the figures show, in neutral words such as \"acknowledgement not recorded by the due time\". Do not say why a figure is high or low, do not credit or blame any person, team or patient, do not give clinical advice and do not claim real-world results.");
+        prompt.AppendLine("Use only the figures below and do not repeat them: the numbers are shown beside your words. Use plain words and British spelling.");
         prompt.AppendLine();
-        prompt.AppendLine($"Scope: {scope}.");
-        prompt.AppendLine($"Measured: {AgentWords.Moment(metrics.GeneratedAt, format)}, local time.");
+        prompt.AppendLine($"Cohort: every case at {scope}, open and closed, on every programme.");
+        prompt.AppendLine(firstOpened is { } from
+            ? $"Period: cases opened from {format.Date(from)} up to {AgentWords.Moment(metrics.GeneratedAt, format)}, local time."
+            : $"Period: no case opened up to {AgentWords.Moment(metrics.GeneratedAt, format)}, local time.");
+        prompt.AppendLine($"Measure definitions: version {GetMetrics.DefinitionVersion} of CareLoop's coordination measures.");
+        prompt.AppendLine("Data: CareLoop may send AI agents synthetic data only until the checks under \"Before real data\" in its AI design are complete, so these figures come from synthetic cases, not real patients.");
+        prompt.AppendLine($"Small numbers: any count from 1 to {SmallCountThreshold - 1} is written \"fewer than {SmallCountThreshold}\", and a rate, median or average resting on fewer than {SmallCountThreshold} cases, or with fewer than {SmallCountThreshold} on either side, is not given. The threshold is a placeholder: the real one is still an open governance decision. Do not guess or work out a hidden number.");
         prompt.AppendLine();
-        prompt.AppendLine($"Cases: {metrics.TotalCases} in total, {metrics.OpenCases} open and {metrics.ClosedCases} closed.");
-        prompt.AppendLine($"Open cases past their deadline: {metrics.OverdueCases}");
-        prompt.AppendLine($"Open cases escalated: {metrics.EscalatedCases}");
-        prompt.AppendLine($"Open cases with no named owner: {metrics.UnassignedCases}");
+        prompt.AppendLine($"Cases: {Count(metrics.TotalCases)} in total, {Count(metrics.OpenCases)} open and {Count(metrics.ClosedCases)} closed.");
+        prompt.AppendLine($"Open cases past their deadline: {Count(metrics.OverdueCases)}");
+        prompt.AppendLine($"Open cases escalated: {Count(metrics.EscalatedCases)}");
+        prompt.AppendLine($"Open cases with no named owner: {Count(metrics.UnassignedCases)}");
         prompt.AppendLine($"Why open cases are waiting: {Counts(metrics.CasesByException, ExceptionName, "nothing")}.");
         prompt.AppendLine($"Cases at each step now: {Counts(metrics.CasesByDisplayLabel, StepName, "none")}.");
         prompt.AppendLine();
@@ -164,9 +184,7 @@ public static class DraftImpactSummary
         foreach (var (key, measure) in metrics.Measures)
         {
             var (name, of) = MeasureWords.TryGetValue(key, out var words) ? words : (MessageFormat.Role(key), "eligible cases");
-            prompt.AppendLine(measure.Denominator == 0
-                ? $"- {name}: not measured yet, no {of}."
-                : $"- {name}: {measure.Numerator} of {measure.Denominator} {of} ({Percent(measure.Rate)}).");
+            prompt.AppendLine($"- {name}: {Rate(measure.Numerator, measure.Denominator, of)}.");
         }
 
         prompt.AppendLine();
@@ -174,22 +192,66 @@ public static class DraftImpactSummary
         foreach (var (key, step) in metrics.TimeToStep)
         {
             var name = StepWords.TryGetValue(key, out var words) ? words : MessageFormat.Role(key);
-            prompt.AppendLine(step.Median is { } median
-                ? $"- to {name}: {Duration(median)}, over {AgentWords.Count(step.Denominator, "case")}."
-                : $"- to {name}: not reached yet.");
+            prompt.AppendLine(step.Median is null
+                ? $"- to {name}: not reached yet."
+                : step.Denominator < SmallCountThreshold
+                    ? $"- to {name}: not given, fewer than {SmallCountThreshold} cases."
+                    : $"- to {name}: {Duration(step.Median.Value)}, over {AgentWords.Count(step.Denominator, "case")}.");
         }
 
         prompt.AppendLine();
         prompt.AppendLine($"Closures by reason: {Counts(metrics.ClosuresByReason, ClosureName, "none yet")}.");
-        prompt.AppendLine(metrics.ConfidenceResponses == 0
-            ? $"Confidence ratings after a call: none yet, out of {AgentWords.Count(metrics.ConfidenceDenominator, "patient")} told."
-            : $"Confidence ratings after a call: {metrics.ConfidenceResponses} of {metrics.ConfidenceDenominator} patients told gave one; average {metrics.AverageConfidence?.ToString("0.0", CultureInfo.InvariantCulture)} out of 5.");
+        prompt.AppendLine($"Confidence ratings after a call: {Confidence(metrics)}.");
         return prompt.ToString();
     }
 
+    /// <summary>Gives a count, hiding a small one.</summary>
+    /// <param name="count">The count.</param>
+    /// <returns>The count; <c>fewer than 5</c> for 1 to 4.</returns>
+    internal static string Count(int count) =>
+        count is > 0 and < SmallCountThreshold ? $"fewer than {SmallCountThreshold}" : count.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Gives a rate with what it is out of, or says why it is not given.</summary>
+    /// <param name="numerator">How many completed the step.</param>
+    /// <param name="denominator">How many could have.</param>
+    /// <param name="of">What the denominator counts, for example <c>patients told</c>.</param>
+    /// <returns>For example <c>12 of 20 patients told (60%)</c>, or a reason it is not measured or not given.</returns>
+    internal static string Rate(int numerator, int denominator, string of)
+    {
+        if (denominator == 0)
+        {
+            return $"not measured yet, no {of}";
+        }
+
+        if (denominator < SmallCountThreshold)
+        {
+            return $"not given, fewer than {SmallCountThreshold} {of}";
+        }
+
+        return IsSmall(numerator) || IsSmall(denominator - numerator)
+            ? $"not given, fewer than {SmallCountThreshold} on one side, out of {denominator} {of}"
+            : $"{numerator} of {denominator} {of} ({Percent((double)numerator / denominator)})";
+    }
+
+    private static string Confidence(MetricsResponse metrics)
+    {
+        var responses = metrics.ConfidenceResponses;
+        var told = metrics.ConfidenceDenominator;
+        if (responses == 0)
+        {
+            return $"none yet, out of {Count(told)} patients told";
+        }
+
+        return responses < SmallCountThreshold || IsSmall(told - responses)
+            ? $"not given, fewer than {SmallCountThreshold} on one side, out of {Count(told)} patients told"
+            : $"{responses} of {told} patients told gave one; average {metrics.AverageConfidence?.ToString("0.0", CultureInfo.InvariantCulture)} out of 5";
+    }
+
+    private static bool IsSmall(int count) => count is > 0 and < SmallCountThreshold;
+
     private static string Counts(IReadOnlyDictionary<string, int> counts, Func<string, string> name, string none)
     {
-        var parts = counts.Where(c => c.Value > 0).Select(c => $"{name(c.Key)} {c.Value}").ToList();
+        var parts = counts.Where(c => c.Value > 0).Select(c => $"{name(c.Key)} {Count(c.Value)}").ToList();
         return parts.Count == 0 ? none : string.Join(", ", parts);
     }
 
@@ -201,8 +263,8 @@ public static class DraftImpactSummary
 
     private static string ClosureName(string key) => ClosureWords.TryGetValue(key, out var words) ? words : MessageFormat.Role(key);
 
-    private static string Percent(double? rate) =>
-        rate is { } value ? $"{Math.Round(value * 100, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)}%" : "not measured";
+    private static string Percent(double rate) =>
+        $"{Math.Round(rate * 100, MidpointRounding.AwayFromZero).ToString(CultureInfo.InvariantCulture)}%";
 
     /// <summary>Gives a median duration in the two largest units that matter.</summary>
     /// <param name="span">The duration.</param>

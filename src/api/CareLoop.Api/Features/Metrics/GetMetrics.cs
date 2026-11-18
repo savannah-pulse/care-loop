@@ -16,6 +16,10 @@ namespace CareLoop.Api.Features.Metrics;
 /// <summary>Aggregates accountable coordination progress, not clinical effectiveness.</summary>
 public static class GetMetrics
 {
+    /// <summary>The version of the measure definitions below (see "Coordination measures" in <c>src/api/README.md</c>).</summary>
+    /// <remarks>Raise it in the same change that alters what a measure counts, so a narrative written from the numbers (the AI impact summary) can say which definitions they follow.</remarks>
+    public const string DefinitionVersion = "metrics-v1";
+
     /// <summary>Maps the metrics route.</summary>
     /// <param name="routes">The route builder.</param>
     /// <returns>The same route builder.</returns>
