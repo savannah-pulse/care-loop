@@ -42,6 +42,7 @@ AGENTS.md                   The rules for this repository
 contracts/                  Shared contract guidance and the API's OpenAPI document (openapi/careloop.json)
 docs/                       Architecture, workstreams, development practices, releasing, and UI design
 infra/local/                Local environment notes
+infra/azure/                Azure deployment: Bicep, parameter files per environment and the deploy script
 src/
   api/                      The CareLoop engine (.NET 10): CareLoop.Domain, CareLoop.Api and its Dockerfile
   ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
