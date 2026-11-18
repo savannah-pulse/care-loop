@@ -309,8 +309,8 @@ public static partial class DraftRoleBriefing
             item.ItemId,
             item.Token,
             item.Band,
-            Kind = c.NextAction ?? "none",
-            Label = AgentWords.NextAction(c.NextAction),
+            // The dashboard's words for the next action, which the agent groups and names items by.
+            Kind = AgentWords.NextAction(c.NextAction),
             Stage = AgentWords.Step(CaseDisplayLabels.From(c, pathways.Get(c.PathwayId))),
             ClockId = $"{c.PathwayId}/{c.NextAction ?? "none"}",
             DueAt = c.DueAt is { } due ? AgentInput.Moment(format.InLocalTime(due)) : null,

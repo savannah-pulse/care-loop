@@ -279,8 +279,9 @@ public sealed class AiAgentEndpointsTests : IDisposable
             items.Select(i => i.GetProperty("due_at").GetString()));
         Assert.Equal([0, 0, 3, 1], items.Skip(1).Select(i => i.GetProperty("working_days_remaining").GetInt32()));
         Assert.Equal(["routine", "not_reviewed", "not_reviewed", "urgent", "not_reviewed"], items.Select(i => i.GetProperty("urgency_tier").GetString()));
-        Assert.Equal("acknowledge-notification", items[0].GetProperty("kind").GetString());
-        Assert.Equal("Make sure the patient has the message", items[0].GetProperty("label").GetString());
+        Assert.Equal("Make sure the patient has the message", items[0].GetProperty("kind").GetString());
+        Assert.False(items[0].TryGetProperty("label", out _));
+        Assert.DoesNotContain("\"kind\":\"acknowledge-notification", Assert.Single(_agents.Calls).Prompt);
         var days = input.GetProperty("lookahead").EnumerateArray().ToList();
         Assert.Equal(["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09"], days.Select(d => d.GetProperty("date").GetString()));
         Assert.Equal("""["W-5"]""", days[0].GetProperty("item_ids").GetRawText());
