@@ -149,13 +149,13 @@ AI attaches to backend-owned stages; it never advances a stage. A case advances 
 
 **Status:** Proposal. Built behind `Ai:Agents` and off by default (see [integration.md](integration.md#foundry-agents-role-briefing-impact-summary-patient-message-draft)); not yet agreed by the team or reviewed by a clinical adviser.
 **User:** Any staff member reading their worklist: clinician, receiving clinician, nurse navigator, facility lead, lab or programme coordinator.
-**Purpose:** One to three plain sentences above the worklist ("Start here today") that say where the reader might start, so they need not read the whole list first. It informs (L0); it decides nothing.
+**Purpose:** A headline and a few short sentences above the worklist ("Start here today") that say where the reader might start, so they need not read the whole list first. It informs (L0); it decides nothing.
 
-**Inputs**, built by the API from the reader's worklist scope only:
+**Inputs**, built by the API from the reader's worklist scope only, as the role-briefing agent's `<input_json>` (see [integration.md](integration.md#what-each-agent-expects-and-returns)):
 
-- The reader's role and facility, and counts of open cases: open, overdue, escalated, urgent, due today, needing an owner.
-- Up to five cases the backend has already chosen and ordered (overdue or escalated, then clinician-reviewed urgent, then due today), each from its coordination state: case number, programme, stage and display step, next action, the owner's role, due and overdue state, urgency, exception flags, the open escalation's level and acknowledgement, each track's status, how contact with the patient stands, understanding and confidence where recorded, and the preferred language for messages.
-- Never names, record numbers, patient references, contact details, source identifiers, staff references or free text.
+- The reader's role, the time, the working-day calendar and the clock configuration, and counts of items by band: act now (overdue or escalated), due today, information for the role (urgent tier or needing an owner), and the next five working days.
+- Every open case in those bands, already chosen, banded and ordered by the backend, each from its coordination state: a token made up for that one prompt, the next action, the display step, the deadline and working days left, the urgency tier, who acts next, how contact with the patient stands and the open escalation's level, role and acknowledgement. The API puts the case number back in place of each token after the answer.
+- Never names, record numbers, case numbers, patient references, contact details, source identifiers, staff references or free text.
 
 **It may not:**
 

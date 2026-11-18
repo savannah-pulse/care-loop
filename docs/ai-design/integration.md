@@ -257,9 +257,9 @@ flowchart LR
 }
 ```
 
-`agent_reference` with a `version` is how the Foundry Responses API addresses one agent version, and it is the request the Agent Framework's `FoundryAgent(agent_name, agent_version)` sends in `src/ai_agents/*/run_agent.py`. The agent's own endpoint (`…/agents/{agent}/endpoint/protocols/openai/responses`), which this pull request called at first, serves whichever version the project's version selector picks, the latest by default, so an edit in the portal could change the text while CareLoop's prompt version stayed the same. The answer's `agent_reference` names the version that wrote it, and an answer from any other version is refused like any other failure. The text is `output_text`, or every `output[].content[].text` in order. The agents have no tools and receive nothing but the prompt.
+`agent_reference` with a `version` is how the Foundry Responses API addresses one agent version, and it is the request the Agent Framework's `FoundryAgent(agent_name, agent_version)` sends in `src/ai_agents/*/run_agent.py`. The agent's own endpoint (`…/agents/{agent}/endpoint/protocols/openai/responses`), which this pull request called at first, serves whichever version the project's version selector picks, the latest by default, so an edit in the portal could change the text while CareLoop's prompt version stayed the same. The answer's `agent_reference` names the version that wrote it, and an answer from any other version is refused like any other failure. The text is `output_text`, or every `output[].content[].text` in order; for these agents it is JSON, read as described [below](#what-each-agent-expects-and-returns). The request may not set the answer's format: Foundry answers `400` ("Not allowed when agent is specified", parameter `text`) when a request names an agent and a JSON schema, so the schema has to be set on the agent version itself.
 
-The request shape was checked against the Foundry REST reference ("Create a model response") and the `agent-framework-foundry` source, not yet against the live project, which the team cannot call yet. If the project answers otherwise, the change stays inside `FoundryAgentClient`.
+This request was sent to the live project on 18 November 2026 with each pinned version; see [Tested live](#tested-live-on-18-november-2026).
 
 #### Proposed: the Python service route
 
@@ -272,9 +272,9 @@ Proposed, pending the team's decision. For Peninah, if the team chooses the Pyth
   "request_id": "2f4d9c1e-0b7a-4f7e-9a51-3c2d6e8f1a20",
   "purpose": "role_briefing",
   "agent": { "name": "role-briefing", "version": "2" },
-  "prompt_version": "role-briefing-v2",
+  "prompt_version": "role-briefing-v3",
   "language": "en",
-  "prompt": "<plain text the API built>"
+  "prompt": "<the prompt the API built: a first line, then <input_json>…</input_json>>"
 }
 ```
 
@@ -283,16 +283,16 @@ Proposed, pending the team's decision. For Peninah, if the team chooses the Pyth
   "request_id": "2f4d9c1e-0b7a-4f7e-9a51-3c2d6e8f1a20",
   "purpose": "role_briefing",
   "agent": { "name": "role-briefing", "version": "2" },
-  "prompt_version": "role-briefing-v2",
+  "prompt_version": "role-briefing-v3",
   "status": "draft",
-  "text": "…"
+  "text": "<the agent's answer, as it wrote it>"
 }
 ```
 
 - `purpose` is `role_briefing`, `impact_summary` or `patient_message_preview`; `request_id` is the call's correlation identifier, already in CareLoop's read audit.
-- The service calls exactly the agent version named, with its own managed identity, and sends the prompt as it is: it adds nothing from case data, and the agent has no tools. The API stays the data boundary.
-- It answers `200` with the same `request_id`, `purpose`, `agent` and `prompt_version`, `status` `draft` and the text, or `422` with `{ "request_id", "reason" }` when AI is off, the request is over `CARELOOP_AI_MAX_INPUT_BYTES`, the agent times out, refuses or writes nothing.
-- The API checks every field again. Anything but a matching `200` draft is the same calm 503 as on the direct route.
+- The service calls exactly the agent version named, with its own managed identity, and sends the prompt as it is: it adds nothing from case data. The API stays the data boundary.
+- It answers `200` with the same `request_id`, `purpose`, `agent` and `prompt_version`, `status` `draft` and the agent's answer unchanged, or `422` with `{ "request_id", "reason" }` when AI is off, the request is over `CARELOOP_AI_MAX_INPUT_BYTES`, the agent times out, refuses or writes nothing.
+- The API checks every field again and reads the agent's JSON answer itself, exactly as on the direct route. Anything but a matching `200` draft is the same calm 503.
 
 #### The endpoints
 
@@ -302,18 +302,70 @@ Proposed, pending the team's decision. For Peninah, if the team chooses the Pyth
 | `POST /ai/impact-summary` | `ImpactSummary`, `impact-summary:4` | Every staff role, scoped like `GET /metrics` | The same |
 | `POST /cases/{caseId}/patient-message-draft` | `PatientNotification`, `patient-notification:2` | Nurse navigator and clinician (pending the team's decision), for a case they may open | The same; a preview that is never sent |
 
-409, titled "AI is switched off", while `Ai:Agents:Enabled` is `false` or `Ai:Provider` is `NoOp`, as the handoff summary answers while AI is off; 503, titled "AI could not write this", when the agent fails in any way (no token, 401, 403, 429, 5xx, a timeout, a request over `Ai:MaxRequestBytes`, an answer marked incomplete, a refusal, no text, or another agent version); 401, 403 and 404 exactly as for the reads they mirror, including the documented reason for another facility.
+409, titled "AI is switched off", while `Ai:Agents:Enabled` is `false` or `Ai:Provider` is `NoOp`, as the handoff summary answers while AI is off; 503, titled "AI could not write this", when the agent fails in any way (no token, 401, 403, 429, 5xx, a timeout, a request over `Ai:MaxRequestBytes`, an answer marked incomplete, a refusal, no text, or another agent version) or when it answers but gives no usable draft: it declines (`cannot_comply`), or its JSON breaks the checks [below](#how-the-answer-is-read). The screen shows the same calm note either way; the reason code goes to the log with the call's correlation identifier, which the read audit holds, and never to the screen. 401, 403 and 404 are exactly as for the reads they mirror, including the documented reason for another facility.
 
-### What each agent is given
+### What each agent expects and returns
 
-| Agent | Given | Never given |
+Each agent's instructions live in its version in the Foundry project, not in this repository; they were read from the live project on 18 November 2026 (`GET {project}/agents/{name}/versions/{version}?api-version=v1`). Each one reads its facts as a single JSON object inside `<input_json>` and answers JSON. The prompt is a first line naming the prompt version, then that block, and nothing else: the agents treat an instruction inside the data as a reason to refuse (`INSTRUCTION_IN_DATA_REQUIRED_ACTION`), so CareLoop sends facts, not wording rules.
+
+No version has a response schema set, so the shape of an answer can drift from call to call (see [Tested live](#tested-live-on-18-november-2026)). CareLoop accepts the shapes it has seen, checks what they say the same way, and declines anything else.
+
+#### Role briefing (`role-briefing:2`, AG1, prompt `role-briefing-v3`)
+
+| `<input_json>` field | What the agent expects | What CareLoop sends |
 |---|---|---|
-| Role briefing | The reader's role in words and the facility's name; counts of open cases in scope (open, overdue, escalated, urgent, due today, needs an owner); up to five cases, overdue or escalated first, then urgent, then due today. Each is described from its full coordination state, the data `GET /cases/{caseId}` returns rather than the worklist row: its eight-character case number, programme, stage and display step, next action in words, the owner's role and who acts next, due status ("late by 18 hours") and overdue state, urgency, exception flags, the open escalation's level, the role it went to and whether it was acknowledged, each track's status (with an upcoming appointment's day and time), how contact with the patient stands (delivered, replied, asked for a call, not reached), understanding and the confidence rating where recorded, and the patient's preferred language for messages. The coordinator's scope is the cases escalated to the coordinator | Patient names, MRNs, patient references, contact details, the hospital's result identifier, staff references, and free text: escalation reasons, a referral's rejection reason, an appointment's place |
-| Impact summary | The aggregate measures `GET /metrics` returns for the same reader, with [small numbers hidden](#small-numbers): counts, rates with what each is out of, median times to each step, closures by reason, confidence participation; the cohort, the period, the version of the measure definitions (`metrics-v1`) and that the data is synthetic. It is asked to say in neutral, non-causal words which steps have higher or lower completion, where open cases wait and which recorded gaps are worth checking, without saying why and without crediting or blaming anyone, and not to repeat the numbers, which the screen shows beside its words | Any case, case number or identifier; any count from 1 to 4 |
-| Patient message draft | One [patient-safe step](#the-patient-safe-step) in place of the next action, the facility's name, an upcoming appointment's day and time in local time and whether its place is known, the channel (text message or email) and the two reply codes: 1 "I got this message", 2 "call me". It is told the message is category A, administrative, with no clinical result in it, writes `{first name}` and `{place}` where they go, and is told never to mention or hint at a result | The patient's name, contact details, MRN, reference, the hospital's result identifier, the case's next action, the appointment's place, and any result or clinical content |
+| `role` | `nurse`, `clinician`, `programme_coordinator`, `facility_lead` or `lab_technician` | The reader's role: nurse navigator is `nurse`, receiving clinician is `clinician`, lab is `lab_technician` |
+| `as_of` | The time | Now, in local time with its offset |
+| `calendar_version`, `clock_config {version, status}` | Which working-day calendar and clocks apply; a coordinator's briefing must say when deadlines are `provisional` | `mon-fri-no-holidays-v1` (Monday to Friday, a placeholder); the pathways in scope with their versions, `provisional` unless every deadline is clinically approved |
+| `counts` | Items per band: `P1`, `P2`, `P3`, `info` | Counted from the items sent |
+| `items[]` | `item_id`, `token` (pseudonymous), `band`, `kind`, `label`, `stage`, `clock_id`, `due_at`, `working_days_remaining`, `urgency_tier`, `owner_is_user`, already scoped, banded and ordered | One item per open case in the worklist's scope: `P1` overdue or escalated, `P2` due today or on a non-working day before the next working day, `info` urgent tier or needing an owner, `P3` due on one of the next five working days, a deadline on a non-working day counting on the working day before it; ordered by band, then deadline. `item_id` `W-1`… and `token` `P-1`… are made up for this one prompt. `kind` is the next action's key and `label` its words on the dashboard; also `acts_next`, `patient_contact` (delivered, replied, asked for a call, not reached), `needs_owner`, the open `escalation` (level, role, acknowledged) and, for every facility, the facility's name |
+| `lookahead[]` | Up to five working days, each `{date, item_ids}` | The next five working days and the `P3` items due on each (a Saturday deadline under the Friday before it) |
+| `max_items_per_section` | How many items each section lists | 5 |
 
-"Urgent" means a clinician-reviewed urgency code listed in `Ai:Agents:UrgentCodes`, which must match the dashboard's table; CareLoop never sets urgency. Each prompt begins with its prompt version (`role-briefing-v2`, `impact-summary-v2`, `patient-message-v2`), so a change of wording can be traced. The agents' instructions live in the Foundry project, not in this repository, so they should expect these inputs and must not ask for anything else.
+It answers `{"headline", "sections": {"today", "coming_up", "role": {"intro", "item_ids", "overflow_count"}, "lookahead": [{"date", "summary", "item_ids"}]}}`: a headline with the `P1` and `P2` counts, then an intro of up to 25 words for each band, naming patients only by token. Reason codes when it cannot comply: `MISSING_FIELD`, `COUNT_MISMATCH`, `UNKNOWN_BAND`, `ROLE_SCOPE_CONFLICT`, `INSTRUCTION_IN_DATA_REQUIRED_ACTION`, `OTHER`.
 
+Staff read the headline; then what to act on now and what is due today; then, when there is one, the intro for their role. Each token becomes the case number the dashboard shows (`case 1A2B3C4D`). The look-ahead is not shown: the worklist below already lists those deadlines.
+
+#### Impact summary (`impact-summary:4`, AG3, prompt `impact-summary-v3`)
+
+| `<input_json>` field | What the agent expects | What CareLoop sends |
+|---|---|---|
+| `snapshot_id`, `period`, `filters`, `cohort_size`, `synthetic` | What the figures cover | `metrics-v1@<time>`; the day the first case in the cohort was opened up to now; every programme and the facility (or every facility); the number of cases; `true`, always, until the checks under [Before real data](#before-real-data) are done |
+| `measures[]` | `metric_id`, `label`, `numerator`, `denominator`, `value`, `unit`, `missing_count`, `suppressed`, `comparison {status}` | The open cases past their deadline, escalated and with no named owner (each out of the open cases), and each rate `GET /metrics` computes, with `denominator_label` saying what it is out of. `missing_count` is `null`: CareLoop does not count missing values per measure yet. `comparison.status` is `not_tracked`: there is no escalation-off replay |
+| `step_times[]` | `metric_id`, `label`, `median_working_days`, `comparison_median` | The median clock time from the screening result to each step, in words (`19 hours`), with how many cases it rests on. CareLoop measures clock time, not working days |
+| `funnel[]` | `stage`, `count` | Nothing yet: the stages' counts would let a suppressed count be worked out by subtraction, so the funnel waits for a [secondary suppression](#small-numbers) rule |
+| `delay_reasons[]`, `delay_reasons_total` | `metric_id`, `code`, `label`, `count`; the total | Why open cases wait (past the deadline, patient not reached, referral declined, message not acknowledged, no named owner); the total of the counts sent |
+| `supplementary[]` | More measures in the same shape | Closures by reason, out of the closed cases; the patients told who gave a confidence rating; the average rating |
+| `targets[]` | Department of Health targets mapped to a `metric_id` | Empty: no measure is mapped to a target yet |
+| `max_words` | Default 120 | 120 |
+
+It answers `{"sentences": [{"text", "metric_ids"}], "limits_note"}`: two to four sentences, each naming the metric IDs it rests on, and a separate note on what the figures cannot show ("Simulated on synthetic data; not evidence of real-world improvement." while `synthetic` is `true`). Reason codes: `MISSING_FIELD`, `ALL_MEASURES_SUPPRESSED`, `INCONSISTENT_SNAPSHOT`, `INSTRUCTION_IN_DATA_REQUIRED_ACTION`, `OTHER`. Staff read the sentences as one paragraph and the note as a second.
+
+#### Patient message draft (`patient-notification:2`, AG2, prompt `patient-message-v3`)
+
+| `<input_json>` field | What the agent expects | What CareLoop sends |
+|---|---|---|
+| `stage`, `language`, `channel` | The stage, the message's language, `sms`, `app` or `email` | `patient_contact`; `en`, the only language with templates; `sms` or `email` |
+| `template` | `id`, `version`, `class` (`A` logistics, `B` result-bearing), `language` and `spans[]`, each `locked` (copied word for word), `adaptable` (tone and reading level only) or `slot` (one fact) | A category A template built in the API: an adaptable greeting ("Hello"), the first name, "this is your care team at" the facility, the [patient-safe step](#the-patient-safe-step), for an upcoming booking "Your appointment is on" its day and time and ". Place: {place}." (or "to be confirmed"), the two reply codes, and an adaptable "Thank you."; email adds a locked subject line |
+| `facts[]` | `fact_id`, `fact_type`, `value`, `recorded_at`, `review_status` | `first_name` is the placeholder `{first name}`, never a name; `care_team`, `next_step` and `appointment_time`; every one `final` |
+| `adaptation` | `reading_level`, `tone`, `greeting_style` | `plain`, `warm-neutral`, `first name` |
+| `max_chars` | The channel's limit | 459 for a text message (three segments of 153, a placeholder) and 1000 for an email |
+
+It answers the spans, each with its `span_id` and `text` (and the `fact_id` a slot used). Reason codes: `SLOT_UNFILLED`, `FACT_NOT_FINAL`, `LANGUAGE_MISMATCH`, `TOO_LONG`, `TEMPLATE_INVALID`, `CLASS_CONFLICT`, `INSTRUCTION_IN_DATA_REQUIRED_ACTION`, `OTHER`. The spans are put together in the template's order into the preview staff read; for email, the subject comes first, on its own line.
+
+"Urgent" means a clinician-reviewed urgency code listed in `Ai:Agents:UrgentCodes`, which must match the dashboard's table; CareLoop never sets urgency.
+
+#### How the answer is read
+
+`AgentReply` reads the answer as one JSON object, also from inside a Markdown code fence. These are declines, each with a short reason code for the log:
+
+- a refusal in any shape the agents use: `{"status": "cannot_comply", "reason_code": …}`, `{"cannot_comply": {"reason_code": …}}`, or plain text such as `cannot_comply: TEMPLATE_INVALID`. The agent's own code is logged; a code that is not a short upper-case word is logged as `OTHER`, and the agent's explanation is never logged;
+- an answer that is not JSON (`NOT_JSON`), or that lacks a field the contract names (`MISSING_OUTPUT_FIELD`, `MALFORMED_OUTPUT`);
+- a briefing that lists an item or token that was not sent (`UNKNOWN_ITEM_ID`, `UNKNOWN_TOKEN`), lists an item under another band's section (`ITEM_IN_WRONG_SECTION`), or leaves a `P1` item neither listed nor counted (`P1_NOT_ACCOUNTED_FOR`);
+- an impact summary with no sentence or more than four (`SENTENCE_COUNT`), or a sentence citing a metric ID that was not sent (`UNKNOWN_METRIC_ID`);
+- a patient message whose spans differ from the template's (`SPANS_CHANGED`), with a locked span not word for word (`LOCKED_SPAN_CHANGED`), a slot not exactly its fact (`SLOT_VALUE_CHANGED`), a number in an adaptable span that had none (`ADAPTED_SPAN_ADDED_NUMBER`), or over the channel's limit (`TOO_LONG`). An adaptable span left empty, which the agent may do to fit the limit, is left out. Its spans are accepted as an array under `spans` or another name, or as one object keyed by span ID: both came back from the same agent version.
+
+A decline is the calm 503 above. The log line is `Agent {name:version} gave no usable draft for request {correlation ID}: {reason code}`.
 #### The patient-safe step
 
 Several next actions reveal clinical state ("review the result", "start the treatment", "send a new referral"), and the reporting physician gives results (DoH §3.8.1). An instruction not to hint at a result cannot help once the input is the hint, so the API maps each next action to one step with no result in it, in the spirit of the category A administrative templates, and the next action itself never reaches the prompt:
@@ -330,7 +382,7 @@ The role briefing does name next actions: it is written for staff, never for a p
 
 #### Small numbers
 
-Before the impact summary's prompt is sent, a count from 1 to 4 is written "fewer than 5", and a rate, median or average resting on fewer than 5 cases, or with fewer than 5 on either side (3 of 40 closed, or 18 of 20 attended), is not given. The screen still shows staff every exact number; only what is sent to the agent is reduced. The threshold of 5 is a placeholder: ai-spec §4.3 leaves the small-cell threshold to a governance decision, and the prompt says so and asks the agent not to work out a hidden number.
+Before the impact summary's prompt is sent, a count from 1 to 4 is sent as `"suppressed": true` with no number, and so is a rate, median or average resting on fewer than 5 cases, or with fewer than 5 on either side (3 of 40 closed, or 18 of 20 attended). The agent's instructions forbid it to use a suppressed measure. So that a suppressed count cannot be worked out by subtraction, the cohort size and the open cases are both left out when the open or the closed cases number 1 to 4 (total = open + closed); when exactly one closure reason is small, the next smallest is suppressed with it, because the reasons split the closed cases between them; and the funnel is not sent. The screen still shows staff every exact number; only what is sent to the agent is reduced. The threshold of 5 is a placeholder: ai-spec §4.3 leaves the small-cell threshold to a governance decision, and the prompt sends it as `small_cell_threshold`.
 
 ### Versions and audit
 
@@ -340,11 +392,12 @@ Before the impact summary's prompt is sent, a count from 1 to 4 is written "fewe
 
 ### Privacy rules
 
-- Patient names, contact details, identifiers and free text from the hospital system are never sent. One test seeds a case with a name, an MRN, a patient reference, a hospital result identifier, a phone number, an email address, an appointment's place and an escalation reason, and checks that no prompt from any of the three endpoints contains them.
-- The patient message prompt never carries a next action. A test builds it for every next action the pathway defines and fails if any next action, or its wording on the dashboard, appears, or if the step is not one of the patient-safe steps.
+- Patient names, contact details, identifiers and free text from the hospital system are never sent. One test seeds a case with a name, an MRN, a patient reference, a hospital result identifier, a phone number, an email address, an appointment's place and an escalation reason, and checks that no prompt from any of the three endpoints contains them, nor the case's identifier or case number.
+- The briefing names each case only by a token made up for that one prompt (`P-1`, `P-2`…); the API puts the case number back after the answer. It no longer sends the patient's preferred language, which the agent does not use.
+- The patient message prompt never carries a next action. A test builds it for every next action the pathway defines and fails if any next action, or its wording on the dashboard, appears, or if the step is not one of the patient-safe steps. The first name is sent as the placeholder `{first name}`, never a name.
 - The patient message preview is not a message. Patient messages go out from the approved templates; the preview is shown to staff, labelled as a draft that was not sent, and is not stored.
 - No AI output changes a case, an owner, a deadline, urgency or a metric. The endpoints read through no-tracking queries and write only the read audit.
-- Prompts and texts are not logged. The clients log the agent version, the status, the duration, the correlation identifier and, on failure, the agent's own error code.
+- Prompts and answers are not logged. The clients log the agent version, the status, the duration, the correlation identifier and, on failure, the agent's own error code; a declined answer logs only its reason code.
 
 ### Configuration
 
@@ -361,10 +414,22 @@ Docker Compose passes `AI_PROVIDER`, `AI_TIMEOUT_SECONDS`, `AI_FOUNDRY_PROJECT_E
 
 ### RBAC
 
-There is no key. Whichever identity calls the agents needs the **Foundry User** role (formerly Azure AI User) on the Foundry project; without it every call answers 403 and the dashboard shows "AI could not write this".
+There is no key. Whichever identity calls the agents needs the **Foundry User** role (formerly Azure AI User, role ID `53ca6127-db72-4b80-b1b0-d745d6d5456d`) on the Foundry account (`care-loop-resource`) or its project; without it every call answers 403 and the dashboard shows "AI could not write this". Microsoft's RBAC page gives Foundry User the project's data actions as well as agent endpoints; **Foundry Agent Consumer** (`eed3b665-ab3a-47b6-8f48-c9382fb1dad6`) covers only an agent's own endpoints. CareLoop calls the project's Responses endpoint, a project data action, so Foundry User is the role it needs. This has not been tested with one role alone: the account used on 18 November had both.
 
 - `FoundryDirect`: the API's identity, through `DefaultAzureCredential`. In Azure that is the API's user-assigned managed identity (`apps` in `infra/azure`, chosen with `AZURE_CLIENT_ID`); locally, the developer's own sign-in, or the `Development`-only token.
-- `AiWorkflow`: the Python service's identity (`ai` in `infra/azure`), which the deployment already gives Foundry User when `AZURE_AI_FOUNDRY_ACCOUNT_ID` is set. The API's identity then needs no Foundry role at all.
+- `AiWorkflow`: the Python service's identity (`ai` in `infra/azure`), which the deployment gives Foundry User when `AZURE_AI_FOUNDRY_ACCOUNT_ID` is set. The API's identity then needs no Foundry role at all.
+
+### Tested live on 18 November 2026
+
+Against the team's project (`care-loop-resource`, project `care-loop`) with each pinned version, using a signed-in guest account with Foundry User and Foundry Agent Consumer, and synthetic cases only. The raw answers are kept outside the repository.
+
+| | Before (prompt v2, plain text) | After (prompt v3, `<input_json>`) |
+|---|---|---|
+| Role briefing (`gpt-6.1-sol`) | Refused, `MISSING_FIELD`, for the nurse navigator, the facility lead and the programme coordinator; the old code would have shown the refusal's JSON as the briefing | Complied for all three roles in 5 to 19 s, e.g. "1 item needs action now and 2 are due today." The coordinator's says "Deadlines are provisional." |
+| Impact summary (`model-router`, answered by `gpt-5.6-luna`) | Markdown bullets and a `**limits_note:**` line, which the old code would have shown as written | Complied in 5 to 12 s: three sentences with their metric IDs and the synthetic-data note |
+| Patient message (`model-router`, answered by `gpt-4o-mini`) | Refused, `cannot_comply: TEMPLATE_INVALID` | Complied about half the time for a text message, in 2 to 9 s; the other answers were plain text (one left out the next step), so CareLoop declined them as `NOT_JSON`. Email previews came back as plain text every time |
+
+The same run, through the API on a local stack with AI on, gave all three cards real AI words. Several calls in a burst answered `429` (the `model-router` deployment's token rate limit), which is the calm 503.
 
 ## Before real data
 
@@ -379,6 +444,9 @@ Two DoH boundaries shape this design rather than being model instructions that c
 - The stage-insight narrative, in part. The impact-summary agent now writes a short narrative beside the Impact numbers, from aggregates with small numbers hidden; it is shown to staff, not stored and not published. The periodic narrative of ai-spec §2.6 and §6, with a stored snapshot, a review and a publication step, is not built.
 - Where the dashboard's agents are called from: the API (`FoundryDirect`) or the Python service (`AiWorkflow`, with the [proposed contract](#proposed-the-python-service-route)). A team decision for 19 November; the proposal is in [`docs/workstreams.md`](../workstreams.md#contract-points-to-settle-between-workstreams).
 - Whether AI text that is shown only to staff, and never stored, published or sent, may be shown with a label and no approval (the role briefing and the impact summary). If the team agrees, the proposed exception to the rules [above](#the-boundary) is in `docs/workstreams.md`; if not, a review step is needed before the text is shown.
-- The patient message preview against AG3: an exception for the prototype, or a preview that starts from the approved template with the agent filling only the adaptable parts; and who may request one (nurse navigator and clinician today, coordinator or physician in ai-spec §5.1). Proposed wording for both is in `docs/workstreams.md`.
+- The patient message preview against AG3: an exception for the prototype, or a preview that starts from the approved template with the agent filling only the adaptable parts; and who may request one (nurse navigator and clinician today, coordinator or physician in ai-spec §5.1). Proposed wording for both is in `docs/workstreams.md`. The preview now sends AG2 a category A template built in the API, with the agent adapting only the greeting and the closing; the template's wording is a placeholder like the approved templates.
 - The small-cell threshold, report audience and review owner for aggregate narratives (ai-spec §9). The impact summary uses 5 as a placeholder.
-- The patient-notification, role-briefing and impact-summary agents' instructions live in the Foundry project. Their owner should confirm they expect the inputs above, including one patient-safe step, `{first name}`, `{place}` and category A only.
+- For the agents' owner: a response schema on each agent version, so every answer has the shape above (the request cannot set one), and a pinned model for `patient-notification` and `impact-summary` instead of `model-router`, which answered the patient message with `gpt-4o-mini` and plain text about half the time; more quota for the `model-router` deployment, which answered `429` to a burst of calls; and what the MCP toolbox attached to each version (`require_approval: never`) holds. CareLoop gives the agents nothing to call and does not need it.
+- The working-day calendar (`mon-fri-no-holidays-v1`, Monday to Friday with no public holidays) and the text message limit (459 characters, three segments) are placeholders for the team to set.
+- The briefing covers the worklist's scope, the reader's whole team; the cards above it count the reader's own cases. Whether the briefing should cover only the reader's cases is a design question for the team.
+- The agents' instructions live in the Foundry project, not here. The contracts above are the versions read on 18 November 2026; a new version that changes its inputs or outputs needs a new prompt version in CareLoop before its pin moves.
