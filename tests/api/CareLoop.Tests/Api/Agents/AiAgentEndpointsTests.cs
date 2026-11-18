@@ -123,7 +123,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var impact = Value<AiTextResponse>(await ImpactAsync());
         var draft = Value<AiTextResponse>(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)));
 
-        Assert.Equal(("role-briefing", "2", "role-briefing-v1", "SYN words from role-briefing."),
+        Assert.Equal(("role-briefing", "2", "role-briefing-v2", "SYN words from role-briefing."),
             (briefing.Agent, briefing.AgentVersion, briefing.PromptVersion, briefing.Text));
         Assert.Equal(("impact-summary", "4", "impact-summary-v2", "SYN words from impact-summary."),
             (impact.Agent, impact.AgentVersion, impact.PromptVersion, impact.Text));
@@ -255,6 +255,35 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task The_briefing_describes_each_case_from_its_full_coordination_state_and_preferred_language()
+    {
+        var @case = await NamedCaseAsync(language: "ar-AE");
+        await ChangeAsync(@case.Id, c =>
+        {
+            var notification = c.Notification ?? c.BeginNotification("patient-follow-up", _clock.UtcNow);
+            notification.RecordAttempt(new NotificationAttempt
+            {
+                Id = Guid.NewGuid(), Channel = NotificationChannel.Sms, Status = NotificationAttemptStatus.Delivered, AttemptedAt = _clock.UtcNow,
+                UsedSmsSafeTemplate = true,
+            });
+            notification.RecordCallRequest(_clock.UtcNow, null);
+            notification.RateConfidence(4, _clock.UtcNow, null);
+        });
+
+        Assert.Equal(200, Status(await BriefingAsync(Identity(DemoRoles.NurseNavigator))));
+
+        var prompt = Assert.Single(_agents.Calls).Prompt;
+        Assert.Contains("Reader: nurse navigator.", prompt);
+        Assert.Contains("   Stage: follow-up under way. Owner role: clinician. Due state: overdue. Urgency: not urgent.", prompt);
+        Assert.Contains("   Escalation: level 1, with the facility lead, not acknowledged yet.", prompt);
+        Assert.Contains("   Tracks: notification delivered; consultation not started; referral not started; appointment booked for Sunday 4 January 2026 at 10:30.", prompt);
+        Assert.Contains("   Patient contact: message delivered, no reply yet; the patient asked for a call.", prompt);
+        Assert.Contains("   Confidence after a call: 4 out of 5.", prompt);
+        Assert.Contains("   Preferred language for messages: Arabic.", prompt);
+        Assert.DoesNotContain("Understanding:", prompt);
+    }
+
+    [Fact]
     public async Task The_coordinator_is_briefed_only_on_cases_escalated_to_the_coordinator()
     {
         var facilityLevel = await SeedAsync(NewCase("SYN-RESULT-LEAD", "SYN-FAC-A", due: _clock.UtcNow.AddHours(-2)));
@@ -271,6 +300,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Contains("Open cases: 1", prompt);
         Assert.Contains(Number(coordinatorLevel), prompt);
         Assert.DoesNotContain(Number(facilityLevel), prompt);
+        Assert.Contains("Escalation: level 2, with the programme coordinator, not acknowledged yet.", prompt);
     }
 
     [Fact]
@@ -437,10 +467,10 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     /// <summary>A reviewed case with the patient's name, MRN and the hospital's result id, an upcoming appointment, overdue, declined and escalated.</summary>
-    private async Task<Case> NamedCaseAsync()
+    private async Task<Case> NamedCaseAsync(string language = "en")
     {
         await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: HospitalResultId, namedOwner: Envelopes.Clinician(),
-            patientDisplayName: PatientName, patientSecondaryIdentifier: PatientMrn));
+            patientDisplayName: PatientName, patientSecondaryIdentifier: PatientMrn, patientLanguage: language));
         await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow, resultId: HospitalResultId));
         var booked = await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Scheduled,
             scheduledFor: new DateTimeOffset(2026, 1, 4, 10, 30, 0, TimeSpan.Zero), resultId: HospitalResultId, location: AppointmentPlace));

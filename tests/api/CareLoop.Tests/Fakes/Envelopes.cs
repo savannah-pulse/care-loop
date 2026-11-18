@@ -31,7 +31,7 @@ public static class Envelopes
     public static string NextEventId() => $"SYN-EVT-{Interlocked.Increment(ref _counter):0000}";
 
     /// <summary>A screening result that opens a case.</summary>
-    public static EventEnvelope ScreeningResult(DateTimeOffset at, string resultId = ResultId, Actor? namedOwner = null, string pathwayId = "breast-screening", string? eventId = null, string? patientDisplayName = null, string? patientSecondaryIdentifier = null) =>
+    public static EventEnvelope ScreeningResult(DateTimeOffset at, string resultId = ResultId, Actor? namedOwner = null, string pathwayId = "breast-screening", string? eventId = null, string? patientDisplayName = null, string? patientSecondaryIdentifier = null, string patientLanguage = "en") =>
         new()
         {
             SourceSystem = TestData.SourceSystem,
@@ -49,7 +49,7 @@ public static class Envelopes
                 FacilityId = "SYN-FAC-A",
                 ResultReference = $"DiagnosticReport/{resultId}",
                 NamedOwner = namedOwner,
-                PatientLanguage = "en",
+                PatientLanguage = patientLanguage,
                 PatientContactPoints =
                 [
                     new ContactPoint { Channel = NotificationChannel.Sms, Address = PatientPhone },

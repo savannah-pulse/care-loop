@@ -1,6 +1,7 @@
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Domain.Cases;
+using CareLoop.Domain.Tracks;
 
 namespace CareLoop.Api.Features.Agents;
 
@@ -67,6 +68,41 @@ internal static class AgentWords
         [CaseExceptions.Unassigned] = "needs an owner",
     };
 
+    private static readonly IReadOnlyDictionary<CaseStage, string> StageWords = new Dictionary<CaseStage, string>
+    {
+        [CaseStage.Received] = "received",
+        [CaseStage.ReviewPending] = "waiting for the clinician's review",
+        [CaseStage.FollowUpActive] = "follow-up under way",
+        [CaseStage.ClosureReview] = "waiting for a closure decision",
+        [CaseStage.Closed] = "closed",
+    };
+
+    private static readonly IReadOnlyDictionary<Enum, string> TrackWords = new Dictionary<Enum, string>
+    {
+        [NotificationStatus.Sent] = "sent",
+        [NotificationStatus.Delivered] = "delivered",
+        [NotificationStatus.Failed] = "failed on every channel",
+        [NotificationStatus.Acknowledged] = "acknowledged",
+        [NotificationStatus.Understood] = "understood",
+        [ConsultationStatus.Requested] = "requested",
+        [ConsultationStatus.OwnerProposed] = "handed over, waiting to be accepted",
+        [ConsultationStatus.Accepted] = "accepted",
+        [ConsultationStatus.Rejected] = "declined",
+        [ConsultationStatus.OutcomeRecorded] = "outcome recorded",
+        [ReferralStatus.Sent] = "sent",
+        [ReferralStatus.Accepted] = "accepted, which is not yet completed care",
+        [ReferralStatus.Rejected] = "declined",
+        [AppointmentStatus.Scheduled] = "booked",
+        [AppointmentStatus.Attended] = "attended",
+        [AppointmentStatus.Missed] = "missed",
+    };
+
+    private static readonly IReadOnlyDictionary<string, string> LanguageWords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["en"] = "English",
+        ["ar"] = "Arabic",
+    };
+
     /// <summary>Names a role.</summary>
     /// <param name="role">The role key.</param>
     /// <returns>For example <c>nurse navigator</c>; an unknown key in words.</returns>
@@ -113,6 +149,31 @@ internal static class AgentWords
     /// <returns>For example <c>not reached</c>.</returns>
     public static string Exception(CaseExceptions exception) =>
         ExceptionWords.TryGetValue(exception, out var words) ? words : exception.ToString();
+
+    /// <summary>Names a pathway stage.</summary>
+    /// <param name="stage">The Domain stage.</param>
+    /// <returns>For example <c>follow-up under way</c>.</returns>
+    public static string Stage(CaseStage stage) => StageWords.TryGetValue(stage, out var words) ? words : stage.ToString();
+
+    /// <summary>Names who is accountable for a case, by role only.</summary>
+    /// <param name="owner">The owner.</param>
+    /// <returns>For example <c>clinician</c>, or <c>facility lead queue</c> for a case waiting in a queue; never a person's reference.</returns>
+    public static string Owner(CaseOwner owner) => owner.IsQueue ? $"{Role(owner.Role)} queue" : Role(owner.Role);
+
+    /// <summary>Describes a track's status.</summary>
+    /// <param name="status">The track's status, or <see langword="null"/> when the track has not started.</param>
+    /// <returns>For example <c>delivered</c>, <c>declined</c> or <c>not started</c>.</returns>
+    public static string Track(Enum? status) =>
+        status is null ? "not started" : TrackWords.TryGetValue(status, out var words) ? words : MessageFormat.Role(status.ToString());
+
+    /// <summary>Names a language from its BCP 47 tag.</summary>
+    /// <param name="tag">The tag, for example <c>ar-AE</c>.</param>
+    /// <returns>For example <c>Arabic</c>; a language not listed here by its tag.</returns>
+    public static string Language(string tag)
+    {
+        var primary = tag.Split('-')[0];
+        return LanguageWords.TryGetValue(primary, out var words) ? words : $"the language tagged {tag}";
+    }
 
     /// <summary>Says when a next action is due, relative to now, in local time.</summary>
     /// <param name="due">The due time, or <see langword="null"/>.</param>
