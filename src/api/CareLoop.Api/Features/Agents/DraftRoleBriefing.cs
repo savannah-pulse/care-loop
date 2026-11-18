@@ -5,7 +5,6 @@ using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Ai;
-using CareLoop.Contracts.Common;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
@@ -30,8 +29,9 @@ namespace CareLoop.Api.Features.Agents;
 /// </para>
 /// <para>
 /// It never carries a patient's name, record number or reference, the hospital's result identifier, a staff member's
-/// reference or any free text such as an escalation reason. The read is recorded like a worklist read, and what the
-/// agent writes is a draft: it is not stored and changes nothing.
+/// reference or any free text such as an escalation reason. The read is recorded like a worklist read, with the agent
+/// version, prompt version and correlation identifier, and what the agent writes is a draft: it is not stored and
+/// changes nothing.
 /// </para>
 /// </remarks>
 public static class DraftRoleBriefing
@@ -39,7 +39,10 @@ public static class DraftRoleBriefing
     /// <summary>The view key the read is recorded under; a refused read appends <c>-denied</c>.</summary>
     public const string AuditView = "role-briefing";
 
-    /// <summary>The prompt's version, written into the prompt so a change of wording can be traced.</summary>
+    /// <summary>What the text is for, as the request to the AI provider names it.</summary>
+    public const string Purpose = "role_briefing";
+
+    /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
     public const string PromptVersion = "role-briefing-v1";
 
     /// <summary>Most cases the prompt describes one by one.</summary>
@@ -54,7 +57,7 @@ public static class DraftRoleBriefing
     {
         routes.MapPost("/ai/role-briefing", Handle).WithName("DraftRoleBriefing").WithTags("Ai")
             .Produces<AiTextResponse>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(403)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         return routes;
     }
 
@@ -65,13 +68,14 @@ public static class DraftRoleBriefing
     /// <param name="db">The read context.</param>
     /// <param name="pathways">The display-step rules.</param>
     /// <param name="format">Gives local dates, times and facility names.</param>
-    /// <param name="agents">Calls the agent.</param>
-    /// <param name="options">Whether the agents are on, the agent's name and which urgency codes mean urgent.</param>
+    /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
+    /// <param name="options">Whether the agents are on, the agent version and which urgency codes mean urgent.</param>
     /// <param name="clock">The current time, for deadlines and the read audit.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
-    /// 200 with the agent's text; 400, 401 or 403 as for the worklist reads; 501 while <c>Ai:Agents:Enabled</c> is
-    /// <see langword="false"/>; 503 when the agent could not write it.
+    /// 200 with the agent's text; 400, 401 or 403 as for the worklist reads; 409 while the agents are switched off
+    /// (<c>Ai:Agents:Enabled</c> is <see langword="false"/> or <c>Ai:Provider</c> is <c>NoOp</c>); 503 when the agent
+    /// could not write it.
     /// </returns>
     public static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason, HttpContext context,
         CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents, IOptions<AgentOptions> options,
@@ -81,7 +85,7 @@ public static class DraftRoleBriefing
         if (ReadAccess.ValidateReason(reason) is { } reasonError) return reasonError;
         if (facilityId?.Length > 100 || facilityId is not null && string.IsNullOrWhiteSpace(facilityId))
             return Results.Problem("Invalid facility filter.", statusCode: 400);
-        if (!options.Value.Enabled) return AgentReplies.Disabled("RoleBriefing");
+        if (!AgentReplies.IsOn(options.Value, agents)) return AgentReplies.SwitchedOff("RoleBriefing", options.Value);
 
         var scopeFacility = facilityId ?? (actor.Role == DemoRoles.Coordinator ? null : actor.FacilityId);
         var queryText = ReadAccess.Query(("facilityId", scopeFacility));
@@ -94,9 +98,14 @@ public static class DraftRoleBriefing
 
         var cases = await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, facilityId)
             .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct);
-        await ReadAccess.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, ct);
-        var prompt = BuildPrompt(actor, scopeFacility, outside, cases, pathways, options.Value.UrgentCodes, format, clock.UtcNow);
-        return await AgentReplies.AskAsync(agents, options.Value.RoleBriefing, prompt, clock, ct);
+        var request = new AgentRequest
+        {
+            Purpose = Purpose, Agent = options.Value.RoleBriefingAgent(), PromptVersion = PromptVersion,
+            Prompt = BuildPrompt(actor, scopeFacility, outside, cases, pathways, options.Value.UrgentCodes, format, clock.UtcNow),
+            CorrelationId = Guid.NewGuid(),
+        };
+        await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
+        return await AgentReplies.AskAsync(agents, request, clock, ct);
     }
 
     /// <summary>

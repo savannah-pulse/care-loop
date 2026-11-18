@@ -12,9 +12,10 @@ namespace CareLoop.Api.Infrastructure.Ai;
 public sealed class FoundryOptions
 {
     /// <summary>The Foundry project endpoint, in the form <c>https://{resource}.services.ai.azure.com/api/projects/{project}</c>.</summary>
+    /// <remarks>Shared: the handoff summary's direct route calls its model deployment, and on the same route the dashboard's agents are called in this project.</remarks>
     public string? ProjectEndpoint { get; set; }
 
     /// <summary>Exact name of the model deployment.</summary>
-    /// <remarks>The deployment name, not the catalogue model name: on the OpenAI-compatible path the deployment name is the model identifier, and the two are often different.</remarks>
+    /// <remarks>The deployment name, not the catalogue model name: on the OpenAI-compatible path the deployment name is the model identifier, and the two are often different. The dashboard's agents do not use it: each agent version names its own model.</remarks>
     public string? DeploymentName { get; set; }
 }

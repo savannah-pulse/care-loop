@@ -1230,12 +1230,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "409": {
+            "description": "Conflict",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1319,12 +1319,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "409": {
+            "description": "Conflict",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1422,12 +1422,12 @@
               }
             }
           },
-          "501": {
-            "description": "Not Implemented",
+          "409": {
+            "description": "Conflict",
             "content": {
-              "application/json": {
+              "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NotImplementedResponse"
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1712,6 +1712,8 @@
       "AiTextResponse": {
         "required": [
           "agent",
+          "agentVersion",
+          "promptVersion",
           "text",
           "generatedAt"
         ],
@@ -1720,6 +1722,14 @@
           "agent": {
             "type": "string",
             "description": "The agent that wrote the text, as named in the Foundry project, for example `role-briefing`."
+          },
+          "agentVersion": {
+            "type": "string",
+            "description": "The agent version that wrote it, as pinned in `Ai:Agents`, for example `2`."
+          },
+          "promptVersion": {
+            "type": "string",
+            "description": "The version of the prompt's wording that asked for it, for example `role-briefing-v2`."
           },
           "text": {
             "type": "string",

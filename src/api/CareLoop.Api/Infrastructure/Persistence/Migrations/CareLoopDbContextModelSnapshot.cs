@@ -41,11 +41,26 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<string>("AgentName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("AgentVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid?>("CaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CorrelationId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("OutsideTeam")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("PromptVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("Query")
                         .HasMaxLength(500)
@@ -64,6 +79,8 @@ namespace CareLoop.Api.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
 
                     b.HasIndex("ActorReference", "ReadAt");
 

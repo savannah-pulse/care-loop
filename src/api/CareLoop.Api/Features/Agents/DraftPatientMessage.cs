@@ -6,7 +6,6 @@ using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Ai;
-using CareLoop.Contracts.Common;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Recipients;
@@ -33,7 +32,8 @@ namespace CareLoop.Api.Features.Agents;
 /// upcoming, the channel and the two reply codes (1 means "I got this message", 2 asks for a call). It carries no name,
 /// contact detail, record number, patient reference or result: the agent writes <c>{first name}</c> where the name
 /// would go, and is told never to mention or hint at a result, because the reporting physician gives results. Access
-/// follows the case reads, and the read is recorded like one.
+/// follows the case reads, and the read is recorded like one, with the agent version, prompt version and correlation
+/// identifier.
 /// </para>
 /// </remarks>
 public static class DraftPatientMessage
@@ -41,7 +41,10 @@ public static class DraftPatientMessage
     /// <summary>The view key the read is recorded under; a refused read appends <c>-denied</c>.</summary>
     public const string AuditView = "patient-message-draft";
 
-    /// <summary>The prompt's version, written into the prompt so a change of wording can be traced.</summary>
+    /// <summary>What the text is for, as the request to the AI provider names it.</summary>
+    public const string Purpose = "patient_message_preview";
+
+    /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
     public const string PromptVersion = "patient-message-v1";
 
     /// <summary>The placeholder the draft uses where the patient's first name would go.</summary>
@@ -59,7 +62,7 @@ public static class DraftPatientMessage
     {
         routes.MapPost("/cases/{caseId:guid}/patient-message-draft", Handle).WithName("DraftPatientMessage").WithTags("Ai")
             .Produces<AiTextResponse>().Produces(StatusCodes.Status404NotFound).ProducesProblem(400).ProducesProblem(401).ProducesProblem(403)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         return routes;
     }
 
@@ -70,14 +73,15 @@ public static class DraftPatientMessage
     /// <param name="context">The caller-stated staff identity.</param>
     /// <param name="db">The read context.</param>
     /// <param name="format">Gives local dates, times and facility names.</param>
-    /// <param name="agents">Calls the agent.</param>
-    /// <param name="options">Whether the agents are on, and the agent's name.</param>
+    /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
+    /// <param name="options">Whether the agents are on, and the agent version.</param>
     /// <param name="clock">The current time and the read audit clock.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
     /// 200 with the draft; 400 for a malformed request; 401 without identity; 403 for a role other than nurse navigator
-    /// or clinician, or a case the reader may not open; 404 for an unknown case; 501 while <c>Ai:Agents:Enabled</c> is
-    /// <see langword="false"/>; 503 when the agent could not write it.
+    /// or clinician, or a case the reader may not open; 404 for an unknown case; 409 while the agents are switched off
+    /// (<c>Ai:Agents:Enabled</c> is <see langword="false"/> or <c>Ai:Provider</c> is <c>NoOp</c>); 503 when the agent
+    /// could not write it.
     /// </returns>
     public static async Task<IResult> Handle(Guid caseId, HttpContext context, CareLoopDbContext db, MessageFormat format,
         IAgentClient agents, IOptions<AgentOptions> options, IClock clock, CancellationToken ct,
@@ -89,19 +93,26 @@ public static class DraftPatientMessage
             return Results.Problem("The channel must be Sms or Email.", statusCode: 400);
         if (!AllowedRoles.Contains(actor.Role))
             return Results.Problem("Only a nurse navigator or a clinician may preview a message to the patient.", statusCode: 403);
-        if (!options.Value.Enabled) return AgentReplies.Disabled("PatientMessageDraft");
+        if (!AgentReplies.IsOn(options.Value, agents)) return AgentReplies.SwitchedOff("PatientMessageDraft", options.Value);
 
         var @case = await db.Cases.AsNoTracking().SingleOrDefaultAsync(c => c.Id == caseId, ct);
         var outside = @case is not null && @case.FacilityId != actor.FacilityId;
         var refusal = @case is null ? null : ReadAccess.CasePermission(@case, actor, reason);
-        await ReadAccess.AuditAsync(db, actor, clock, refusal is null ? AuditView : AuditView + "-denied",
-            caseId, outside, reason, ReadAccess.Query(("channel", channel)), ct);
-        if (refusal is not null) return refusal;
-        if (@case is null) return Results.NotFound();
+        var query = ReadAccess.Query(("channel", channel));
+        if (refusal is not null || @case is null)
+        {
+            await ReadAccess.AuditAsync(db, actor, clock, refusal is null ? AuditView : AuditView + "-denied", caseId, outside, reason, query, ct);
+            return refusal ?? Results.NotFound();
+        }
 
         var place = await AppointmentPlaceAsync(db, @case, ct);
-        var prompt = BuildPrompt(@case, place, channel, format, clock.UtcNow);
-        return await AgentReplies.AskAsync(agents, options.Value.PatientNotification, prompt, clock, ct);
+        var request = new AgentRequest
+        {
+            Purpose = Purpose, Agent = options.Value.PatientNotificationAgent(), PromptVersion = PromptVersion,
+            Prompt = BuildPrompt(@case, place, channel, format, clock.UtcNow), CorrelationId = Guid.NewGuid(),
+        };
+        await AgentReplies.AuditAsync(db, actor, clock, AuditView, caseId, outside, reason, query, request, ct);
+        return await AgentReplies.AskAsync(agents, request, clock, ct);
     }
 
     /// <summary>

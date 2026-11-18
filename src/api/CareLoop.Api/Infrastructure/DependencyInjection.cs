@@ -224,32 +224,57 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the client for the three Microsoft Foundry agents the dashboard asks for words: the role briefing,
-    /// the impact summary and the patient message draft.
+    /// Registers the client for the three Microsoft Foundry agents the dashboard asks for words (the role briefing, the
+    /// impact summary and the patient message preview), on the route <c>Ai:Provider</c> chooses.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="configuration">Application configuration; supplies the <c>Ai:Agents</c> section.</param>
+    /// <param name="configuration">Application configuration; supplies the <c>Ai</c> and <c>Ai:Agents</c> sections.</param>
     /// <returns>The same service collection, for chaining.</returns>
     /// <remarks>
-    /// Separate from <see cref="AddSummaries"/>: these agents do not draft the handoff summary and do not go through
-    /// <see cref="IAiProvider"/>. The client is always registered, and the endpoints answer 501 while
-    /// <c>Ai:Agents:Enabled</c> is <see langword="false"/>. Once it is <see langword="true"/>, the settings are checked
-    /// at start-up, so a missing project endpoint stops the host. Tokens come from <c>DefaultAzureCredential</c>: the
-    /// managed identity in Azure, which needs <c>Azure AI User</c> on the Foundry project.
+    /// <para>
+    /// One set of AI settings: the route, the wait, the request-size limit and the addresses are the shared <c>Ai</c>
+    /// settings <see cref="AddSummaries"/> binds, and <c>Ai:Agents</c> adds only whether the agents are on and which
+    /// agent version writes each text. The agents do not draft the handoff summary and do not go through
+    /// <see cref="IAiProvider"/>, but they follow the same <c>Ai:Provider</c>: <c>FoundryDirect</c> calls the Foundry
+    /// project from the API (<see cref="FoundryAgentClient"/>), with a token from <c>DefaultAzureCredential</c>, the
+    /// managed identity in Azure, which needs <c>Foundry User</c> (formerly <c>Azure AI User</c>) on the project;
+    /// <c>AiWorkflow</c> hands the request to the Python service (<see cref="AiWorkflowAgentClient"/>, a proposed
+    /// contract); <c>NoOp</c> keeps AI off (<see cref="NoOpAgentClient"/>).
+    /// </para>
+    /// <para>
+    /// The endpoints answer 409 while <c>Ai:Agents:Enabled</c> is <see langword="false"/> or the route is <c>NoOp</c>.
+    /// Once the agents are on, the settings are checked at start-up, so a missing address or a malformed agent version
+    /// stops the host.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddAiAgents(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddOptions<AgentOptions>()
             .Bind(configuration.GetSection(AgentOptions.SectionName))
-            .Validate(AgentOptions.IsValid,
-                "Ai:Agents needs an https ProjectEndpoint, agent names of letters, digits, '-', '_' or '.', and TimeoutSeconds from 1 to 300 when Enabled is true.")
+            .Validate<IOptions<AiOptions>>((agents, ai) => AgentOptions.IsValid(agents, ai.Value),
+                "Ai:Agents needs each agent as name:version (for example role-briefing:2), Ai:TimeoutSeconds from 1 to 300, a positive " +
+                "Ai:MaxRequestBytes, and the route's address (an https Ai:FoundryDirect:ProjectEndpoint, or Ai:AiWorkflow:BaseUrl) when Enabled is true.")
             .ValidateOnStart();
-        services.AddSingleton(sp => new AgentAccessToken(new DefaultAzureCredential(),
-            sp.GetRequiredService<IOptions<AgentOptions>>(), sp.GetRequiredService<IHostEnvironment>(),
-            sp.GetRequiredService<IClock>(), sp.GetRequiredService<ILogger<AgentAccessToken>>()));
-        // A backstop only: the client cancels each call itself after Ai:Agents:TimeoutSeconds, token included.
-        services.AddHttpClient<IAgentClient, FoundryAgentClient>((sp, http) =>
-            http.Timeout = TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<AgentOptions>>().Value.TimeoutSeconds, 1, AgentOptions.MaximumTimeoutSeconds) + 5));
+
+        // A backstop only: each client cancels its call itself after Ai:TimeoutSeconds, token included.
+        static TimeSpan Backstop(IServiceProvider sp) =>
+            TimeSpan.FromSeconds(Math.Clamp(sp.GetRequiredService<IOptions<AiOptions>>().Value.TimeoutSeconds, 1, AiOptions.MaximumTimeoutSeconds) + 5);
+
+        switch (AiOptions.RouteOf(configuration.GetValue<string>($"{AiOptions.SectionName}:{nameof(AiOptions.Provider)}")))
+        {
+            case AiRoute.FoundryDirect:
+                services.AddSingleton(sp => new AgentAccessToken(new DefaultAzureCredential(),
+                    sp.GetRequiredService<IOptions<AgentOptions>>(), sp.GetRequiredService<IHostEnvironment>(),
+                    sp.GetRequiredService<IClock>(), sp.GetRequiredService<ILogger<AgentAccessToken>>()));
+                services.AddHttpClient<IAgentClient, FoundryAgentClient>((sp, http) => http.Timeout = Backstop(sp));
+                break;
+            case AiRoute.AiWorkflow:
+                services.AddHttpClient<IAgentClient, AiWorkflowAgentClient>((sp, http) => http.Timeout = Backstop(sp));
+                break;
+            default:
+                services.AddSingleton<IAgentClient, NoOpAgentClient>();
+                break;
+        }
 
         return services;
     }

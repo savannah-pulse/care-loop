@@ -9,7 +9,6 @@ using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
 using CareLoop.Contracts.Ai;
-using CareLoop.Contracts.Common;
 using CareLoop.Contracts.Events;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Pathways;
@@ -31,9 +30,10 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Tests.Api.Agents;
 
 /// <summary>
-/// The three AI endpoints: switched off they answer 501, the agent's text comes back as a draft, a failing agent is a
-/// calm 503, access follows the reads, and no prompt ever carries a patient's name, record number, reference or the
-/// hospital's result identifier.
+/// The three AI endpoints: switched off they answer 409, the agent's text comes back as a draft with its agent and
+/// prompt versions, a failing agent is a calm 503, access follows the reads, each call is audited with its agent version,
+/// prompt version and correlation identifier, and no prompt ever carries a patient's name, record number, reference,
+/// contact details or the hospital's identifiers.
 /// </summary>
 public sealed class AiAgentEndpointsTests : IDisposable
 {
@@ -42,6 +42,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private const string PatientReference = "SYN-PT-0001";
     private const string HospitalResultId = "SYN-RESULT-HOSPITAL-4242";
     private const string AppointmentPlace = "SYN Breast Clinic, Room 4";
+    private const string EscalationReason = "SYN free text the briefing must never carry";
     private const string Reader = "SYN-STAFF-1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
@@ -51,12 +52,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private readonly ServiceProvider _services;
     private readonly IPathwayProvider _pathways = DomainTestData.Provider();
     private readonly FakeAgentClient _agents = new();
-    private readonly AgentOptions _options = new()
-    {
-        Enabled = true,
-        ProjectEndpoint = "https://syn-foundry.invalid/api/projects/syn",
-        UrgentCodes = ["PLACEHOLDER-URGENCY-B"],
-    };
+    private readonly AgentOptions _options = new() { Enabled = true, UrgentCodes = ["PLACEHOLDER-URGENCY-B"] };
     private readonly MessageFormat _format = new(new NotificationOptions
     {
         FacilityNames = new(StringComparer.OrdinalIgnoreCase) { ["SYN-FAC-A"] = "SYN Family Health Centre", ["SYN-FAC-B"] = "SYN General Hospital" },
@@ -83,27 +79,33 @@ public sealed class AiAgentEndpointsTests : IDisposable
         _connection.Dispose();
     }
 
-    [Fact]
-    public async Task Switched_off_every_endpoint_answers_501_with_the_not_implemented_body_and_asks_no_agent()
+    [Theory]
+    [InlineData(false, true, "Ai:Agents:Enabled is false")]
+    [InlineData(true, false, "Ai:Provider is NoOp")]
+    public async Task Switched_off_every_endpoint_answers_409_reads_nothing_and_asks_no_agent(bool enabled, bool routed, string why)
     {
         var @case = await NamedCaseAsync();
-        _options.Enabled = false;
+        _options.Enabled = enabled;
+        _agents.IsEnabled = routed;
 
         foreach (var result in new[]
         {
             await BriefingAsync(), await ImpactAsync(), await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)),
         })
         {
-            Assert.Equal(501, Status(result));
-            var body = Assert.IsType<NotImplementedResponse>(((IValueHttpResult)result).Value);
-            Assert.Contains("Ai:Agents:Enabled", body.Message);
+            Assert.Equal(409, Status(result));
+            var problem = Assert.IsType<ProblemDetails>(((IValueHttpResult)result).Value);
+            Assert.Equal("AI is switched off", problem.Title);
+            Assert.Contains(why, problem.Detail);
         }
 
         Assert.Empty(_agents.Calls);
+        using var scope = _services.CreateScope();
+        Assert.Empty(await Db(scope).CaseReads.ToListAsync());
     }
 
     [Fact]
-    public async Task The_agents_text_comes_back_as_a_draft_with_the_agent_and_the_time()
+    public async Task The_agents_text_comes_back_as_a_draft_with_the_agent_and_prompt_versions_and_the_time()
     {
         var @case = await NamedCaseAsync();
         _agents.Answer = agent => $"  SYN words from {agent}.  ";
@@ -112,15 +114,41 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var impact = Value<AiTextResponse>(await ImpactAsync());
         var draft = Value<AiTextResponse>(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)));
 
-        Assert.Equal(("role-briefing", "SYN words from role-briefing."), (briefing.Agent, briefing.Text));
-        Assert.Equal(("impact-summary", "SYN words from impact-summary."), (impact.Agent, impact.Text));
-        Assert.Equal(("patient-notification", "SYN words from patient-notification."), (draft.Agent, draft.Text));
+        Assert.Equal(("role-briefing", "2", "role-briefing-v1", "SYN words from role-briefing."),
+            (briefing.Agent, briefing.AgentVersion, briefing.PromptVersion, briefing.Text));
+        Assert.Equal(("impact-summary", "4", "impact-summary-v1", "SYN words from impact-summary."),
+            (impact.Agent, impact.AgentVersion, impact.PromptVersion, impact.Text));
+        Assert.Equal(("patient-notification", "2", "patient-message-v1", "SYN words from patient-notification."),
+            (draft.Agent, draft.AgentVersion, draft.PromptVersion, draft.Text));
         Assert.All([briefing, impact, draft], r => Assert.Equal(_clock.UtcNow, r.GeneratedAt));
-        Assert.Equal(["role-briefing", "impact-summary", "patient-notification"], _agents.Calls.Select(c => c.Agent));
+        Assert.Equal(["role_briefing", "impact_summary", "patient_message_preview"], _agents.Calls.Select(c => c.Purpose));
+        Assert.All(_agents.Calls, c => Assert.StartsWith($"CareLoop", c.Prompt));
+        Assert.All(_agents.Calls, c => Assert.Contains($"prompt version {c.PromptVersion}.", c.Prompt));
     }
 
     [Fact]
-    public async Task No_prompt_carries_the_patients_name_record_number_reference_or_the_hospital_result_identifier()
+    public async Task Each_call_is_audited_with_the_agent_version_the_prompt_version_and_its_correlation_identifier()
+    {
+        var @case = await NamedCaseAsync();
+
+        Assert.Equal(200, Status(await BriefingAsync()));
+        Assert.Equal(200, Status(await ImpactAsync()));
+        Assert.Equal(200, Status(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator))));
+
+        using var scope = _services.CreateScope();
+        var reads = await Db(scope).CaseReads.OrderBy(r => r.View).ToListAsync();
+        Assert.Equal(3, reads.Count);
+        foreach (var call in _agents.Calls)
+        {
+            var read = Assert.Single(reads, r => r.CorrelationId == call.CorrelationId);
+            Assert.Equal((call.Agent.Name, call.Agent.Version, call.PromptVersion), (read.AgentName, read.AgentVersion, read.PromptVersion));
+        }
+
+        Assert.Equal(3, _agents.Calls.Select(c => c.CorrelationId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task No_prompt_carries_the_patients_name_identifiers_or_contact_details()
     {
         var @case = await NamedCaseAsync();
         var stored = await ReadCaseAsync(@case.Id);
@@ -135,11 +163,16 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Equal(200, Status(await DraftAsync(@case.Id, Identity(DemoRoles.Clinician), NotificationChannel.Email)));
 
         Assert.Equal(4, _agents.Calls.Count);
-        foreach (var (_, prompt) in _agents.Calls)
+        Assert.Contains(Number(@case), _agents.Calls[0].Prompt);
+        foreach (var call in _agents.Calls)
         {
-            foreach (var secret in new[] { PatientName, "Hessa", PatientMrn, "99887766", PatientReference, HospitalResultId, "HOSPITAL-4242", Reader, "SYN-STAFF-0001", "SYN free text", stored.Id.ToString() })
+            foreach (var secret in new[]
             {
-                Assert.DoesNotContain(secret, prompt, StringComparison.OrdinalIgnoreCase);
+                PatientName, "Hessa", PatientMrn, "99887766", PatientReference, HospitalResultId, "HOSPITAL-4242", Reader, "SYN-STAFF-0001",
+                Envelopes.PatientPhone, Envelopes.PatientEmail, EscalationReason, "SYN free text", stored.Id.ToString(),
+            })
+            {
+                Assert.DoesNotContain(secret, call.Prompt, StringComparison.OrdinalIgnoreCase);
             }
         }
     }
@@ -262,6 +295,8 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var reads = await Db(scope).CaseReads.ToListAsync();
         Assert.Equal(3, reads.Count(r => r.View.EndsWith("-denied", StringComparison.Ordinal)));
         Assert.All(reads.Where(r => r.Reason is not null), r => Assert.True(r.OutsideTeam));
+        Assert.All(reads.Where(r => r.View.EndsWith("-denied", StringComparison.Ordinal) || r.View == DraftPatientMessage.AuditView && r.CaseId is { } id && id != foreign.Id),
+            r => Assert.Null(r.CorrelationId));
     }
 
     [Fact]
@@ -329,7 +364,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private Escalation Escalation(int level, string role, string facility) => new()
     {
         Level = level, EscalatedTo = TestData.FacilityLeadQueue() with { Role = role, FacilityId = facility },
-        RaisedAt = _clock.UtcNow, Reason = "SYN free text the briefing must never carry",
+        RaisedAt = _clock.UtcNow, Reason = EscalationReason,
     };
 
     private static DefaultHttpContext Identity(string role = DemoRoles.Clinician, string? facility = "SYN-FAC-A")
@@ -401,19 +436,25 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private static int Status(IResult result) => ((IStatusCodeHttpResult)result).StatusCode!.Value;
     private static T Value<T>(IResult result) => Assert.IsType<T>(((IValueHttpResult)result).Value);
 
-    /// <summary>Stands in for Foundry: records every prompt and answers, or fails, as the test says.</summary>
+    /// <summary>Stands in for the route <c>Ai:Provider</c> chooses: records every request and answers, or fails, as the test says.</summary>
     private sealed class FakeAgentClient : IAgentClient
     {
-        public List<(string Agent, string Prompt)> Calls { get; } = [];
+        public List<AgentRequest> Calls { get; } = [];
 
         public Func<string, string> Answer { get; set; } = agent => $"SYN text from {agent}.";
 
         public AgentUnavailableException? Failure { get; set; }
 
-        public Task<string> AskAsync(string agentName, string prompt, CancellationToken ct)
+        public string Route => "Fake";
+
+        public bool IsEnabled { get; set; } = true;
+
+        public Task<AgentText> AskAsync(AgentRequest request, CancellationToken ct)
         {
-            Calls.Add((agentName, prompt));
-            return Failure is not null ? Task.FromException<string>(Failure) : Task.FromResult(Answer(agentName));
+            Calls.Add(request);
+            return Failure is not null
+                ? Task.FromException<AgentText>(Failure)
+                : Task.FromResult(new AgentText(Answer(request.Agent.Name), request.Agent));
         }
     }
 }

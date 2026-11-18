@@ -53,4 +53,20 @@ public sealed class CaseReadRecord
 
     /// <summary>When the read was served, from <c>IClock</c>.</summary>
     public DateTimeOffset ReadAt { get; set; }
+
+    /// <summary>
+    /// For a read made to ask an AI agent, the agent's name in the Foundry project, for example <c>role-briefing</c>;
+    /// <see langword="null"/> for every other read.
+    /// </summary>
+    /// <remarks>Recorded with <see cref="AgentVersion"/>, <see cref="PromptVersion"/> and <see cref="CorrelationId"/> before the call, so the audit can say which agent version and which prompt wording wrote what a person read.</remarks>
+    public string? AgentName { get; set; }
+
+    /// <summary>For an AI read, the agent version CareLoop pinned and asked, for example <c>2</c>.</summary>
+    public string? AgentVersion { get; set; }
+
+    /// <summary>For an AI read, the version of the prompt's wording, for example <c>role-briefing-v2</c>.</summary>
+    public string? PromptVersion { get; set; }
+
+    /// <summary>For an AI read, the identifier of the call, also sent to the AI provider and written in CareLoop's logs.</summary>
+    public Guid? CorrelationId { get; set; }
 }

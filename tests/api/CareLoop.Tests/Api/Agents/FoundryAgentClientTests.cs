@@ -16,27 +16,36 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Tests.Api.Agents;
 
 /// <summary>
-/// The Foundry agent client sends the Responses request with a bearer token, reads the text back, fails closed on every
-/// kind of failure, and logs the agent, status and duration but never the prompt.
+/// The Foundry agent client asks the pinned agent version through the project's Responses endpoint with a bearer
+/// token, reads the text back, fails closed on every kind of failure (another agent version and an oversized request
+/// included), and logs the agent version, status, duration and correlation identifier but never the prompt.
 /// </summary>
 public sealed class FoundryAgentClientTests
 {
     private const string Endpoint = "https://syn-foundry.invalid/api/projects/syn";
     private const string Prompt = "SYN prompt: Case 3F6B1C2A, overdue.";
 
+    private static readonly AgentReference Agent = new("role-briefing", "2");
+
     [Fact]
-    public async Task Posts_the_prompt_to_the_agents_responses_endpoint_with_a_bearer_token_and_returns_output_text()
+    public async Task Asks_the_pinned_agent_version_through_the_projects_responses_endpoint_with_a_bearer_token()
     {
-        var handler = new StubHandler(_ => Json(HttpStatusCode.OK, """{"status":"completed","output_text":"  SYN briefing.  "}"""));
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
+            """{"status":"completed","output_text":"  SYN briefing.  ","agent_reference":{"type":"agent_reference","name":"role-briefing","version":"2"}}"""));
+        var request = Request();
 
-        var text = await Client(handler).AskAsync("role-briefing", Prompt, CancellationToken.None);
+        var answer = await Client(handler).AskAsync(request, CancellationToken.None);
 
-        Assert.Equal("SYN briefing.", text);
-        var request = Assert.Single(handler.Requests);
-        Assert.Equal(HttpMethod.Post, request.Method);
-        Assert.Equal($"{Endpoint}/agents/role-briefing/endpoint/protocols/openai/responses?api-version=v1", request.Uri);
-        Assert.Equal("Bearer SYN-IDENTITY-TOKEN", request.Authorization);
-        using var body = JsonDocument.Parse(request.Body);
+        Assert.Equal(new AgentText("SYN briefing.", Agent), answer);
+        var sent = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Post, sent.Method);
+        Assert.Equal($"{Endpoint}/openai/v1/responses", sent.Uri);
+        Assert.Equal("Bearer SYN-IDENTITY-TOKEN", sent.Authorization);
+        Assert.Equal(request.CorrelationId.ToString(), sent.ClientRequestId);
+        using var body = JsonDocument.Parse(sent.Body);
+        var reference = body.RootElement.GetProperty("agent_reference");
+        Assert.Equal(("agent_reference", "role-briefing", "2"),
+            (reference.GetProperty("type").GetString(), reference.GetProperty("name").GetString(), reference.GetProperty("version").GetString()));
         var input = Assert.Single(body.RootElement.GetProperty("input").EnumerateArray());
         Assert.Equal("user", input.GetProperty("role").GetString());
         Assert.Equal(Prompt, input.GetProperty("content").GetString());
@@ -52,7 +61,7 @@ public sealed class FoundryAgentClientTests
             ]}
             """));
 
-        Assert.Equal("SYN first.\nSYN second.", await Client(handler).AskAsync("impact-summary", Prompt, CancellationToken.None));
+        Assert.Equal("SYN first.\nSYN second.", (await Client(handler).AskAsync(Request(), CancellationToken.None)).Text);
     }
 
     [Theory]
@@ -66,7 +75,7 @@ public sealed class FoundryAgentClientTests
     {
         var handler = new StubHandler(_ => Json(status, """{"error":{"code":"PermissionDenied","message":"SYN principal lacks a data action"}}"""));
 
-        var failure = await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler).AskAsync("role-briefing", Prompt, CancellationToken.None));
+        var failure = await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler).AskAsync(Request(), CancellationToken.None));
 
         Assert.Equal((int)status, failure.StatusCode);
         Assert.Equal("role-briefing", failure.AgentName);
@@ -77,12 +86,29 @@ public sealed class FoundryAgentClientTests
     [InlineData("""{"status":"completed","output":[]}""")]
     [InlineData("""{"status":"incomplete","output_text":"SYN half a sente"}""")]
     [InlineData("""{"status":"completed","output":[{"type":"message","content":[{"type":"refusal","refusal":"SYN no"}]}]}""")]
+    [InlineData("""{"status":"completed","output_text":"SYN from another version","agent_reference":{"type":"agent_reference","name":"role-briefing","version":"3"}}""")]
+    [InlineData("""{"status":"completed","output_text":"SYN from another agent","agent_reference":{"type":"agent_reference","name":"impact-summary","version":"2"}}""")]
     [InlineData("not json")]
-    public async Task An_empty_incomplete_refused_or_unreadable_answer_is_unavailable_never_partial_text(string body)
+    public async Task An_empty_incomplete_refused_unreadable_or_other_version_answer_is_unavailable_never_partial_text(string body)
     {
         var handler = new StubHandler(_ => Json(HttpStatusCode.OK, body));
 
-        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler).AskAsync("patient-notification", Prompt, CancellationToken.None));
+        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler).AskAsync(Request(), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_request_over_the_size_limit_is_refused_before_any_token_or_call()
+    {
+        var handler = new StubHandler(_ => Json(HttpStatusCode.OK, """{"output_text":"SYN"}"""));
+        var credential = new CountingCredential();
+
+        var failure = await Assert.ThrowsAsync<AgentUnavailableException>(() =>
+            Client(handler, Settings(maxRequestBytes: 200), credential: credential).AskAsync(Request(new string('x', 300)), CancellationToken.None));
+
+        Assert.Null(failure.StatusCode);
+        Assert.Contains("larger than the configured limit", failure.Message);
+        Assert.Empty(handler.Requests);
+        Assert.Equal(0, credential.Calls);
     }
 
     [Fact]
@@ -95,8 +121,7 @@ public sealed class FoundryAgentClientTests
         });
 
         var failure = await Assert.ThrowsAsync<AgentUnavailableException>(() =>
-            Client(handler, new AgentOptions { Enabled = true, ProjectEndpoint = Endpoint, TimeoutSeconds = 1 })
-                .AskAsync("role-briefing", Prompt, CancellationToken.None));
+            Client(handler, Settings(timeoutSeconds: 1)).AskAsync(Request(), CancellationToken.None));
 
         Assert.Null(failure.StatusCode);
         Assert.Contains("within 1 second.", failure.Message);
@@ -109,24 +134,26 @@ public sealed class FoundryAgentClientTests
         var token = new AgentAccessToken(new FailingCredential(), Options.Create(new AgentOptions()), new HostEnvironment(Environments.Production),
             new FakeClock(), NullLogger<AgentAccessToken>.Instance);
 
-        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler, token: token).AskAsync("role-briefing", Prompt, CancellationToken.None));
+        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(handler, token: token).AskAsync(Request(), CancellationToken.None));
         Assert.Empty(handler.Requests);
     }
 
     [Fact]
-    public async Task The_log_names_the_agent_status_and_duration_and_never_the_prompt()
+    public async Task The_log_names_the_agent_version_status_duration_and_request_and_never_the_prompt()
     {
         var logs = new CapturingLogger();
         var ok = new StubHandler(_ => Json(HttpStatusCode.OK, """{"output_text":"SYN text the log must not hold"}"""));
         var refused = new StubHandler(_ => Json(HttpStatusCode.Forbidden, """{"error":{"code":"PermissionDenied","message":"SYN no role"}}"""));
         var foundryRefused = new StubHandler(_ => Json(HttpStatusCode.Forbidden, """{"code":"UserError","message":"SYN identity lacks agents/write"}"""));
+        var request = Request();
 
-        await Client(ok, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None);
-        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(refused, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None));
-        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(foundryRefused, logger: logs).AskAsync("role-briefing", Prompt, CancellationToken.None));
+        await Client(ok, logger: logs).AskAsync(request, CancellationToken.None);
+        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(refused, logger: logs).AskAsync(request, CancellationToken.None));
+        await Assert.ThrowsAsync<AgentUnavailableException>(() => Client(foundryRefused, logger: logs).AskAsync(request, CancellationToken.None));
 
         Assert.Equal(3, logs.Messages.Count);
-        Assert.All(logs.Messages, m => Assert.Contains("role-briefing", m));
+        Assert.All(logs.Messages, m => Assert.Contains("role-briefing:2", m));
+        Assert.All(logs.Messages, m => Assert.Contains(request.CorrelationId.ToString(), m));
         Assert.Contains(logs.Messages, m => m.Contains("200", StringComparison.Ordinal));
         Assert.Contains(logs.Messages, m => m.Contains("403", StringComparison.Ordinal) && m.Contains("PermissionDenied: SYN no role", StringComparison.Ordinal));
         Assert.Contains(logs.Messages, m => m.Contains("UserError: SYN identity lacks agents/write", StringComparison.Ordinal));
@@ -152,44 +179,75 @@ public sealed class FoundryAgentClientTests
     }
 
     [Theory]
-    [InlineData(false, null, "role-briefing", 30, true)]
-    [InlineData(true, Endpoint, "role-briefing", 30, true)]
-    [InlineData(true, null, "role-briefing", 30, false)]
-    [InlineData(true, "http://syn-foundry.invalid/api/projects/syn", "role-briefing", 30, false)]
-    [InlineData(true, Endpoint, "role-briefing/../x", 30, false)]
-    [InlineData(true, Endpoint, "", 30, false)]
-    [InlineData(true, Endpoint, "role-briefing", 0, false)]
-    [InlineData(true, Endpoint, "role-briefing", 301, false)]
-    public void Settings_are_checked_only_once_the_agents_are_switched_on(bool enabled, string? endpoint, string agent, int timeout, bool valid) =>
-        Assert.Equal(valid, AgentOptions.IsValid(new AgentOptions { Enabled = enabled, ProjectEndpoint = endpoint, RoleBriefing = agent, TimeoutSeconds = timeout }));
-
-    [Fact]
-    public void Base_settings_keep_the_agents_off_with_no_endpoint_or_token()
+    [InlineData(false, "NoOp", null, null, "role-briefing", 30, 32768, true)]
+    [InlineData(false, "FoundryDirect", null, null, "", 0, 0, true)]
+    [InlineData(true, "NoOp", null, null, "role-briefing:2", 30, 32768, true)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing:2", 30, 32768, true)]
+    [InlineData(true, "FoundryDirect", null, null, "role-briefing:2", 30, 32768, false)]
+    [InlineData(true, "FoundryDirect", "http://syn-foundry.invalid/api/projects/syn", null, "role-briefing:2", 30, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing", 30, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing:2/../x", 30, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "", 30, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing:2", 0, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing:2", 301, 32768, false)]
+    [InlineData(true, "FoundryDirect", Endpoint, null, "role-briefing:2", 30, 0, false)]
+    [InlineData(true, "AiWorkflow", null, "http://ai-workflow:8080", "role-briefing:2", 30, 32768, true)]
+    [InlineData(true, "AiWorkflow", Endpoint, null, "role-briefing:2", 30, 32768, false)]
+    public void Settings_are_checked_only_once_the_agents_are_switched_on(bool enabled, string provider, string? projectEndpoint,
+        string? workflowUrl, string agent, int timeout, int maxBytes, bool valid)
     {
-        var options = new AgentOptions();
-        new ConfigurationBuilder().AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json")).Build()
-            .GetSection(AgentOptions.SectionName).Bind(options);
+        var ai = new AiOptions
+        {
+            Provider = provider, TimeoutSeconds = timeout, MaxRequestBytes = maxBytes,
+            FoundryDirect = new FoundryOptions { ProjectEndpoint = projectEndpoint }, AiWorkflow = new AiWorkflowOptions { BaseUrl = workflowUrl },
+        };
 
-        Assert.False(options.Enabled);
-        Assert.True(string.IsNullOrEmpty(options.ProjectEndpoint));
-        Assert.Null(options.AccessToken);
-        Assert.Equal(("role-briefing", "impact-summary", "patient-notification", 30),
-            (options.RoleBriefing, options.ImpactSummary, options.PatientNotification, options.TimeoutSeconds));
-        Assert.Equal(["PLACEHOLDER-URGENCY-B"], options.UrgentCodes);
+        Assert.Equal(valid, AgentOptions.IsValid(new AgentOptions { Enabled = enabled, RoleBriefing = agent }, ai));
     }
 
-    private static FoundryAgentClient Client(StubHandler handler, AgentOptions? options = null, AgentAccessToken? token = null,
-        ILogger<FoundryAgentClient>? logger = null)
+    [Fact]
+    public void Base_settings_keep_the_agents_off_with_each_agent_pinned_and_no_endpoint_or_token()
     {
-        var settings = Options.Create(options ?? new AgentOptions { Enabled = true, ProjectEndpoint = Endpoint });
-        token ??= new AgentAccessToken(new CountingCredential(), settings, new HostEnvironment(Environments.Production), new FakeClock(), NullLogger<AgentAccessToken>.Instance);
-        return new FoundryAgentClient(new HttpClient(handler), token, settings, logger ?? NullLogger<FoundryAgentClient>.Instance);
+        var configuration = new ConfigurationBuilder().AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json")).Build();
+        var options = new AgentOptions();
+        configuration.GetSection(AgentOptions.SectionName).Bind(options);
+        var ai = new AiOptions();
+        configuration.GetSection(AiOptions.SectionName).Bind(ai);
+
+        Assert.False(options.Enabled);
+        Assert.Equal(AiRoute.NoOp, ai.Route());
+        Assert.True(string.IsNullOrEmpty(ai.FoundryDirect.ProjectEndpoint));
+        Assert.Null(options.AccessToken);
+        Assert.Equal((new AgentReference("role-briefing", "2"), new AgentReference("impact-summary", "4"), new AgentReference("patient-notification", "2")),
+            (options.RoleBriefingAgent(), options.ImpactSummaryAgent(), options.PatientNotificationAgent()));
+        Assert.Equal(["PLACEHOLDER-URGENCY-B"], options.UrgentCodes);
+        Assert.Null(configuration["Ai:Agents:ProjectEndpoint"]);
+        Assert.Null(configuration["Ai:Agents:TimeoutSeconds"]);
+    }
+
+    private static AgentRequest Request(string prompt = Prompt) => new()
+    {
+        Purpose = "role_briefing", Agent = Agent, PromptVersion = "role-briefing-v2", Prompt = prompt, CorrelationId = Guid.NewGuid(),
+    };
+
+    private static AiOptions Settings(int timeoutSeconds = 30, int maxRequestBytes = 32_768) => new()
+    {
+        Provider = "FoundryDirect", TimeoutSeconds = timeoutSeconds, MaxRequestBytes = maxRequestBytes,
+        FoundryDirect = new FoundryOptions { ProjectEndpoint = Endpoint },
+    };
+
+    private static FoundryAgentClient Client(StubHandler handler, AiOptions? options = null, AgentAccessToken? token = null,
+        ILogger<FoundryAgentClient>? logger = null, CountingCredential? credential = null)
+    {
+        token ??= new AgentAccessToken(credential ?? new CountingCredential(), Options.Create(new AgentOptions()),
+            new HostEnvironment(Environments.Production), new FakeClock(), NullLogger<AgentAccessToken>.Instance);
+        return new FoundryAgentClient(new HttpClient(handler), token, Options.Create(options ?? Settings()), logger ?? NullLogger<FoundryAgentClient>.Instance);
     }
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-    private sealed record SentRequest(HttpMethod Method, string Uri, string? Authorization, string Body);
+    private sealed record SentRequest(HttpMethod Method, string Uri, string? Authorization, string? ClientRequestId, string Body);
 
     private sealed class StubHandler : HttpMessageHandler
     {
@@ -207,6 +265,7 @@ public sealed class FoundryAgentClientTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(new SentRequest(request.Method, request.RequestUri!.ToString(), request.Headers.Authorization?.ToString(),
+                request.Headers.TryGetValues(FoundryAgentClient.ClientRequestIdHeader, out var ids) ? ids.Single() : null,
                 request.Content is null ? string.Empty : await request.Content.ReadAsStringAsync(cancellationToken)));
             return await _answer(request, cancellationToken);
         }

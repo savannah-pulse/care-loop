@@ -7,7 +7,6 @@ using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Ai;
-using CareLoop.Contracts.Common;
 using CareLoop.Contracts.Metrics;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Pathways;
@@ -30,8 +29,8 @@ namespace CareLoop.Api.Features.Agents;
 /// </para>
 /// <para>
 /// Access follows <c>GET /metrics</c>: staff see their facility unless they give a reason for another, and the
-/// programme coordinator sees every facility. The read is recorded, and what the agent writes is a draft that is not
-/// stored and changes nothing.
+/// programme coordinator sees every facility. The read is recorded, with the agent version, prompt version and
+/// correlation identifier, and what the agent writes is a draft that is not stored and changes nothing.
 /// </para>
 /// </remarks>
 public static class DraftImpactSummary
@@ -39,7 +38,10 @@ public static class DraftImpactSummary
     /// <summary>The view key the read is recorded under; a refused read appends <c>-denied</c>.</summary>
     public const string AuditView = "impact-summary";
 
-    /// <summary>The prompt's version, written into the prompt so a change of wording can be traced.</summary>
+    /// <summary>What the text is for, as the request to the AI provider names it.</summary>
+    public const string Purpose = "impact_summary";
+
+    /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
     public const string PromptVersion = "impact-summary-v1";
 
     private static readonly IReadOnlyDictionary<string, (string Name, string Of)> MeasureWords = new Dictionary<string, (string, string)>
@@ -82,7 +84,7 @@ public static class DraftImpactSummary
     {
         routes.MapPost("/ai/impact-summary", Handle).WithName("DraftImpactSummary").WithTags("Ai")
             .Produces<AiTextResponse>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(403)
-            .Produces<NotImplementedResponse>(StatusCodes.Status501NotImplemented).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
         return routes;
     }
 
@@ -93,14 +95,15 @@ public static class DraftImpactSummary
     /// <param name="db">The read context.</param>
     /// <param name="pathways">The display-label and closure rules the measures use.</param>
     /// <param name="format">Gives local dates, times and facility names.</param>
-    /// <param name="agents">Calls the agent.</param>
-    /// <param name="options">Whether the agents are on, and the agent's name.</param>
+    /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
+    /// <param name="options">Whether the agents are on, and the agent version.</param>
     /// <param name="clock">The measurement time and the read audit clock.</param>
     /// <param name="loggerFactory">Records cases left out of a measure, as <c>GET /metrics</c> does.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
-    /// 200 with the agent's text; 400, 401 or 403 as for <c>GET /metrics</c>; 501 while <c>Ai:Agents:Enabled</c> is
-    /// <see langword="false"/>; 503 when the agent could not write it.
+    /// 200 with the agent's text; 400, 401 or 403 as for <c>GET /metrics</c>; 409 while the agents are switched off
+    /// (<c>Ai:Agents:Enabled</c> is <see langword="false"/> or <c>Ai:Provider</c> is <c>NoOp</c>); 503 when the agent
+    /// could not write it.
     /// </returns>
     public static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason, HttpContext context,
         CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents, IOptions<AgentOptions> options,
@@ -110,7 +113,7 @@ public static class DraftImpactSummary
         if (ReadAccess.ValidateReason(reason) is { } invalid) return invalid;
         if (facilityId?.Length > 100 || facilityId is not null && string.IsNullOrWhiteSpace(facilityId))
             return Results.Problem("Invalid facility filter.", statusCode: 400);
-        if (!options.Value.Enabled) return AgentReplies.Disabled("ImpactSummary");
+        if (!AgentReplies.IsOn(options.Value, agents)) return AgentReplies.SwitchedOff("ImpactSummary", options.Value);
 
         var scopeFacility = facilityId ?? (actor.Role == DemoRoles.Coordinator ? null : actor.FacilityId);
         var queryText = ReadAccess.Query(("facilityId", scopeFacility));
@@ -123,9 +126,14 @@ public static class DraftImpactSummary
 
         var metrics = await GetMetrics.MeasureAsync(ReadAccess.FacilityScope(db.Cases.AsNoTracking(), actor, facilityId),
             db, pathways, clock.UtcNow, loggerFactory.CreateLogger(typeof(DraftImpactSummary)), ct);
-        await ReadAccess.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, ct);
-        var prompt = BuildPrompt(metrics, scopeFacility is null ? "every facility" : format.Facility(scopeFacility), format);
-        return await AgentReplies.AskAsync(agents, options.Value.ImpactSummary, prompt, clock, ct);
+        var request = new AgentRequest
+        {
+            Purpose = Purpose, Agent = options.Value.ImpactSummaryAgent(), PromptVersion = PromptVersion,
+            Prompt = BuildPrompt(metrics, scopeFacility is null ? "every facility" : format.Facility(scopeFacility), format),
+            CorrelationId = Guid.NewGuid(),
+        };
+        await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
+        return await AgentReplies.AskAsync(agents, request, clock, ct);
     }
 
     /// <summary>
