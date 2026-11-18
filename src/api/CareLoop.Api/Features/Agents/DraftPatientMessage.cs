@@ -36,11 +36,16 @@ namespace CareLoop.Api.Features.Agents;
 /// find a new time for your appointment. A next action this map does not know becomes the first, the most neutral.
 /// </para>
 /// <para>
-/// Otherwise the prompt carries the facility's name, the booked appointment's day and time in local time when one is
-/// upcoming, the channel and the two reply codes (1 means "I got this message", 2 asks for a call). It carries no name,
-/// contact detail, record number, patient reference, result, and no free text from the hospital system: the agent
-/// writes <c>{first name}</c> where the name goes and <c>{place}</c> where the appointment's place goes. Access follows
-/// the case reads, and the read is recorded like one, with the agent version, prompt version and correlation identifier.
+/// The agent (AG2 in the Foundry project) fills in one template inside <c>&lt;input_json&gt;</c>: CareLoop builds a
+/// category A template, without result content, from locked spans it copies word for word, slots it fills with facts
+/// and two adaptable spans (the greeting and the closing). The facts are the facility's name, the patient-safe step, an
+/// upcoming appointment's day and time in local time, and <c>{first name}</c> in place of the name; the two reply codes
+/// (1 means "I got this message", 2 asks for a call) and <c>{place}</c> in place of the appointment's place are locked
+/// text. The answer is accepted only when every locked span is word for word, every slot is exactly its fact and no
+/// number appears in an adaptable span; otherwise, or on a refusal, it is the calm 503, with the reason code in the log.
+/// It carries no name, contact detail, record number, patient reference, result, and no free text from the hospital
+/// system. Access follows the case reads, and the read is recorded like one, with the agent version, prompt version and
+/// correlation identifier.
 /// </para>
 /// </remarks>
 public static class DraftPatientMessage
@@ -52,13 +57,25 @@ public static class DraftPatientMessage
     public const string Purpose = "patient_message_preview";
 
     /// <summary>The prompt's version, written into the prompt and returned with the text so a change of wording can be traced.</summary>
-    public const string PromptVersion = "patient-message-v2";
+    public const string PromptVersion = "patient-message-v3";
 
     /// <summary>The placeholder the draft uses where the patient's first name would go.</summary>
     public const string FirstNamePlaceholder = "{first name}";
 
     /// <summary>The placeholder the draft uses where the appointment's place would go: the place is free text from the hospital system, so it is never sent.</summary>
     public const string PlacePlaceholder = "{place}";
+
+    /// <summary>The two reply codes every patient message ends with, as the approved templates word them.</summary>
+    public const string ReplyCodes = "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.";
+
+    /// <summary>The email preview's subject line.</summary>
+    public const string EmailSubject = "Subject: A message from your care team";
+
+    /// <summary>Most characters in a text message preview: three SMS segments of 153 characters. A placeholder until the team sets a limit.</summary>
+    public const int MaxSmsCharacters = 459;
+
+    /// <summary>Most characters in an email preview.</summary>
+    public const int MaxEmailCharacters = 1000;
 
     /// <summary>The roles that may preview a message to a patient.</summary>
     /// <remarks>Proposed, pending the team's decision (the design proposes the coordinator or a physician); see <c>docs/workstreams.md</c>.</remarks>
@@ -110,6 +127,7 @@ public static class DraftPatientMessage
     /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
     /// <param name="options">Whether the agents are on, and the agent version.</param>
     /// <param name="clock">The current time and the read audit clock.</param>
+    /// <param name="loggerFactory">Records the reason code when the agent declines or its answer does not match the template.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>
     /// 200 with the draft; 400 for a malformed request; 401 without identity; 403 for a role other than nurse navigator
@@ -118,7 +136,7 @@ public static class DraftPatientMessage
     /// could not write it.
     /// </returns>
     public static async Task<IResult> Handle(Guid caseId, HttpContext context, CareLoopDbContext db, MessageFormat format,
-        IAgentClient agents, IOptions<AgentOptions> options, IClock clock, CancellationToken ct,
+        IAgentClient agents, IOptions<AgentOptions> options, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct,
         [FromQuery] NotificationChannel channel = NotificationChannel.Sms, [FromQuery] string? reason = null)
     {
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
@@ -140,13 +158,15 @@ public static class DraftPatientMessage
         }
 
         var placeNamed = await AppointmentPlaceNamedAsync(db, @case, ct);
+        var input = BuildInput(@case, placeNamed, channel, format, clock.UtcNow);
         var request = new AgentRequest
         {
-            Purpose = Purpose, Agent = options.Value.PatientNotificationAgent(), PromptVersion = PromptVersion,
-            Prompt = BuildPrompt(@case, placeNamed, channel, format, clock.UtcNow), CorrelationId = Guid.NewGuid(),
+            Purpose = Purpose, Agent = options.Value.PatientNotificationAgent(), PromptVersion = PromptVersion, Prompt = input.Prompt,
+            CorrelationId = Guid.NewGuid(),
         };
         await AgentReplies.AuditAsync(db, actor, clock, AuditView, caseId, outside, reason, query, request, ct);
-        return await AgentReplies.AskAsync(agents, request, clock, ct);
+        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock,
+            loggerFactory.CreateLogger(typeof(DraftPatientMessage)), ct);
     }
 
     /// <summary>
@@ -163,34 +183,151 @@ public static class DraftPatientMessage
         nextAction is not null && PatientSteps.TryGetValue(nextAction.Trim(), out var step) ? step : TalkWithYou;
 
     /// <summary>
-    /// Writes the patient-message prompt.
+    /// Writes the patient-message prompt: a category A template, its facts, the channel and the character limit, inside
+    /// <c>&lt;input_json&gt;</c>.
     /// </summary>
     /// <param name="case">The case; only its next action (as a patient-safe step), appointment time and facility are used.</param>
     /// <param name="placeNamed">Whether the hospital system named the booked appointment's place. The place itself is never sent.</param>
     /// <param name="channel">The channel to draft for.</param>
     /// <param name="format">Gives local dates, times and facility names.</param>
     /// <param name="now">The current time; only an upcoming appointment is described.</param>
-    /// <returns>The plain-text prompt. It holds no name, contact detail, identifier, result, next action or free text.</returns>
-    internal static string BuildPrompt(Case @case, bool placeNamed, NotificationChannel channel, MessageFormat format, DateTimeOffset now)
+    /// <returns>The prompt and the template it carries. It holds no name, contact detail, identifier, result, next action or free text.</returns>
+    internal static MessageInput BuildInput(Case @case, bool placeNamed, NotificationChannel channel, MessageFormat format, DateTimeOffset now)
     {
         var sms = channel == NotificationChannel.Sms;
-        var prompt = new StringBuilder();
-        prompt.AppendLine($"CareLoop patient message draft, prompt version {PromptVersion}.");
-        prompt.AppendLine(sms
-            ? "Draft one text message from the care team to a patient, under 320 characters."
-            : "Draft one short email from the care team to a patient: a subject line, then the body.");
-        prompt.AppendLine($"It is a preview for staff and will not be sent. Write {FirstNamePlaceholder} where the patient's first name goes and {PlacePlaceholder} where the appointment's place goes: you are given neither. Use plain, warm words in English, with British spelling.");
-        prompt.AppendLine("It is a category A, administrative message with no clinical result in it. Never mention or hint at a screening result, a test, a diagnosis, a treatment or how urgent anything is: the patient's doctor gives results. Add no phone number, link or address that is not below.");
-        prompt.AppendLine("Name only the next step below, in your own words, and end with the two reply codes exactly as written below.");
-        prompt.AppendLine();
-        prompt.AppendLine($"Channel: {(sms ? "text message (SMS)" : "email")}.");
-        prompt.AppendLine($"Care team: {format.Facility(@case.FacilityId)}.");
-        prompt.AppendLine($"Next step for the patient: {PatientStepFor(@case.NextAction)}");
-        prompt.AppendLine(@case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now
-            ? $"Appointment: {format.Date(at)} at {format.Time(at)}, local time. Place: {(placeNamed ? PlacePlaceholder : "to be confirmed")}."
-            : "Appointment: none booked yet.");
-        prompt.AppendLine("Reply codes: \"Reply 1 to confirm you got this message.\" and \"Reply 2 if you would like your care team to call you.\"");
-        return prompt.ToString();
+        var recorded = AgentInput.Moment(format.InLocalTime(now));
+        var facts = new List<MessageFact>
+        {
+            new("F1", "first_name", FirstNamePlaceholder),
+            new("F2", "care_team", format.Facility(@case.FacilityId)),
+            new("F3", "next_step", PatientStepFor(@case.NextAction)),
+        };
+        var spans = new List<MessageSpan>();
+        if (!sms)
+        {
+            spans.Add(MessageSpan.Locked("subject", EmailSubject));
+        }
+
+        spans.AddRange(
+        [
+            MessageSpan.Adaptable("greeting", "Hello"),
+            MessageSpan.Slot("first_name", "first_name"),
+            MessageSpan.Locked("greeting_end", ","),
+            MessageSpan.Locked("care_team_intro", "this is your care team at"),
+            MessageSpan.Slot("care_team", "care_team"),
+            MessageSpan.Locked("care_team_end", "."),
+            MessageSpan.Slot("next_step", "next_step"),
+        ]);
+        if (@case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now)
+        {
+            facts.Add(new MessageFact("F4", "appointment_time", $"{format.Date(at)} at {format.Time(at)}"));
+            spans.Add(MessageSpan.Locked("appointment_intro", "Your appointment is on"));
+            spans.Add(MessageSpan.Slot("appointment_time", "appointment_time"));
+            spans.Add(MessageSpan.Locked("appointment_place", placeNamed ? $". Place: {PlacePlaceholder}." : ". Place: to be confirmed."));
+        }
+
+        spans.Add(MessageSpan.Locked("reply_codes", ReplyCodes));
+        spans.Add(MessageSpan.Adaptable("closing", "Thank you."));
+        var template = new MessageTemplate(sms ? "careloop-preview-a.sms" : "careloop-preview-a", "1", "A", "en", spans);
+        var maxChars = sms ? MaxSmsCharacters : MaxEmailCharacters;
+        var input = new
+        {
+            Stage = "patient_contact",
+            Language = template.Language,
+            Channel = sms ? "sms" : "email",
+            Template = new
+            {
+                template.Id, template.Version, Class = template.Class, template.Language,
+                Spans = spans.Select(s => new { s.SpanId, s.Kind, s.Text, s.SlotName, MaxChars = (int?)null }).ToList(),
+            },
+            Facts = facts.Select(f => new { f.FactId, f.FactType, f.Value, RecordedAt = recorded, ReviewStatus = "final" }).ToList(),
+            Adaptation = new { ReadingLevel = "plain", Tone = "warm-neutral", GreetingStyle = "first name" },
+            MaxChars = maxChars,
+        };
+        return new MessageInput(AgentInput.Prompt("CareLoop patient message draft", PromptVersion, input), template, facts, maxChars);
+    }
+
+    /// <summary>
+    /// Reads the agent's filled-in template and checks it against what was sent: the same spans in the same order,
+    /// every locked span word for word, every slot holding its fact, and no number added to an adaptable span.
+    /// </summary>
+    /// <param name="answer">The agent's answer.</param>
+    /// <param name="input">What was sent.</param>
+    /// <returns>The message as staff read it; for email, the subject on its own line first.</returns>
+    /// <exception cref="AgentDeclinedException">The agent declined, or its spans do not match the template
+    /// (<c>SPANS_CHANGED</c>, <c>LOCKED_SPAN_CHANGED</c>, <c>SLOT_VALUE_CHANGED</c>, <c>ADAPTED_SPAN_ADDED_NUMBER</c>), or
+    /// the message is over the channel's limit (<c>TOO_LONG</c>).</exception>
+    internal static string Read(string answer, MessageInput input)
+    {
+        var root = AgentReply.Read(answer);
+        var sent = input.Template.Spans;
+        var written = WrittenSpans(root, sent);
+        if (written.Count != sent.Count)
+        {
+            throw new AgentDeclinedException("SPANS_CHANGED");
+        }
+
+        var texts = new List<string>();
+        for (var i = 0; i < sent.Count; i++)
+        {
+            var span = sent[i];
+            if (written[i].SpanId != span.SpanId)
+            {
+                throw new AgentDeclinedException("SPANS_CHANGED");
+            }
+
+            var text = written[i].Text;
+            switch (span.Kind)
+            {
+                case "locked" when text != span.Text:
+                    throw new AgentDeclinedException("LOCKED_SPAN_CHANGED");
+                case "slot" when text != input.Facts.Single(f => f.FactType == span.SlotName).Value:
+                    throw new AgentDeclinedException("SLOT_VALUE_CHANGED");
+                case "adaptable" when text.Any(char.IsDigit) && !span.Text!.Any(char.IsDigit):
+                    throw new AgentDeclinedException("ADAPTED_SPAN_ADDED_NUMBER");
+            }
+
+            texts.Add(text);
+        }
+
+        var subject = input.Template.Spans[0].SpanId == "subject" ? texts[0] : null;
+        var body = new StringBuilder();
+        // An adaptable span may come back empty: the agent shortens those first to fit the channel's limit.
+        foreach (var text in (subject is null ? texts : texts.Skip(1)).Where(text => text.Length > 0))
+        {
+            if (body.Length > 0 && !".,;:!?".Contains(text[0], StringComparison.Ordinal))
+            {
+                body.Append(' ');
+            }
+
+            body.Append(text);
+        }
+
+        var message = subject is null ? body.ToString() : $"{subject}\n\n{body}";
+        return message.Length > input.MaxChars ? throw new AgentDeclinedException("TOO_LONG") : message;
+    }
+    // The agent's spans: an array of {span_id, text} objects, under "spans" or another name, or one object keyed by span
+    // ID. The shape varies while the agent version has no response schema (see docs/ai-design/integration.md); what the
+    // spans say is checked the same way whatever the shape.
+    private static List<(string SpanId, string Text)> WrittenSpans(JsonElement root, IReadOnlyList<MessageSpan> sent)
+    {
+        var array = root.TryGetProperty("spans", out var spans) && spans.ValueKind == JsonValueKind.Array
+            ? spans
+            : root.EnumerateObject().Select(p => p.Value).FirstOrDefault(v => v.ValueKind == JsonValueKind.Array && v.GetArrayLength() > 0
+                && v.EnumerateArray().All(e => e.ValueKind == JsonValueKind.Object && e.TryGetProperty("span_id", out _)));
+        if (array.ValueKind == JsonValueKind.Array)
+        {
+            return array.EnumerateArray()
+                .Select(e => (AgentReply.Text(e, "span_id") ?? throw new AgentDeclinedException("MALFORMED_OUTPUT"),
+                    e.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                        ? text.GetString()!.Trim()
+                        : throw new AgentDeclinedException("MALFORMED_OUTPUT")))
+                .ToList();
+        }
+
+        return sent.All(s => root.TryGetProperty(s.SpanId, out var value) && value.ValueKind == JsonValueKind.String)
+            ? sent.Select(s => (s.SpanId, root.GetProperty(s.SpanId).GetString()!.Trim())).ToList()
+            : throw new AgentDeclinedException("MISSING_OUTPUT_FIELD");
     }
 
     /// <summary>
@@ -227,4 +364,39 @@ public static class DraftPatientMessage
 
         return false;
     }
+
+    /// <summary>One span of the template sent to the agent.</summary>
+    /// <param name="SpanId">The span's ID.</param>
+    /// <param name="Kind"><c>locked</c> (copied word for word), <c>adaptable</c> (tone and reading level only) or <c>slot</c> (one fact).</param>
+    /// <param name="Text">The text of a locked or adaptable span.</param>
+    /// <param name="SlotName">The fact type a slot takes.</param>
+    internal sealed record MessageSpan(string SpanId, string Kind, string? Text, string? SlotName)
+    {
+        public static MessageSpan Locked(string id, string text) => new(id, "locked", text, null);
+
+        public static MessageSpan Adaptable(string id, string text) => new(id, "adaptable", text, null);
+
+        public static MessageSpan Slot(string id, string slotName) => new(id, "slot", null, slotName);
+    }
+
+    /// <summary>One fact a slot may take; every fact is final, and none is a result.</summary>
+    /// <param name="FactId">For example <c>F1</c>.</param>
+    /// <param name="FactType">The slot it fills, for example <c>next_step</c>.</param>
+    /// <param name="Value">The words, exactly as the slot must hold them.</param>
+    internal sealed record MessageFact(string FactId, string FactType, string Value);
+
+    /// <summary>The category A template the preview is drafted from.</summary>
+    /// <param name="Id">The template's ID.</param>
+    /// <param name="Version">Its version.</param>
+    /// <param name="Class"><c>A</c>: logistics, no result content.</param>
+    /// <param name="Language">The template's language.</param>
+    /// <param name="Spans">Its spans, in order.</param>
+    internal sealed record MessageTemplate(string Id, string Version, string Class, string Language, IReadOnlyList<MessageSpan> Spans);
+
+    /// <summary>A patient-message prompt and what it carries, to check the answer against.</summary>
+    /// <param name="Prompt">The prompt.</param>
+    /// <param name="Template">The template sent.</param>
+    /// <param name="Facts">The facts sent.</param>
+    /// <param name="MaxChars">The channel's limit.</param>
+    internal sealed record MessageInput(string Prompt, MessageTemplate Template, IReadOnlyList<MessageFact> Facts, int MaxChars);
 }

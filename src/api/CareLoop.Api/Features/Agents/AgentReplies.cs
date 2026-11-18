@@ -77,14 +77,18 @@ internal static class AgentReplies
     }
 
     /// <summary>
-    /// Asks an agent and turns the outcome into the endpoint's answer.
+    /// Asks an agent, reads its structured answer and turns the outcome into the endpoint's answer.
     /// </summary>
     /// <param name="agents">The agent client.</param>
     /// <param name="request">The call, its prompt already limited to what the endpoint may send.</param>
+    /// <param name="read">Turns the agent's JSON answer into the words staff read, checking it against what was sent;
+    /// throws <see cref="AgentDeclinedException"/> when the agent declined or broke its output contract.</param>
     /// <param name="clock">Stamps when the text arrived.</param>
+    /// <param name="logger">Records a declined or unusable answer's reason code with the call's correlation identifier.</param>
     /// <param name="ct">Cancels the call.</param>
     /// <returns>200 with <see cref="AiTextResponse"/>, or a calm 503 problem when the agent could not write the text.</returns>
-    public static async Task<IResult> AskAsync(IAgentClient agents, AgentRequest request, IClock clock, CancellationToken ct)
+    public static async Task<IResult> AskAsync(IAgentClient agents, AgentRequest request, Func<string, string> read, IClock clock,
+        ILogger logger, CancellationToken ct)
     {
         AgentText answer;
         try
@@ -96,12 +100,29 @@ internal static class AgentReplies
             return Unavailable(request.Agent.Name, ex.Message);
         }
 
-        return string.IsNullOrWhiteSpace(answer.Text)
+        if (string.IsNullOrWhiteSpace(answer.Text))
+        {
+            return Unavailable(request.Agent.Name, "The agent wrote no text.");
+        }
+
+        string text;
+        try
+        {
+            text = read(answer.Text);
+        }
+        catch (AgentDeclinedException ex)
+        {
+            logger.LogWarning("Agent {Agent} gave no usable draft for request {CorrelationId}: {ReasonCode}",
+                answer.Agent, request.CorrelationId, ex.ReasonCode);
+            return Unavailable(request.Agent.Name, "The agent did not write a draft this time.");
+        }
+
+        return string.IsNullOrWhiteSpace(text)
             ? Unavailable(request.Agent.Name, "The agent wrote no text.")
             : TypedResults.Ok(new AiTextResponse
             {
                 Agent = answer.Agent.Name, AgentVersion = answer.Agent.Version, PromptVersion = request.PromptVersion,
-                Text = answer.Text.Trim(), GeneratedAt = clock.UtcNow,
+                Text = text.Trim(), GeneratedAt = clock.UtcNow,
             });
     }
 

@@ -25,7 +25,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CareLoop.Tests.Api.Agents;
@@ -61,6 +61,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private readonly ServiceProvider _services;
     private readonly IPathwayProvider _pathways = DomainTestData.Provider();
     private readonly FakeAgentClient _agents = new();
+    private readonly ListLoggerFactory _logs = new();
     private readonly AgentOptions _options = new() { Enabled = true, UrgentCodes = ["PLACEHOLDER-URGENCY-B"] };
     private readonly MessageFormat _format = new(new NotificationOptions
     {
@@ -114,25 +115,49 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_agents_text_comes_back_as_a_draft_with_the_agent_and_prompt_versions_and_the_time()
+    public async Task The_agents_answer_comes_back_as_a_draft_in_plain_words_with_the_agent_and_prompt_versions_and_the_time()
     {
         var @case = await NamedCaseAsync();
-        _agents.Answer = agent => $"  SYN words from {agent}.  ";
 
         var briefing = Value<AiTextResponse>(await BriefingAsync());
         var impact = Value<AiTextResponse>(await ImpactAsync());
         var draft = Value<AiTextResponse>(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)));
 
-        Assert.Equal(("role-briefing", "2", "role-briefing-v2", "SYN words from role-briefing."),
+        Assert.Equal(("role-briefing", "2", "role-briefing-v3", $"SYN headline.\n\nSYN P1: case {NotificationRouter.CaseReferenceFor(@case.Id)}."),
             (briefing.Agent, briefing.AgentVersion, briefing.PromptVersion, briefing.Text));
-        Assert.Equal(("impact-summary", "4", "impact-summary-v2", "SYN words from impact-summary."),
+        Assert.Equal(("impact-summary", "4", "impact-summary-v3", "SYN sentence.\n\nSYN limits note."),
             (impact.Agent, impact.AgentVersion, impact.PromptVersion, impact.Text));
-        Assert.Equal(("patient-notification", "2", "patient-message-v2", "SYN words from patient-notification."),
+        Assert.Equal(("patient-notification", "2", "patient-message-v3",
+                "Hello {first name}, this is your care team at SYN Family Health Centre. Your care team sent you a message and would like to know that you got it. "
+                + "Your appointment is on Sunday 4 January 2026 at 10:30. Place: {place}. "
+                + "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Thank you."),
             (draft.Agent, draft.AgentVersion, draft.PromptVersion, draft.Text));
         Assert.All([briefing, impact, draft], r => Assert.Equal(_clock.UtcNow, r.GeneratedAt));
         Assert.Equal(["role_briefing", "impact_summary", "patient_message_preview"], _agents.Calls.Select(c => c.Purpose));
         Assert.All(_agents.Calls, c => Assert.StartsWith($"CareLoop", c.Prompt));
-        Assert.All(_agents.Calls, c => Assert.Contains($"prompt version {c.PromptVersion}.", c.Prompt));
+        Assert.All(_agents.Calls, c => Assert.Contains($"prompt version {c.PromptVersion}.\n<input_json>\n", c.Prompt));
+        Assert.All(_agents.Calls, c => Assert.EndsWith("\n</input_json>\n", c.Prompt));
+    }
+
+    [Fact]
+    public async Task A_refusal_is_the_calm_503_with_its_reason_code_in_the_log_and_not_on_screen()
+    {
+        var @case = await NamedCaseAsync();
+        _agents.Answer = _ => "{\"cannot_comply\":{\"reason_code\":\"MISSING_FIELD\",\"detail\":\"SYN detail about the input\"}}";
+
+        foreach (var result in new[] { await BriefingAsync(), await ImpactAsync(), await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)) })
+        {
+            Assert.Equal(503, Status(result));
+            var problem = JsonSerializer.Serialize(Assert.IsType<ProblemDetails>(((IValueHttpResult)result).Value), JsonOptions);
+            Assert.Contains("AI could not write this", problem);
+            Assert.DoesNotContain("MISSING_FIELD", problem);
+            Assert.DoesNotContain("SYN detail", problem);
+        }
+
+        Assert.Equal(3, _agents.Calls.Count);
+        Assert.All(_agents.Calls, call => Assert.Single(_logs.Lines, line =>
+            line.Contains(call.CorrelationId.ToString(), StringComparison.Ordinal) && line.EndsWith(": MISSING_FIELD", StringComparison.Ordinal)));
+        Assert.DoesNotContain(_logs.Lines, line => line.Contains("SYN detail", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -172,13 +197,14 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Equal(200, Status(await DraftAsync(@case.Id, Identity(DemoRoles.Clinician), NotificationChannel.Email)));
 
         Assert.Equal(4, _agents.Calls.Count);
-        Assert.Contains(Number(@case), _agents.Calls[0].Prompt);
+        Assert.Contains("\"token\":\"P-1\"", _agents.Calls[0].Prompt);
         foreach (var call in _agents.Calls)
         {
             foreach (var secret in new[]
             {
                 PatientName, "Hessa", PatientMrn, "99887766", PatientReference, HospitalResultId, "HOSPITAL-4242", Reader, "SYN-STAFF-0001",
                 Envelopes.PatientPhone, Envelopes.PatientEmail, AppointmentPlace, "Room 4", EscalationReason, "SYN free text", stored.Id.ToString(),
+                stored.Id.ToString("N"), NotificationRouter.CaseReferenceFor(stored.Id),
             })
             {
                 Assert.DoesNotContain(secret, call.Prompt, StringComparison.OrdinalIgnoreCase);
@@ -193,10 +219,11 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var @case = NewCase("SYN-RESULT-STEP", "SYN-FAC-A");
         @case.SetNextAction(nextAction, _clock.UtcNow.AddDays(1), _clock.UtcNow);
 
-        var prompt = DraftPatientMessage.BuildPrompt(@case, placeNamed: true, NotificationChannel.Sms, _format, _clock.UtcNow);
+        var prompt = DraftPatientMessage.BuildInput(@case, placeNamed: true, NotificationChannel.Sms, _format, _clock.UtcNow).Prompt;
 
-        var step = Assert.Single(prompt.Split('\n'), line => line.StartsWith("Next step for the patient: ", StringComparison.Ordinal))
-            ["Next step for the patient: ".Length..].Trim();
+        using var facts = AgentInput.Facts(prompt);
+        var step = Assert.Single(facts.RootElement.GetProperty("facts").EnumerateArray(), f => f.GetProperty("fact_type").GetString() == "next_step")
+            .GetProperty("value").GetString()!;
         Assert.Contains(step, DraftPatientMessage.PatientSafeSteps);
         foreach (var action in _pathways.Get("breast-screening").Deadlines.Select(d => d.NextAction).Distinct())
         {
@@ -225,37 +252,60 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_briefing_counts_the_worklist_and_lists_cases_overdue_or_escalated_then_urgent_then_due_today()
+    public async Task The_briefing_sends_the_worklist_banded_and_ordered_overdue_or_escalated_then_due_before_the_next_working_day_then_urgent_then_the_next_working_days()
     {
         var late = await NamedCaseAsync();
-        var urgent = await SeedAsync(NewCase("SYN-RESULT-URGENT", "SYN-FAC-A", urgency: "PLACEHOLDER-URGENCY-B", due: _clock.UtcNow.AddDays(2)));
+        var urgent = await SeedAsync(NewCase("SYN-RESULT-URGENT", "SYN-FAC-A", urgency: "PLACEHOLDER-URGENCY-B", due: _clock.UtcNow.AddDays(5)));
         var today = await SeedAsync(NewCase("SYN-RESULT-TODAY", "SYN-FAC-A", due: _clock.UtcNow.AddHours(3)));
+        var saturday = await SeedAsync(NewCase("SYN-RESULT-SATURDAY", "SYN-FAC-A", due: _clock.UtcNow.AddDays(1)));
         var later = await SeedAsync(NewCase("SYN-RESULT-LATER", "SYN-FAC-A", due: _clock.UtcNow.AddDays(3)));
-        var elsewhere = await SeedAsync(NewCase("SYN-RESULT-ELSEWHERE", "SYN-FAC-B", due: _clock.UtcNow.AddHours(1)));
+        await SeedAsync(NewCase("SYN-RESULT-AFTER", "SYN-FAC-A", due: _clock.UtcNow.AddDays(30)));
+        await SeedAsync(NewCase("SYN-RESULT-ELSEWHERE", "SYN-FAC-B", due: _clock.UtcNow.AddHours(1)));
 
         Assert.Equal(200, Status(await BriefingAsync()));
 
-        var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("Reader: clinician.", prompt);
-        Assert.Contains("Facility: SYN Family Health Centre, the reader's team.", prompt);
-        Assert.Contains("Open cases: 4", prompt);
-        Assert.Contains("Overdue: 1", prompt);
-        Assert.Contains("Escalated: 1", prompt);
-        Assert.Contains("Urgent: 1", prompt);
-        Assert.Contains("Due today: 1", prompt);
-        var first = prompt.IndexOf(Number(late), StringComparison.Ordinal);
-        var second = prompt.IndexOf(Number(urgent), StringComparison.Ordinal);
-        var third = prompt.IndexOf(Number(today), StringComparison.Ordinal);
-        Assert.True(first >= 0 && first < second && second < third, prompt);
-        Assert.DoesNotContain(Number(later), prompt);
-        Assert.DoesNotContain(Number(elsewhere), prompt);
-        Assert.Contains("Next action: Make sure the patient has the message.", prompt);
-        Assert.Contains("Flags: overdue, referral declined, escalated.", prompt);
-        Assert.Contains("Acts next: a clinician.", prompt);
+        var input = Facts(Assert.Single(_agents.Calls));
+        Assert.Equal("clinician", input.GetProperty("role").GetString());
+        Assert.Equal("SYN Family Health Centre, the reader's team", input.GetProperty("scope").GetString());
+        Assert.Equal("2026-01-02T10:00+00:00", input.GetProperty("as_of").GetString());
+        Assert.Equal(DraftRoleBriefing.WorkingDayCalendar, input.GetProperty("calendar_version").GetString());
+        Assert.Equal("provisional", input.GetProperty("clock_config").GetProperty("status").GetString());
+        Assert.Equal("""{"P1":1,"P2":2,"info":1,"P3":1}""", input.GetProperty("counts").GetRawText());
+        var items = input.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(["P1", "P2", "P2", "info", "P3"], items.Select(i => i.GetProperty("band").GetString()));
+        Assert.Equal(["W-1", "W-2", "W-3", "W-4", "W-5"], items.Select(i => i.GetProperty("item_id").GetString()));
+        Assert.Equal(["P-1", "P-2", "P-3", "P-4", "P-5"], items.Select(i => i.GetProperty("token").GetString()));
+        Assert.Equal(new[] { late, today, saturday, urgent, later }.Select(c => AgentInput.Moment(_format.InLocalTime(c.DueAt!.Value))),
+            items.Select(i => i.GetProperty("due_at").GetString()));
+        Assert.Equal([0, 0, 3, 1], items.Skip(1).Select(i => i.GetProperty("working_days_remaining").GetInt32()));
+        Assert.Equal(["routine", "not_reviewed", "not_reviewed", "urgent", "not_reviewed"], items.Select(i => i.GetProperty("urgency_tier").GetString()));
+        Assert.Equal("acknowledge-notification", items[0].GetProperty("kind").GetString());
+        Assert.Equal("Make sure the patient has the message", items[0].GetProperty("label").GetString());
+        var days = input.GetProperty("lookahead").EnumerateArray().ToList();
+        Assert.Equal(["2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09"], days.Select(d => d.GetProperty("date").GetString()));
+        Assert.Equal("""["W-5"]""", days[0].GetProperty("item_ids").GetRawText());
+        Assert.Equal(DraftRoleBriefing.MaxItemsPerSection, input.GetProperty("max_items_per_section").GetInt32());
     }
 
     [Fact]
-    public async Task The_briefing_describes_each_case_from_its_full_coordination_state_and_preferred_language()
+    public void A_deadline_on_a_non_working_day_is_listed_under_the_working_day_before_it()
+    {
+        var monday = new DateTimeOffset(2026, 1, 5, 8, 0, 0, TimeSpan.Zero);
+        var saturday = NewCase("SYN-RESULT-SATURDAY", "SYN-FAC-A", due: new DateTimeOffset(2026, 1, 10, 9, 0, 0, TimeSpan.Zero));
+        var reader = new CareLoop.Domain.Events.Actor { Reference = Reader, Role = DemoRoles.Clinician, FacilityId = "SYN-FAC-A" };
+
+        var built = DraftRoleBriefing.BuildInput(reader, "SYN-FAC-A", false, [saturday], _pathways, _options.UrgentCodes, _format, monday);
+
+        using var facts = AgentInput.Facts(built.Prompt);
+        var item = Assert.Single(facts.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(("P3", 4), (item.GetProperty("band").GetString(), item.GetProperty("working_days_remaining").GetInt32()));
+        var days = facts.RootElement.GetProperty("lookahead").EnumerateArray()
+            .ToDictionary(d => d.GetProperty("date").GetString()!, d => d.GetProperty("item_ids").GetRawText());
+        Assert.Equal(["2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12"], days.Keys);
+        Assert.Equal("""["W-1"]""", days["2026-01-09"]);
+    }
+    [Fact]
+    public async Task The_briefing_describes_each_case_from_its_coordination_state_without_the_preferred_language()
     {
         var @case = await NamedCaseAsync(language: "ar-AE");
         await ChangeAsync(@case.Id, c =>
@@ -267,20 +317,20 @@ public sealed class AiAgentEndpointsTests : IDisposable
                 UsedSmsSafeTemplate = true,
             });
             notification.RecordCallRequest(_clock.UtcNow, null);
-            notification.RateConfidence(4, _clock.UtcNow, null);
         });
 
         Assert.Equal(200, Status(await BriefingAsync(Identity(DemoRoles.NurseNavigator))));
 
-        var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("Reader: nurse navigator.", prompt);
-        Assert.Contains("   Stage: follow-up under way. Owner role: clinician. Due state: overdue. Urgency: not urgent.", prompt);
-        Assert.Contains("   Escalation: level 1, with the facility lead, not acknowledged yet.", prompt);
-        Assert.Contains("   Tracks: notification delivered; consultation not started; referral not started; appointment booked for Sunday 4 January 2026 at 10:30.", prompt);
-        Assert.Contains("   Patient contact: message delivered, no reply yet; the patient asked for a call.", prompt);
-        Assert.Contains("   Confidence after a call: 4 out of 5.", prompt);
-        Assert.Contains("   Preferred language for messages: Arabic.", prompt);
-        Assert.DoesNotContain("Understanding:", prompt);
+        var call = Assert.Single(_agents.Calls);
+        var item = Assert.Single(Facts(call).GetProperty("items").EnumerateArray());
+        Assert.Equal("nurse", Facts(call).GetProperty("role").GetString());
+        Assert.Equal("message delivered, no reply yet; the patient asked for a call", item.GetProperty("patient_contact").GetString());
+        Assert.Equal("""{"level":1,"to":"facility lead","acknowledged":false}""", item.GetProperty("escalation").GetRawText());
+        Assert.Equal("a clinician", item.GetProperty("acts_next").GetString());
+        Assert.False(item.GetProperty("owner_is_user").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("facility").ValueKind);
+        Assert.DoesNotContain("Arabic", call.Prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("ar-AE", call.Prompt, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -294,13 +344,13 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         Assert.Equal(200, Status(await BriefingAsync(Identity(DemoRoles.Coordinator, facility: null))));
 
-        var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("Reader: programme coordinator.", prompt);
-        Assert.Contains("only the cases escalated to the programme coordinator", prompt);
-        Assert.Contains("Open cases: 1", prompt);
-        Assert.Contains(Number(coordinatorLevel), prompt);
-        Assert.DoesNotContain(Number(facilityLevel), prompt);
-        Assert.Contains("Escalation: level 2, with the programme coordinator, not acknowledged yet.", prompt);
+        var input = Facts(Assert.Single(_agents.Calls));
+        Assert.Equal("programme_coordinator", input.GetProperty("role").GetString());
+        Assert.Equal("every facility; only the cases escalated to the programme coordinator", input.GetProperty("scope").GetString());
+        var item = Assert.Single(input.GetProperty("items").EnumerateArray());
+        Assert.Equal("P1", item.GetProperty("band").GetString());
+        Assert.Equal("SYN General Hospital", item.GetProperty("facility").GetString());
+        Assert.Equal("""{"level":2,"to":"programme coordinator","acknowledged":false}""", item.GetProperty("escalation").GetRawText());
     }
 
     [Fact]
@@ -313,10 +363,10 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         Assert.Equal(200, Status(await BriefingAsync(context)));
 
-        Assert.Contains($"{Number(mine)} Programme: breast screening.", _agents.Calls.Single().Prompt);
-        Assert.Contains("Acts next: the reader.", _agents.Calls.Single().Prompt);
+        var item = Assert.Single(Facts(_agents.Calls.Single()).GetProperty("items").EnumerateArray());
+        Assert.True(item.GetProperty("owner_is_user").GetBoolean());
+        Assert.Equal("the reader", item.GetProperty("acts_next").GetString());
     }
-
     [Theory]
     [InlineData(DemoRoles.Clinician, 200)]
     [InlineData(DemoRoles.ReceivingClinician, 403)]
@@ -332,22 +382,31 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_message_draft_uses_a_patient_safe_step_the_appointment_time_the_channel_and_the_reply_codes_and_is_recorded_as_a_read()
+    public async Task The_message_draft_fills_a_category_A_template_with_a_patient_safe_step_the_appointment_time_and_the_reply_codes_and_is_recorded_as_a_read()
     {
         var @case = await NamedCaseAsync();
 
-        Assert.Equal(200, Status(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator), NotificationChannel.Email)));
+        var draft = Value<AiTextResponse>(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator), NotificationChannel.Email));
 
-        var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("{first name}", prompt);
-        Assert.Contains("Channel: email.", prompt);
-        Assert.Contains("category A, administrative message", prompt);
-        Assert.Contains("Next step for the patient: Your care team sent you a message and would like to know that you got it.", prompt);
-        Assert.Contains("Appointment: Sunday 4 January 2026 at 10:30, local time. Place: {place}.", prompt);
-        Assert.Contains("Reply 1 to confirm you got this message.", prompt);
-        Assert.Contains("Reply 2 if you would like your care team to call you.", prompt);
-        Assert.Contains("Never mention or hint at a screening result", prompt);
-        Assert.DoesNotContain("Make sure the patient has the message", prompt);
+        var call = Assert.Single(_agents.Calls);
+        var input = Facts(call);
+        Assert.Equal(("en", "email", 1000), (input.GetProperty("language").GetString(), input.GetProperty("channel").GetString(), input.GetProperty("max_chars").GetInt32()));
+        var template = input.GetProperty("template");
+        Assert.Equal(("A", "en"), (template.GetProperty("class").GetString(), template.GetProperty("language").GetString()));
+        var spans = template.GetProperty("spans").EnumerateArray().ToList();
+        Assert.Equal(("subject", "locked", DraftPatientMessage.EmailSubject), (spans[0].GetProperty("span_id").GetString(), spans[0].GetProperty("kind").GetString(), spans[0].GetProperty("text").GetString()));
+        Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked" && s.GetProperty("text").GetString() == DraftPatientMessage.ReplyCodes);
+        Assert.Contains(spans, s => s.GetProperty("kind").GetString() == "locked" && s.GetProperty("text").GetString() == ". Place: {place}.");
+        var facts = input.GetProperty("facts").EnumerateArray().ToDictionary(f => f.GetProperty("fact_type").GetString()!, f => f.GetProperty("value").GetString());
+        Assert.Equal(new Dictionary<string, string?>
+        {
+            ["first_name"] = "{first name}", ["care_team"] = "SYN Family Health Centre",
+            ["next_step"] = "Your care team sent you a message and would like to know that you got it.",
+            ["appointment_time"] = "Sunday 4 January 2026 at 10:30",
+        }, facts);
+        Assert.All(input.GetProperty("facts").EnumerateArray(), f => Assert.Equal("final", f.GetProperty("review_status").GetString()));
+        Assert.DoesNotContain("Make sure the patient has the message", call.Prompt);
+        Assert.StartsWith($"{DraftPatientMessage.EmailSubject}\n\nHello {{first name}}, this is your care team at SYN Family Health Centre.", draft.Text);
 
         using var scope = _services.CreateScope();
         var read = Assert.Single(await Db(scope).CaseReads.ToListAsync());
@@ -379,28 +438,32 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_impact_prompt_holds_totals_only_with_small_numbers_hidden_and_says_what_they_cover()
+    public async Task The_impact_prompt_holds_totals_only_with_small_numbers_suppressed_and_says_what_they_cover()
     {
         var @case = await NamedCaseAsync();
 
         Assert.Equal(200, Status(await ImpactAsync()));
 
-        var prompt = Assert.Single(_agents.Calls).Prompt;
-        Assert.Contains("Cohort: every case at SYN Family Health Centre, open and closed, on every programme.", prompt);
-        Assert.Contains("Period: cases opened from Thursday 1 January 2026 up to Friday 2 January 2026, 10:00, local time.", prompt);
-        Assert.Contains("Measure definitions: version metrics-v1", prompt);
-        Assert.Contains("synthetic data only", prompt);
-        Assert.Contains("open governance decision", prompt);
-        Assert.Contains("Cases: fewer than 5 in total, fewer than 5 open and 0 closed.", prompt);
-        Assert.Contains("Open cases past their deadline: fewer than 5", prompt);
-        Assert.Contains("- Patients who acknowledged the message: not given, fewer than 5 patients told.", prompt);
-        Assert.DoesNotContain("going well", prompt);
-        Assert.DoesNotContain(Number(@case), prompt);
-        Assert.DoesNotContain("Case ", prompt);
+        var call = Assert.Single(_agents.Calls);
+        var input = Facts(call);
+        Assert.Equal("""{"programme":"every programme","facility":"SYN Family Health Centre"}""", input.GetProperty("filters").GetRawText());
+        Assert.Equal("2026-01-01", input.GetProperty("period").GetProperty("from").GetString());
+        Assert.Equal("2026-01-02T10:00+00:00", input.GetProperty("period").GetProperty("to").GetString());
+        Assert.Equal("metrics-v1", input.GetProperty("measure_definitions").GetString());
+        Assert.True(input.GetProperty("synthetic").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, input.GetProperty("cohort_size").ValueKind);
+        Assert.True(input.GetProperty("cohort_size_suppressed").GetBoolean());
+        var overdue = Metric(input, "measures", "overdue_open");
+        Assert.True(overdue.GetProperty("suppressed").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, overdue.GetProperty("numerator").ValueKind);
+        Assert.Equal("[]", input.GetProperty("targets").GetRawText());
+        Assert.DoesNotContain(NotificationRouter.CaseReferenceFor(@case.Id), call.Prompt);
+        Assert.DoesNotContain(@case.Id.ToString(), call.Prompt);
+        Assert.DoesNotContain("going well", call.Prompt);
     }
 
     [Fact]
-    public void The_impact_prompt_gives_counts_and_rates_from_5_and_hides_anything_smaller_on_either_side()
+    public void The_impact_prompt_gives_counts_and_rates_from_5_and_suppresses_anything_smaller_on_either_side()
     {
         var metrics = new MetricsResponse
         {
@@ -425,28 +488,69 @@ public sealed class AiAgentEndpointsTests : IDisposable
             ConfidenceDenominator = 20, ConfidenceResponses = 3, AverageConfidence = 4.0,
         };
 
-        var prompt = DraftImpactSummary.BuildPrompt(metrics, "SYN Family Health Centre", _format);
+        var built = DraftImpactSummary.BuildInput(metrics, "SYN Family Health Centre", _format);
 
-        Assert.Contains("Cases: 40 in total, 37 open and fewer than 5 closed.", prompt);
-        Assert.Contains("Open cases past their deadline: 6", prompt);
-        Assert.Contains("Open cases escalated: fewer than 5", prompt);
-        Assert.Contains("Why open cases are waiting: overdue 6, not reached fewer than 5.", prompt);
-        Assert.Contains("Cases at each step now: follow-up 30, consultation fewer than 5.", prompt);
-        Assert.Contains("- Patients who acknowledged the message: 12 of 20 patients told (60%).", prompt);
-        Assert.Contains("- Cases closed: not given, fewer than 5 on one side, out of 40 cases.", prompt);
-        Assert.Contains("- Appointments attended: not given, fewer than 5 on one side, out of 20 appointments due.", prompt);
-        Assert.Contains("- Understood their next step: not given, fewer than 5 patients who acknowledged.", prompt);
-        Assert.Contains("- to patient acknowledged: 5 hours, over 12 cases.", prompt);
-        Assert.Contains("- to case closed: not given, fewer than 5 cases.", prompt);
-        Assert.Contains("Closures by reason: declined by the patient fewer than 5.", prompt);
-        Assert.Contains("Confidence ratings after a call: not given, fewer than 5 on one side, out of 20 patients told.", prompt);
-        Assert.Contains("Period: no case opened", prompt);
-        foreach (var hidden in new[] { "and 3 closed", "not reached 2", "escalated: 1", "patient 1", "consultation 4", "3 of 40", "18 of 20", "2 of 3", "3 of 20", "(8%)", "(90%)", "(67%)", "4.0" })
+        using var document = AgentInput.Facts(built.Prompt);
+        var input = document.RootElement;
+        Assert.Equal(JsonValueKind.Null, input.GetProperty("cohort_size").ValueKind);
+        Assert.Equal(JsonValueKind.Null, input.GetProperty("open_cases").ValueKind);
+        Assert.True(input.GetProperty("cohort_size_suppressed").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, input.GetProperty("period").GetProperty("from").ValueKind);
+        Assert.Equal((6, 37, 16), Shown(Metric(input, "measures", "overdue_open")));
+        Assert.Equal((0, 37, 0), Shown(Metric(input, "measures", "unassigned_open")));
+        Assert.Equal((12, 20, 60), Shown(Metric(input, "measures", "acknowledgement")));
+        Assert.Equal("patients told", Metric(input, "measures", "acknowledgement").GetProperty("denominator_label").GetString());
+        foreach (var (group, id) in new[]
         {
-            Assert.DoesNotContain(hidden, prompt);
+            ("measures", "escalated_open"), ("measures", "closure"), ("measures", "appointmentsAttended"), ("measures", "understanding"),
+            ("step_times", "time_to_closure"), ("delay_reasons", "waiting_Unreachable"), ("supplementary", "closed_Declined"),
+            ("supplementary", "confidence_responses"),
+        })
+        {
+            Assert.True(Metric(input, group, id).GetProperty("suppressed").GetBoolean(), id);
+        }
+
+        Assert.Equal("5 hours", Metric(input, "step_times", "time_to_acknowledgement").GetProperty("median").GetString());
+        Assert.Equal(("past the deadline", 6), (Metric(input, "delay_reasons", "waiting_Overdue").GetProperty("label").GetString(),
+            Metric(input, "delay_reasons", "waiting_Overdue").GetProperty("count").GetInt32()));
+        Assert.Equal(6, input.GetProperty("delay_reasons_total").GetInt32());
+        Assert.DoesNotContain(input.GetProperty("supplementary").EnumerateArray(), m => m.GetProperty("metric_id").GetString() == "confidence_average");
+        Assert.Contains("overdue_open", built.MetricIds);
+        Assert.Contains("time_to_acknowledgement", built.MetricIds);
+        foreach (var hidden in new[] { "\"numerator\":1,", "\"numerator\":3,", "\"numerator\":18,", "\"numerator\":2,", "\"count\":2,", "\"count\":1,", "4.0", "\"value\":8,", "\"value\":90,", "\"value\":67," })
+        {
+            Assert.DoesNotContain(hidden, built.Prompt);
         }
     }
+    [Fact]
+    public void A_small_count_cannot_be_worked_out_from_the_totals_or_the_other_closure_reasons()
+    {
+        var metrics = new MetricsResponse
+        {
+            GeneratedAt = _clock.UtcNow, TotalCases = 40, OpenCases = 20, ClosedCases = 20,
+            CasesByStage = new Dictionary<string, int>(), CasesByException = new Dictionary<string, int>(),
+            OverdueCases = 5, EscalatedCases = 5, UnassignedCases = 5,
+            Measures = new Dictionary<string, RateMeasureResponse>(), TimeToStep = new Dictionary<string, DurationMeasureResponse>(),
+            ClosuresByReason = new Dictionary<string, int>
+            {
+                [nameof(ClosureReason.Treated)] = 10, [nameof(ClosureReason.OnSurveillance)] = 7, [nameof(ClosureReason.Declined)] = 3,
+            },
+            CasesReachingDisplayLabel = new Dictionary<string, RateMeasureResponse>(),
+            CasesByDisplayLabel = new Dictionary<string, int>(),
+            ConfidenceDenominator = 0, ConfidenceResponses = 0,
+        };
 
+        using var whole = AgentInput.Facts(DraftImpactSummary.BuildInput(metrics, "SYN Family Health Centre", _format).Prompt);
+        using var fewOpen = AgentInput.Facts(DraftImpactSummary.BuildInput(metrics with { OpenCases = 2, TotalCases = 22 }, "SYN Family Health Centre", _format).Prompt);
+
+        Assert.Equal((40, 20), (whole.RootElement.GetProperty("cohort_size").GetInt32(), whole.RootElement.GetProperty("open_cases").GetInt32()));
+        Assert.Equal((10, 20, 50), Shown(Metric(whole.RootElement, "supplementary", $"closed_{nameof(ClosureReason.Treated)}")));
+        Assert.True(Metric(whole.RootElement, "supplementary", $"closed_{nameof(ClosureReason.Declined)}").GetProperty("suppressed").GetBoolean());
+        Assert.True(Metric(whole.RootElement, "supplementary", $"closed_{nameof(ClosureReason.OnSurveillance)}").GetProperty("suppressed").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, fewOpen.RootElement.GetProperty("cohort_size").ValueKind);
+        Assert.Equal(JsonValueKind.Null, fewOpen.RootElement.GetProperty("open_cases").ValueKind);
+        Assert.Equal("[]", fewOpen.RootElement.GetProperty("funnel").GetRawText());
+    }
     [Fact]
     public async Task A_failing_agent_is_a_calm_503_with_no_text()
     {
@@ -512,20 +616,20 @@ public sealed class AiAgentEndpointsTests : IDisposable
     {
         using var scope = _services.CreateScope();
         return await DraftRoleBriefing.Handle(facilityId, reason, context ?? Identity(), Db(scope), _pathways, _format, _agents,
-            Options.Create(_options), _clock, CancellationToken.None);
+            Options.Create(_options), _clock, _logs, CancellationToken.None);
     }
 
     private async Task<IResult> ImpactAsync(HttpContext? context = null, string? facilityId = null, string? reason = null)
     {
         using var scope = _services.CreateScope();
         return await DraftImpactSummary.Handle(facilityId, reason, context ?? Identity(), Db(scope), _pathways, _format, _agents,
-            Options.Create(_options), _clock, NullLoggerFactory.Instance, CancellationToken.None);
+            Options.Create(_options), _clock, _logs, CancellationToken.None);
     }
 
     private async Task<IResult> DraftAsync(Guid caseId, HttpContext context, NotificationChannel channel = NotificationChannel.Sms, string? reason = null)
     {
         using var scope = _services.CreateScope();
-        return await DraftPatientMessage.Handle(caseId, context, Db(scope), _format, _agents, Options.Create(_options), _clock,
+        return await DraftPatientMessage.Handle(caseId, context, Db(scope), _format, _agents, Options.Create(_options), _clock, _logs,
             CancellationToken.None, channel, reason);
     }
 
@@ -563,7 +667,93 @@ public sealed class AiAgentEndpointsTests : IDisposable
         return (await scope.ServiceProvider.GetRequiredService<ICaseRepository>().GetAsync(id, CancellationToken.None))!;
     }
 
-    private static string Number(Case @case) => $"Case {NotificationRouter.CaseReferenceFor(@case.Id)}.";
+    private static JsonElement Facts(AgentRequest call)
+    {
+        using var facts = AgentInput.Facts(call.Prompt);
+        return facts.RootElement.Clone();
+    }
+
+    private static JsonElement Metric(JsonElement input, string group, string id) =>
+        Assert.Single(input.GetProperty(group).EnumerateArray(), m => m.GetProperty("metric_id").GetString() == id);
+
+    private static (int Numerator, int Denominator, int Value) Shown(JsonElement measure)
+    {
+        Assert.False(measure.GetProperty("suppressed").GetBoolean());
+        return (measure.GetProperty("numerator").GetInt32(), measure.GetProperty("denominator").GetInt32(), measure.GetProperty("value").GetInt32());
+    }
+
+    /// <summary>
+    /// An answer in the shape each agent gave live for the same input: a briefing listing every band's items with their
+    /// tokens, one impact sentence citing a metric that was sent, and the patient template filled in exactly.
+    /// </summary>
+    private static string ValidReply(AgentRequest request)
+    {
+        var input = Facts(request);
+        var json = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+        return request.Agent.Name switch
+        {
+            "role-briefing" => JsonSerializer.Serialize(new
+            {
+                Headline = "SYN headline.",
+                Sections = new { Today = Band(input, "P1"), ComingUp = Band(input, "P2"), Role = Band(input, "info"), Lookahead = Array.Empty<object>() },
+            }, json),
+            "impact-summary" => JsonSerializer.Serialize(new
+            {
+                Sentences = new[] { new { Text = "SYN sentence.", MetricIds = new[] { "overdue_open" } } },
+                LimitsNote = "SYN limits note.",
+            }, json),
+            _ => JsonSerializer.Serialize(new
+            {
+                Status = "complied",
+                Spans = input.GetProperty("template").GetProperty("spans").EnumerateArray().Select(span => new
+                {
+                    SpanId = span.GetProperty("span_id").GetString(),
+                    Text = span.GetProperty("kind").GetString() == "slot"
+                        ? input.GetProperty("facts").EnumerateArray()
+                            .Single(f => f.GetProperty("fact_type").GetString() == span.GetProperty("slot_name").GetString()).GetProperty("value").GetString()
+                        : span.GetProperty("text").GetString(),
+                }).ToList(),
+            }, json),
+        };
+
+        static object Band(JsonElement input, string band)
+        {
+            var items = input.GetProperty("items").EnumerateArray().Where(i => i.GetProperty("band").GetString() == band).ToList();
+            return new
+            {
+                Intro = items.Count == 0 ? "None." : $"SYN {band}: {string.Join(", ", items.Select(i => i.GetProperty("token").GetString()))}.",
+                ItemIds = items.Take(DraftRoleBriefing.MaxItemsPerSection).Select(i => i.GetProperty("item_id").GetString()).ToList(),
+                OverflowCount = Math.Max(0, items.Count - DraftRoleBriefing.MaxItemsPerSection),
+            };
+        }
+    }
+
+    /// <summary>Keeps every log line, to check what reaches the log and what does not.</summary>
+    private sealed class ListLoggerFactory : ILoggerFactory
+    {
+        public List<string> Lines { get; } = [];
+
+        public ILogger CreateLogger(string categoryName) => new ListLogger(Lines);
+
+        public void AddProvider(ILoggerProvider provider)
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class ListLogger(List<string> lines) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+                lines.Add(formatter(state, exception));
+        }
+    }
     private static CareLoopDbContext Db(IServiceScope scope) => scope.ServiceProvider.GetRequiredService<CareLoopDbContext>();
     private static int Status(IResult result) => ((IStatusCodeHttpResult)result).StatusCode!.Value;
     private static T Value<T>(IResult result) => Assert.IsType<T>(((IValueHttpResult)result).Value);
@@ -573,7 +763,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     {
         public List<AgentRequest> Calls { get; } = [];
 
-        public Func<string, string> Answer { get; set; } = agent => $"SYN text from {agent}.";
+        public Func<AgentRequest, string> Answer { get; set; } = ValidReply;
 
         public AgentUnavailableException? Failure { get; set; }
 
@@ -586,7 +776,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
             Calls.Add(request);
             return Failure is not null
                 ? Task.FromException<AgentText>(Failure)
-                : Task.FromResult(new AgentText(Answer(request.Agent.Name), request.Agent));
+                : Task.FromResult(new AgentText(Answer(request), request.Agent));
         }
     }
 }

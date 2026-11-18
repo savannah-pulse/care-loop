@@ -65,6 +65,13 @@ public sealed class MessageFormat
         return Words(role);
     }
 
+    /// <summary>
+    /// Gives the same moment in local time (<c>Notifications:TimeZone</c>), with its offset.
+    /// </summary>
+    /// <param name="at">The moment.</param>
+    /// <returns>The moment in local time.</returns>
+    public DateTimeOffset InLocalTime(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, _zone);
+
     private DateTime Local(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, _zone).DateTime;
 
     private static string Words(string key) => key.Trim().Replace('-', ' ').Replace('_', ' ').ToLowerInvariant();
