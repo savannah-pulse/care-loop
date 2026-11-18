@@ -5,8 +5,7 @@
 > `simulated` marker. No text message or email is really sent. Never point this service at a live endpoint.
 
 A stand-in for an SMS and email service, used to demonstrate CareLoop (workstream **WS8**; paths
-below are relative to the repository root). It was called the patient-channel simulator until it
-stopped assuming a patient app; the folder, project, Docker service and health name are now `messaging`.
+below are relative to the repository root).
 
 CareLoop reaches patients, caregivers and staff by **text message and email only**. There is no
 health app and no patient portal. CareLoop's `Sms` and `Email` notification providers post each

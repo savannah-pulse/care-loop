@@ -4,7 +4,7 @@ This specification is part of the [AI design set](README.md).
 
 **Status:** Design proposal for team and clinical review
 **Primary requirement:** FR-11, human-reviewed AI coordination summary at handoff
-**Related work:** FR-04 (patient-channel simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
+**Related work:** FR-04 (messaging simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
 **Alignment basis:** CareLoop AI Layer Engineering Design Specification v0.3; proposed extensions remain subject to team and clinical-adviser review.
 
 ## 1. Purpose and design boundary
