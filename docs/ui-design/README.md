@@ -3,7 +3,7 @@
 One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
 
 - Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the messaging simulator, and 13 across all of them.
-- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is now the patient's email. The image `10-patient-view.png` and `ui-design.html` still show the earlier app design and are to be redrawn (P20).
+- CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email, and a nurse navigator records what a patient says on a call on screen 2. A reply of 1 means "I got this message" (decision 31).
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
@@ -19,7 +19,7 @@ The design follows the seven decisions in the [UI design gap analysis](../ui-des
 | # | Decision | What changed in the design |
 |---|---|---|
 | 1 | Five stages in code; the ten on screen are display labels | The flow table maps each label to its stage and track status. The flow has a row "In code". |
-| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Screens 9, 10, 12 and 14 say "she will come": a reply of 1, which sends `NotificationUpdated/Acknowledged` only. Since decision 31, reply 1 means "I got this message"; the screens are to be reworded (P22). |
+| 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Since decision 31, a reply of 1 means "I got this message" and sends `NotificationUpdated/Acknowledged` only; screens 9, 10, 12 and 14 say so (P22). Whether she will come is asked on a call, and the nurse records it on screen 2. |
 | 3 | Build the confidence rating | A nurse navigator records it after a call, on screen 2 (decision 30), as `NotificationUpdated/ConfidenceRated` from 1 to 5. Screen 3 reports it. |
 | 4 | The AI handoff summary is approved in the CareLoop web app | New screen 18. Screen 6 shows the approved summary, read-only. |
 | 5 | Add the roles `nurse-navigator`, `receiving-clinician` and `lab` | Who sees what gives each person their role in CareLoop. |
@@ -93,18 +93,18 @@ Some events can arrive at any stage without moving it: `NotificationUpdated/Call
 
 ![Who sees what](14-who-sees-what.png)
 
-Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines, who is responsible and links to records. Reports, images and notes stay in each hospital system, under that system's own access rules.
+Each person sees only the cases they care for, and only what their part of the care needs. CareLoop keeps where each case is, its deadlines, who is responsible and links to records. Reports, images and notes stay in each hospital system, under that system's own access rules. Patients and the family members they name are reached by text message and email only, with no app or portal.
 
 | Person | Role in CareLoop | Sees | Can do | Cannot |
 |---|---|---|---|---|
-| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say the next step back and how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
+| Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say whether she will come, say the next step back and say how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
 | Family member the patient named in writing: Saeed | None. A recipient of messages (`Caregiver`), only while her consent is active. | The day, time and place of her appointments, by email | Help her get there. Nothing in CareLoop. | See results or the reason for the visit. Reply for her or change anything. |
 | Nurse navigator: Huda | `nurse-navigator` | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved | Call patients and record on the case what they said (will come, said the next step back, a 1 to 5 confidence rating), hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
 | Screening doctor: Dr. Rekha | `clinician` | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts. | See patients she does not care for |
 | Receiving doctor: Dr. Layla | `receiving-clinician` | Referrals sent to her unit: the request, the approved summary, the screening report and images | Accept or decline with a reason, book, record the outcome and close the case with evidence | See referrals sent to other units, or other cases at the Family Health Centre |
 | Lab and test teams | `lab` | Test requests sent to them, and what each test needs | Accept a request, record that the test was done and send the report to the doctor who asked | See the rest of the patient's case |
 | Facility lead: Joy | `facility-lead` | Every case at her facility, to cover gaps and escalations | Choose or change who is responsible, and acknowledge escalations | See reports, images or notes, or cases at other facilities |
-| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case only when it is escalated to him. | Approve the impact summary and act on escalations | See named lists of patients |
+| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case, by its case number only, when it is escalated to him (decision 35). | Approve the impact summary and act on escalations | See named lists of patients |
 | AI drafting, inside CareLoop | None. Part of CareLoop. | The facts of one case, only while drafting | Draft plain words and summaries for a person to approve | Send, decide, set urgency or close anything. Keep data, or learn from it. |
 | Engineers and support | None | Synthetic data only | Build, test and fix CareLoop | See real patient data, unless it is approved and recorded |
 
@@ -119,6 +119,7 @@ The rules behind the table:
 - **Data stays in the UAE.** All patient data, backups and AI processing stay in the UAE (DoH Standard, 4.1.4; Federal Law No. 2 of 2019, Article 13).
 - **Written consent for anything beyond care.** Sharing with family, or research that names patients, needs the patient's written consent (DoH Standard, 4.2.3; Federal Law No. 2 of 2019, Article 16; HIPAA, 45 CFR 164.510(b)).
 - **Automated calls check who answered.** When automated calls are added, a call gives no details until the person who answers says they are the patient.
+- **Staff notices come by email or text message.** Staff are told about tasks and escalations at one address per role, kept in CareLoop's settings (decisions 27 and 28), not in the hospital system's inbox. A notice says only that a case at their facility needs action and gives the case number to look for in CareLoop: no link, no patient details and no result (decision 36).
 
 ## Screens
 
@@ -143,7 +144,7 @@ Where each screen is built:
 | 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | Messaging simulator | US02, US03 | FR-04 | Shown |
 | 10 | [Patient email](#10-patient-email) | Patients reached by email | Messaging simulator | US02, US03, US05 | FR-04 | Shown |
 | 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | Messaging simulator | US02, US03 | FR-04 | Deferred |
-| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named, and email users | Messaging simulator | US04, US10 | FR-04, FR-10 | Shown |
+| 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named | Messaging simulator | US04, US10 | FR-04, FR-10 | Shown |
 | 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-11 | Reference |
 
 Hessa's journey:
@@ -173,10 +174,12 @@ Hessa's journey:
 
 ![Case](02-case.png)
 
-- Read-only, except the AI handoff summary, which a clinician checks and approves from here (screen 18, C9). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
+- Read-only, except two things: a clinician checks and approves the AI handoff summary from here (screen 18, C9), and a nurse navigator records what a patient said on a call (decision 30). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
 - The next action shows its escalation ladder and who has acknowledged it (C15).
 - The checklist shows what must happen before the next stage. Missing evidence blocks progress.
-- The four tracks (notification, consultation, referral and appointment) each show their own status. Each timeline entry names its source system, which needs C3.
+- The four tracks (notification, consultation, referral and appointment) each show their own status. Each timeline entry names where it came from, as the API records it: CareLoop, the hospital system, a text message or an email (C3, decision 34). What a nurse records after a call shows as CareLoop, with her name.
+- "After a call with the patient" is shown to nurse navigators only. After a call, the nurse ticks that the patient said they will come (`NotificationUpdated/Acknowledged`) and that they said the next step back in their own words (`/Understood`), and chooses how sure the patient feels, from 1 (not sure) to 5 (very sure), or "Not asked" (`/ConfidenceRated`). "Record call outcome" sends `POST /cases/{caseId}/call-outcome` and stays off until she ticks something or chooses a rating. The card shows the confidence on record and, once she records a call, what she recorded and when, for example "Recorded at 11:20: said the next step back, 4 out of 5." Recording never changes who is responsible.
+- The card is the only way "will come", understanding and the rating reach CareLoop: a reply by text or email can only say "I got this message" or ask for a call (decisions 24, 30 and 31).
 
 ### 3. Impact
 
@@ -256,20 +259,23 @@ Hessa's journey:
 
 ![Basic phone, no internet](09-basic-phone.png)
 
-- Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`. On a call, the nurse records on screen 2 that she will come (`/Acknowledged`), that she said the next step back (`/Understood`) and how sure she feels (`/ConfidenceRated`).
+- Delivery sends `NotificationUpdated/Delivered`, and failure `/Failed`.
+- The text on screen is the appointment message, sent when the appointment is booked (decision 33). It asks her to reply 1 when she gets it, not whether she will come (decision 31).
+- Huda's call ends with two questions: can Hessa say the next step back, and how sure does she feel, from 1 to 5. After the call, Huda records on screen 2 that she said it back (`/Understood`) and how sure she feels (`/ConfidenceRated`), and that she will come (`/Acknowledged`) when she says so on a call.
 - Replying 1 sends `/Acknowledged` (she got the message, decision 31), and 2 sends `/CallRequested`. Any other reply also sends `/CallRequested`: someone should call her (decision 29). Replies need two-way texts: C7 and C22 in the simulator, and an agreement with the text provider in production.
 - A person gives results. Texts carry only dates and places, with no links, and come from a number the patient can reply to.
-- Automated calls are future work: there is no voice channel in `NotificationChannel`. The screen shows how they would work.
+- Automated calls are future work: there is no voice channel in `NotificationChannel`. The screen marks the call "Future" and shows how it would work.
 - Texts are in English in the prototype (screen 11).
 
 ### 10. Patient email
 
-![Patient view, the earlier app design, to be redrawn as an email](10-patient-view.png)
+![Patient email](10-patient-email.png)
 
 - There is no patient app or portal (decision 21). A patient with an email address on record gets the same message as screen 9 by email: a subject, the dates and places, and how to reply. No links, and no result: a person gives it.
-- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (decision 2), and 2 or any other reply sends `/CallRequested`.
-- Saying the next step back (`/Understood`) and the confidence rating (`/ConfidenceRated`, 1 to 5) are not asked by email. The nurse records them on screen 2 after a call (decision 30). Acknowledgement and understanding are still recorded separately.
-- The image shows the earlier app design (P20).
+- Shown with Amna Al Ameri in a plain mail window. The email from the Family Health Centre has the subject "Your appointment on Friday 13 November", the date, time and place, "Reply 1 when you get this message, 2 if you would like a call", and her named nurse with a number to call. There are no buttons, links, questions or ratings.
+- She replies by email the same way as by text: 1 sends `NotificationUpdated/Acknowledged` (she got the message, decision 31), and 2 or any other reply sends `/CallRequested` (decision 29). The screen shows both: her reply of 1, and a reply such as "Can I come later in the day?", which gives her nurse a call-back task.
+- Whether she will come, saying the next step back (`/Understood`) and the confidence rating (`/ConfidenceRated`, 1 to 5) are not asked by email. The nurse records them on screen 2 after a call (decision 30). Acknowledgement and understanding are still recorded separately.
+- In the prototype, the email is shown in the messaging simulator, not sent, and it is in English (screen 11).
 
 ### 11. Arabic, right to left
 
@@ -277,8 +283,8 @@ Hessa's journey:
 
 - Deferred: this is the target design. The prototype runs in English, and every template and screen is keyed by language from the start, as `AGENTS.md` requires, so Arabic needs no new code.
 - Arabic is added once a qualified bilingual reviewer approves the wording ([AI specification](../ai-design/ai-spec.md), section 2.3). The wording shown is a draft.
-- The same messages and events as 9 and 10. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
-- An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 128 characters: two messages.
+- The same messages and events as 9 and 10: the screen shows the email from screen 10 and the text from screen 9 in Arabic. Set `dir="rtl"` and use logical CSS properties (start and end, not left and right).
+- An Arabic text holds 70 characters, or 67 per part when split, so Arabic templates are shorter. The reminder shown is 130 characters: two messages.
 
 ### 12. Caregiver and email
 
@@ -286,6 +292,7 @@ Hessa's journey:
 
 - In scope (decision 7). Only the patient replies to the clinic or changes an appointment. A family member never does this for her, so the email asks for no reply and sends no event that changes the case.
 - Consent is a `Consent` on the case, recorded by `ConsentRecorded/Granted` with a reference to the signed form (C13). The family member is a recipient (`Caregiver`), not a user, and gets the day, time and place only, while consent is active: no results, no reason for the visit and no links (DoH Standard on Patient Healthcare Data Privacy, 4.2.3; Federal Law No. 2 of 2019, Article 16).
+- The email to Saeed carries the day, time and place, a number for help with transport, and why he gets it. Nothing in it is about her health.
 - Giving consent: the patient signs a form with her doctor, who records it in the hospital system (screen 15). CareLoop receives `ConsentRecorded/Granted` when her case opens; in the hackathon, the test scenario sends it.
 - Withdrawing consent: the patient tells anyone in her care team, who records it in the hospital system. That sends `ConsentRecorded/Withdrawn`, and the emails stop at once.
 - In the prototype, the email is shown in the messaging simulator, not sent. CareLoop records each email as a notification attempt.
@@ -301,7 +308,7 @@ Hessa's journey:
 | Same result received twice | Results are matched on source and result number, so a resent result never opens a second case. | FR-01 |
 | No AI draft | If AI is off, slow or fails a check, screen 18 shows no draft at all. A person writes the summary, and every step still works ([AI specification](../ai-design/ai-spec.md), section 5). | FR-11 |
 | Closing blocked | The close button stays off until every step has evidence. | FR-08 |
-| No internet | There is no app to work offline. A text message arrives when the phone has signal; a message that cannot be delivered raises `Unreachable` and a person follows up (P16). | FR-04 |
+| No signal or internet | There is no app to work offline. A text needs no internet and arrives when the phone has signal; an email arrives when the patient is next online. A message that cannot be delivered raises `Unreachable`, shown as not reached, and her nurse gets a task to reach her another way (P16). | FR-04 |
 
 ### 15. First visit
 
@@ -400,13 +407,11 @@ Withdrawn after the 13 November call: C14, C17 and C18 served hospital-system sc
 | Size | Used for |
 |---|---|
 | 13 px | Captions and labels on staff screens |
-| 14 px | Controls, secondary text and patient fine print |
+| 14 px | Controls, secondary text and the small print in emails |
 | 15 px | Body text on staff screens |
-| 16 px | Body text on patient screens; card titles on staff screens |
-| 18 px | Patient buttons and names |
-| 20 px | Section titles on staff screens; questions on patient screens |
-| 22 px | Card titles on patient screens |
-| 24 px | Page titles on patient screens |
+| 16 px | Text messages and emails to patients; card titles on staff screens |
+| 18 px | Email subjects, patient names on small banners, and Arabic email text |
+| 20 px | Section titles and patient names on staff screens |
 | 28 px | Page titles |
 | 40 px | Headline numbers |
 
@@ -438,7 +443,7 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Staff screens show two patient identifiers (name with date of birth or MRN), and the Emirates ID is always masked.
 - Texts, automated calls and emails never contain results, diagnoses, body parts or links.
 - AI output is labelled "AI draft" and needs a named person's approval. AI never sets urgency, sends messages or closes cases.
-- Patient screens use 16 px text or larger and buttons at least 44 px tall, and are ready for right-to-left languages.
+- Patients get text messages and emails, never a screen. The simulator shows them at 16 px or larger, and every template is ready for right-to-left languages.
 - Names from the code (stages, events and roles) appear only on the flow and on who sees what, in a monospace font. Product screens use plain words.
 - Text meets WCAG 2.2 AA contrast (4.5:1), and field borders meet 3:1. Every text element was checked automatically.
 
