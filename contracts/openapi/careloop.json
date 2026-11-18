@@ -1620,7 +1620,7 @@
               "null",
               "string"
             ],
-            "description": "Reference to the recorded outcome evidence, when there is any."
+            "description": "Reference to the recorded outcome evidence, when there is any. `null` for the coordinator, who sees no one's identity."
           },
           "closureReason": {
             "oneOf": [
@@ -3063,7 +3063,7 @@
           },
           "actorReference": {
             "type": "string",
-            "description": "The source system or actor responsible."
+            "description": "The source system or actor responsible. For the coordinator, `(hidden)` where it would name the patient."
           },
           "actorRole": {
             "type": "string",
@@ -3096,14 +3096,14 @@
           },
           "reason": {
             "type": "string",
-            "description": "Why the change was made or refused."
+            "description": "Why the change was made or refused. For the coordinator, any identifier of the patient or of a hospital record\nthat the wording quotes reads `(hidden)`."
           },
           "evidenceReference": {
             "type": [
               "null",
               "string"
             ],
-            "description": "Reference to the supporting evidence, when there is any."
+            "description": "Reference to the supporting evidence, when there is any. `null` for the coordinator, who sees no one's identity."
           },
           "origin": {
             "type": "string",
