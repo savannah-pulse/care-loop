@@ -103,6 +103,26 @@ export const STAFF: readonly StaffMember[] = [
     titleKey: 'staffTitles.familyDoctor',
     facilityId: 'family-health-centre',
   },
+  {
+    id: 'khalid-noor',
+    reference: 'khalid-noor',
+    name: 'Khalid Noor',
+    shortName: 'Khalid',
+    initials: 'KN',
+    role: 'lab',
+    titleKey: 'staffTitles.labTechnician',
+    facilityId: 'family-health-centre',
+  },
+  {
+    id: 'mona-khalil',
+    reference: 'mona-khalil',
+    name: 'Mona Khalil',
+    shortName: 'Mona',
+    initials: 'MK',
+    role: 'nurse-navigator',
+    titleKey: 'staffTitles.nurseNavigator',
+    facilityId: 'general-hospital',
+  },
 ]
 
 /** The person signed in when nobody has been chosen yet: the nurse navigator. */

@@ -6,12 +6,12 @@ import { describeDue, formatWhen } from '../../format'
 import { useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { routeHref } from '../../routing'
-import { START_REASON_TONES, isMine, startHere, type StartHereItem } from './startHere'
-import { nextDeadline, type WorklistRow } from './worklist'
+import { START_REASON_TONES, startHere, type StartHereItem } from './startHere'
+import { isMine, nextDeadline, type WorklistRow } from './worklist'
 
 /** Props for {@link StartHereCard}. */
 export interface StartHereCardProps {
-  /** The open cases of the worklist, before any filter or search. */
+  /** The open cases of the person's team, before any filter, search or scope. */
   readonly rows: readonly WorklistRow[]
   /** The current time. */
   readonly now: Date

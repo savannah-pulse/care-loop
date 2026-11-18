@@ -50,7 +50,7 @@ Stages advance only on validated, authorized events. Supporting events and excep
 | 1 | `RESULT_RECEIVED` | Synthetic screening result arrives through the HIS adapter. |
 | 2 | `CASE_CREATED` | Result is validated and deduplicated; one coordination case is opened. |
 | 3 | `OWNER_ASSIGNED` | A coordinator is assigned or the case enters an accountable facility lead queue. |
-| 4 | `PATIENT_NOTIFIED` | Channel simulator reports delivery; delivery is not acknowledgement. |
+| 4 | `PATIENT_NOTIFIED` | Messaging simulator reports delivery; delivery is not acknowledgement. |
 | 5 | `PATIENT_ACKNOWLEDGED` | Patient acknowledgement and any separately recorded understanding are captured. |
 | 6 | `CONSULTATION_PENDING` | A consultation or handoff request is recorded with its proposed owner. |
 | 7 | `FOLLOW_UP_IN_PROGRESS` | Referral and appointment events are correlated; acceptance is not completed care. |

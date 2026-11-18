@@ -17,7 +17,7 @@ namespace CareLoop.Api.Infrastructure.Notifications;
 /// reply) comes back through <see cref="SimulatorInboundNotificationHandler"/>.
 /// </para>
 /// <para>
-/// This is a simulation: the format is CareLoop's own, and both channels are served by the SMS and email
+/// This is a simulation: the format is CareLoop's own, and both channels are served by the messaging
 /// simulator. Real delivery means a provider written for a real service's API beside this one; the sender and the
 /// router do not change.
 /// </para>

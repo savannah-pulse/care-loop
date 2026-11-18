@@ -9,18 +9,21 @@
 export { WorklistPage } from './WorklistPage'
 export { StartHereCard } from './StartHereCard'
 export type { StartHereCardProps } from './StartHereCard'
-export { START_HERE_LIMIT, START_REASON_TONES, isMine, startHere, startReason } from './startHere'
+export { START_HERE_LIMIT, START_REASON_TONES, startHere, startReason } from './startHere'
 export type { StartHereItem, StartReason } from './startHere'
 export {
   FILTER_TONES,
   WORKLIST_FILTERS,
   WORKLIST_GROUPS,
+  WORKLIST_SCOPES,
   countByFilter,
   countOpen,
   groupOf,
   groupRows,
   isOverdue,
   matchesFilter,
+  hasOwnWorklist,
+  isMine,
   matchesProgramme,
   matchesSearch,
   nextDeadline,
@@ -34,5 +37,7 @@ export type {
   WorklistFilter,
   WorklistGroup,
   WorklistRow,
+  WorklistScope,
   WorklistSection,
+  WorklistViewer,
 } from './worklist'

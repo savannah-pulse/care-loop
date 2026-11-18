@@ -1,7 +1,7 @@
 import type { Tone } from '../../domain'
 import { isSameDay } from '../../format'
-import { sameReference, type StaffMember } from '../../identity'
-import { isOverdue, type WorklistRow } from './worklist'
+import type { StaffMember } from '../../identity'
+import { isMine, isOverdue, type WorklistRow } from './worklist'
 
 /** Most cases the "Start here today" card lists. */
 export const START_HERE_LIMIT = 3
@@ -37,26 +37,6 @@ export interface StartHereItem {
 }
 
 /**
- * Tells whether the signed-in person acts next on a case.
- *
- * @param row - A worklist row.
- * @param me - The signed-in person.
- * @returns `true` when the person owns the case, when it waits in their role's queue at their
- * facility (the facility lead's queue for the facility lead), or, for the programme coordinator,
- * when it is escalated: every case they see is escalated to them.
- */
-export function isMine(row: WorklistRow, me: StaffMember): boolean {
-  const { owner } = row.summary
-  if (me.role === 'coordinator') {
-    return row.summary.isEscalated
-  }
-  if (owner.isQueue) {
-    return owner.role === me.role && owner.facilityId === me.facilityId
-  }
-  return sameReference(owner.reference, me.reference)
-}
-
-/**
  * Works out why a case belongs on the "Start here today" card, if it does.
  *
  * @param row - A worklist row.
@@ -80,12 +60,13 @@ export function startReason(row: WorklistRow, now: Date): StartReason | undefine
 /**
  * Picks the signed-in person's cases for the "Start here today" card.
  *
- * @param rows - The open cases of the worklist, before any filter.
+ * @param rows - The open cases of the person's team, before any filter or scope.
  * @param me - The signed-in person.
  * @param now - The current time.
  * @param limit - Most cases to pick; {@link START_HERE_LIMIT} by default.
- * @returns Up to `limit` of the person's cases, overdue or escalated first, then urgent, then due
- * today; within each, the earliest due time first, then the case number.
+ * @returns Up to `limit` of the person's own cases (those "My cases" lists, see `isMine`),
+ * overdue or escalated first, then urgent, then due today; within each, the earliest due time
+ * first, then the case number.
  *
  * @remarks
  * Worked out by CareLoop from data the worklist already loaded, never by AI, so the card works

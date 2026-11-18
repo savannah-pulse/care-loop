@@ -461,7 +461,7 @@ Work in this order. Finish and test each step before starting the next.
 6. **FHIR boundary.** Endpoints, then inbound mappers one resource at a time starting with `DiagnosticReport`, then outbound mappers.
 7. **Outbox and notifications.** Dispatcher, `FhirPublisher`, `NotificationRouter`, `NotificationSender`, SMS and email providers, templates.
 8. **Dashboard.** Exception queue, case timeline, metrics.
-9. **Simulators.** HIS first, then SMS and email, each with its scenario runner; UIs last.
+9. **Simulators.** HIS first, then the messaging simulator, each with its scenario runner; UIs last.
 10. **AI handoff summary.** Draft, approval and rejection behind `IAiProvider`; see [`docs/ai-design/integration.md`](docs/ai-design/integration.md).
 11. **Scenarios and simulation.** Scenario scripts, cohort, the with-and-without-escalation comparison, end-to-end tests.
 

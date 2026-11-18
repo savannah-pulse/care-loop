@@ -103,8 +103,8 @@ function RunPanel({ runId, initial, pollIntervalMs }: RunPanelProps) {
  * @remarks
  * A run sends nothing by itself. It sets how the scenario's patients behave; they then react
  * only when CareLoop notifies them, which happens because the HIS simulator replays the same
- * scenario's hospital-system events. A cohort scenario cannot be run here, because the patient
- * channel puts the behaviours of named patients in force.
+ * scenario's hospital-system events. A cohort scenario cannot be run here, because the messaging
+ * simulator puts the behaviours of named patients in force.
  */
 export function ScenarioRunnerPage({ pollIntervalMs }: ScenarioRunnerPageProps) {
   const { t } = useTranslation();

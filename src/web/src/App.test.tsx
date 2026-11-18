@@ -41,7 +41,8 @@ describe('who is acting', () => {
   )
 
   it('sends the next person’s identity as soon as they sign in, with no facility for the programme coordinator', async () => {
-    answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'] })]))
+    // A call-back, so the case is on the nurse navigator's own list, which the worklist opens on.
+    answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'], nextAction: 'call-patient' })]))
     answer('POST /ai/role-briefing', problem(501, 'RoleBriefing is switched off here.'))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
     await screen.findByRole('link', { name: 'Hessa Al Dhaheri, MRN 100\u00a0245\u00a0891' })
