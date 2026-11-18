@@ -155,7 +155,12 @@
   "urgency": {
     "urgent": "Urgent",
     "routine": "Routine",
-    "notReviewed": "Not reviewed yet"
+    "notReviewed": "Not reviewed yet",
+    "inSentence": {
+      "urgent": "urgent",
+      "routine": "routine",
+      "notReviewed": "not reviewed yet"
+    }
   },
   "time": {
     "date": "{weekday} {day} {month}",

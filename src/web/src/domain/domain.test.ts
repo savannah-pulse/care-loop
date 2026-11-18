@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { t } from '../i18n'
 import { caseDetail, caseSummary, escalation, timelineEntry } from '../testing/builders'
 import { latestCase } from './changes'
 import { caseLinkNames, caseNumber, describePatient } from './patients'
 import { DISPLAY_LABELS, displayLabelText, displayStepIndex, isDisplayLabel } from './stages'
 import { hasOwnReason, sourceLabel, timelineEntryTitle, timelineSource } from './timeline'
+import { urgencyInSentence } from './urgency'
 
 const NBSP = '\u00a0'
 const STAFF_ROLE = 'nurse-navigator'
@@ -163,5 +165,15 @@ describe('a case the person just changed', () => {
 
   it('never lets a read that was on its way during the change undo it on screen', () => {
     expect(latestCase({ ...before }, change)).toBe(acknowledged)
+  })
+})
+
+describe('urgency in a sentence', () => {
+  it('writes the urgency in lower case inside a sentence, and a code it does not know exactly as sent', () => {
+    expect(t('programmesPage.forUrgency', { urgency: urgencyInSentence('PLACEHOLDER-URGENCY-A') })).toBe(
+      'For routine results',
+    )
+    expect(urgencyInSentence('PLACEHOLDER-URGENCY-B')).toBe('urgent')
+    expect(urgencyInSentence('SITE-PRIORITY-1')).toBe('SITE-PRIORITY-1')
   })
 })
