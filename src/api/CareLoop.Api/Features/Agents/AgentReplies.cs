@@ -24,6 +24,19 @@ internal static class AgentReplies
     public const string UnavailableTitle = "AI could not write this";
 
     /// <summary>
+    /// Most times an agent is asked again after an answer CareLoop could not use: one that came back empty, in the wrong
+    /// format or failing CareLoop's checks. Never after a refusal.
+    /// </summary>
+    public const int MaxRetries = 2;
+
+    /// <summary>
+    /// The time every attempt at one answer may take together, from <c>Ai:TimeoutSeconds</c>.
+    /// </summary>
+    /// <param name="ai">The shared AI settings.</param>
+    /// <returns><c>Ai:TimeoutSeconds</c>, from 1 to <see cref="AiOptions.MaximumTimeoutSeconds"/> seconds.</returns>
+    public static TimeSpan Budget(AiOptions ai) => TimeSpan.FromSeconds(Math.Clamp(ai.TimeoutSeconds, 1, AiOptions.MaximumTimeoutSeconds));
+
+    /// <summary>
     /// Tells whether the agents may be asked: <c>Ai:Agents:Enabled</c> is <see langword="true"/> and <c>Ai:Provider</c>
     /// names a route.
     /// </summary>
@@ -77,53 +90,80 @@ internal static class AgentReplies
     }
 
     /// <summary>
-    /// Asks an agent, reads its structured answer and turns the outcome into the endpoint's answer.
+    /// Asks an agent, reads its structured answer and turns the outcome into the endpoint's answer, asking again, at
+    /// most <see cref="MaxRetries"/> more times, when an answer could not be used.
     /// </summary>
     /// <param name="agents">The agent client.</param>
     /// <param name="request">The call, its prompt already limited to what the endpoint may send.</param>
     /// <param name="read">Turns the agent's JSON answer into the words staff read, checking it against what was sent;
     /// throws <see cref="AgentDeclinedException"/> when the agent declined or broke its output contract.</param>
+    /// <param name="audit">Records one attempt in the read audit, with its own correlation identifier, before it is sent.</param>
+    /// <param name="budget">The time every attempt together may take: <c>Ai:TimeoutSeconds</c>.</param>
     /// <param name="clock">Stamps when the text arrived.</param>
-    /// <param name="logger">Records a declined or unusable answer's reason code with the call's correlation identifier.</param>
+    /// <param name="logger">Records each unusable answer's reason code with its attempt's correlation identifier.</param>
     /// <param name="ct">Cancels the call.</param>
     /// <returns>200 with <see cref="AiTextResponse"/>, or a calm 503 problem when the agent could not write the text.</returns>
-    public static async Task<IResult> AskAsync(IAgentClient agents, AgentRequest request, Func<string, string> read, IClock clock,
-        ILogger logger, CancellationToken ct)
+    /// <remarks>
+    /// An answer is asked for again only when it came back empty, in the wrong format, or failed CareLoop's checks
+    /// (<see cref="AgentDeclinedException.Refused"/> is <see langword="false"/>): the same question can get a usable answer
+    /// from the same agent version. A refusal (<c>cannot_comply</c>) is the agent's judgement of the input and is never
+    /// asked again, and neither is a failure to reach the agent (no token, 4xx, 5xx, 429), which another call at once
+    /// would only repeat. Every attempt is audited before it is sent, with a fresh correlation identifier, and all of them
+    /// together stay within <paramref name="budget"/>.
+    /// </remarks>
+    public static async Task<IResult> AskAsync(IAgentClient agents, AgentRequest request, Func<string, string> read,
+        Func<AgentRequest, Task> audit, TimeSpan budget, IClock clock, ILogger logger, CancellationToken ct)
     {
-        AgentText answer;
-        try
+        using var overall = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        overall.CancelAfter(budget);
+        var attempt = request;
+        for (var number = 1; ; number++)
         {
-            answer = await agents.AskAsync(request, ct);
-        }
-        catch (AgentUnavailableException ex)
-        {
-            return Unavailable(request.Agent.Name, ex.Message);
-        }
-
-        if (string.IsNullOrWhiteSpace(answer.Text))
-        {
-            return Unavailable(request.Agent.Name, "The agent wrote no text.");
-        }
-
-        string text;
-        try
-        {
-            text = read(answer.Text);
-        }
-        catch (AgentDeclinedException ex)
-        {
-            logger.LogWarning("Agent {Agent} gave no usable draft for request {CorrelationId}: {ReasonCode}",
-                answer.Agent, request.CorrelationId, ex.ReasonCode);
-            return Unavailable(request.Agent.Name, "The agent did not write a draft this time.");
-        }
-
-        return string.IsNullOrWhiteSpace(text)
-            ? Unavailable(request.Agent.Name, "The agent wrote no text.")
-            : TypedResults.Ok(new AiTextResponse
+            await audit(attempt);
+            AgentText answer;
+            try
             {
-                Agent = answer.Agent.Name, AgentVersion = answer.Agent.Version, PromptVersion = request.PromptVersion,
-                Text = text.Trim(), GeneratedAt = clock.UtcNow,
-            });
+                answer = await agents.AskAsync(attempt, overall.Token);
+            }
+            catch (AgentUnavailableException ex)
+            {
+                return Unavailable(request.Agent.Name, ex.Message);
+            }
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+            {
+                logger.LogWarning("Agent {Agent} did not answer request {CorrelationId} (attempt {Attempt} of {Attempts}) within the {Seconds} s allowed",
+                    request.Agent, attempt.CorrelationId, number, MaxRetries + 1, (int)budget.TotalSeconds);
+                var seconds = (int)budget.TotalSeconds;
+                return Unavailable(request.Agent.Name, $"The agent did not answer within {(seconds == 1 ? "1 second" : $"{seconds} seconds")}.");
+            }
+
+            string reason;
+            bool refused;
+            try
+            {
+                var text = string.IsNullOrWhiteSpace(answer.Text) ? throw new AgentDeclinedException("EMPTY") : read(answer.Text);
+                return string.IsNullOrWhiteSpace(text)
+                    ? throw new AgentDeclinedException("EMPTY")
+                    : TypedResults.Ok(new AiTextResponse
+                    {
+                        Agent = answer.Agent.Name, AgentVersion = answer.Agent.Version, PromptVersion = request.PromptVersion,
+                        Text = text.Trim(), GeneratedAt = clock.UtcNow,
+                    });
+            }
+            catch (AgentDeclinedException ex)
+            {
+                (reason, refused) = (ex.ReasonCode, ex.Refused);
+            }
+
+            logger.LogWarning("Agent {Agent} gave no usable draft for request {CorrelationId} (attempt {Attempt} of {Attempts}): {ReasonCode}",
+                answer.Agent, attempt.CorrelationId, number, MaxRetries + 1, reason);
+            if (refused || number > MaxRetries || overall.IsCancellationRequested)
+            {
+                return Unavailable(request.Agent.Name, "The agent did not write a draft this time.");
+            }
+
+            attempt = attempt with { CorrelationId = Guid.NewGuid() };
+        }
     }
 
     /// <summary>

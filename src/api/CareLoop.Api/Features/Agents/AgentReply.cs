@@ -17,11 +17,23 @@ public sealed class AgentDeclinedException : Exception
     /// Creates the exception.
     /// </summary>
     /// <param name="reasonCode">The agent's own reason code, such as <c>MISSING_FIELD</c>, or CareLoop's, such as <c>LOCKED_SPAN_CHANGED</c>.</param>
-    public AgentDeclinedException(string reasonCode)
-        : base($"The agent gave no usable draft ({reasonCode}).") => ReasonCode = reasonCode;
+    /// <param name="refused"><see langword="true"/> when the agent refused (<c>cannot_comply</c>); <see langword="false"/>
+    /// when its answer came back in the wrong format or failed CareLoop's checks.</param>
+    public AgentDeclinedException(string reasonCode, bool refused = false)
+        : base($"The agent gave no usable draft ({reasonCode}).")
+    {
+        ReasonCode = reasonCode;
+        Refused = refused;
+    }
 
     /// <summary>A short upper-case code, safe to log: never words the agent wrote about a case.</summary>
     public string ReasonCode { get; }
+
+    /// <summary>
+    /// <see langword="true"/> when the agent refused the input (<c>cannot_comply</c>). A refusal is never asked again; an
+    /// answer in the wrong format or failing CareLoop's checks may be.
+    /// </summary>
+    public bool Refused { get; }
 }
 
 /// <summary>
@@ -40,20 +52,17 @@ internal static partial class AgentReply
     /// </summary>
     /// <param name="text">The agent's text, as the client returned it.</param>
     /// <returns>The answer's root object.</returns>
-    /// <exception cref="AgentDeclinedException">The agent declined, with its reason code; or the answer holds no JSON object (<c>NOT_JSON</c>).</exception>
+    /// <exception cref="AgentDeclinedException">The agent refused, with its reason code (<see cref="AgentDeclinedException.Refused"/>); or the answer holds no JSON object (<c>NOT_JSON</c>).</exception>
     public static JsonElement Read(string text)
     {
-        var body = text.Trim();
-        if (Fence().Match(body) is { Success: true } fence)
-        {
-            body = fence.Groups["body"].Value.Trim();
-        }
-
+        var body = Unfenced(text);
         var start = body.IndexOf('{', StringComparison.Ordinal);
         var end = body.LastIndexOf('}');
         if (start < 0 || end <= start)
         {
-            throw new AgentDeclinedException(PlainRefusal().Match(body) is { Success: true } refusal ? Code(refusal.Groups["code"].Value) : "NOT_JSON");
+            throw PlainRefusal().Match(body) is { Success: true } refusal
+                ? new AgentDeclinedException(Code(refusal.Groups["code"].Value), refused: true)
+                : new AgentDeclinedException("NOT_JSON");
         }
 
         JsonElement root;
@@ -74,10 +83,19 @@ internal static partial class AgentReply
 
         if (Refusal(root) is { } reason)
         {
-            throw new AgentDeclinedException(reason);
+            throw new AgentDeclinedException(reason, refused: true);
         }
 
         return root;
+    }
+
+    /// <summary>The answer without a Markdown code fence around it, trimmed.</summary>
+    /// <param name="text">The agent's text.</param>
+    /// <returns>What is inside the fence, or the whole text when there is none.</returns>
+    public static string Unfenced(string text)
+    {
+        var body = text.Trim();
+        return Fence().Match(body) is { Success: true } fence ? fence.Groups["body"].Value.Trim() : body;
     }
 
     /// <summary>A string property, trimmed; <see langword="null"/> when it is missing, not a string or blank.</summary>
@@ -159,7 +177,9 @@ internal static partial class AgentReply
     [GeneratedRegex(@"^```[A-Za-z]*\s*(?<body>[\s\S]*?)\s*```$")]
     private static partial Regex Fence();
 
-    [GeneratedRegex(@"cannot[_ ]comply\W+(?<code>[A-Z][A-Z_]{2,48})")]
+    // "cannot_comply: TEMPLATE_INVALID", or a refusal in words that names its code: "I'm unable to fulfill your request
+    // due to the following reason: SLOT_UNFILLED."
+    [GeneratedRegex(@"cannot[_ ]comply\W+(?<code>[A-Z][A-Z_]{2,48})|\b(?:unable|cannot|can't|can’t)\b[^{}\n]{0,160}?\b(?<code>[A-Z]{2,}(?:_[A-Z]+)+)\b")]
     private static partial Regex PlainRefusal();
 
     [GeneratedRegex("^[A-Za-z][A-Za-z_]{1,48}$")]

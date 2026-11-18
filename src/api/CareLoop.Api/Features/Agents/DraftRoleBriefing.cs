@@ -114,6 +114,7 @@ public static partial class DraftRoleBriefing
     /// <param name="format">Gives local dates, times and facility names.</param>
     /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
     /// <param name="options">Whether the agents are on, the agent version and which urgency codes mean urgent.</param>
+    /// <param name="ai">The shared AI settings: <c>Ai:TimeoutSeconds</c> bounds every attempt together.</param>
     /// <param name="clock">The current time, for deadlines and the read audit.</param>
     /// <param name="loggerFactory">Records the reason code when the agent declines, and how many named cases were ignored.</param>
     /// <param name="ct">Cancels the request.</param>
@@ -125,7 +126,7 @@ public static partial class DraftRoleBriefing
     /// </returns>
     public static async Task<IResult> Handle([FromBody] RoleBriefingRequest briefing, [FromQuery] string? facilityId, [FromQuery] string? reason,
         HttpContext context, CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents,
-        IOptions<AgentOptions> options, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
+        IOptions<AgentOptions> options, IOptions<AiOptions> ai, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
     {
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
         if (ReadAccess.ValidateReason(reason) is { } reasonError) return reasonError;
@@ -163,8 +164,9 @@ public static partial class DraftRoleBriefing
             Purpose = Purpose, Agent = options.Value.RoleBriefingAgent(), PromptVersion = PromptVersion, Prompt = input.Prompt,
             CorrelationId = Guid.NewGuid(),
         };
-        await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
-        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock, logger, ct);
+        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input),
+            attempt => AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, attempt, ct),
+            AgentReplies.Budget(ai.Value), clock, logger, ct);
     }
 
     /// <summary>

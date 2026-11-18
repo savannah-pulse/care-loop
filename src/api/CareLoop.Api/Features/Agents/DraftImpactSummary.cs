@@ -120,6 +120,7 @@ public static class DraftImpactSummary
     /// <param name="format">Gives local dates, times and facility names.</param>
     /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
     /// <param name="options">Whether the agents are on, and the agent version.</param>
+    /// <param name="ai">The shared AI settings: <c>Ai:TimeoutSeconds</c> bounds every attempt together.</param>
     /// <param name="clock">The measurement time and the read audit clock.</param>
     /// <param name="loggerFactory">Records cases left out of a measure, as <c>GET /metrics</c> does.</param>
     /// <param name="ct">Cancels the request.</param>
@@ -130,7 +131,7 @@ public static class DraftImpactSummary
     /// </returns>
     public static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason, HttpContext context,
         CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, IAgentClient agents, IOptions<AgentOptions> options,
-        IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
+        IOptions<AiOptions> ai, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct)
     {
         if (ReadAccess.Identity(context, out var actor) is { } error) return error;
         if (ReadAccess.ValidateReason(reason) is { } invalid) return invalid;
@@ -157,9 +158,9 @@ public static class DraftImpactSummary
             Purpose = Purpose, Agent = options.Value.ImpactSummaryAgent(), PromptVersion = PromptVersion, Prompt = input.Prompt,
             CorrelationId = Guid.NewGuid(),
         };
-        await AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, request, ct);
-        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock,
-            loggerFactory.CreateLogger(typeof(DraftImpactSummary)), ct);
+        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input),
+            attempt => AgentReplies.AuditAsync(db, actor, clock, AuditView, null, outside, reason, queryText, attempt, ct),
+            AgentReplies.Budget(ai.Value), clock, loggerFactory.CreateLogger(typeof(DraftImpactSummary)), ct);
     }
 
     /// <summary>

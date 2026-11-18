@@ -63,6 +63,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private readonly FakeAgentClient _agents = new();
     private readonly ListLoggerFactory _logs = new();
     private readonly AgentOptions _options = new() { Enabled = true, UrgentCodes = ["PLACEHOLDER-URGENCY-B"] };
+    private readonly AiOptions _ai = new() { TimeoutSeconds = 30 };
     private readonly MessageFormat _format = new(new NotificationOptions
     {
         FacilityNames = new(StringComparer.OrdinalIgnoreCase) { ["SYN-FAC-A"] = "SYN Family Health Centre", ["SYN-FAC-B"] = "SYN General Hospital" },
@@ -210,6 +211,79 @@ public sealed class AiAgentEndpointsTests : IDisposable
                 Assert.DoesNotContain(secret, call.Prompt, StringComparison.OrdinalIgnoreCase);
             }
         }
+    }
+
+    [Fact]
+    public async Task An_answer_in_the_wrong_format_is_asked_again_each_attempt_audited_with_its_own_correlation_identifier()
+    {
+        await NamedCaseAsync();
+        _agents.Answers.Enqueue("Here is the briefing you asked for: SYN prose, not JSON.");
+        _agents.Answers.Enqueue("""{"headline":"SYN headline without sections."}""");
+
+        var briefing = Value<AiTextResponse>(await BriefingAsync());
+
+        Assert.StartsWith("SYN headline.", briefing.Text);
+        Assert.Equal(3, _agents.Calls.Count);
+        Assert.Equal(3, _agents.Calls.Select(c => c.CorrelationId).Distinct().Count());
+        Assert.All(_agents.Calls, c => Assert.Equal(_agents.Calls[0].Prompt, c.Prompt));
+        using var scope = _services.CreateScope();
+        var reads = await Db(scope).CaseReads.ToListAsync();
+        Assert.Equal(_agents.Calls.Select(c => (Guid?)c.CorrelationId).Order(), reads.Select(r => r.CorrelationId).Order());
+        Assert.All(reads, r => Assert.Equal((DraftRoleBriefing.AuditView, "role-briefing", "2"), (r.View, r.AgentName, r.AgentVersion)));
+        Assert.Single(_logs.Lines, l => l.Contains(_agents.Calls[0].CorrelationId.ToString(), StringComparison.Ordinal) && l.EndsWith("(attempt 1 of 3): NOT_JSON", StringComparison.Ordinal));
+        Assert.Single(_logs.Lines, l => l.Contains(_agents.Calls[1].CorrelationId.ToString(), StringComparison.Ordinal) && l.EndsWith("(attempt 2 of 3): MISSING_OUTPUT_FIELD", StringComparison.Ordinal));
+        Assert.DoesNotContain(_logs.Lines, l => l.Contains("SYN", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task After_three_unusable_answers_each_endpoint_gives_the_calm_503()
+    {
+        var @case = await NamedCaseAsync();
+        _agents.Answer = _ => "SYN prose, not JSON.";
+
+        foreach (var result in new[] { await BriefingAsync(), await ImpactAsync(), await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator)) })
+        {
+            Assert.Equal(503, Status(result));
+            Assert.Equal("AI could not write this", Assert.IsType<ProblemDetails>(((IValueHttpResult)result).Value).Title);
+        }
+
+        Assert.Equal(9, _agents.Calls.Count);
+        Assert.Equal(9, _logs.Lines.Count(l => l.EndsWith(": NOT_JSON", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task A_refusal_or_an_agent_that_cannot_be_reached_is_not_asked_again()
+    {
+        var @case = await NamedCaseAsync();
+        _agents.Answer = _ => """{"cannot_comply":{"reason_code":"ROLE_SCOPE_CONFLICT","detail":"SYN"}}""";
+        Assert.Equal(503, Status(await BriefingAsync()));
+        Assert.Single(_agents.Calls);
+
+        _agents.Answer = _ => "I'm unable to fulfill your request due to the following reason: SLOT_UNFILLED.";
+        Assert.Equal(503, Status(await DraftAsync(@case.Id, Identity(DemoRoles.NurseNavigator))));
+        Assert.Equal(2, _agents.Calls.Count);
+        Assert.Single(_logs.Lines, l => l.EndsWith("(attempt 1 of 3): SLOT_UNFILLED", StringComparison.Ordinal));
+
+        _agents.Failure = new AgentUnavailableException("role-briefing", "The agent answered HTTP 429.", 429);
+        Assert.Equal(503, Status(await BriefingAsync()));
+        Assert.Equal(3, _agents.Calls.Count);
+    }
+
+    [Fact]
+    public async Task Every_attempt_together_stays_within_Ai_TimeoutSeconds()
+    {
+        await NamedCaseAsync();
+        _ai.TimeoutSeconds = 1;
+        _agents.Answers.Enqueue("SYN prose, not JSON.");
+        _agents.Hang = true;
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var result = await BriefingAsync();
+
+        Assert.Equal(503, Status(result));
+        Assert.InRange(watch.Elapsed, TimeSpan.FromSeconds(0.9), TimeSpan.FromSeconds(10));
+        Assert.Equal(2, _agents.Calls.Count);
+        Assert.Contains("did not answer within 1 second.", Assert.IsType<ProblemDetails>(((IValueHttpResult)result).Value).Detail);
     }
 
     [Theory]
@@ -664,21 +738,21 @@ public sealed class AiAgentEndpointsTests : IDisposable
         using var scope = _services.CreateScope();
         var named = caseIds ?? await Db(scope).Cases.Select(c => c.Id).ToListAsync();
         return await DraftRoleBriefing.Handle(new RoleBriefingRequest { CaseIds = named }, facilityId, reason, context ?? Identity(), Db(scope),
-            _pathways, _format, _agents, Options.Create(_options), _clock, _logs, CancellationToken.None);
+            _pathways, _format, _agents, Options.Create(_options), Options.Create(_ai), _clock, _logs, CancellationToken.None);
     }
 
     private async Task<IResult> ImpactAsync(HttpContext? context = null, string? facilityId = null, string? reason = null)
     {
         using var scope = _services.CreateScope();
         return await DraftImpactSummary.Handle(facilityId, reason, context ?? Identity(), Db(scope), _pathways, _format, _agents,
-            Options.Create(_options), _clock, _logs, CancellationToken.None);
+            Options.Create(_options), Options.Create(_ai), _clock, _logs, CancellationToken.None);
     }
 
     private async Task<IResult> DraftAsync(Guid caseId, HttpContext context, NotificationChannel channel = NotificationChannel.Sms, string? reason = null)
     {
         using var scope = _services.CreateScope();
-        return await DraftPatientMessage.Handle(caseId, context, Db(scope), _format, _agents, Options.Create(_options), _clock, _logs,
-            CancellationToken.None, channel, reason);
+        return await DraftPatientMessage.Handle(caseId, context, Db(scope), _format, _agents, Options.Create(_options), Options.Create(_ai), _clock,
+            _logs, CancellationToken.None, channel, reason);
     }
 
     private async Task<Case> SeedAsync(Case @case)
@@ -813,18 +887,37 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         public Func<AgentRequest, string> Answer { get; set; } = ValidReply;
 
+        /// <summary>Answers given first, one per call, before <see cref="Answer"/> takes over.</summary>
+        public Queue<string> Answers { get; } = new();
+
+        /// <summary>When set, a call with no queued answer waits until it is cancelled, as an agent that never answers.</summary>
+        public bool Hang { get; set; }
+
         public AgentUnavailableException? Failure { get; set; }
 
         public string Route => "Fake";
 
         public bool IsEnabled { get; set; } = true;
 
-        public Task<AgentText> AskAsync(AgentRequest request, CancellationToken ct)
+        public async Task<AgentText> AskAsync(AgentRequest request, CancellationToken ct)
         {
             Calls.Add(request);
-            return Failure is not null
-                ? Task.FromException<AgentText>(Failure)
-                : Task.FromResult(new AgentText(Answer(request), request.Agent));
+            if (Failure is not null)
+            {
+                throw Failure;
+            }
+
+            if (Answers.TryDequeue(out var queued))
+            {
+                return new AgentText(queued, request.Agent);
+            }
+
+            if (Hang)
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+
+            return new AgentText(Answer(request), request.Agent);
         }
     }
 }

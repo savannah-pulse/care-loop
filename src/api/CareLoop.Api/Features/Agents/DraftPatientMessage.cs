@@ -126,6 +126,7 @@ public static class DraftPatientMessage
     /// <param name="format">Gives local dates, times and facility names.</param>
     /// <param name="agents">Calls the agent on the route <c>Ai:Provider</c> chose.</param>
     /// <param name="options">Whether the agents are on, and the agent version.</param>
+    /// <param name="ai">The shared AI settings: <c>Ai:TimeoutSeconds</c> bounds every attempt together.</param>
     /// <param name="clock">The current time and the read audit clock.</param>
     /// <param name="loggerFactory">Records the reason code when the agent declines or its answer does not match the template.</param>
     /// <param name="ct">Cancels the request.</param>
@@ -136,7 +137,7 @@ public static class DraftPatientMessage
     /// could not write it.
     /// </returns>
     public static async Task<IResult> Handle(Guid caseId, HttpContext context, CareLoopDbContext db, MessageFormat format,
-        IAgentClient agents, IOptions<AgentOptions> options, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct,
+        IAgentClient agents, IOptions<AgentOptions> options, IOptions<AiOptions> ai, IClock clock, ILoggerFactory loggerFactory, CancellationToken ct,
         [FromQuery] NotificationChannel channel = NotificationChannel.Sms, [FromQuery] string? reason = null)
     {
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
@@ -164,9 +165,9 @@ public static class DraftPatientMessage
             Purpose = Purpose, Agent = options.Value.PatientNotificationAgent(), PromptVersion = PromptVersion, Prompt = input.Prompt,
             CorrelationId = Guid.NewGuid(),
         };
-        await AgentReplies.AuditAsync(db, actor, clock, AuditView, caseId, outside, reason, query, request, ct);
-        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input), clock,
-            loggerFactory.CreateLogger(typeof(DraftPatientMessage)), ct);
+        return await AgentReplies.AskAsync(agents, request, answer => Read(answer, input),
+            attempt => AgentReplies.AuditAsync(db, actor, clock, AuditView, caseId, outside, reason, query, attempt, ct),
+            AgentReplies.Budget(ai.Value), clock, loggerFactory.CreateLogger(typeof(DraftPatientMessage)), ct);
     }
 
     /// <summary>
