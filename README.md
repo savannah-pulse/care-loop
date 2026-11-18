@@ -82,6 +82,23 @@ and email simulator, which calls back on `/notifications/inbound/sms` and `/emai
 with CareLoop. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit; the
 Python workflow proposes actions for the API and authorized people to review.
 
+## Test environment
+
+A deployed copy for testing and the demo. It runs on the simulators and synthetic data only, has no real sign-in, and
+is open to anyone with these addresses. Never enter real patient data.
+
+| | Address |
+| --- | --- |
+| Dashboard | <https://web.greendune-d4715603.eastus2.azurecontainerapps.io> |
+| API | <https://api.greendune-d4715603.eastus2.azurecontainerapps.io> |
+| HIS simulator | <https://his-simulator.greendune-d4715603.eastus2.azurecontainerapps.io> |
+| Messaging simulator | <https://messaging-simulator.greendune-d4715603.eastus2.azurecontainerapps.io> |
+
+It uses the demo timing, so pathway deadlines elapse in seconds. The first request after a quiet spell can take about
+twenty seconds. How it was deployed, and how to deploy your own, is in
+[`infra/azure/DEPLOY-FROM-LOCAL.md`](infra/azure/DEPLOY-FROM-LOCAL.md). The addresses change if the environment is
+rebuilt from scratch; update this table when that happens.
+
 ## Start everything
 
 Prerequisite: Docker with Compose.
