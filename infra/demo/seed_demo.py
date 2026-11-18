@@ -378,7 +378,7 @@ def seed_overdue(c: Client) -> None:
         .result()
     # At the general hospital, on Dr. Layla's own list.
     start(c, "gh-silent", "Sawsan Idris", 1008, "general hospital: Dr. Layla's case, the patient never answers", clinician=YUSUF) \
-        .reacts(response="None").result().review().consultation().consultation_decision("accepted")
+        .reacts(response="None").result().review().pause().consultation().consultation_decision("accepted")
     start(c, "gh-missed", "Hala Nasser", 1009, "general hospital: Dr. Layla's case, appointment missed and not rebooked", clinician=YUSUF) \
         .reacts().result().review().pause().consultation().consultation_decision("accepted") \
         .appointment("booked", 1, in_days(-0.01)).appointment("noshow", 2, in_days(-0.01))
@@ -390,15 +390,15 @@ def seed_ontime(c: Client) -> None:
     tomorrow, earlier_today = in_days(1), in_days(-0.01)
 
     start(c, "closed-treated", "Dana Farouk", 1011, "full journey, closed as treated on evidence") \
-        .reacts().result().review().pause().referral().referral_decision("accepted") \
+        .reacts().result().review().pause().call_outcome(True, True, 4).referral().referral_decision("accepted") \
         .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today) \
         .outcome("diagnosis").closure("treated")
     start(c, "closed-surveillance", "Aisha Karim", 1012, "closed on surveillance with a next date", clinician=SARA) \
-        .reacts().result().review().pause().referral().referral_decision("accepted") \
+        .reacts().result().review().pause().call_outcome(True, True, 5).referral().referral_decision("accepted") \
         .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today) \
         .outcome("surveillance-started").closure("on-surveillance", next_surveillance=in_days(180)[:10])
     start(c, "closed-negative", "Shamma Obaid", 1013, "confirmation was negative: closed on evidence", email=True) \
-        .reacts().result().review(urgency="PLACEHOLDER-URGENCY-B").pause().referral().referral_decision("accepted") \
+        .reacts().result().review(urgency="PLACEHOLDER-URGENCY-B").pause().call_outcome(True, True, 4).referral().referral_decision("accepted") \
         .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today) \
         .outcome("diagnosis").closure("negative-on-confirmation")
 
@@ -421,14 +421,14 @@ def seed_ontime(c: Client) -> None:
 
     # At the general hospital, so Dr. Layla has cases of her own: each reaches her by a handoff she accepted.
     start(c, "gh-accepted", "Lina Aziz", 1021, "general hospital: handoff accepted by Dr. Layla, who now owns it", clinician=YUSUF) \
-        .reacts().result().review().pause().consultation().consultation_decision("accepted")
+        .reacts().result().review().pause().call_outcome(True, True, 5).consultation().consultation_decision("accepted")
     start(c, "gh-treatment", "Farah Nabil", 1022, "general hospital: Dr. Layla's case, treatment plan recorded, treatment to start", clinician=YUSUF) \
-        .reacts().result().review().pause().consultation().consultation_decision("accepted") \
+        .reacts().result().review().pause().call_outcome(True, True, 4).consultation().consultation_decision("accepted") \
         .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today).outcome("treatment-plan")
     start(c, "gh-booked", "Amira Sabry", 1024, "general hospital: Dr. Layla's case, appointment booked for tomorrow", clinician=YUSUF) \
-        .reacts().result().review().pause().consultation().consultation_decision("accepted").appointment("booked", 1, tomorrow)
+        .reacts().result().review().pause().call_outcome(True, True, 5).consultation().consultation_decision("accepted").appointment("booked", 1, tomorrow)
     start(c, "gh-closed", "Wafa Jaber", 1023, "general hospital: Dr. Layla's case, closed as treated", clinician=YUSUF, email=True) \
-        .reacts().result().review().pause().consultation().consultation_decision("accepted") \
+        .reacts().result().review().pause().call_outcome(True, True, 4).consultation().consultation_decision("accepted") \
         .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today).outcome("diagnosis").closure("treated")
 
 
