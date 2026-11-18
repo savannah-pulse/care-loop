@@ -5,8 +5,8 @@ It is not a clinical system. It is built as for production and is currently conn
 
 Domain, persistence/intake, FHIR, outbox/notifications, deadlines and the WS6 read APIs are implemented.
 Remaining workstream stubs return **501**, including WS9 summary actions and WS10 simulation.
-The three AI agent endpoints also answer **501** until `Ai:Agents:Enabled` is `true` (see
-[AI agents on the dashboard](#ai-agents-on-the-dashboard)).
+The three AI agent endpoints answer **409**, as the handoff summary does while AI is off, until `Ai:Agents:Enabled` is
+`true` and `Ai:Provider` names a route (see [AI agents on the dashboard](#ai-agents-on-the-dashboard)).
 See `docs/workstreams.md` for ownership and status.
 
 ## Projects
@@ -85,13 +85,15 @@ Messaging simulator and gives each staff role a synthetic address; Docker Compos
 | `Outbox:LeaseDuration` | `00:05:00` | How long one instance's claim on a delivery lasts. Several API instances may share the database; a claim left by a stopped instance lapses after this and the delivery is picked up again. |
 | `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
 | `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. Development settings and Docker Compose use `00:00:01` because the demo pathway's deadlines last seconds. |
-| `Ai:Provider` | `NoOp` | `NoOp` (AI off) or `AzureOpenAi`. Azure settings come from environment variables only. |
-| `Ai:Agents:Enabled` | `false` | Switch on the three Foundry agents the dashboard asks for words. While `false` their endpoints answer 501 and nothing is sent. When `true`, the settings below are checked at start-up and a bad value stops the host. |
-| `Ai:Agents:ProjectEndpoint` | none | The Foundry project, `https://{resource}.services.ai.azure.com/api/projects/{project}`. `https` only. Set it from the environment (`Ai__Agents__ProjectEndpoint`), never in a committed file. |
-| `Ai:Agents:RoleBriefing`, `…:ImpactSummary`, `…:PatientNotification` | `role-briefing`, `impact-summary`, `patient-notification` | The agents' names in the project. |
-| `Ai:Agents:TimeoutSeconds` | `30` | How long one agent may take, token included, before the endpoint answers 503. From 1 to 300. |
-| `Ai:Agents:AccessToken` | none | A ready Entra token for `https://ai.azure.com/.default`, used instead of the API's identity. Honoured only in the `Development` environment (ignored, with a warning, anywhere else). For a local test only: set it in the shell for one session and never commit it. |
-| `Ai:Agents:UrgentCodes` | `[ "PLACEHOLDER-URGENCY-B" ]` | Which clinician-reviewed urgency codes the role briefing counts and orders as urgent. Must match the dashboard's table of urgency codes; a placeholder like the pathway's codes. |
+| `Ai:Provider` | `NoOp` | The route for everything AI does: `NoOp` (AI off), `AiWorkflow` (through the Python AI workflow service) or `FoundryDirect` (from the API to Foundry). The handoff summary and the dashboard's agents both follow it. |
+| `Ai:TimeoutSeconds` | `30` | How long a draft, or one agent call (token included), may take before the endpoint answers 503. From 1 to 300 for the agents. |
+| `Ai:MaxRequestBytes` | `32768` | Largest request that may be sent to an AI provider, checked before any call; a larger one is refused with 503 and nothing is sent. |
+| `Ai:FoundryDirect:ProjectEndpoint` | none | The Foundry project, `https://{resource}.services.ai.azure.com/api/projects/{project}`, for the `FoundryDirect` route. `https` only. Set it from the environment (`Ai__FoundryDirect__ProjectEndpoint`), never in a committed file. |
+| `Ai:AiWorkflow:BaseUrl` | none | The Python AI workflow service, for the `AiWorkflow` route. Docker Compose points it at the `ai-workflow` service. |
+| `Ai:Agents:Enabled` | `false` | Switch on the three Foundry agents the dashboard asks for words. While `false`, or while `Ai:Provider` is `NoOp`, their endpoints answer 409 and nothing is sent. When `true`, the agent versions and the route's settings are checked at start-up and a bad value stops the host. |
+| `Ai:Agents:RoleBriefing`, `…:ImpactSummary`, `…:PatientNotification` | `role-briefing:2`, `impact-summary:4`, `patient-notification:2` | The agent versions to call, `name:version`, as pinned in `src/ai_agents/*/run_agent.py`. Change both together. |
+| `Ai:Agents:AccessToken` | none | A ready Entra token for `https://ai.azure.com/.default`, used on the `FoundryDirect` route instead of the API's identity. Honoured only in the `Development` environment (ignored, with a warning, anywhere else). For a local test only: set it in the shell for one session and never commit it. |
+| `Ai:Agents:UrgentCodes` | `[ "PLACEHOLDER-URGENCY-B" ]` | Which clinician-reviewed urgency codes the role briefing counts and orders as urgent. Not a connection setting. Must match the dashboard's table of urgency codes; a placeholder like the pathway's codes. |
 
 Clinical deadlines are **not** configuration keys here. They live in
 `src/api/CareLoop.Api/Infrastructure/Pathways/breast-screening.json`, where every value is a placeholder.
@@ -225,32 +227,41 @@ sends no message. `docs/ai-design/integration.md` has the full boundary.
 
 | Route | Agent (`Ai:Agents:…`) | Who | Built from |
 |---|---|---|---|
-| `POST /ai/role-briefing` (optional `facilityId`, `reason`) | `RoleBriefing` | every staff role | The reader's role and facility, counts of the open cases in the worklist scope (open, overdue, escalated, urgent, due today, needs an owner) and up to five of them, most pressing first, each by case number, programme, step, next action, due status and flags |
-| `POST /ai/impact-summary` (optional `facilityId`, `reason`) | `ImpactSummary` | every staff role | The aggregate measures `GET /metrics` returns for the same reader, nothing per case |
-| `POST /cases/{caseId}/patient-message-draft` (optional `channel` = `Sms` or `Email`, `reason`) | `PatientNotification` | nurse navigator, clinician | The next action, the upcoming appointment's day, time and place in local time, the channel and the reply codes; `{first name}` stands for the name |
+| `POST /ai/role-briefing` (optional `facilityId`, `reason`) | `RoleBriefing`, `role-briefing:2` | every staff role | The reader's role and facility, counts of the open cases in the worklist scope (open, overdue, escalated, urgent, due today, needs an owner) and up to five of them, most pressing first, each from its full coordination state: case number, programme, stage and step, next action, owner role, due and overdue state, urgency, flags, open escalation level, track statuses, patient contact, understanding and confidence where recorded, and the preferred language for messages |
+| `POST /ai/impact-summary` (optional `facilityId`, `reason`) | `ImpactSummary`, `impact-summary:4` | every staff role | The aggregate measures `GET /metrics` returns for the same reader, nothing per case, with counts under 5 hidden, plus the cohort, the period, the measure-definition version (`GetMetrics.DefinitionVersion`) and a synthetic-data note |
+| `POST /cases/{caseId}/patient-message-draft` (optional `channel` = `Sms` or `Email`, `reason`) | `PatientNotification`, `patient-notification:2` | nurse navigator, clinician | One patient-safe step mapped from the next action (never the next action itself), the upcoming appointment's day and time in local time, the channel and the reply codes; `{first name}` and `{place}` stand for the name and the place |
 
-Each answers `AiTextResponse { agent, text, generatedAt }`. Identity, facility scope and reasons follow the reads they
-mirror (the worklist, `GET /metrics`, a case read), each call is recorded in `CaseReads` (views `role-briefing`,
-`impact-summary`, `patient-message-draft`, with `-denied` for a refusal), and the coordinator's briefing covers only the
-cases escalated to the coordinator. While `Ai:Agents:Enabled` is `false` they answer 501 with the not-implemented body.
-When the agent fails (no token, 401, 403, 429, 5xx, a timeout, an incomplete or empty answer) they answer 503 with the
+Each answers `AiTextResponse { agent, agentVersion, promptVersion, text, generatedAt }`. Identity, facility scope and
+reasons follow the reads they mirror (the worklist, `GET /metrics`, a case read). Each call is recorded in `CaseReads`
+(views `role-briefing`, `impact-summary`, `patient-message-draft`, with `-denied` for a refusal) with the agent's name
+and pinned version, the prompt version and a correlation identifier, and the coordinator's briefing covers only the
+cases escalated to the coordinator. While `Ai:Agents:Enabled` is `false` or `Ai:Provider` is `NoOp` they answer 409,
+titled "AI is switched off". When the agent fails (no token, 401, 403, 429, 5xx, a timeout, a request over
+`Ai:MaxRequestBytes`, an incomplete or empty answer, an answer from another agent version) they answer 503 with the
 title "AI could not write this" and no text. No prompt carries a patient's name, contact details, MRN, patient
 reference, the hospital's result identifier, a staff reference or free text.
 
-`FoundryAgentClient` posts `{"input":[{"role":"user","content":"<prompt>"}]}` to
-`{ProjectEndpoint}/agents/{agent}/endpoint/protocols/openai/responses?api-version=v1` with an Entra bearer token for
-`https://ai.azure.com/.default`, and reads `output_text`, or every `output[].content[].text`. It logs the agent, status
-and duration, and the agent's error code on a failure, never the prompt or the text.
+`Ai:Provider` chooses the `IAgentClient`: `FoundryDirect` is `FoundryAgentClient`, `AiWorkflow` is
+`AiWorkflowAgentClient` (a client for the contract proposed in `integration.md`, pending the team's decision on the
+route) and `NoOp` is `NoOpAgentClient`. `FoundryAgentClient` posts
+`{"agent_reference":{"type":"agent_reference","name":"<agent>","version":"<version>"},"input":[{"role":"user","content":"<prompt>"}]}`
+to `{Ai:FoundryDirect:ProjectEndpoint}/openai/v1/responses` with an Entra bearer token for
+`https://ai.azure.com/.default` and the correlation identifier as `x-ms-client-request-id`, reads `output_text`, or
+every `output[].content[].text`, and refuses an answer whose `agent_reference` names another version. Both clients log
+the agent version, status, duration and correlation identifier, and the provider's error on a failure, never the
+prompt or the text.
 
-Tokens come from `DefaultAzureCredential`: the managed identity when hosted in Azure (`AZURE_CLIENT_ID` picks a
-user-assigned one), the developer's Azure CLI or Visual Studio sign-in locally. That identity needs the **Azure AI
-User** role on the Foundry project, or every call answers 403 and the endpoints answer 503. To test locally with a
-token from your own sign-in instead:
+On the `FoundryDirect` route, tokens come from `DefaultAzureCredential`: the managed identity when hosted in Azure
+(`AZURE_CLIENT_ID` picks a user-assigned one), the developer's Azure CLI or Visual Studio sign-in locally. That
+identity needs the **Foundry User** role (formerly Azure AI User) on the Foundry project, or every call answers 403
+and the endpoints answer 503. On the `AiWorkflow` route it is the Python service's identity that needs the role. To
+test locally with a token from your own sign-in instead:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = "Development"
+$env:Ai__Provider = "FoundryDirect"
 $env:Ai__Agents__Enabled = "true"
-$env:Ai__Agents__ProjectEndpoint = "https://<resource>.services.ai.azure.com/api/projects/<project>"
+$env:Ai__FoundryDirect__ProjectEndpoint = "https://<resource>.services.ai.azure.com/api/projects/<project>"
 $env:Ai__Agents__AccessToken = az account get-access-token --scope https://ai.azure.com/.default --query accessToken -o tsv
 dotnet run --project src/api/CareLoop.Api
 ```

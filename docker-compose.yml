@@ -65,14 +65,17 @@ services:
       Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
       Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}
       Ai__AzureOpenAi__ApiKey: ${AZURE_OPENAI_API_KEY:-}
-      # Foundry agents on the dashboard: off unless AI_AGENTS_ENABLED is true. The API calls them with its own Entra
-      # identity (DefaultAzureCredential), which needs Azure AI User on the project; no key or token is set here.
+      Ai__TimeoutSeconds: ${AI_TIMEOUT_SECONDS:-30}
+      # Where AI_PROVIDER points: AiWorkflow is the Python service below, FoundryDirect is the Foundry project.
+      Ai__AiWorkflow__BaseUrl: http://ai-workflow:8080
+      Ai__FoundryDirect__ProjectEndpoint: ${AI_FOUNDRY_PROJECT_ENDPOINT:-}
+      # Foundry agents on the dashboard: off unless AI_AGENTS_ENABLED is true and AI_PROVIDER names a route. With
+      # FoundryDirect the API calls them with its own Entra identity (DefaultAzureCredential), which needs Foundry User
+      # (formerly Azure AI User) on the project; no key or token is set here. Each agent is pinned as name:version.
       Ai__Agents__Enabled: ${AI_AGENTS_ENABLED:-false}
-      Ai__Agents__ProjectEndpoint: ${AI_AGENTS_PROJECT_ENDPOINT:-}
-      Ai__Agents__RoleBriefing: ${AI_AGENTS_ROLE_BRIEFING:-role-briefing}
-      Ai__Agents__ImpactSummary: ${AI_AGENTS_IMPACT_SUMMARY:-impact-summary}
-      Ai__Agents__PatientNotification: ${AI_AGENTS_PATIENT_NOTIFICATION:-patient-notification}
-      Ai__Agents__TimeoutSeconds: ${AI_AGENTS_TIMEOUT_SECONDS:-30}
+      Ai__Agents__RoleBriefing: ${AI_AGENTS_ROLE_BRIEFING:-role-briefing:2}
+      Ai__Agents__ImpactSummary: ${AI_AGENTS_IMPACT_SUMMARY:-impact-summary:4}
+      Ai__Agents__PatientNotification: ${AI_AGENTS_PATIENT_NOTIFICATION:-patient-notification:2}
     ports:
       - "${API_PORT:-8080}:8080"
     healthcheck:

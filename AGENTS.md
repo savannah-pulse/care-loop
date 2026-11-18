@@ -106,7 +106,8 @@ care-loop/
 │   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
 │   │       │   │                       StaffContactOptions
 │   │       │   ├── Ai/                 NoOpAiProvider (default), AiWorkflowProvider, FoundryDirectProvider,
-│   │       │   │                       FoundryAgentClient and AgentOptions (the dashboard's Foundry agents)
+│   │       │   │                       FoundryAgentClient, AiWorkflowAgentClient, NoOpAgentClient and AgentOptions
+│   │       │   │                       (the dashboard's Foundry agents, on the route Ai:Provider chooses)
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
 │   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
@@ -320,7 +321,7 @@ public interface ICaseRepository
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
 | `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `AiWorkflowProvider`, `FoundryDirectProvider` |
-| `IAgentClient` | `Api/Features/Agents` | `FoundryAgentClient` |
+| `IAgentClient` | `Api/Features/Agents` | `FoundryAgentClient`, `AiWorkflowAgentClient`, `NoOpAgentClient` (chosen by `Ai:Provider`) |
 | `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
 | `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
@@ -347,7 +348,7 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. The dashboard's Foundry agents go through `IAgentClient`, off unless `Ai:Agents:Enabled`. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
+| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. The dashboard's Foundry agents go through `IAgentClient`, on the route `Ai:Provider` chooses, each pinned to an agent version, off unless `Ai:Agents:Enabled`. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |
