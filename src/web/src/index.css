@@ -2237,6 +2237,25 @@ a.name:focus-visible {
   }
 }
 
+/* Below 640 px, such as a phone: the sections scroll inside the header rather than push the page sideways */
+@media (max-width: 639px) {
+  .appbar-inner {
+    gap: 8px;
+  }
+
+  .nav {
+    min-inline-size: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav a {
+    flex: none;
+    padding-inline: 6px;
+    white-space: nowrap;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
