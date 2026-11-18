@@ -33,7 +33,8 @@ namespace CareLoop.Tests.Api.Agents;
 /// The three AI endpoints: switched off they answer 409, the agent's text comes back as a draft with its agent and
 /// prompt versions, a failing agent is a calm 503, access follows the reads, each call is audited with its agent version,
 /// prompt version and correlation identifier, and no prompt ever carries a patient's name, record number, reference,
-/// contact details or the hospital's identifiers.
+/// contact details, the hospital's identifiers or free text; the patient message prompt never carries a next action
+/// that would reveal a result.
 /// </summary>
 public sealed class AiAgentEndpointsTests : IDisposable
 {
@@ -46,6 +47,13 @@ public sealed class AiAgentEndpointsTests : IDisposable
     private const string Reader = "SYN-STAFF-1";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { Converters = { new JsonStringEnumConverter() } };
+
+    /// <summary>Next actions whose staff wording would tell a patient something about a result.</summary>
+    private static readonly string[] ResultBearing =
+    [
+        "review-result", "answer-consultation", "respond-to-referral", "arrange-follow-up", "reassign-consultation",
+        "arrange-alternative-referral", "start-treatment", "decide-closure",
+    ];
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
     private readonly FakeClock _clock = new();
@@ -118,7 +126,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
             (briefing.Agent, briefing.AgentVersion, briefing.PromptVersion, briefing.Text));
         Assert.Equal(("impact-summary", "4", "impact-summary-v1", "SYN words from impact-summary."),
             (impact.Agent, impact.AgentVersion, impact.PromptVersion, impact.Text));
-        Assert.Equal(("patient-notification", "2", "patient-message-v1", "SYN words from patient-notification."),
+        Assert.Equal(("patient-notification", "2", "patient-message-v2", "SYN words from patient-notification."),
             (draft.Agent, draft.AgentVersion, draft.PromptVersion, draft.Text));
         Assert.All([briefing, impact, draft], r => Assert.Equal(_clock.UtcNow, r.GeneratedAt));
         Assert.Equal(["role_briefing", "impact_summary", "patient_message_preview"], _agents.Calls.Select(c => c.Purpose));
@@ -148,7 +156,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task No_prompt_carries_the_patients_name_identifiers_or_contact_details()
+    public async Task No_prompt_carries_the_patients_name_identifiers_contact_details_or_free_text()
     {
         var @case = await NamedCaseAsync();
         var stored = await ReadCaseAsync(@case.Id);
@@ -169,12 +177,50 @@ public sealed class AiAgentEndpointsTests : IDisposable
             foreach (var secret in new[]
             {
                 PatientName, "Hessa", PatientMrn, "99887766", PatientReference, HospitalResultId, "HOSPITAL-4242", Reader, "SYN-STAFF-0001",
-                Envelopes.PatientPhone, Envelopes.PatientEmail, EscalationReason, "SYN free text", stored.Id.ToString(),
+                Envelopes.PatientPhone, Envelopes.PatientEmail, AppointmentPlace, "Room 4", EscalationReason, "SYN free text", stored.Id.ToString(),
             })
             {
                 Assert.DoesNotContain(secret, call.Prompt, StringComparison.OrdinalIgnoreCase);
             }
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryNextAction))]
+    public void The_patient_message_prompt_never_carries_a_result_bearing_next_action(string nextAction)
+    {
+        var @case = NewCase("SYN-RESULT-STEP", "SYN-FAC-A");
+        @case.SetNextAction(nextAction, _clock.UtcNow.AddDays(1), _clock.UtcNow);
+
+        var prompt = DraftPatientMessage.BuildPrompt(@case, placeNamed: true, NotificationChannel.Sms, _format, _clock.UtcNow);
+
+        var step = Assert.Single(prompt.Split('\n'), line => line.StartsWith("Next step for the patient: ", StringComparison.Ordinal))
+            ["Next step for the patient: ".Length..].Trim();
+        Assert.Contains(step, DraftPatientMessage.PatientSafeSteps);
+        foreach (var action in _pathways.Get("breast-screening").Deadlines.Select(d => d.NextAction).Distinct())
+        {
+            Assert.DoesNotContain(action, prompt, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(AgentWords.NextAction(action), prompt, StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (ResultBearing.Contains(nextAction) || nextAction.StartsWith("SYN-", StringComparison.Ordinal))
+        {
+            Assert.Equal(DraftPatientMessage.PatientSafeSteps[0], step);
+        }
+
+        Assert.Equal(DraftPatientMessage.PatientSafeSteps[0], DraftPatientMessage.PatientStepFor(null));
+    }
+
+    /// <summary>Every next action the pathway defines and an unknown one, so a new next action is covered as soon as it is added.</summary>
+    public static TheoryData<string> EveryNextAction()
+    {
+        var data = new TheoryData<string> { "SYN-unknown-next-action" };
+        foreach (var action in DomainTestData.Provider().Get("breast-screening").Deadlines.Select(d => d.NextAction).Distinct())
+        {
+            data.Add(action);
+        }
+
+        return data;
     }
 
     [Fact]
@@ -255,7 +301,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task The_message_draft_uses_the_next_action_the_appointment_the_channel_and_the_reply_codes_and_is_recorded_as_a_read()
+    public async Task The_message_draft_uses_a_patient_safe_step_the_appointment_time_the_channel_and_the_reply_codes_and_is_recorded_as_a_read()
     {
         var @case = await NamedCaseAsync();
 
@@ -264,11 +310,13 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var prompt = Assert.Single(_agents.Calls).Prompt;
         Assert.Contains("{first name}", prompt);
         Assert.Contains("Channel: email.", prompt);
-        Assert.Contains("The care team's next step: Make sure the patient has the message.", prompt);
-        Assert.Contains($"Appointment: Sunday 4 January 2026 at 10:30, local time. Place: {AppointmentPlace}.", prompt);
+        Assert.Contains("category A, administrative message", prompt);
+        Assert.Contains("Next step for the patient: Your care team sent you a message and would like to know that you got it.", prompt);
+        Assert.Contains("Appointment: Sunday 4 January 2026 at 10:30, local time. Place: {place}.", prompt);
         Assert.Contains("Reply 1 to confirm you got this message.", prompt);
         Assert.Contains("Reply 2 if you would like your care team to call you.", prompt);
         Assert.Contains("Never mention or hint at a screening result", prompt);
+        Assert.DoesNotContain("Make sure the patient has the message", prompt);
 
         using var scope = _services.CreateScope();
         var read = Assert.Single(await Db(scope).CaseReads.ToListAsync());
