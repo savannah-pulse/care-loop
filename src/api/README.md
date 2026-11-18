@@ -86,7 +86,7 @@ Messaging simulator and gives each staff role a synthetic address; Docker Compos
 | `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
 | `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. Development settings and Docker Compose use `00:00:01` because the demo pathway's deadlines last seconds. |
 | `Ai:Provider` | `NoOp` | The route for everything AI does: `NoOp` (AI off), `AiWorkflow` (through the Python AI workflow service) or `FoundryDirect` (from the API to Foundry). The handoff summary and the dashboard's agents both follow it. |
-| `Ai:TimeoutSeconds` | `30` | How long a draft, or one agent call (token included), may take before the endpoint answers 503. From 1 to 300 for the agents. |
+| `Ai:TimeoutSeconds` | `30` | How long a draft, or an agent's text with every attempt at it (token included), may take before the endpoint answers 503. From 1 to 300 for the agents. |
 | `Ai:MaxRequestBytes` | `32768` | Largest request that may be sent to an AI provider, checked before any call; a larger one is refused with 503 and nothing is sent. |
 | `Ai:FoundryDirect:ProjectEndpoint` | none | The Foundry project, `https://{resource}.services.ai.azure.com/api/projects/{project}`, for the `FoundryDirect` route. `https` only. Set it from the environment (`Ai__FoundryDirect__ProjectEndpoint`), never in a committed file. |
 | `Ai:AiWorkflow:BaseUrl` | none | The Python AI workflow service, for the `AiWorkflow` route. Docker Compose points it at the `ai-workflow` service. |
@@ -227,9 +227,9 @@ sends no message. `docs/ai-design/integration.md` has the full boundary.
 
 | Route | Agent (`Ai:Agents:…`) | Who | Built from |
 |---|---|---|---|
-| `POST /ai/role-briefing` (optional `facilityId`, `reason`) | `RoleBriefing`, `role-briefing:2` | every staff role | The reader's role and facility, counts of the open cases in the worklist scope (open, overdue, escalated, urgent, due today, needs an owner) and up to five of them, most pressing first, each from its full coordination state: case number, programme, stage and step, next action, owner role, due and overdue state, urgency, flags, open escalation level, track statuses, patient contact, understanding and confidence where recorded, and the preferred language for messages |
+| `POST /ai/role-briefing`, body `{ "caseIds": [...] }` (optional `facilityId`, `reason`) | `RoleBriefing`, `role-briefing:2` | every staff role | The open cases among those named (the "Start here today" card's "My cases") that the reader may read in the worklist's scope, banded and ordered with their counts, the clock configuration and a five-working-day look-ahead. Each case is a token made up for the prompt, with its next action in the dashboard's words, who acts next (from the pathway), its deadline, urgency tier, patient contact and open escalation; never its case number |
 | `POST /ai/impact-summary` (optional `facilityId`, `reason`) | `ImpactSummary`, `impact-summary:4` | every staff role | The aggregate measures `GET /metrics` returns for the same reader, nothing per case, with counts under 5 hidden, plus the cohort, the period, the measure-definition version (`GetMetrics.DefinitionVersion`) and a synthetic-data note |
-| `POST /cases/{caseId}/patient-message-draft` (optional `channel` = `Sms` or `Email`, `reason`) | `PatientNotification`, `patient-notification:2` | nurse navigator, clinician | One patient-safe step mapped from the next action (never the next action itself), the upcoming appointment's day and time in local time, the channel and the reply codes; `{first name}` and `{place}` stand for the name and the place |
+| `POST /cases/{caseId}/patient-message-draft` (optional `channel` = `Sms` or `Email`, `reason`) | `PatientNotification`, `patient-notification:2` | nurse navigator, clinician | A category A template: the facility's name, one patient-safe step mapped from the next action (never the next action itself) and the reply codes as locked text, the upcoming appointment's day and time in local time, and the channel; `{first name}` and `{place}` stand for the name and the place |
 
 Each answers `AiTextResponse { agent, agentVersion, promptVersion, text, generatedAt }`. Identity, facility scope and
 reasons follow the reads they mirror (the worklist, `GET /metrics`, a case read). Each call is recorded in `CaseReads`
@@ -237,8 +237,10 @@ reasons follow the reads they mirror (the worklist, `GET /metrics`, a case read)
 and pinned version, the prompt version and a correlation identifier, and the coordinator's briefing covers only the
 cases escalated to the coordinator. While `Ai:Agents:Enabled` is `false` or `Ai:Provider` is `NoOp` they answer 409,
 titled "AI is switched off". When the agent fails (no token, 401, 403, 429, 5xx, a timeout, a request over
-`Ai:MaxRequestBytes`, an incomplete or empty answer, an answer from another agent version) they answer 503 with the
-title "AI could not write this" and no text. No prompt carries a patient's name, contact details, MRN, patient
+`Ai:MaxRequestBytes`, an incomplete or empty answer, an answer from another agent version), refuses, or gives an
+answer that fails CareLoop's checks, they answer 503 with the title "AI could not write this" and no text. An answer
+that is empty, in the wrong format or fails the checks is asked for again, at most twice, within `Ai:TimeoutSeconds`;
+a refusal or a failure to reach the agent is not. No prompt carries a patient's name, contact details, MRN, patient
 reference, the hospital's result identifier, a staff reference or free text.
 
 `Ai:Provider` chooses the `IAgentClient`: `FoundryDirect` is `FoundryAgentClient`, `AiWorkflow` is
