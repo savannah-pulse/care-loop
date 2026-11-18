@@ -2266,6 +2266,7 @@ a.name:focus-visible {
 }
 
 .showing {
+  inline-size: fit-content;
   margin-block: -8px;
   font-size: 14px;
   color: var(--ink3);

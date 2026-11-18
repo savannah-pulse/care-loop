@@ -171,13 +171,15 @@ describe('worklist', () => {
     expect(screen.getByRole('button', { name: /^Whole team\s*3$/ })).toBeInTheDocument()
   })
 
-  it('says so when nothing waits for the person, and offers the team’s list', async () => {
+  it('says so when nothing waits for the person, with what is overdue on the team, and offers the team’s list', async () => {
     answer('GET /cases', json([HESSA]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
 
-    expect(await screen.findByText('No open case is waiting for you. Your team has 1 open case.')).toBeInTheDocument()
+    expect(await screen.findByText('No open case is waiting for you. Your team has 1 open case, 1 overdue.')).toBeInTheDocument()
+    expect(screen.queryByText('0 open cases')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show the whole team' }))
     expect(await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Whole team/ })).toHaveFocus()
   })
 
   it('lets the programme coordinator search by case number, and never shows or searches names', async () => {
@@ -208,6 +210,20 @@ describe('worklist', () => {
     }
     expect(document.body.textContent).not.toMatch(/100245891|100245892|MRN\s\d/)
     expect(document.querySelector('[title*="p-1002458"]')).toBeNull()
+  })
+
+  it('says when every case on the team’s list is on track, and shows them on request, with focus on how many are shown', async () => {
+    answer('GET /cases', json([caseSummary({ ...NOURA, exceptions: [] }), UNNAMED]))
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+
+    expect(await screen.findByText('No open case is waiting for you. Your team has 2 open cases.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show the whole team' }))
+    expect(screen.getByText(/^All 2 open cases are on track\. The next deadline is /)).toBeInTheDocument()
+    expect(screen.getByText(/^2 open cases/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show all cases' }))
+    expect(screen.getByText('Showing 2 of 2 open cases.', { selector: '.showing' })).toHaveFocus()
+    expect(caseLinks()).toHaveLength(2)
   })
 
   it('shows a new case after the next read, keeping the list, filter, search and focus, and announcing nothing', async () => {

@@ -255,12 +255,12 @@
     "forbiddenBody": "Your role can only see cases sent to you. If you think you should see this list, ask your facility lead.",
     "emptyTitle": "Nothing needs you right now",
     "emptyAllOnTrack": {
-      "one": "Your {count} case is on track. The next deadline is {date}.",
-      "other": "All {count} of your cases are on track. The next deadline is {date}."
+      "one": "The only open case is on track. The next deadline is {date}.",
+      "other": "All {count} open cases are on track. The next deadline is {date}."
     },
     "emptyAllOnTrackNoDeadline": {
-      "one": "Your {count} case is on track.",
-      "other": "All {count} of your cases are on track."
+      "one": "The only open case is on track.",
+      "other": "All {count} open cases are on track."
     },
     "emptyNoCases": "There are no open cases.",
     "emptyNothingEscalated": "No case is escalated to you. A case shows here while an escalation is with the programme coordinator.",
@@ -273,6 +273,10 @@
     "emptyNoneOfMine": {
       "one": "No open case is waiting for you. Your team has {count} open case.",
       "other": "No open case is waiting for you. Your team has {count} open cases."
+    },
+    "emptyNoneOfMineOverdue": {
+      "one": "No open case is waiting for you. Your team has {count} open case, {overdue} overdue.",
+      "other": "No open case is waiting for you. Your team has {count} open cases, {overdue} overdue."
     },
     "showTeam": "Show the whole team",
     "filterEmptyTitle": "No cases match these filters",

@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { AccessReasonForm, Badge, Dialog, EmptyState, Icon, ReadView } from '../../components'
 import { CASE_LIST_LIMIT, useCaseList, type CaseList } from '../../data'
 import { describeOwner, needsAttention, nextActionText } from '../../domain'
@@ -329,6 +329,11 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const ids = useId()
+  // Where focus goes once the list has changed under a button that is then gone: the "Whole team" chip,
+  // or the line that says how many cases are shown, just above them.
+  const focusNext = useRef<'team' | 'list'>(undefined)
+  const teamChip = useRef<HTMLButtonElement>(null)
+  const showingLine = useRef<HTMLParagraphElement>(null)
 
   const programmes = useMemo(() => programmeOptions(rows), [rows])
   const scoped = rows.filter((row) => matchesProgramme(row, programme) && matchesSearch(row, query))
@@ -353,6 +358,16 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
     setAnnounced({ choice, text: '' })
   }
 
+  useEffect(() => {
+    const target = focusNext.current
+    focusNext.current = undefined
+    if (target === 'team') {
+      teamChip.current?.focus()
+    } else if (target === 'list') {
+      showingLine.current?.focus()
+    }
+  })
+
   const clearFilters = (): void => {
     setFilter('all')
     setProgramme('')
@@ -364,6 +379,7 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
       {WORKLIST_SCOPES.map((id) => (
         <button
           key={id}
+          ref={id === 'team' ? teamChip : undefined}
           type="button"
           className="chip"
           aria-pressed={scope === id}
@@ -383,10 +399,13 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   if (rows.length === 0 || (allOnTrack && !showAll && scope === 'team')) {
     const deadline = nextDeadline(rows)
     const noneOfMine = rows.length === 0 && scope === 'mine' && teamRows.length > 0
+    const teamOverdue = noneOfMine ? countOpen(teamRows, now).overdue : 0
     const body =
       rows.length === 0
         ? noneOfMine
-          ? tp('worklist.emptyNoneOfMine', teamRows.length)
+          ? teamOverdue > 0
+            ? tp('worklist.emptyNoneOfMineOverdue', teamRows.length, { overdue: teamOverdue })
+            : tp('worklist.emptyNoneOfMine', teamRows.length)
           : me.role === 'coordinator'
             ? t('worklist.emptyNothingEscalated')
             : t('worklist.emptyNoCases')
@@ -395,7 +414,8 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
           : tp('worklist.emptyAllOnTrackNoDeadline', rows.length)
     return (
       <>
-        <Greeting now={now} summary={summary} />
+        {/* With nothing to list, "0 open cases" would only repeat the message below. */}
+        <Greeting now={now} summary={rows.length > 0 ? summary : undefined} />
         {toolbarExtra}
         {scopeBar}
         <EmptyState
@@ -404,11 +424,25 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
           body={body}
           action={
             rows.length > 0 ? (
-              <button type="button" className="btn" onClick={() => setShowAll(true)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  focusNext.current = 'list'
+                  setShowAll(true)
+                }}
+              >
                 {t('worklist.showAll')}
               </button>
             ) : noneOfMine ? (
-              <button type="button" className="btn" onClick={() => setChosenScope('team')}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  focusNext.current = 'team'
+                  setChosenScope('team')
+                }}
+              >
                 {t('worklist.showTeam')}
               </button>
             ) : undefined
@@ -464,7 +498,7 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
         })}
       </div>
 
-      <p className="showing">
+      <p className="showing" ref={showingLine} tabIndex={-1}>
         {showing}
       </p>
       <p className="visually-hidden" role="status">
