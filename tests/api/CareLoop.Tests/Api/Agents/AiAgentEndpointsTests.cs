@@ -340,7 +340,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
 
         var input = Facts(Assert.Single(_agents.Calls));
         Assert.Equal("clinician", input.GetProperty("role").GetString());
-        Assert.Equal("SYN Family Health Centre, the reader's own cases", input.GetProperty("scope").GetString());
+        Assert.Equal("SYN Family Health Centre, the cases on the reader's worklist", input.GetProperty("scope").GetString());
         Assert.Equal("2026-01-02T10:00+00:00", input.GetProperty("as_of").GetString());
         Assert.Equal(DraftRoleBriefing.WorkingDayCalendar, input.GetProperty("calendar_version").GetString());
         Assert.Equal("provisional", input.GetProperty("clock_config").GetProperty("status").GetString());
@@ -401,8 +401,9 @@ public sealed class AiAgentEndpointsTests : IDisposable
         Assert.Equal("nurse", Facts(call).GetProperty("role").GetString());
         Assert.Equal("message delivered, no reply yet; the patient asked for a call", item.GetProperty("patient_contact").GetString());
         Assert.Equal("""{"level":1,"to":"facility lead","acknowledged":false}""", item.GetProperty("escalation").GetRawText());
-        Assert.Equal("a clinician", item.GetProperty("acts_next").GetString());
-        Assert.False(item.GetProperty("owner_is_user").GetBoolean());
+        // The pathway gives "make sure the patient has the message" to the nurse navigator, whoever owns the case.
+        Assert.Equal("the reader", item.GetProperty("acts_next").GetString());
+        Assert.True(item.GetProperty("owner_is_user").GetBoolean());
         Assert.Equal(JsonValueKind.Null, item.GetProperty("facility").ValueKind);
         Assert.DoesNotContain("Arabic", call.Prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("ar-AE", call.Prompt, StringComparison.OrdinalIgnoreCase);
@@ -442,7 +443,7 @@ public sealed class AiAgentEndpointsTests : IDisposable
         var input = Facts(call);
         Assert.Equal("""{"P1":1,"P2":1,"info":0,"P3":0}""", input.GetProperty("counts").GetRawText());
         Assert.Equal(2, input.GetProperty("items").GetArrayLength());
-        Assert.Equal("SYN Family Health Centre, the reader's own cases", input.GetProperty("scope").GetString());
+        Assert.Equal("SYN Family Health Centre, the cases on the reader's worklist", input.GetProperty("scope").GetString());
         Assert.Contains(_logs.Lines, line => line.StartsWith("Role briefing ignored 2 of 4 named cases", StringComparison.Ordinal));
         Assert.DoesNotContain(mine.Id.ToString(), call.Prompt, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(_logs.Lines, line => line.Contains(elsewhere.Id.ToString(), StringComparison.OrdinalIgnoreCase));

@@ -10,6 +10,7 @@ using CareLoop.Contracts.Ai;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Pathways;
+using CareLoop.Domain.Rules;
 using CareLoop.Domain.Time;
 using CareLoop.Domain.Tracks;
 using Microsoft.AspNetCore.Mvc;
@@ -306,6 +307,7 @@ public static partial class DraftRoleBriefing
     {
         var c = item.Case;
         var escalation = c.Escalations.LastOrDefault(e => e.IsOpen);
+        var stepRole = StepRole(c, pathways);
         return new
         {
             item.ItemId,
@@ -318,8 +320,8 @@ public static partial class DraftRoleBriefing
             DueAt = c.DueAt is { } due ? AgentInput.Moment(format.InLocalTime(due)) : null,
             WorkingDaysRemaining = c.DueAt is { } deadline ? WorkingDaysBetween(today, LocalDay(deadline, format)) : (int?)null,
             UrgencyTier = c.Urgency is null ? "not_reviewed" : urgent.Contains(c.Urgency) ? "urgent" : "routine",
-            OwnerIsUser = IsReaders(c.Owner, reader),
-            ActsNext = ActsNext(c.Owner, reader),
+            OwnerIsUser = ReaderActs(c, stepRole, reader),
+            ActsNext = ActsNext(c, stepRole, reader),
             PatientContact = Contact(c),
             NeedsOwner = c.Exceptions.HasFlag(CaseExceptions.Unassigned),
             Escalation = escalation is null
@@ -376,7 +378,8 @@ public static partial class DraftRoleBriefing
         {
             foreach (var section in sections.EnumerateArray())
             {
-                var name = AgentReply.Text(section, "name") ?? AgentReply.Text(section, "section") ?? AgentReply.Text(section, "id");
+                var name = AgentReply.Text(section, "key") ?? AgentReply.Text(section, "name") ?? AgentReply.Text(section, "section")
+                    ?? AgentReply.Text(section, "id");
                 if (string.Equals(name, key, StringComparison.OrdinalIgnoreCase))
                 {
                     return section;
@@ -456,21 +459,49 @@ public static partial class DraftRoleBriefing
             return $"{place}; only the cases escalated to the programme coordinator";
         }
 
-        return outsideTeam ? $"{place}, another team's cases" : $"{place}, the reader's own cases";
+        return outsideTeam ? $"{place}, another team's cases" : $"{place}, the cases on the reader's worklist";
     }
 
     private static bool IsReaders(CaseOwner owner, Actor reader) =>
         !owner.IsQueue && string.Equals(WithoutType(owner.Reference), WithoutType(reader.Reference), StringComparison.OrdinalIgnoreCase);
 
-    private static string ActsNext(CaseOwner owner, Actor reader)
+    // The role the pathway expects to hold the case while its next action is open (a call-back is the nurse
+    // navigator's), the same lookup the deadlines use; null when the pathway does not say.
+    private static string? StepRole(Case c, IPathwayProvider pathways)
     {
-        if (IsReaders(owner, reader))
+        if (string.IsNullOrWhiteSpace(c.NextAction))
+        {
+            return null;
+        }
+
+        try
+        {
+            return DeadlinePolicy.FindDeadline(c.NextAction, c.Urgency, pathways.Get(c.PathwayId)).OwnerRole;
+        }
+        catch (KeyNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    // The reader acts on the next action when they own the case, or when the pathway gives that next action to their role.
+    private static bool ReaderActs(Case c, string? stepRole, Actor reader) =>
+        IsReaders(c.Owner, reader) || stepRole is not null && string.Equals(stepRole, reader.Role, StringComparison.OrdinalIgnoreCase);
+
+    private static string ActsNext(Case c, string? stepRole, Actor reader)
+    {
+        if (ReaderActs(c, stepRole, reader))
         {
             return "the reader";
         }
 
-        var role = AgentWords.Role(owner.Role);
-        return owner.IsQueue ? $"the {role} queue" : $"a {role}";
+        if (stepRole is not null && !string.Equals(stepRole, c.Owner.Role, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"a {AgentWords.Role(stepRole)}";
+        }
+
+        var role = AgentWords.Role(c.Owner.Role);
+        return c.Owner.IsQueue ? $"the {role} queue" : $"a {role}";
     }
 
     // Staff are stored without a FHIR type ("rekha-varghese") but a caller may state one ("Practitioner/rekha-varghese").

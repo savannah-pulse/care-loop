@@ -73,6 +73,20 @@ public sealed class AgentReplyTests
         Assert.DoesNotContain("None", text);
     }
 
+    [Fact]
+    public void Sections_may_come_as_an_array_that_names_each_by_key()
+    {
+        var input = Briefing(DraftRoleBriefing.ActNow, DraftRoleBriefing.Info);
+        string Number(int i) => NotificationRouter.CaseReferenceFor(input.Items[i].Case.Id);
+
+        var text = DraftRoleBriefing.Read(Recorded.RoleBriefingSectionsByKey, input);
+
+        Assert.Equal(
+            "1 item needs action now and 0 are due today.\n\n"
+            + $"1 unacknowledged facility-lead escalation concerns contacting case {Number(0)} another way; a clinician acts next.\n\n"
+            + $"1 case, case {Number(1)}, needs an owner chosen by the facility lead queue.",
+            text);
+    }
     [Theory]
     [InlineData("\"W-1\"]", "\"W-9\"]", "UNKNOWN_ITEM_ID")]
     [InlineData("for P-1 is overdue", "for P-9 is overdue", "UNKNOWN_TOKEN")]
@@ -235,6 +249,9 @@ public sealed class AgentReplyTests
             }
             """;
 
+        /// <summary>role-briefing:2 for the facility lead on 19 November, given role-briefing-v3: the sections as an array, each named by "key".</summary>
+        public const string RoleBriefingSectionsByKey =
+            "{\"headline\":\"1 item needs action now and 0 are due today.\",\"sections\":[{\"key\":\"today\",\"intro\":\"1 unacknowledged facility-lead escalation concerns contacting P-1 another way; a clinician acts next.\",\"item_ids\":[\"W-1\"],\"overflow_count\":0},{\"key\":\"coming_up\",\"intro\":\"None.\",\"item_ids\":[],\"overflow_count\":0},{\"key\":\"role\",\"intro\":\"1 case, P-2, needs an owner chosen by the facility lead queue.\",\"item_ids\":[\"W-2\"],\"overflow_count\":0},{\"key\":\"lookahead\",\"days\":[{\"date\":\"2026-11-20\",\"summary\":\"No deadlines.\",\"item_ids\":[]}]}]}";
         /// <summary>impact-summary:4, given impact-summary-v3.</summary>
         public const string ImpactSummary = """
             {
