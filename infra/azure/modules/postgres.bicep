@@ -2,6 +2,7 @@
 // Public mode: reachable from Azure services only (the Container Apps outbound addresses are not fixed).
 // Private mode: no public access; reached through a private endpoint.
 param location string
+param privateEndpointLocation string
 param tags object
 param name string
 param version string
@@ -15,6 +16,9 @@ param storageGb int
 param backupRetentionDays int
 param geoRedundantBackup bool
 param highAvailability string
+
+@description('Availability zone to place the server in, for example 1. Empty lets Azure choose.')
+param availabilityZone string = ''
 param privateEndpointSubnetId string
 param privateDnsZoneId string
 
@@ -30,6 +34,7 @@ resource server 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   }
   properties: {
     version: version
+    availabilityZone: empty(availabilityZone) ? null : availabilityZone
     administratorLogin: administratorLogin
     administratorLoginPassword: administratorPassword
     authConfig: {
@@ -77,7 +82,7 @@ resource allowAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@202
 module privateEndpoint 'private-endpoint.bicep' = if (usePrivateEndpoint) {
   name: 'postgres-private-endpoint'
   params: {
-    location: location
+    location: privateEndpointLocation
     tags: tags
     name: 'pe-${name}'
     subnetId: privateEndpointSubnetId

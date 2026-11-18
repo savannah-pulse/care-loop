@@ -1,7 +1,8 @@
-// Microsoft Foundry account, project and one model deployment, with a guardrail that blocks prompt
-// attacks. Keys are disabled: callers sign in with a managed identity holding the Foundry User role.
+// Optional: a Microsoft Foundry account, project and one model deployment, with a guardrail that
+// blocks prompt attacks. Used only when createFoundry is true, for a subscription that has no
+// Foundry to point at. Keys are disabled: callers sign in with a managed identity holding the
+// Foundry User role. The account is reached over its public endpoint.
 param location string
-param privateEndpointLocation string
 param tags object
 param accountName string
 param projectName string
@@ -10,10 +11,7 @@ param modelVersion string
 param modelSku string
 param modelCapacity int
 param userPrincipalIds array
-param privateEndpointSubnetId string
-param privateDnsZoneIds array
 
-var usePrivateEndpoint = !empty(privateEndpointSubnetId)
 // Foundry User (formerly Azure AI User): read the project and call its models.
 var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var guardrailName = 'careloop-prompt-shields'
@@ -29,10 +27,7 @@ resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
     customSubDomainName: accountName
     allowProjectManagement: true
     disableLocalAuth: true
-    publicNetworkAccess: usePrivateEndpoint ? 'Disabled' : 'Enabled'
-    networkAcls: {
-      defaultAction: usePrivateEndpoint ? 'Deny' : 'Allow'
-    }
+    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -72,6 +67,9 @@ resource guardrail 'Microsoft.CognitiveServices/accounts/raiPolicies@2025-06-01'
       { name: 'Protected Material Code', blocking: false, enabled: true, source: 'Completion' }
     ]
   }
+  // The account accepts one change at a time: created beside the project, one of the two fails
+  // with "Another operation is in progress". So project, then guardrail, then model deployment.
+  dependsOn: [project]
 }
 
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
@@ -89,7 +87,6 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01
     }
     raiPolicyName: guardrail.name
   }
-  dependsOn: [project]
 }
 
 resource users 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
@@ -104,19 +101,5 @@ resource users 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
   }
 ]
 
-module privateEndpoint 'private-endpoint.bicep' = if (usePrivateEndpoint) {
-  name: 'ai-private-endpoint'
-  params: {
-    location: privateEndpointLocation
-    tags: tags
-    name: 'pe-${accountName}'
-    subnetId: privateEndpointSubnetId
-    targetResourceId: account.id
-    groupId: 'account'
-    privateDnsZoneIds: privateDnsZoneIds
-  }
-}
-
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
-output accountEndpoint string = account.properties.endpoint
 output deploymentName string = deployment.name

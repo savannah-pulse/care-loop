@@ -9,6 +9,10 @@ param tags object
 param environmentId string
 param environmentDefaultDomain string
 param registryServer string
+param registryName string
+
+@description('false: no role lets the identities pull images, so the apps pull with the registry admin password.')
+param assignRoles bool
 param imageTag string
 param appsIdentityId string
 param appsIdentityClientId string
@@ -29,9 +33,7 @@ param apiAiProvider string
 param apiExtraEnv array
 param webMaxReplicas int
 param aiProjectEndpoint string
-param aiAccountEndpoint string
 param aiModelDeploymentName string
-param aiInferenceEnabled bool
 param aiPromptShieldsAttested bool
 
 var appNames = {
@@ -55,6 +57,13 @@ var images = {
   hisSimulator: '${registryServer}/careloop/his-simulator:${imageTag}'
   messagingSimulator: '${registryServer}/careloop/messaging-simulator:${imageTag}'
 }
+
+// Without role assignments the apps cannot pull with their identity, so each is given the
+// registry's admin password, which it keeps as a secret of its own.
+resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
+  name: registryName
+}
+var registryUsername = assignRoles ? '' : registryName
 
 var connectionStringSecret = {
   name: 'careloop-connection-string'
@@ -127,8 +136,6 @@ var apiSimulatorEnv = deploySimulators
 var apiAiEnv = deployAi
   ? [
       { name: 'Ai__AiWorkflow__BaseUrl', value: 'https://${aiWorkflowHost}' }
-      { name: 'Ai__AzureOpenAi__Endpoint', value: aiAccountEndpoint }
-      { name: 'Ai__AzureOpenAi__Deployment', value: aiModelDeploymentName }
     ]
   : []
 
@@ -141,6 +148,8 @@ module api 'container-app.bicep' = {
     environmentId: environmentId
     identityId: appsIdentityId
     registryServer: registryServer
+    registryUsername: registryUsername
+    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
     image: images.api
     targetPort: 8080
     external: exposeApi
@@ -181,6 +190,8 @@ module web 'container-app.bicep' = {
     environmentId: environmentId
     identityId: appsIdentityId
     registryServer: registryServer
+    registryUsername: registryUsername
+    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
     image: images.web
     targetPort: 80
     external: true
@@ -191,9 +202,7 @@ module web 'container-app.bicep' = {
     minReplicas: 1
     maxReplicas: webMaxReplicas
     // The nginx configuration is not a secret; a secret volume is simply how Container Apps mounts a file.
-    secrets: [
-      { name: 'nginx-conf', value: webNginxConf }
-    ]
+    secrets: [{ name: 'nginx-conf', value: webNginxConf }]
     volumes: [
       {
         name: 'nginx-conf'
@@ -221,12 +230,15 @@ module aiWorkflow 'container-app.bicep' = if (deployAi) {
     environmentId: environmentId
     identityId: aiIdentityId
     registryServer: registryServer
+    registryUsername: registryUsername
+    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
     image: images.aiWorkflow
     targetPort: 8080
     external: false
     env: concat(
       [
-        { name: 'CARELOOP_AI_PROVIDER', value: aiInferenceEnabled ? 'foundry' : 'disabled' }
+        // Inference is on only when an existing Foundry project is named.
+        { name: 'CARELOOP_AI_PROVIDER', value: empty(aiProjectEndpoint) ? 'disabled' : 'foundry' }
         { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiProjectEndpoint }
         { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: aiModelDeploymentName }
         { name: 'CARELOOP_AZURE_HOSTED', value: 'true' }
@@ -250,6 +262,8 @@ module hisSimulator 'container-app.bicep' = if (deploySimulators) {
     environmentId: environmentId
     identityId: appsIdentityId
     registryServer: registryServer
+    registryUsername: registryUsername
+    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
     image: images.hisSimulator
     targetPort: 8080
     external: exposeSimulators
@@ -272,6 +286,8 @@ module messagingSimulator 'container-app.bicep' = if (deploySimulators) {
     environmentId: environmentId
     identityId: appsIdentityId
     registryServer: registryServer
+    registryUsername: registryUsername
+    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
     image: images.messagingSimulator
     targetPort: 8080
     external: exposeSimulators

@@ -17,7 +17,7 @@ targetScope = 'subscription'
 @maxLength(8)
 param environmentName string
 
-@description('Azure region for every resource except, optionally, the AI resources (see aiLocation).')
+@description('Azure region for every resource.')
 param location string = deployment().location
 
 @description('Lower-case letters and digits only. Prefix of every resource name.')
@@ -28,17 +28,20 @@ param namePrefix string = 'careloop'
 @description('Extra tags for every resource.')
 param tags object = {}
 
+@description('Deploy into this existing resource group instead of creating rg-<prefix>-<environment>. The group is left as it is: not created, moved, retagged or, on teardown, deleted. Empty creates the group.')
+param resourceGroupName string = ''
+
 // ---------------------------------------------------------------------------------------------------
 // Switches
 // ---------------------------------------------------------------------------------------------------
 
-@description('false: public endpoints protected by firewall rules and Entra ID. true: a virtual network, with private endpoints for PostgreSQL, Key Vault, the registry and the AI account. Use true before any real patient data.')
+@description('false: public endpoints protected by firewall rules and Entra ID. true: a virtual network, with private endpoints for PostgreSQL, Key Vault and the registry. Use true before any real patient data.')
 param privateNetworking bool = false
 
 @description('Deploy the HIS and messaging simulators, so the environment can run the demo scenarios.')
 param deploySimulators bool = true
 
-@description('Deploy the Python AI workflow service and a Microsoft Foundry account, project and model deployment.')
+@description('Deploy the Python AI workflow service. It is pointed at an existing Microsoft Foundry project (aiProjectEndpoint) or, with createFoundry, at one created here.')
 param deployAi bool = true
 
 @description('Deploy a Log Analytics workspace and Application Insights, and send container logs there.')
@@ -66,8 +69,8 @@ param demoTiming bool = deploySimulators
 @description('Apply EF Core migrations when the API starts. Nothing else in this project applies them.')
 param migrateOnStartup bool = true
 
-@description('The API setting Ai:Provider. Leave NoOp until WS9 finishes the provider you choose.')
-@allowed(['NoOp', 'AiWorkflow', 'FoundryDirect'])
+@description('The API setting Ai:Provider. AiWorkflow sends drafting to the AI workflow service; leave NoOp until WS9 finishes that provider.')
+@allowed(['NoOp', 'AiWorkflow'])
 param apiAiProvider string = 'NoOp'
 
 @description('Time zone used in messages to patients and staff.')
@@ -93,12 +96,18 @@ param postgresAdminPassword string
 @minLength(16)
 param simulatorInboundSecret string
 
+@description('true: give the managed identities their access with Azure role assignments, which needs Owner or Role Based Access Control Administrator. false: for a deployer with Contributor only. The apps then pull images with the registry admin password, Key Vault uses access policies instead of roles, and nobody is given the Foundry User role (its owner grants it by hand).')
+param assignRoles bool = true
+
 @description('Object ID of the person or service principal deploying. When set, it can read and write the Key Vault secrets, which lets scripts/deploy.sh reuse them on the next run.')
 param deployerPrincipalId string = ''
 
 // ---------------------------------------------------------------------------------------------------
 // Database
 // ---------------------------------------------------------------------------------------------------
+
+@description('Region of the PostgreSQL server. Some subscriptions are refused PostgreSQL in some regions; put only the database elsewhere with this.')
+param postgresLocation string = location
 
 param postgresAdminLogin string = 'careloopadmin'
 param postgresDatabaseName string = 'careloop'
@@ -137,25 +146,36 @@ param keyVaultPurgeProtection bool = false
 param registryPublicAccess bool = true
 
 // ---------------------------------------------------------------------------------------------------
-// AI (used only when deployAi is true)
+// AI (used only when deployAi is true). The AI workflow service is pointed at a Foundry project:
+// an existing one (the usual case; give its endpoint), or one created here (createFoundry).
 // ---------------------------------------------------------------------------------------------------
 
-@description('Region of the Foundry account. The model must be offered there; check data residency before choosing a region other than location.')
-param aiLocation string = location
+@description('Endpoint of an existing Foundry project, https://<account>.services.ai.azure.com/api/projects/<project>. Never write the value in a parameter file; it is read from the environment. Ignored when createFoundry is true.')
+param aiProjectEndpoint string = ''
 
-param aiModelName string = 'gpt-4.1-mini'
-param aiModelVersion string = '2025-04-14'
+@description('Name of the model deployment in the existing project. Ignored when createFoundry is true.')
+param aiModelDeploymentName string = ''
+
+@description('Resource ID of the existing Foundry account, /subscriptions/.../providers/Microsoft.CognitiveServices/accounts/<name>. When set, the AI workflow service identity is given the Foundry User role on it. Empty: someone who owns the account grants the role by hand. Ignored when createFoundry is true.')
+param aiFoundryAccountId string = ''
+
+@description('Create a Foundry account, project, model deployment and Prompt Shields guardrail in this environment, for a subscription that has no Foundry to use. false, the default, creates nothing.')
+param createFoundry bool = false
+
+@description('Region of the created Foundry account. The model must be offered there; check data residency.')
+param foundryLocation string = location
+
+@description('Model to deploy in the created Foundry. Check that it is offered in foundryLocation and that the subscription has quota.')
+param foundryModelName string = 'gpt-4.1-mini'
+param foundryModelVersion string = '2025-04-14'
 
 @description('GlobalStandard may process prompts in any Azure region. Use DataZoneStandard or Standard where residency matters.')
-param aiModelSku string = 'GlobalStandard'
+param foundryModelSku string = 'GlobalStandard'
 
 @description('Thousands of tokens per minute.')
-param aiModelCapacity int = 10
+param foundryModelCapacity int = 10
 
-@description('Turn inference on in the AI workflow service (CARELOOP_AI_PROVIDER = foundry). Off, the service runs but drafts nothing.')
-param aiInferenceEnabled bool = false
-
-@description('Operator attestation that Prompt Shields block user and document attacks on the model deployment. Verify it in the Foundry guardrail playground first; the service refuses to call Foundry without it.')
+@description('Operator attestation that Prompt Shields block user and document attacks on the model deployment in use.')
 param aiPromptShieldsAttested bool = false
 
 param logRetentionDays int = 30
@@ -178,26 +198,31 @@ var names = {
   // Registry and Key Vault names are global and short, so they carry the token instead of the environment.
   registry: 'cr${namePrefix}${token}'
   keyVault: 'kv-${namePrefix}-${take(token, 10)}'
-  postgres: 'psql-${baseName}-${token}'
-  aiAccount: 'ai-${baseName}-${token}'
-  aiProject: 'careloop'
+  // The region is in the name so that moving the database to another region makes a new server
+  // beside the old one, rather than trying to move a server, which Azure cannot do.
+  postgres: 'psql-${baseName}-${postgresLocation}-${take(token, 6)}'
+  foundryAccount: 'ai-${baseName}-${token}'
+  foundryProject: 'careloop'
   containerEnvironment: 'cae-${baseName}'
 }
 
 var deployApps = !empty(imageTag)
+var useExistingGroup = !empty(resourceGroupName)
+var targetGroupName = useExistingGroup ? resourceGroupName : names.resourceGroup
 
 // ---------------------------------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------------------------------
 
-resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
+resource rg 'Microsoft.Resources/resourceGroups@2024-03-01' = if (!useExistingGroup) {
   name: names.resourceGroup
   location: location
   tags: allTags
 }
 
 module monitoring 'modules/monitoring.bicep' = if (deployMonitoring) {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'monitoring'
   params: {
     location: location
@@ -209,7 +234,8 @@ module monitoring 'modules/monitoring.bicep' = if (deployMonitoring) {
 }
 
 module network 'modules/network.bicep' = if (privateNetworking) {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'network'
   params: {
     location: location
@@ -219,7 +245,8 @@ module network 'modules/network.bicep' = if (privateNetworking) {
 }
 
 module identity 'modules/identity.bicep' = {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'identity'
   params: {
     location: location
@@ -230,13 +257,15 @@ module identity 'modules/identity.bicep' = {
 }
 
 module registry 'modules/registry.bicep' = {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'registry'
   params: {
     location: location
     tags: allTags
     name: names.registry
     pullPrincipalIds: [identity.outputs.appsPrincipalId, identity.outputs.aiPrincipalId]
+    assignRoles: assignRoles
     publicAccess: !privateNetworking || registryPublicAccess
     privateEndpointSubnetId: privateNetworking ? network!.outputs.privateEndpointSubnetId : ''
     privateDnsZoneId: privateNetworking ? network!.outputs.registryDnsZoneId : ''
@@ -244,10 +273,12 @@ module registry 'modules/registry.bicep' = {
 }
 
 module postgres 'modules/postgres.bicep' = {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'postgres'
   params: {
-    location: location
+    location: postgresLocation
+    privateEndpointLocation: location
     tags: allTags
     name: names.postgres
     version: postgresVersion
@@ -266,7 +297,8 @@ module postgres 'modules/postgres.bicep' = {
 }
 
 module keyVault 'modules/keyvault.bicep' = {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'keyvault'
   params: {
     location: location
@@ -275,6 +307,7 @@ module keyVault 'modules/keyvault.bicep' = {
     purgeProtection: keyVaultPurgeProtection
     readerPrincipalId: identity.outputs.appsPrincipalId
     deployerPrincipalId: deployerPrincipalId
+    assignRoles: assignRoles
     postgresAdminPassword: postgresAdminPassword
     connectionString: 'Host=${postgres.outputs.fqdn};Port=5432;Database=${postgresDatabaseName};Username=${postgresAdminLogin};Password=${postgresAdminPassword};SSL Mode=${postgresSslMode}'
     simulatorInboundSecret: simulatorInboundSecret
@@ -283,30 +316,39 @@ module keyVault 'modules/keyvault.bicep' = {
   }
 }
 
-module ai 'modules/ai.bicep' = if (deployAi) {
-  scope: rg
-  name: 'ai'
+var useCreatedFoundry = deployAi && createFoundry
+
+module foundry 'modules/foundry.bicep' = if (useCreatedFoundry) {
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
+  name: 'foundry'
   params: {
-    location: aiLocation
-    privateEndpointLocation: location
+    location: foundryLocation
     tags: allTags
-    accountName: names.aiAccount
-    projectName: names.aiProject
-    modelName: aiModelName
-    modelVersion: aiModelVersion
-    modelSku: aiModelSku
-    modelCapacity: aiModelCapacity
-    // The AI workflow service always may call the model; the API only on the FoundryDirect route.
-    userPrincipalIds: apiAiProvider == 'FoundryDirect'
-      ? [identity.outputs.aiPrincipalId, identity.outputs.appsPrincipalId]
-      : [identity.outputs.aiPrincipalId]
-    privateEndpointSubnetId: privateNetworking ? network!.outputs.privateEndpointSubnetId : ''
-    privateDnsZoneIds: privateNetworking ? network!.outputs.aiDnsZoneIds : []
+    accountName: names.foundryAccount
+    projectName: names.foundryProject
+    modelName: foundryModelName
+    modelVersion: foundryModelVersion
+    modelSku: foundryModelSku
+    modelCapacity: foundryModelCapacity
+    userPrincipalIds: assignRoles ? [identity.outputs.aiPrincipalId] : []
+  }
+}
+
+var foundryIdParts = split(aiFoundryAccountId, '/')
+
+module foundryAccess 'modules/foundry-access.bicep' = if (assignRoles && deployAi && !createFoundry && !empty(aiFoundryAccountId)) {
+  scope: resourceGroup(foundryIdParts[?2] ?? subscription().subscriptionId, foundryIdParts[?4] ?? targetGroupName)
+  name: 'foundry-access-${environmentName}'
+  params: {
+    accountName: last(foundryIdParts)!
+    principalId: identity.outputs.aiPrincipalId
   }
 }
 
 module containerEnvironment 'modules/container-env.bicep' = {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'container-environment'
   params: {
     location: location
@@ -318,7 +360,8 @@ module containerEnvironment 'modules/container-env.bicep' = {
 }
 
 module apps 'modules/apps.bicep' = if (deployApps) {
-  scope: rg
+  scope: resourceGroup(targetGroupName)
+  dependsOn: [rg]
   name: 'apps'
   params: {
     location: location
@@ -326,6 +369,8 @@ module apps 'modules/apps.bicep' = if (deployApps) {
     environmentId: containerEnvironment.outputs.id
     environmentDefaultDomain: containerEnvironment.outputs.defaultDomain
     registryServer: registry.outputs.loginServer
+    registryName: registry.outputs.name
+    assignRoles: assignRoles
     imageTag: imageTag
     appsIdentityId: identity.outputs.appsId
     appsIdentityClientId: identity.outputs.appsClientId
@@ -345,10 +390,8 @@ module apps 'modules/apps.bicep' = if (deployApps) {
     apiAiProvider: apiAiProvider
     apiExtraEnv: apiExtraEnv
     webMaxReplicas: webMaxReplicas
-    aiProjectEndpoint: deployAi ? ai!.outputs.projectEndpoint : ''
-    aiAccountEndpoint: deployAi ? ai!.outputs.accountEndpoint : ''
-    aiModelDeploymentName: deployAi ? ai!.outputs.deploymentName : ''
-    aiInferenceEnabled: aiInferenceEnabled
+    aiProjectEndpoint: useCreatedFoundry ? foundry!.outputs.projectEndpoint : aiProjectEndpoint
+    aiModelDeploymentName: useCreatedFoundry ? foundry!.outputs.deploymentName : aiModelDeploymentName
     aiPromptShieldsAttested: aiPromptShieldsAttested
   }
 }
@@ -357,13 +400,16 @@ module apps 'modules/apps.bicep' = if (deployApps) {
 // Outputs (read by scripts/deploy.sh)
 // ---------------------------------------------------------------------------------------------------
 
-output resourceGroupName string = rg.name
+output resourceGroupName string = targetGroupName
 output registryName string = registry.outputs.name
 output registryLoginServer string = registry.outputs.loginServer
 output keyVaultName string = keyVault.outputs.name
 output postgresServerName string = postgres.outputs.name
 output deploySimulators bool = deploySimulators
 output deployAi bool = deployAi
+// The identity the AI workflow service signs in with. It needs the Foundry User role on the existing
+// Foundry account: given here when aiFoundryAccountId is set, by hand otherwise.
+output aiIdentityPrincipalId string = identity.outputs.aiPrincipalId
 output webUrl string = deployApps ? apps!.outputs.webUrl : ''
 output apiUrl string = deployApps ? apps!.outputs.apiUrl : ''
 output hisSimulatorUrl string = deployApps ? apps!.outputs.hisSimulatorUrl : ''

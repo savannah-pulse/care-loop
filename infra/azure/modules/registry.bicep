@@ -1,9 +1,11 @@
-// Container registry. No admin user: images are pushed with the deployer's Entra ID sign-in and
-// pulled by the managed identities.
+// Container registry. Normally there is no admin user: images are pushed with the deployer's Entra
+// ID sign-in and pulled by the managed identities. Without role assignments (assignRoles false) the
+// admin user is switched on instead and the apps pull with its password.
 param location string
 param tags object
 param name string
 param pullPrincipalIds array
+param assignRoles bool
 param publicAccess bool
 param privateEndpointSubnetId string
 param privateDnsZoneId string
@@ -18,13 +20,13 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   // Private endpoints need the Premium tier.
   sku: { name: usePrivateEndpoint ? 'Premium' : 'Basic' }
   properties: {
-    adminUserEnabled: false
+    adminUserEnabled: !assignRoles
     publicNetworkAccess: publicAccess ? 'Enabled' : 'Disabled'
   }
 }
 
 resource pull 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for principalId in pullPrincipalIds: {
+  for principalId in (assignRoles ? pullPrincipalIds : []): {
     scope: registry
     name: guid(registry.id, principalId, acrPullRoleId)
     properties: {

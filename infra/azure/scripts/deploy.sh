@@ -11,8 +11,16 @@
 #
 # Environment variables (all optional):
 #   AZURE_LOCATION            region, default uaenorth
-#   AZURE_AI_LOCATION         region of the Foundry account, where the parameter file reads it
+#   ASSIGN_ROLES              false when you are Contributor only: no role assignments are made (see the README)
+#   POSTGRES_LOCATION         region of the database, default AZURE_LOCATION
+#   POSTGRES_SKU_NAME, POSTGRES_SKU_TIER
+#                             database size where the parameter file reads them, default Standard_B1ms and Burstable
+#   AZURE_AI_PROJECT_ENDPOINT, AZURE_AI_MODEL_DEPLOYMENT_NAME, AZURE_AI_FOUNDRY_ACCOUNT_ID,
+#   CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED
+#                             the existing Foundry project the AI workflow service calls; unset leaves inference off
+#   CREATE_FOUNDRY            true creates a Foundry account, project and model here instead (AZURE_AI_LOCATION picks its region)
 #   NAME_PREFIX               resource name prefix, default careloop
+#   RESOURCE_GROUP            deploy into this existing resource group instead of creating rg-<prefix>-<environment>
 #   POSTGRES_ADMIN_PASSWORD   letters and digits only; reused from Key Vault, or generated on the first run
 #   SIMULATOR_INBOUND_SECRET  reused from Key Vault, or generated on the first run
 #   IMAGE_TAG                 default <commit>-<timestamp>
@@ -21,7 +29,7 @@
 set -euo pipefail
 
 usage() {
-  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
   exit 1
 }
 
@@ -49,17 +57,47 @@ echo "Subscription: $(az account show --query name -o tsv)"
 echo "Environment:  $ENVIRONMENT   Region: $AZURE_LOCATION"
 
 # --- What already exists: every resource carries the application and environment tags --------------
+# The registry stands for the environment: it is the first thing created and is always there.
 TAGGED="[?tags.application=='$NAME_PREFIX' && tags.environment=='$ENVIRONMENT']"
-RESOURCE_GROUP="$(az group list --query "$TAGGED.name | [0]" -o tsv)"
-EXISTING_LOCATION="$(az group list --query "$TAGGED.location | [0]" -o tsv)"
 VAULT="$(az keyvault list --query "$TAGGED.name | [0]" -o tsv)"
 REGISTRY="$(az acr list --query "$TAGGED.name | [0]" -o tsv)"
 LOGIN_SERVER="$(az acr list --query "$TAGGED.loginServer | [0]" -o tsv)"
+EXISTING_LOCATION="$(az acr list --query "$TAGGED.location | [0]" -o tsv)"
+EXISTING_GROUP="$(az acr list --query "$TAGGED.resourceGroup | [0]" -o tsv)"
 
-# An environment cannot move: its resource group and its subscription deployment are tied to a region.
+# An environment cannot move: its resources and its subscription deployment are tied to a region,
+# and its resource group is where it was first put.
 if [ -n "$EXISTING_LOCATION" ] && [ "$EXISTING_LOCATION" != "$AZURE_LOCATION" ]; then
   echo "Environment $ENVIRONMENT already exists in $EXISTING_LOCATION, not $AZURE_LOCATION." >&2
   echo "Set AZURE_LOCATION=$EXISTING_LOCATION, or use another environment name or NAME_PREFIX for a second copy." >&2
+  exit 1
+fi
+DEFAULT_GROUP="rg-$NAME_PREFIX-$ENVIRONMENT"
+if [ -n "$EXISTING_GROUP" ] && [ "$EXISTING_GROUP" != "${RESOURCE_GROUP:-$DEFAULT_GROUP}" ]; then
+  if [ -n "${RESOURCE_GROUP:-}" ]; then
+    echo "Environment $ENVIRONMENT already exists in resource group $EXISTING_GROUP, not $RESOURCE_GROUP." >&2
+    exit 1
+  fi
+  # Deployed into an existing group before: keep using it without being told again.
+  RESOURCE_GROUP="$EXISTING_GROUP"
+fi
+export RESOURCE_GROUP="${RESOURCE_GROUP:-}"
+if [ -n "$RESOURCE_GROUP" ] && [ "$(az group exists --name "$RESOURCE_GROUP")" != "true" ]; then
+  echo "Resource group $RESOURCE_GROUP does not exist. Create it, or unset RESOURCE_GROUP to have one created." >&2
+  exit 1
+fi
+TARGET_GROUP="${RESOURCE_GROUP:-$DEFAULT_GROUP}"
+echo "Resource group: $TARGET_GROUP"
+
+# Some subscriptions are refused PostgreSQL in some regions. Azure says so here, which is much
+# quicker than finding out ten minutes into a deployment.
+export POSTGRES_LOCATION="${POSTGRES_LOCATION:-$AZURE_LOCATION}"
+PG_REFUSED="$(az rest --method get \
+  --url "https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/providers/Microsoft.DBforPostgreSQL/locations/$POSTGRES_LOCATION/capabilities?api-version=2024-08-01" \
+  --query "value[?restricted=='Enabled'].reason | [0]" -o tsv 2>/dev/null || true)"
+if [ -n "$PG_REFUSED" ]; then
+  echo "This subscription cannot create PostgreSQL in $POSTGRES_LOCATION: $PG_REFUSED" >&2
+  echo "Keep everything else where it is and put the database elsewhere: POSTGRES_LOCATION=<region> $0 $ENVIRONMENT" >&2
   exit 1
 fi
 
@@ -155,7 +193,6 @@ if [ -z "$REGISTRY" ]; then
   echo "Deploying the platform (registry, database, Key Vault, Container Apps environment) ..."
   export IMAGE_TAG=""
   deploy
-  RESOURCE_GROUP="$(output resourceGroupName)"
   REGISTRY="$(output registryName)"
   LOGIN_SERVER="$(output registryLoginServer)"
 fi
@@ -196,7 +233,7 @@ done
 # running against a database the new one has just migrated. So the old revision is stopped first.
 # The API is down from here until the new revision is healthy; API_ROLLOUT=rolling skips this.
 if [ "$API_ROLLOUT" = "recreate" ]; then
-  REVISIONS_URL="https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.App/containerApps/api/revisions"
+  REVISIONS_URL="https://management.azure.com/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$TARGET_GROUP/providers/Microsoft.App/containerApps/api/revisions"
   ACTIVE="$(az rest --method get --url "$REVISIONS_URL?api-version=2024-03-01" \
     --query "value[?properties.active].name" -o tsv 2>/dev/null || true)"
   for revision in $ACTIVE; do

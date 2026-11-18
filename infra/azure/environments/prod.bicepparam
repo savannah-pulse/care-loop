@@ -8,6 +8,10 @@ using '../main.bicep'
 param environmentName = 'prod'
 param location = readEnvironmentVariable('AZURE_LOCATION', 'uaenorth')
 param namePrefix = readEnvironmentVariable('NAME_PREFIX', 'careloop')
+// Empty creates rg-<prefix>-<environment>; a name deploys into that existing resource group.
+param resourceGroupName = readEnvironmentVariable('RESOURCE_GROUP', '')
+// The database can sit in another region when the subscription is refused PostgreSQL in the main one.
+param postgresLocation = readEnvironmentVariable('POSTGRES_LOCATION', readEnvironmentVariable('AZURE_LOCATION', 'uaenorth'))
 
 param privateNetworking = true
 param deploySimulators = false
@@ -32,7 +36,7 @@ param postgresGeoRedundantBackup = true
 // 'ZoneRedundant' where the region has availability zones and the cost is accepted.
 param postgresHighAvailability = 'Disabled'
 
-// AI stays off until the model region, data residency, retention and the guardrail are approved.
+// The AI workflow service stays off until data residency, retention and the guardrail are approved.
 param deployAi = false
 param apiAiProvider = 'NoOp'
 
@@ -41,3 +45,5 @@ param imageTag = readEnvironmentVariable('IMAGE_TAG', '')
 param postgresAdminPassword = readEnvironmentVariable('POSTGRES_ADMIN_PASSWORD')
 param simulatorInboundSecret = readEnvironmentVariable('SIMULATOR_INBOUND_SECRET')
 param deployerPrincipalId = readEnvironmentVariable('DEPLOYER_PRINCIPAL_ID', '')
+// false for a deployer with Contributor only; see "Deploying without the right to assign roles" in ../README.md.
+param assignRoles = toLower(readEnvironmentVariable('ASSIGN_ROLES', 'true')) == 'true'

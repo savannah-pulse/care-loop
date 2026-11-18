@@ -1,11 +1,14 @@
 // Key Vault holding the three secrets of a deployment. The container apps read them through
 // Key Vault references with the apps identity; nothing secret is stored on the apps themselves.
+// Access is by Azure roles, or, without role assignments (assignRoles false), by vault access
+// policies, which a Contributor may set.
 param location string
 param tags object
 param name string
 param purgeProtection bool
 param readerPrincipalId string
 param deployerPrincipalId string
+param assignRoles bool
 @secure()
 param postgresAdminPassword string
 @secure()
@@ -26,7 +29,27 @@ resource vault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   properties: {
     tenantId: subscription().tenantId
     sku: { family: 'A', name: 'standard' }
-    enableRbacAuthorization: true
+    enableRbacAuthorization: assignRoles
+    accessPolicies: assignRoles
+      ? []
+      : concat(
+          [
+            {
+              tenantId: subscription().tenantId
+              objectId: readerPrincipalId
+              permissions: { secrets: ['get', 'list'] }
+            }
+          ],
+          empty(deployerPrincipalId)
+            ? []
+            : [
+                {
+                  tenantId: subscription().tenantId
+                  objectId: deployerPrincipalId
+                  permissions: { secrets: ['get', 'list', 'set'] }
+                }
+              ]
+        )
     enableSoftDelete: true
     softDeleteRetentionInDays: 90
     // Purge protection can be turned on but never off, so it is left unset rather than set to false.
@@ -58,7 +81,7 @@ resource inboundSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   properties: { value: simulatorInboundSecret }
 }
 
-resource reader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+resource reader 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (assignRoles) {
   scope: vault
   name: guid(vault.id, readerPrincipalId, secretsUserRoleId)
   properties: {
@@ -68,7 +91,7 @@ resource reader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-resource deployer 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(deployerPrincipalId)) {
+resource deployer 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (assignRoles && !empty(deployerPrincipalId)) {
   scope: vault
   name: guid(vault.id, deployerPrincipalId, secretsOfficerRoleId)
   properties: {

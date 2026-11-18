@@ -5,6 +5,12 @@ param name string
 param environmentId string
 param identityId string
 param registryServer string
+
+@description('Empty: pull with the managed identity. Set: pull as this registry user with registryPassword.')
+param registryUsername string = ''
+
+@secure()
+param registryPassword string = ''
 param image string
 param targetPort int
 
@@ -62,9 +68,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           : null
       }
       registries: [
-        { server: registryServer, identity: identityId }
+        empty(registryUsername)
+          ? { server: registryServer, identity: identityId }
+          : { server: registryServer, username: registryUsername, passwordSecretRef: 'registry-password' }
       ]
-      secrets: secrets
+      secrets: empty(registryUsername)
+        ? secrets
+        : concat(secrets, [{ name: 'registry-password', value: registryPassword }])
     }
     template: {
       containers: [

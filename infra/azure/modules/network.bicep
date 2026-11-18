@@ -11,9 +11,6 @@ var zoneNames = {
   postgres: 'privatelink.postgres.database.azure.com'
   keyVault: 'privatelink.vaultcore.azure.net'
   registry: 'privatelink${environment().suffixes.acrLoginServer}'
-  cognitiveServices: 'privatelink.cognitiveservices.azure.com'
-  openAi: 'privatelink.openai.azure.com'
-  aiServices: 'privatelink.services.ai.azure.com'
 }
 
 resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
@@ -68,8 +65,3 @@ output privateEndpointSubnetId string = vnet.properties.subnets[1].id
 output postgresDnsZoneId string = resourceId('Microsoft.Network/privateDnsZones', zoneNames.postgres)
 output keyVaultDnsZoneId string = resourceId('Microsoft.Network/privateDnsZones', zoneNames.keyVault)
 output registryDnsZoneId string = resourceId('Microsoft.Network/privateDnsZones', zoneNames.registry)
-output aiDnsZoneIds array = [
-  resourceId('Microsoft.Network/privateDnsZones', zoneNames.cognitiveServices)
-  resourceId('Microsoft.Network/privateDnsZones', zoneNames.openAi)
-  resourceId('Microsoft.Network/privateDnsZones', zoneNames.aiServices)
-]

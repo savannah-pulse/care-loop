@@ -45,7 +45,17 @@ jobs:
       - name: Deploy
         env:
           AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'uaenorth' }}
-          AZURE_AI_LOCATION: ${{ vars.AZURE_AI_LOCATION || 'swedencentral' }}
+          RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+          ASSIGN_ROLES: ${{ vars.ASSIGN_ROLES || 'true' }}
+          POSTGRES_LOCATION: ${{ vars.POSTGRES_LOCATION }}
+          POSTGRES_SKU_NAME: ${{ vars.POSTGRES_SKU_NAME || 'Standard_B1ms' }}
+          POSTGRES_SKU_TIER: ${{ vars.POSTGRES_SKU_TIER || 'Burstable' }}
+          AZURE_AI_PROJECT_ENDPOINT: ${{ vars.AZURE_AI_PROJECT_ENDPOINT }}
+          AZURE_AI_MODEL_DEPLOYMENT_NAME: ${{ vars.AZURE_AI_MODEL_DEPLOYMENT_NAME }}
+          AZURE_AI_FOUNDRY_ACCOUNT_ID: ${{ vars.AZURE_AI_FOUNDRY_ACCOUNT_ID }}
+          CREATE_FOUNDRY: ${{ vars.CREATE_FOUNDRY || 'false' }}
+          AZURE_AI_LOCATION: ${{ vars.AZURE_AI_LOCATION }}
+          CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED: ${{ vars.CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED || 'false' }}
           POSTGRES_ADMIN_PASSWORD: ${{ secrets.POSTGRES_ADMIN_PASSWORD }}
           SIMULATOR_INBOUND_SECRET: ${{ secrets.SIMULATOR_INBOUND_SECRET }}
           ENVIRONMENT: ${{ inputs.environment }}
