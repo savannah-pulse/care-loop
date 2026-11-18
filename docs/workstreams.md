@@ -267,6 +267,12 @@ button is `aria-disabled` rather than disabled; focus goes to the heading after 
 refusal), ties its hints to the controls, says why it is locked before the controls, keeps 1 to 5 on one row, says what
 was just recorded, and on a 409 reads the case and timeline again. The footnotes no longer say "Read-only".
 
+Live QA of 18 November (M2, H3). Done: the coordinator's case and timeline reads also leave out the outcome evidence
+reference and every timeline `evidenceReference`, and read `(hidden)` wherever an entry's wording or actor quotes one of
+the case's identifiers. Impact's cases reaching each display label now count a label once the event that puts a case
+there was applied, even if the case moved on at once (result received, case opened, outcome recorded), and still count
+an optional step only where it happened.
+
 Read lists are resilient to inconsistent data: an exception row with no deadline or next action is returned with
 those fields null, and a metric leaves out (and logs) a case whose history cannot support it, instead of failing the
 whole read. `GET /exceptions` accepts `skip` and `take` (default and maximum 200).
