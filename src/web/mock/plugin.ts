@@ -63,9 +63,9 @@ const SLOW_AI_MS = 4000
 
 /** The agent version and prompt version each agent answers with, as the API's defaults pin them. */
 const AI_VERSIONS: Readonly<Record<string, Pick<AiText, 'agentVersion' | 'promptVersion'>>> = {
-  'role-briefing': { agentVersion: '2', promptVersion: 'role-briefing-v2' },
-  'impact-summary': { agentVersion: '4', promptVersion: 'impact-summary-v2' },
-  'patient-notification': { agentVersion: '2', promptVersion: 'patient-message-v2' },
+  'role-briefing': { agentVersion: '2', promptVersion: 'role-briefing-v3' },
+  'impact-summary': { agentVersion: '4', promptVersion: 'impact-summary-v3' },
+  'patient-notification': { agentVersion: '2', promptVersion: 'patient-message-v3' },
 }
 
 /** Roles that may preview a message to a patient, as in the API. */
