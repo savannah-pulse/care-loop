@@ -25,6 +25,8 @@ Phases, because CareLoop measures deadlines in real time:
              most cases in a working programme look like. Run it under the demo pathway too: a step
              counts as "done by the deadline" only once its deadline has passed, and under the real
              pathway that takes a day.
+    additions  cases for the lab technician and the general hospital's nurse navigator, added to an
+             environment that already holds the phases above. Nothing is replaced.
     calls      the nurse navigator calls six patients whose cases are still open and records teach-back.
              Run it after the ontime phase.
     acknowledge  two of the escalations raised by the overdue cases are acknowledged, each by the role
@@ -61,8 +63,10 @@ OBAID = ("obaid-al-suwaidi", "coordinator", "")
 # A screening physician at the general hospital. Not on the dashboard's sign-in list: Dr. Layla, who
 # is, receives cases there by accepting a handoff from this person.
 YUSUF = ("yusuf-al-mansoori", "clinician", GH)
-# The general hospital's nurse navigator, likewise not on the sign-in list.
+# The general hospital's nurse navigator.
 MONA = ("mona-khalil", "nurse-navigator", GH)
+# The lab technician at the Family Health Centre, who records confirmation results as outcome evidence.
+KHALID = ("khalid-noor", "lab", FHC)
 
 
 def now() -> str:
@@ -294,12 +298,24 @@ class Case:
         })
         return self
 
+    def lab_outcome(self, kind: str = "diagnosis", by: tuple[str, str, str] = KHALID) -> "Case":
+        """The lab's follow-up report, which CareLoop takes as outcome evidence. Only the reference is kept."""
+        self.c.fhir(f"lab result recorded ({kind})", {
+            "resourceType": "DiagnosticReport", "id": f"SYN-LABRESULT-{self.number}", "extension": self._result_extension(),
+            "status": "final", "category": [coding("pathway", PATHWAY)],
+            "code": {"coding": [{"system": f"{B}/CodeSystem/evidence-kind", "code": kind}], "text": "PLACEHOLDER - synthetic, not a clinical code"},
+            "subject": self._for(), "issued": now(), "performer": [{"reference": f"Organization/{by[2]}"}],
+            "resultsInterpreter": [actor(by)],
+        })
+        return self
+
     def closure(self, reason: str, by: tuple[str, str, str] = LAYLA, evidence: bool = True,
-                next_surveillance: str | None = None, expect: tuple[int, ...] = (200, 201), part: str = "") -> "Case":
+                next_surveillance: str | None = None, expect: tuple[int, ...] = (200, 201), part: str = "",
+                evidence_reference: str | None = None) -> "Case":
         """A person authorizes closure. Without the evidence its reason needs, CareLoop refuses it."""
         outputs = []
         if evidence:
-            outputs.append({"type": coding("closure-output", "evidence"), "valueReference": {"reference": f"Procedure/SYN-OUTCOME-{self.number}{part}"}})
+            outputs.append({"type": coding("closure-output", "evidence"), "valueReference": {"reference": evidence_reference or f"Procedure/SYN-OUTCOME-{self.number}{part}"}})
         if next_surveillance:
             outputs.append({"type": coding("closure-output", "next-surveillance-date"), "valueDate": next_surveillance})
         task_id = f"SYN-CASE-TASK-{self.number}"
@@ -499,6 +515,36 @@ def seed_completed(c: Client, count: int = 46) -> None:
             case.outcome("diagnosis").closure("treated" if kind == "treated" else "negative-on-confirmation")
 
 
+# --- Cases for the lab technician and the general hospital's nurse navigator ------------------------
+def seed_additions(c: Client) -> None:
+    """Added to an environment that already holds the other phases; nothing here replaces anything."""
+    print("\nPhase: additions for the lab technician and the general hospital's nurse navigator")
+    earlier_today = in_days(-0.01)
+    # Khalid Noor, lab technician: the patient attended, and the confirmation result is awaited from the lab.
+    for number, name, clinician in [(1301, "Nawal Barakat", REKHA), (1302, "Suad Tahir", SARA), (1303, "Maysa Halabi", REKHA)]:
+        start(c, f"lab-awaited-{number}", name, number, "attended; confirmation result awaited from the lab", clinician=clinician) \
+            .reacts().result().review().pause().referral().referral_decision("accepted") \
+            .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today)
+    # ... and results the lab has recorded: awaiting the clinician's closure decision, or closed on that evidence.
+    for number, name, clinician, close in [(1304, "Ruba Sharif", REKHA, None), (1305, "Lama Fakhoury", SARA, None),
+                                           (1306, "Dima Kanaan", REKHA, "negative-on-confirmation"),
+                                           (1307, "Rola Tannous", SARA, "treated"), (1308, "Hiba Zaidan", REKHA, "negative-on-confirmation")]:
+        case = start(c, f"lab-recorded-{number}", name, number,
+                     "the lab recorded the confirmation result" + (f"; closed: {close}" if close else "; closure decision waiting"), clinician=clinician)
+        case.reacts().result().review().pause().call_outcome(True, True, 4).referral().referral_decision("accepted") \
+            .appointment("booked", 1, earlier_today).appointment("fulfilled", 2, earlier_today).lab_outcome("diagnosis")
+        if close:
+            case.closure(close, evidence_reference=f"DiagnosticReport/SYN-LABRESULT-{number}")
+
+    # Mona Khalil, nurse navigator at the general hospital: patients waiting for a call, and calls she made.
+    for number, name in [(1311, "Ibtisam Qabbani"), (1312, "Thuraya Masri")]:
+        start(c, f"gh-call-waiting-{number}", name, number, "general hospital: asked for a call, waiting for Mona", clinician=YUSUF) \
+            .reacts(response="CallMe").result().review()
+    for number, name, rating in [(1313, "Nisreen Awad", 5), (1314, "Kawthar Salim", 3), (1315, "Raghad Hijazi", 4)]:
+        start(c, f"gh-called-{number}", name, number, "general hospital: asked for a call; Mona called and recorded teach-back", clinician=YUSUF) \
+            .reacts(response="CallMe").result().review().pause(10).call_outcome(True, True, rating)
+
+
 # --- The nurse navigator's calls to patients who are still in progress -----------------------------
 def seed_calls(c: Client) -> None:
     print("\nPhase: nurse navigator calls")
@@ -538,7 +584,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Seed a CareLoop environment with demonstration cases.")
     parser.add_argument("--api", required=True, help="CareLoop API address, for example https://api.example")
     parser.add_argument("--messaging", required=True, help="messaging simulator address")
-    parser.add_argument("--phase", required=True, choices=["overdue", "completed", "ontime", "all", "calls", "acknowledge"])
+    parser.add_argument("--phase", required=True, choices=["overdue", "completed", "ontime", "all", "calls", "acknowledge", "additions"])
     parser.add_argument("--count", type=int, default=46, help="how many completed journeys at the Family Health Centre; the General Hospital gets about a quarter as many")
     parser.add_argument("--only", default="", help="comma-separated case labels to send, for example gh-closed,booked")
     parser.add_argument("--source", default="his-simulator", help="the sending system's key under ExternalSystems:Systems")
@@ -553,6 +599,8 @@ def main() -> int:
         seed_completed(client, args.count)
     if args.phase in ("ontime", "all"):
         seed_ontime(client)
+    if args.phase == "additions":
+        seed_additions(client)
     if args.phase == "calls":
         seed_calls(client)
     if args.phase == "acknowledge":

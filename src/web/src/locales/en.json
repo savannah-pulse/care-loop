@@ -30,7 +30,8 @@
     "facilityLead": "Facility lead",
     "programmeCoordinator": "Programme coordinator",
     "breastSurgeon": "Breast surgeon",
-    "familyDoctor": "Family doctor"
+    "familyDoctor": "Family doctor",
+    "labTechnician": "Lab technician"
   },
   "facilities": {
     "family-health-centre": "Family Health Centre",

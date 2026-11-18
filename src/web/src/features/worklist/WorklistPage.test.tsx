@@ -158,6 +158,18 @@ describe('worklist', () => {
     expect(caseLinks()).toHaveLength(2)
   })
 
+  it('shows the lab the cases whose follow-up is under way with no outcome recorded yet', async () => {
+    const awaited = caseSummary({ ...NOURA, exceptions: [], nextAction: 'arrange-follow-up' })
+    const referred = caseSummary({ ...MARIAM, nextAction: 'respond-to-referral' })
+    const decided = caseSummary({ ...NAMESAKE, exceptions: [], stage: 'ClosureReview', displayLabel: 'ClosureReview', nextAction: 'decide-closure' })
+    answer('GET /cases', json([awaited, referred, decided]))
+    renderApp({ at: '#/', as: 'khalid-noor' })
+
+    expect(await screen.findByRole('link', { name: `Noura Al Shamsi, ${mrn('100245892')}` })).toBeInTheDocument()
+    expect(caseLinks()).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /^Whole team\s*3$/ })).toBeInTheDocument()
+  })
+
   it('says so when nothing waits for the person, and offers the team’s list', async () => {
     answer('GET /cases', json([HESSA]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })

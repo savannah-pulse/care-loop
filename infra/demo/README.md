@@ -15,7 +15,7 @@ reached through the messaging simulator, which the script first tells how each p
 
 ## What it creates
 
-About eighty cases: about sixty at the Family Health Centre and twenty at the General Hospital. Most are journeys
+About a hundred cases: about seventy at the Family Health Centre and twenty-five at the General Hospital. Most are journeys
 that met every deadline and closed on evidence, which is what a working programme mostly looks like; the rest are
 the cases CareLoop exists to catch.
 
@@ -24,6 +24,7 @@ the cases CareLoop exists to catch.
 | `overdue` | 9 | Patients who never answer or cannot be reached, a handoff nobody accepts, a call-back nobody makes, a result with no owner, a missed appointment not rebooked. Each goes overdue and escalates to the facility lead, then the coordinator |
 | `completed` | 59 | Full journeys, each step done by its deadline, closed as treated, on surveillance with a next date, or negative on confirmation. Most include a nurse navigator's call with teach-back and a confidence rating; some record a treatment plan and then treatment started |
 | `ontime` | 13 | In progress and on time: awaiting a referral response, appointment booked, call recorded, referral rejected with a new next action, appointment to rebook, a closure refused for lack of evidence, treatment to start; and four closed |
+| `additions` | 18 | For the lab technician: patients who attended with the confirmation result awaited, and results the lab recorded (closure waiting, or closed on that evidence). For the General Hospital's nurse navigator: patients waiting for a call, and calls she made |
 | `calls` | (6 calls) | The nurse navigator calls six patients whose cases are still open |
 | `acknowledge` | (2) | Two escalations acknowledged by the role they sit with |
 
@@ -33,6 +34,8 @@ Who gets what on the dashboard's sign-in list:
 - **Huda** (nurse navigator): the patient waiting for a call back; the calls she recorded show on the cases.
 - **Joy** (facility lead): the escalated cases and the result with no owner.
 - **Dr. Layla** (receiving clinician, General Hospital): cases she owns after accepting a handoff, including two overdue.
+- **Khalid** (lab technician, Family Health Centre): cases whose follow-up is under way with no outcome recorded yet.
+- **Mona** (nurse navigator, General Hospital): the patients waiting for a call there; the calls she recorded.
 - **Dr. Obaid** (programme coordinator): every case escalated to programme level, without names.
 
 ## Running it
@@ -72,6 +75,13 @@ passed. So the data is seeded in two parts, around a change of pathway timing.
 
    ```bash
    python3 infra/demo/seed_demo.py --api https://<api> --messaging https://<messaging simulator> --phase acknowledge
+   ```
+
+4. **Add the cases for the lab technician and the General Hospital's nurse navigator.** This phase adds to what
+   is there and replaces nothing, so it can also be run later against an environment that is already seeded:
+
+   ```bash
+   python3 infra/demo/seed_demo.py --api https://<api> --messaging https://<messaging simulator> --phase additions
    ```
 
 The script prints the response to every event and ends with "Every event got the response it expected", or lists

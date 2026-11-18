@@ -77,16 +77,19 @@ export interface WorklistViewer {
 /** The next action that is a nurse navigator's to do: calling a patient who asked for a call. */
 const CALL_PATIENT_ACTION = 'call-patient'
 
+/** The next action a case has while its follow-up is under way and nothing else is in the way. */
+const ARRANGE_FOLLOW_UP_ACTION = 'arrange-follow-up'
+
 /**
  * Tells whether a role has a list of its own, narrower than its team's.
  *
  * @param role - A role key.
- * @returns `true` for clinicians, the nurse navigator and the facility lead. The programme
+ * @returns `true` for clinicians, the nurse navigator, the facility lead and the lab. The programme
  * coordinator's list is already limited by the API to the cases escalated to them, and other roles
  * see their team's.
  */
 export function hasOwnWorklist(role: string): boolean {
-  return ['clinician', 'receiving-clinician', 'nurse-navigator', 'facility-lead'].includes(role)
+  return ['clinician', 'receiving-clinician', 'nurse-navigator', 'facility-lead', 'lab'].includes(role)
 }
 
 /**
@@ -98,6 +101,9 @@ export function hasOwnWorklist(role: string): boolean {
  *   because the call is the navigator's to make.
  * - The facility lead: the cases escalated, and the cases with no named owner, which sit in the
  *   lead's queue.
+ * - The lab: the cases whose follow-up is under way with no outcome recorded yet, since recording
+ *   the outcome evidence is what the lab does. The case list does not say whether the appointment
+ *   has been attended, so a case with an appointment still to come is on this list too.
  * - Anyone else: every case they are shown.
  *
  * @param row - A worklist row.
@@ -114,6 +120,12 @@ export function isMine(row: WorklistRow, viewer: WorklistViewer): boolean {
       return nextAction === CALL_PATIENT_ACTION
     case 'facility-lead':
       return isEscalated || owner.isQueue
+    case 'lab':
+      return (
+        row.summary.stage === 'FollowUpActive' &&
+        row.summary.displayLabel === 'FollowUp' &&
+        nextAction === ARRANGE_FOLLOW_UP_ACTION
+      )
     default:
       return true
   }

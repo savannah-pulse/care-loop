@@ -367,7 +367,9 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
     </div>
   ) : null
 
-  if (rows.length === 0 || (allOnTrack && !showAll)) {
+  // A person's own cases are always listed. Only the whole team's list is folded away while every
+  // case on it is on track, where a long list of cases that need nothing would bury the message.
+  if (rows.length === 0 || (allOnTrack && !showAll && scope === 'team')) {
     const deadline = nextDeadline(rows)
     const noneOfMine = rows.length === 0 && scope === 'mine' && teamRows.length > 0
     const body =
@@ -533,7 +535,8 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
  * wherever it is tapped. The chips are the exception queues, and a case can sit in more than one.
  * Each case's link is named by the patient as shown, with the MRN (the case number for the
  * coordinator), so no two links read the same to a screen reader.
- * When nothing needs attention it says so, with the next deadline, instead of listing cases.
+ * When nothing on the team's list needs attention it says so, with the next deadline, instead of
+ * listing cases; a person's own cases are always listed.
  */
 export function WorklistPage() {
   useDocumentTitle(t('worklist.title'))
