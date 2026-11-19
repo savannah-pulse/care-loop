@@ -25,8 +25,9 @@ namespace CareLoop.Api.Features.Ai;
 /// </para>
 /// <para>
 /// The model is never given the patient's name, contact details, identifiers, the result, the appointment's place or
-/// the case's next action. The name and the clinic's contact number go as the placeholders
-/// <see cref="FirstNamePlaceholder"/> and <see cref="ClinicContactPlaceholder"/>, which the reviewer fills in. Only
+/// the case's next action. The name goes as the placeholder <see cref="FirstNamePlaceholder"/>, which the reviewer
+/// fills in; so does the clinic's contact (<see cref="ClinicContactPlaceholder"/>) when the facility has none configured
+/// (<see cref="NotificationOptions.FacilityContacts"/>). Only
 /// templates with no result content can be chosen: the reporting physician gives results, so the templates that invite
 /// a patient to discuss a result need a clinician's recorded authorization, which CareLoop does not hold.
 /// </para>
@@ -36,7 +37,7 @@ public static class PatientMessageDraft
     /// <summary>What stands in the draft for the patient's first name; the name itself is never sent.</summary>
     public const string FirstNamePlaceholder = "{first name}";
 
-    /// <summary>What stands in the draft for the clinic's contact number; CareLoop holds none, so the reviewer fills it in.</summary>
+    /// <summary>What stands in the draft for the clinic's contact when the facility has none configured; the reviewer fills it in.</summary>
     public const string ClinicContactPlaceholder = "{clinic contact}";
 
     /// <summary>The roles that may ask for a draft.</summary>
@@ -109,7 +110,7 @@ public static class PatientMessageDraft
             {
                 PatientName = FirstNamePlaceholder,
                 FacilityName = format.Facility(@case.FacilityId),
-                FacilityContact = ClinicContactPlaceholder,
+                FacilityContact = format.FacilityContact(@case.FacilityId) ?? ClinicContactPlaceholder,
                 AppointmentDate = appointment is { } day ? format.Date(day) : null,
                 AppointmentTime = template == "T02" && appointment is { } time ? format.Time(time) : null,
             },

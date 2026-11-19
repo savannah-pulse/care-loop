@@ -74,7 +74,8 @@ Messaging simulator and gives each staff role a synthetic address; Docker Compos
 | `Notifications:Sms:InboundSecret`, `Notifications:Email:InboundSecret` | none | Secret each channel's callbacks are signed with. Every message to `POST /notifications/inbound/sms` or `/email` must carry `X-CareLoop-Signature: sha256=<hex HMAC-SHA256 of the body>`; while the secret is unset, all are refused with 401. Set it from the environment (`SIMULATOR_INBOUND_SECRET` in Docker Compose), never in a committed file. |
 | `Notifications:StaffContacts:{role}:Channel`, `…:Address` | none | How each staff role is notified: `Sms` or `Email`, and its address. An optional `default` entry covers roles with none. A role with neither cannot be reached, and its notices are retried. |
 | `Notifications:TimeZone` | `Asia/Dubai` (UTC when empty) | The IANA time zone messages give dates and times in: appointment times for patients and caregivers, and when the previous escalation level was acknowledged. An unknown zone stops start-up. |
-| `Notifications:FacilityNames:{facilityId}` | none | The name a staff message gives a facility ("A case at Family Health Centre needs your action"). A facility with no entry is named by its identifier in words. |
+| `Notifications:FacilityNames:{facilityId}` | none | The name a staff or patient message gives a facility ("A case at Family Health Centre needs your action"). A facility with no entry is named by its identifier in words. |
+| `Notifications:FacilityContacts:{facilityId}` | none | How a patient contacts a facility, given after "please contact" in patient messages and in the AI patient message draft. With no entry a sent message says "the clinic" and the draft carries the placeholder `{clinic contact}`. |
 | `Notifications:EnabledProviders` | `[ "Sms", "Email" ]` | Enabled notification providers. Only `Sms` and `Email` are accepted; any other name stops the host at start-up. |
 | `Notifications:PerEventOverrides` | `{ }` | Optional provider list per domain event name. |
 | `Outbox:Enabled` | `false` (on in `appsettings.json`) | Run the outbox dispatcher. Test hosts leave it off. |
@@ -195,8 +196,8 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   (`PatientMessageDraft.TemplateFor`): an appointment booked and still to come is `T02` (appointment reminder); a
   missed last appointment is `T03` (missed appointment follow-up); a case flagged unreachable is `T06` (unsuccessful
   contact follow-up); anything else is `T05` (care-team callback request). The values are `patient_name` and
-  `facility_contact`, sent as the placeholders `{first name}` and `{clinic contact}` (the name is never sent, and
-  CareLoop holds no clinic contact number, so the reviewer fills both in), `facility_name`, and the appointment's date
+  `facility_contact`, (the name is never sent, so it goes as the placeholder `{first name}` for the reviewer to fill in; the contact comes
+  from `Notifications:FacilityContacts`, or goes as the placeholder `{clinic contact}` when the facility has none), `facility_name`, and the appointment's date
   and time when relevant. To add a template, add its text to the file and a rule to `TemplateFor`; a template the
   code cannot select is never used.
 - **Reuse.** The role briefing and the impact summary are kept in the API's memory for `Ai:CacheHours`, under the

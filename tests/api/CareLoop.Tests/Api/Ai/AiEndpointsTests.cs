@@ -232,6 +232,17 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.Empty(_ai.Prompts);
     }
 
+    [Fact]
+    public void The_patient_message_draft_gives_the_facilitys_contact_when_one_is_configured()
+    {
+        var format = new MessageFormat(new NotificationOptions { FacilityContacts = new(StringComparer.OrdinalIgnoreCase) { ["SYN-FAC-A"] = "SYN-PHONE-A" } });
+
+        var data = System.Text.Json.JsonSerializer.Serialize(PatientMessageDraft.BuildData(NewCase("SYN-RESULT-1"), NotificationChannel.Sms, format, DateTimeOffset.UnixEpoch));
+
+        Assert.Contains("SYN-PHONE-A", data);
+        Assert.DoesNotContain(PatientMessageDraft.ClinicContactPlaceholder, data);
+    }
+
     [Theory]
     [InlineData("review-result")]
     [InlineData("start-treatment")]

@@ -121,7 +121,7 @@ For a nurse navigator or a clinician, for one case they may read. The draft is o
 | `template` | Which approved template to fill: `T02`, `T03`, `T05` or `T06` |
 | `values.patient_name` | Always the placeholder `{first name}`. The name is never sent; the reviewer fills it in |
 | `values.facility_name` | The facility's name |
-| `values.facility_contact` | Always the placeholder `{clinic contact}`. CareLoop holds no contact number for a facility, so the reviewer fills it in |
+| `values.facility_contact` | The facility's contact from `Notifications:FacilityContacts`. When the facility has none configured, the placeholder `{clinic contact}`, which the reviewer fills in |
 | `values.appointment_date` | The appointment's day, for `T02` and `T03` only |
 | `values.appointment_time` | The appointment's time, for `T02` only |
 
@@ -286,7 +286,7 @@ Synthetic only today. Before any non-synthetic data reaches a model, the organiz
 - The small-number threshold.
 - The model's text is not checked against the data. If a wrong summary is ever seen, add a check for that case rather than a general parser.
 - Which further patient message templates the API should be able to select, and the recorded state each would need. Today it can select four (see [Patient message draft](#patient-message-draft)); a template the code cannot select is never used.
-- Where a clinic contact number comes from. CareLoop holds none, so the draft carries the placeholder `{clinic contact}` for the reviewer to fill in.
+- The real clinic contact numbers. They are a setting (`Notifications:FacilityContacts`), set to synthetic values in development and the demo; a facility with none configured gets the placeholder `{clinic contact}` in the draft.
 - The `patient-notification` agent has a web search tool attached. An agent that is sent patient-related facts should not have a way to send them elsewhere; raise it with the agent's owner.
 - The agents are called at their latest version, so a change to an agent's permanent instructions can change behaviour. Agree how changes are announced.
 - `src/ai_agents/` holds sample scripts the API does not use; decide whether to keep them.

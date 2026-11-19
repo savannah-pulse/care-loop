@@ -252,7 +252,7 @@ Notification rules:
 - A patient reply can say only two things. CareLoop reads `1` as "I got this message" (an acknowledgement; the message goes out before any appointment exists, so it never asks whether the patient will attend) and `2`, or any other text, as a request for a call. No reply is ever teach-back or a confidence rating: a nurse navigator records those after a call (`POST /cases/{caseId}/call-outcome`). Recording a call answers the patient's request for one; a later text reply of `1` does not.
 - Every channel a patient notification goes out on is recorded on the case as sent before anything is sent, so a failure on one channel marks the patient unreachable only once every channel has failed.
 - Staff notifications carry no patient detail: "a case at {facility} needs your action", and the case number to look for in CareLoop, with no link.
-- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`.
+- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`, and a patient message gives a facility's contact from `Notifications:FacilityContacts` ("the clinic" when none is set).
 - Every stored event says where it came from (`SourceEvent.Origin`: `careloop`, `sms` or `email`; empty for the case's own source system), so the timeline never has to guess.
 - Templates come from `Infrastructure/Templates/{language}/`. English only for now; keep everything language-keyed so Arabic can be added later.
 
@@ -282,7 +282,8 @@ public interface IInboundNotificationHandler
   "Email": { "BaseUrl": "...", "InboundSecret": "..." },
   "StaffContacts": { "nurse-navigator": { "Channel": "Email", "Address": "..." } },
   "TimeZone": "Asia/Dubai",
-  "FacilityNames": { "family-health-centre": "Family Health Centre" }
+  "FacilityNames": { "family-health-centre": "Family Health Centre" },
+  "FacilityContacts": { "family-health-centre": "..." }
 }
 ```
 
