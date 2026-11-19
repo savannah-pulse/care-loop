@@ -65,7 +65,7 @@ Data:
 
 - **To change what the model is asked,** edit the file and restart the API. No code changes.
 - For a provider that takes a prompt, what is in the file is what is sent, with `{{data}}` replaced by the data as JSON.
-- On Foundry, how much of the file applies depends on the agent: `role-briefing` follows the file's instructions as its task, while `impact-summary` follows its own instructions in the Foundry project and uses only the data. See [The Foundry agents](#the-foundry-agents).
+- On Foundry, how much of the file applies depends on the agent: `role-briefing` and `impact-summary` follow the file's instructions as their task, while `patient-notification` fills an approved template CareLoop sends it. See [The Foundry agents](#the-foundry-agents).
 - A file that is missing, or does not contain `{{data}}` exactly once, stops the API at start-up with a message naming the file.
 - `Ai:PromptsDirectory` can point at another folder for one environment.
 
@@ -131,7 +131,7 @@ For a nurse navigator or a clinician, for one case they may read.
 The API does not parse the text or check it against the data. That is a deliberate simplification: the texts are short drafts that staff read next to the real figures and worklist, and nothing is sent or stored. What it does do:
 
 - the role briefing gets the API's opening sentence in front, and case numbers in place of tokens;
-- an agent's refusal (`CANNOT_COMPLY`, or `"status": "cannot_comply"`) or an answer in a shape the agent's instructions do not give is a failure, never shown as text.
+- an agent's refusal (`CANNOT_COMPLY`) or an empty answer is a failure, never shown as text.
 
 ## Reusing an answer
 
@@ -180,33 +180,32 @@ The endpoints, the prompt files, the data and their tests do not change, because
 - **Owned elsewhere.** An agent's instructions, model and tools are set in the Foundry project by its owner. The API only calls the agents; it never creates or changes one.
 - **One translation file.** An agent's instructions fix the input it accepts and the shape of its answer. `Infrastructure/Ai/FoundryAgentFormat.cs` is the only place that knows those shapes: it turns the request into the agent's input and the agent's answer into text. When an agent's owner changes its instructions, that is the one file to change. Until it is, that use answers 503.
 
-As the agents stood on 19 November 2026:
+As the agents stood on 19 November 2026, after their owner's changes that morning:
 
 | Agent | What it is sent | What it answers | State |
 |---|---|---|---|
-| `role-briefing` (version 6) | `{ "task": <the prompt file's instructions>, "data": <the data> }`. The agent follows the task over the data, so the prompt file's wording applies | One plain paragraph, naming cases as `{{C-1}}` | Working |
-| `impact-summary` (version 5) | `<input_json>` built from the data: `period`, `filters`, `cohort_size`, `synthetic`, `measures[]`, `delay_reasons[]`, `supplementary[]`. A withheld value goes as `suppressed` with no number. The agent follows its own instructions; the prompt file's are not sent | JSON: paragraphs of sentences and a limits note, read into plain text | Working |
-| `patient-notification` (version 5) | `<input_json>` naming one of the agent's own templates and the facts to fill it with. The agent adds no wording of its own; the prompt file's instructions are not sent | JSON with the draft (`draft_text`), read into plain text | Working |
+| `role-briefing` (version 8) | `{ "task": <the prompt file's instructions>, "data": <the data> }`. The agent follows the task over the data, so the prompt file's wording applies | One plain paragraph, naming cases as `{{C-1}}` | Working |
+| `impact-summary` (version 7) | `{ "task": <the prompt file's instructions>, "data": <the data, with "synthetic_data"> }`, as for the role briefing. The prompt file's wording applies | Plain text | Working |
+| `patient-notification` (version 7) | A task, one approved template chosen by CareLoop and the values to fill it with. The agent adds no wording of its own; the prompt file's instructions are not sent | The completed message, plain text | Working |
 
-**The patient message on Foundry.** The agent holds a registry of approved templates and fills the one CareLoop names. `FoundryAgentFormat` chooses it from the `situation` in the data:
+Each agent answers `CANNOT_COMPLY` when it cannot write the text; that is a failure, never shown.
 
-| `situation` | Template | Condition fact sent |
+**The patient message on Foundry.** CareLoop sends the agent the task from its owner's prompt guide, one template and the values for its placeholders. `FoundryAgentFormat` chooses the template from the `situation` in the data:
+
+| `situation` | Template, after "Hello {patient_name}, this is the care team at {facility_name}." | Values |
 |---|---|---|
-| `appointment reminder` (an appointment is booked and still to come) | `T02` Appointment reminder | `appointment_status` = `confirmed`, with the appointment's date and time |
-| `could not reach the patient` (the case is flagged unreachable) | `T06` Unsuccessful contact follow-up | `contact_attempt_status` = `unsuccessful` |
-| `please contact the care team` (everything else) | `T05` Request to contact the care team | `callback_task_verified` = `true` |
+| `appointment reminder` (an appointment is booked and still to come) | "This is a reminder of your appointment on {appointment_date} at {appointment_time}." | the clinic, the appointment's date and time |
+| `could not reach the patient` (the case is flagged unreachable) | "We tried to contact you but could not reach you." | the clinic |
+| `please contact the care team` (everything else) | "Your care team would like to speak with you." | the clinic |
 
-Only these three administrative templates are ever named. The result-bearing ones (`T09` to `T12`) are never used.
-
-The facts sent, and three things to know about them:
+Every template ends with the reply codes ("Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you."), and an email's starts with "Subject: A message from your care team". The wording is placeholder wording, not approved, like the templates under `Infrastructure/Templates`.
 
 - `patient_name` is the placeholder `{first name}`. The name is never sent.
-- `facility_contact` is the placeholder `{clinic contact}`. CareLoop holds no contact number for a facility, so the reviewer fills it in.
-- `recipient_verified` and `channel_permitted` are sent as `true`, because the agent refuses without them. CareLoop does not itself verify a recipient: the draft goes to a nurse or clinician, who checks the recipient and the channel before anything is sent. **This is a proposal to confirm** with the agent's owner and the clinical lead.
+- There is no slot for a contact number. CareLoop holds none, and the agent refuses a placeholder where a number should be; the reply codes give the patient a way to ask for a call.
 
-On Foundry the draft is the template's fixed wording, so it has no reply instructions ("Reply 1 …") and, for email, no subject line. With a provider that takes the prompt, `patient-message.md` governs the wording instead.
+On Foundry the draft is the template's fixed wording. With a provider that takes the prompt, `patient-message.md` governs the wording instead.
 
-`Ai:Foundry:SyntheticData` (default `true`) is what the impact agent is told when it asks whether the figures are synthetic. The samples in `src/ai_agents/` are not used by the API.
+`Ai:Foundry:SyntheticData` (default `true`) is sent with the impact summary's data as `synthetic_data`. The samples in `src/ai_agents/` are not used by the API.
 
 ## Failure
 
@@ -229,7 +228,7 @@ Section `Ai` (`Infrastructure/Ai/AiOptions.cs`):
 | `Ai:PromptsDirectory` | `Prompts` | Where the prompt files are read from |
 | `Ai:Foundry:ProjectEndpoint` | empty | `https://{resource}.services.ai.azure.com/api/projects/{project}`; `https` only. Never committed |
 | `Ai:Foundry:Agents` | `role-briefing`, `impact-summary`, `patient-notification` | Which agent writes each text, by name: the key is the use (`role-briefing`, `impact-summary`, `patient-message`) |
-| `Ai:Foundry:SyntheticData` | `true` | Told to an agent that asks whether the figures are synthetic |
+| `Ai:Foundry:SyntheticData` | `true` | Sent with the impact summary's data as `synthetic_data` |
 
 - **Docker Compose** passes `AI_PROVIDER`, `AZURE_AI_PROJECT_ENDPOINT`, `AI_TIMEOUT_SECONDS` and `AI_CACHE_HOURS`; see `.env.example`. A container has no `az login`, so a live check uses `dotnet run`.
 - **Azure** (`infra/azure`): `API_AI_PROVIDER` sets `Ai__Provider`; `AZURE_AI_PROJECT_ENDPOINT` sets the project endpoint; with `AZURE_AI_FOUNDRY_ACCOUNT_ID` the deployment gives the API's identity Foundry User on that account.
@@ -249,7 +248,7 @@ Or, without a database, run the opt-in test. It runs the three real endpoints wi
 CARELOOP_LIVE_FOUNDRY_ENDPOINT=https://<account>.services.ai.azure.com/api/projects/<project> dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~Live_"
 ```
 
-Run on 19 November 2026: all three uses answered 200 from their own agents, the repeated briefing was reused, the briefing named the seeded cases by their case numbers, and the patient drafts kept the `{first name}` and `{clinic contact}` placeholders.
+Run on 19 November 2026 against role-briefing 8, impact-summary 7 and patient-notification 7: all three uses answered 200 from their own agents, the repeated briefing was reused, the briefing named the seeded cases by their case numbers, and the patient drafts kept the `{first name}` placeholder.
 
 ## What is built
 
@@ -274,7 +273,7 @@ Synthetic only today. Before any non-synthetic data reaches a model, the organiz
 - Which roles may ask for a patient message draft. Today a nurse navigator or a clinician.
 - The small-number threshold.
 - The model's text is not checked against the data. If a wrong summary is ever seen, add a check for that case rather than a general parser.
-- The patient message on Foundry: confirm the template chosen for each situation, who supplies a clinic contact number, and whether CareLoop may state that the recipient is verified and the channel permitted (see [The Foundry agents](#the-foundry-agents)).
-- The `patient-notification` agent has a web search tool attached. An agent that is sent patient-related facts should not have a way to send them elsewhere; raise it with the agent's owner.
+- The patient message on Foundry: approve the wording of the three templates and the template chosen for each situation (see [The Foundry agents](#the-foundry-agents)).
+- All three agents have a web search tool attached, through their toolboxes. An agent that is sent patient-related facts should not have a way to send them elsewhere; raise it with the agents' owner.
 - The agents are called at their latest version, so a change to an agent's instructions can break a use until `FoundryAgentFormat` is updated. Agree how changes are announced.
 - `src/ai_agents/` holds sample scripts the API does not use; decide whether to keep them.

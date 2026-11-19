@@ -340,7 +340,7 @@ public sealed class AiEndpointsTests : IDisposable
 
         Assert.All(results, r => Assert.True(Status(r.Result) == 200, report));
         Assert.Equal("Foundry/patient-notification", Value<AiTextResponse>(results[3].Result).Model);
-        Assert.StartsWith("Dear {first name},", Value<AiTextResponse>(results[3].Result).Text);
+        Assert.StartsWith("Hello {first name},", Value<AiTextResponse>(results[3].Result).Text);
         Assert.True(Value<AiTextResponse>(results[1].Result).Cached);
         Assert.Equal("Foundry/role-briefing", Value<AiTextResponse>(results[0].Result).Model);
         Assert.Equal("Foundry/impact-summary", Value<AiTextResponse>(results[2].Result).Model);

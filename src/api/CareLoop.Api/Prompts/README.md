@@ -33,7 +33,7 @@ With `Ai:Provider` set to `Foundry`, each use goes to its own agent in the Found
 | File | Agent | Does this file's wording apply? |
 |---|---|---|
 | `role-briefing.md` | `role-briefing` | Yes. The agent is given these instructions as its task |
-| `impact-summary.md` | `impact-summary` | No. The agent follows its own instructions; only the data is sent |
-| `patient-message.md` | `patient-notification` | No. The agent fills one of its own approved templates; only the data is sent |
+| `impact-summary.md` | `impact-summary` | Yes. The agent is given these instructions as its task |
+| `patient-message.md` | `patient-notification` | No. The agent fills an approved template CareLoop sends it, with the values it is sent |
 
 To change wording that does not come from these files, the agent's owner changes the agent. With any other provider, all three files apply as written. [`docs/ai-design/integration.md`](../../../../docs/ai-design/integration.md) has the details.

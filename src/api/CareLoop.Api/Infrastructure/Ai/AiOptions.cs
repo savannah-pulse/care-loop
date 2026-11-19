@@ -38,6 +38,6 @@ public sealed class FoundryOptions
         [AiPrompts.PatientMessage] = "patient-notification",
     };
 
-    /// <summary>Told to an agent that asks whether the figures are synthetic. <see langword="true"/> until real data is approved for this deployment.</summary>
+    /// <summary>Sent with the impact summary's data as <c>synthetic_data</c>. <see langword="true"/> until real data is approved for this deployment.</summary>
     public bool SyntheticData { get; set; } = true;
 }

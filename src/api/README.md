@@ -89,7 +89,7 @@ Messaging simulator and gives each staff role a synthetic address; Docker Compos
 | `Ai:PromptsDirectory` | `Prompts` | Folder the prompt files are read from; relative to the content root unless rooted. |
 | `Ai:Foundry:ProjectEndpoint` | empty | `https://{resource}.services.ai.azure.com/api/projects/{project}`. Required, `https` only, for `Foundry`. Set it from the environment (`AZURE_AI_PROJECT_ENDPOINT` in Docker Compose), never in a committed file. There is no key. |
 | `Ai:Foundry:Agents` | `role-briefing`, `impact-summary`, `patient-notification` | Which agent writes each text, by name, so its latest version answers. The key is the use (`role-briefing`, `impact-summary`, `patient-message`). The API never creates or changes an agent. |
-| `Ai:Foundry:SyntheticData` | `true` | Told to an agent that asks whether the figures are synthetic. |
+| `Ai:Foundry:SyntheticData` | `true` | Sent with the impact summary's data as `synthetic_data`. |
 
 Clinical deadlines are **not** configuration keys here. They live in
 `src/api/CareLoop.Api/Infrastructure/Pathways/breast-screening.json`, where every value is a placeholder.
@@ -176,17 +176,15 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   [`CareLoop.Api/Prompts/README.md`](CareLoop.Api/Prompts/README.md).
 - **Foundry agents.** `FoundryAiClient` is the one Foundry client. An agent has instructions of its own, set in the
   Foundry project by its owner, and they fix the input it accepts and the shape of its answer.
-  `Infrastructure/Ai/FoundryAgentFormat.cs` is the one file that knows those shapes. `role-briefing` is sent
-  `{task, data}`, so the prompt file's instructions apply. `impact-summary` is sent a structured `<input_json>` and
-  follows its own instructions; only the data is used, and its JSON answer is turned into text. `patient-notification`
-  is sent an `<input_json>` that names one of the agent's own templates, chosen from the `situation` in the data
-  (`appointment reminder` is `T02`, `could not reach the patient` is `T06`, `please contact the care team` is `T05`),
-  and the facts to fill it with. `patient_name` and `facility_contact` go as the placeholders `{first name}` and
-  `{clinic contact}`: the name is never sent, and CareLoop holds no clinic contact number, so the reviewer fills it
-  in. `recipient_verified` and `channel_permitted` go as `true`, a proposal still to confirm: the draft goes to a
-  nurse or clinician, who checks before anything is sent. The agent answers with the template's fixed wording as the
-  draft; the prompt file's instructions are not sent. The agents are called at their latest version, so a
-  change to an agent can make its use answer 503 until `FoundryAgentFormat` is updated.
+  `Infrastructure/Ai/FoundryAgentFormat.cs` is the one file that knows those shapes. `role-briefing` and
+  `impact-summary` are sent `{task, data}`, so the prompt file's instructions apply. `patient-notification` is sent a
+  task, one approved template chosen from the `situation` in the data (`appointment reminder`, `could not reach the
+  patient` or `please contact the care team`) and the values to fill it with. `patient_name` goes as the placeholder
+  `{first name}`: the name is never sent. There is no contact number slot: CareLoop holds none, and the agent refuses
+  a placeholder where a number should be. The agent answers with the template's fixed wording as the draft; the prompt
+  file's instructions are not sent. All three answer plain text, or `CANNOT_COMPLY`, which is a failure. The agents
+  are called at their latest version, so a change to an agent can make its use answer 503 until `FoundryAgentFormat`
+  is updated.
 - **Role briefing.** The API writes the opening sentence (`opening` in the data) and the model continues from it. The
   model knows a case only as a token (`C-1`, `C-2`, …); the API swaps each token for the dashboard's case number after
   the text comes back, after any reuse, so case numbers are never sent.
