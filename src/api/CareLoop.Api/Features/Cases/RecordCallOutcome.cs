@@ -130,7 +130,7 @@ public static class RecordCallOutcome
         }
 
         var updated = await repository.GetAsync(caseId, ct);
-        return updated is null ? Results.NotFound() : Results.Ok(CaseReadMapping.Detail(updated, actor, pathways));
+        return updated is null ? Results.NotFound() : Results.Ok(await CaseReadMapping.DetailAsync(updated, actor, pathways, db, ct));
     }
 
     private static string PartlyRecorded(string reason, IReadOnlyList<NotificationUpdateKind> recorded) =>

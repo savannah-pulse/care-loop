@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CareLoop.Api.Features.Events;
 using CareLoop.Api.Infrastructure.Notifications;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Events.Payloads;
@@ -165,19 +166,13 @@ public sealed class RecipientResolver
     /// <summary>The latest applied screening result, the current source of the patient's language and contact points.</summary>
     private async Task<ScreeningResultPayload?> ScreeningResultAsync(Guid caseId, CancellationToken ct)
     {
-        var stored = await _db.SourceEvents.AsNoTracking()
-            .Where(e => e.CaseId == caseId
-                && e.Type == CaseEventType.ScreeningResultReceived
-                && e.Disposition == SourceEventDisposition.Applied)
-            .Select(e => new { e.PayloadJson, e.ReceivedAt })
-            .ToListAsync(ct);
-        var latest = stored.OrderByDescending(e => e.ReceivedAt).FirstOrDefault();
-        if (latest is null)
+        var payloads = await ScreeningResultReader.ReadPayloadsAsync(_db, [caseId], ct);
+        if (!payloads.TryGetValue(caseId, out var payload))
         {
             return null;
         }
 
-        return JsonSerializer.Deserialize<ScreeningResultPayload>(latest.PayloadJson, PayloadSerializerOptions)
+        return JsonSerializer.Deserialize<ScreeningResultPayload>(payload, PayloadSerializerOptions)
             ?? throw new InvalidOperationException($"The screening result of case {caseId} has an empty payload.");
     }
 

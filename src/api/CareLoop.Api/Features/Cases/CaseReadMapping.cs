@@ -1,4 +1,7 @@
+using System.Text.Json;
+using CareLoop.Api.Features.Events;
 using CareLoop.Api.Infrastructure.Auth;
+using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Cases;
 using CareLoop.Contracts.Common;
 using CareLoop.Contracts.Exceptions;
@@ -15,7 +18,7 @@ namespace CareLoop.Api.Features.Cases;
 /// </summary>
 internal static class CaseReadMapping
 {
-    /// <summary>Projects a case-list row.</summary>
+    /// <summary>Projects the compact fields shared with an exception row.</summary>
     /// <param name="case">The no-tracking case.</param>
     /// <param name="actor">The reader.</param>
     /// <param name="pathways">The configured pathways.</param>
@@ -32,18 +35,53 @@ internal static class CaseReadMapping
         CreatedAt = @case.CreatedAt, UpdatedAt = @case.UpdatedAt, ClosureReason = @case.Closure?.Reason,
     };
 
+    /// <summary>Projects full case coordination state and the source-recorded patient language.</summary>
+    /// <param name="case">The authorized case.</param>
+    /// <param name="actor">The reader.</param>
+    /// <param name="pathways">The configured pathways.</param>
+    /// <param name="db">The source-event read context.</param>
+    /// <param name="ct">Cancels the read.</param>
+    /// <returns>The detail response, with patient language hidden from coordinators.</returns>
+    public static async Task<CaseDetailResponse> DetailAsync(Case @case, Actor actor, IPathwayProvider pathways,
+        CareLoopDbContext db, CancellationToken ct) =>
+        (await DetailsAsync([@case], actor, pathways, db, ct))[0];
+
+    /// <summary>Projects a page of full cases, loading patient languages together rather than once per row.</summary>
+    /// <param name="cases">The authorized, ordered page.</param>
+    /// <param name="actor">The reader.</param>
+    /// <param name="pathways">The configured pathways.</param>
+    /// <param name="db">The source-event read context.</param>
+    /// <param name="ct">Cancels the read.</param>
+    /// <returns>Full case responses in the supplied order.</returns>
+    public static async Task<IReadOnlyList<CaseDetailResponse>> DetailsAsync(IReadOnlyList<Case> cases, Actor actor,
+        IPathwayProvider pathways, CareLoopDbContext db, CancellationToken ct)
+    {
+        var payloads = await ScreeningResultReader.ReadPayloadsAsync(db,
+            actor.Role == DemoRoles.Coordinator ? [] : cases.Select(c => c.Id).ToArray(), ct);
+        return cases.Select(c => Detail(c, actor, pathways,
+            payloads.TryGetValue(c.Id, out var payload) ? PatientLanguage(payload) : null)).ToList();
+    }
+
+    private static string? PatientLanguage(string payload)
+    {
+        using var document = JsonDocument.Parse(payload);
+        return document.RootElement.TryGetProperty("patientLanguage", out var language) ? language.GetString() : null;
+    }
+
     /// <summary>Projects full case coordination state.</summary>
     /// <param name="case">The no-tracking case.</param>
     /// <param name="actor">The reader.</param>
     /// <param name="pathways">The configured pathways.</param>
+    /// <param name="patientLanguage">The source-recorded language, or null when unavailable or redacted.</param>
     /// <returns>The detail response.</returns>
-    public static CaseDetailResponse Detail(Case @case, Actor actor, IPathwayProvider pathways) => new()
+    private static CaseDetailResponse Detail(Case @case, Actor actor, IPathwayProvider pathways, string? patientLanguage) => new()
     {
         CaseId = @case.Id, SourceSystem = @case.SourceSystem,
         SourceResultId = actor.Role == DemoRoles.Coordinator ? null : @case.SourceResultId,
         PatientReference = actor.Role == DemoRoles.Coordinator ? null : @case.PatientReference,
         PatientDisplayName = actor.Role == DemoRoles.Coordinator ? null : @case.PatientDisplayName,
         PatientSecondaryIdentifier = actor.Role == DemoRoles.Coordinator ? null : @case.PatientSecondaryIdentifier,
+        PatientLanguage = patientLanguage,
         PathwayId = @case.PathwayId, FacilityId = @case.FacilityId, Stage = @case.Stage,
         DisplayLabel = CaseDisplayLabels.From(@case, pathways.Get(@case.PathwayId)), Urgency = @case.Urgency,
         Owner = Owner(@case.Owner), ProposedOwner = @case.PendingAssignment is { } p ? Owner(p.ProposedOwner) : null,

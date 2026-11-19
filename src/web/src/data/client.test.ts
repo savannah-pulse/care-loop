@@ -228,6 +228,13 @@ describe('call outcome', () => {
 })
 
 describe('paging', () => {
+  it('keeps the detailed case and patient language returned for the nurse worklist', async () => {
+    const row = caseDetail({ patientLanguage: 'ar-AE', confidence: 4, outcomeEvidenceReference: 'Procedure/SYN-OUTCOME' })
+    const { client } = fakeApi(() => Response.json([row]))
+    const outcome = await loadCaseList({}, { client })
+    expect(outcome).toMatchObject({ ok: true, data: { cases: [row], complete: true } })
+  })
+
   it('reads every page of at most 200 cases until a short page', async () => {
     const { client, requests } = pagedApi(450)
     const outcome = await loadCaseList({}, { client })

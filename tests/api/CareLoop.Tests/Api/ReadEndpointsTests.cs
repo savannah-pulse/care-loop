@@ -77,11 +77,11 @@ public sealed class ReadEndpointsTests : IDisposable
         second.RecordReview("PLACEHOLDER-URGENCY-A", DomainTestData.ClinicianActor(), _clock.UtcNow);
         second.Escalate(Escalation(1));
         await SeedAsync(second);
-        var filtered = Rows<CaseSummaryResponse>(await ListAsync(stage: CaseStage.FollowUpActive, owner: second.Owner.Reference, escalated: true));
+        var filtered = Rows<CaseDetailResponse>(await ListAsync(stage: CaseStage.FollowUpActive, owner: second.Owner.Reference, escalated: true));
         Assert.Equal(second.Id, Assert.Single(filtered).CaseId);
-        Assert.Equal(first.Id, Assert.Single(Rows<CaseSummaryResponse>(await ListAsync(escalated: false))).CaseId);
-        Assert.Equal(second.Id, Rows<CaseSummaryResponse>(await ListAsync(take: 1))[0].CaseId);
-        Assert.Equal(first.Id, Rows<CaseSummaryResponse>(await ListAsync(skip: 1, take: 1))[0].CaseId);
+        Assert.Equal(first.Id, Assert.Single(Rows<CaseDetailResponse>(await ListAsync(escalated: false))).CaseId);
+        Assert.Equal(second.Id, Rows<CaseDetailResponse>(await ListAsync(take: 1))[0].CaseId);
+        Assert.Equal(first.Id, Rows<CaseDetailResponse>(await ListAsync(skip: 1, take: 1))[0].CaseId);
     }
 
     [Theory]
@@ -111,6 +111,49 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(CaseDisplayLabels.From(@case, _pathways.Get(@case.PathwayId)), response.DisplayLabel);
         Assert.Equal(4, response.Tracks.Count);
         Assert.False(response.Tracks.Single(t => t.Kind == TrackKind.Notification).IsComplete);
+        @case.Escalate(Escalation(1));
+        await SaveChangeAsync(@case.Id, c => c.Escalate(@case.Escalations.Single()));
+        var listed = Assert.Single(Rows<CaseDetailResponse>(await ListAsync(context: Identity(DemoRoles.NurseNavigator))));
+        Assert.Equal("SYN-STAFF-2", listed.ProposedOwner!.Reference);
+        Assert.Equal(4, listed.Tracks.Count);
+        Assert.Single(listed.Escalations);
+        Assert.Equal(@case.SourceSystem, listed.SourceSystem);
+        Assert.Equal(@case.SourceResultId, listed.SourceResultId);
+        Assert.Equal(JsonSerializer.Serialize(Value<CaseDetailResponse>(await GetAsync(@case.Id)), JsonOptions),
+            JsonSerializer.Serialize(listed, JsonOptions));
+    }
+
+    [Fact]
+    public async Task Case_reads_use_each_patients_recorded_language_and_ignore_rejected_screening_updates()
+    {
+        var screening = Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician());
+        var arabic = await IngestAsync(screening with
+        {
+            Payload = ((ScreeningResultPayload)screening.Payload) with { PatientLanguage = "ar" },
+        });
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        var english = await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: "SYN-RESULT-EN", namedOwner: Envelopes.Clinician()));
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await SaveChangeAsync(arabic.Id, _ => { }, CaseEventType.ScreeningResultReceived,
+            payloadJson: "{\"patientLanguage\":\"ar-AE\"}");
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await SaveChangeAsync(arabic.Id, _ => { }, CaseEventType.ScreeningResultReceived,
+            disposition: SourceEventDisposition.Rejected, payloadJson: "{\"patientLanguage\":\"fr\"}");
+
+        var rows = Rows<CaseDetailResponse>(await ListAsync(context: Identity(DemoRoles.NurseNavigator)));
+        Assert.Equal("ar-AE", rows.Single(c => c.CaseId == arabic.Id).PatientLanguage);
+        Assert.Equal("en", rows.Single(c => c.CaseId == english.Id).PatientLanguage);
+        var detail = Value<CaseDetailResponse>(await GetAsync(arabic.Id));
+        Assert.Equal("ar-AE", detail.PatientLanguage);
+        Assert.Contains("\"patientLanguage\":\"ar-AE\"", JsonSerializer.Serialize(detail, JsonOptions));
+    }
+
+    [Fact]
+    public async Task Case_reads_leave_unknown_patient_language_null_rather_than_assuming_English()
+    {
+        var @case = await SeedAsync();
+        Assert.Null(Assert.Single(Rows<CaseDetailResponse>(await ListAsync())).PatientLanguage);
+        Assert.Null(Value<CaseDetailResponse>(await GetAsync(@case.Id)).PatientLanguage);
     }
 
     [Fact]
@@ -240,14 +283,14 @@ public sealed class ReadEndpointsTests : IDisposable
     public async Task Cross_facility_reads_require_a_reason_and_are_audited_once()
     {
         var foreign = await SeedAsync(NewCase("SYN-FOREIGN", "SYN-FAC-B", name: "SYNTHETIC Patient B"));
-        Assert.Empty(Rows<CaseSummaryResponse>(await ListAsync()));
+        Assert.Empty(Rows<CaseDetailResponse>(await ListAsync()));
         Assert.Equal(403, Status(await GetAsync(foreign.Id)));
         Assert.Equal(403, Status(await TimelineAsync(foreign.Id)));
         Assert.Equal(403, Status(await ListAsync(facility: "SYN-FAC-B")));
         var response = Value<CaseDetailResponse>(await GetAsync(foreign.Id, reason: "SYN covering the other facility"));
         Assert.Equal("SYNTHETIC Patient B", response.PatientDisplayName);
         Assert.Equal(200, Status(await TimelineAsync(foreign.Id, reason: "SYN covering the other facility")));
-        var rows = Rows<CaseSummaryResponse>(await ListAsync(facility: "SYN-FAC-B", reason: "SYN covering the other facility"));
+        var rows = Rows<CaseDetailResponse>(await ListAsync(facility: "SYN-FAC-B", reason: "SYN covering the other facility"));
         Assert.Single(rows);
         using var scope = _services.CreateScope();
         var reads = await Db(scope).CaseReads.ToListAsync();
@@ -266,22 +309,29 @@ public sealed class ReadEndpointsTests : IDisposable
         {
             EscalatedTo = TestData.FacilityLeadQueue() with { FacilityId = "SYN-FAC-B", Role = "coordinator" },
         }));
+        _clock.Advance(TimeSpan.FromMinutes(1));
+        await SaveChangeAsync(escalated.Id, _ => { }, CaseEventType.ScreeningResultReceived,
+            payloadJson: "{\"patientLanguage\":\"ar\"}");
         var coordinator = Identity("coordinator", facility: null);
         Assert.Equal(403, Status(await GetAsync(normal.Id, coordinator)));
-        var summary = Assert.Single(Rows<CaseSummaryResponse>(await ListAsync(context: coordinator)));
+        var summary = Assert.Single(Rows<CaseDetailResponse>(await ListAsync(context: coordinator)));
         Assert.Equal(escalated.Id, summary.CaseId);
         Assert.Null(summary.PatientDisplayName);
         Assert.Null(summary.PatientSecondaryIdentifier);
         Assert.Null(summary.PatientReference);
+        Assert.Null(summary.SourceResultId);
+        Assert.Null(summary.PatientLanguage);
         var detail = Value<CaseDetailResponse>(await GetAsync(escalated.Id, coordinator));
         Assert.Null(detail.PatientDisplayName);
         Assert.Null(detail.PatientSecondaryIdentifier);
         Assert.Null(detail.PatientReference);
         Assert.Null(detail.SourceResultId);
+        Assert.Null(detail.PatientLanguage);
         // Staff on the case's own team still see both.
         var lead = Value<CaseDetailResponse>(await GetAsync(escalated.Id, Identity("facility-lead", "SYN-FAC-B")));
         Assert.NotNull(lead.PatientReference);
         Assert.NotNull(lead.SourceResultId);
+        Assert.Equal("ar", lead.PatientLanguage);
         Assert.Equal(2, Value<MetricsResponse>(await MetricsAsync(coordinator)).TotalCases);
     }
 
@@ -365,6 +415,7 @@ public sealed class ReadEndpointsTests : IDisposable
 
         Assert.Equal(before.Owner.Reference, result.Owner.Reference);
         Assert.Equal(4, result.Confidence);
+        Assert.Equal("en", result.PatientLanguage);
         var after = await ReadCaseAsync(before.Id);
         Assert.Equal(NotificationStatus.Understood, after.Notification!.Status);
         Assert.Equal(4, after.Notification.Confidence);
@@ -596,7 +647,7 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(1, metrics.CasesReachingDisplayLabel["PatientAcknowledged"].Numerator);
         Assert.Equal(0, metrics.CasesReachingDisplayLabel["Consultation"].Numerator);
         Assert.Equal(1, metrics.CasesByDisplayLabel["Closed"]);
-        Assert.Equal(@case.Id, Assert.Single(Rows<CaseSummaryResponse>(await ListAsync())).CaseId);
+        Assert.Equal(@case.Id, Assert.Single(Rows<CaseDetailResponse>(await ListAsync())).CaseId);
     }
 
     [Fact]
@@ -672,7 +723,7 @@ public sealed class ReadEndpointsTests : IDisposable
     {
         using var scope = _services.CreateScope();
         return await AcknowledgeEscalation.Handle(caseId, escalationId, reason, context,
-            scope.ServiceProvider.GetRequiredService<ICaseRepository>(), _pathways, _clock, CancellationToken.None);
+            scope.ServiceProvider.GetRequiredService<ICaseRepository>(), Db(scope), _pathways, _clock, CancellationToken.None);
     }
 
     /// <summary>A reviewed case, so its patient notification has been requested and nothing has come back yet.</summary>
@@ -705,14 +756,14 @@ public sealed class ReadEndpointsTests : IDisposable
     }
 
     private async Task SaveChangeAsync(Guid id, Action<Case> change, CaseEventType type = CaseEventType.ClinicalReviewCompleted,
-        string source = "SYN-HIS", SourceEventDisposition disposition = SourceEventDisposition.Applied)
+        string source = "SYN-HIS", SourceEventDisposition disposition = SourceEventDisposition.Applied, string payloadJson = "{}")
     {
         using var scope = _services.CreateScope();
         var repo = scope.ServiceProvider.GetRequiredService<ICaseRepository>();
         var @case = (await repo.GetAsync(id, CancellationToken.None))!;
         change(@case);
         await repo.SaveAsync(@case, TestData.AppliedEvent(@case, Guid.NewGuid().ToString("N"), _clock.UtcNow, type)
-            with { SourceSystem = source, Disposition = disposition, DispositionReason = "SYN test event" }, CancellationToken.None);
+            with { SourceSystem = source, Disposition = disposition, DispositionReason = "SYN test event", PayloadJson = payloadJson }, CancellationToken.None);
     }
 
     private async Task<Case> IngestAsync(EventEnvelope envelope)

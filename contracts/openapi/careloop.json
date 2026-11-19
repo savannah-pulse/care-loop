@@ -184,7 +184,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/CaseSummaryResponse"
+                    "$ref": "#/components/schemas/CaseDetailResponse"
                   }
                 }
               }
@@ -1520,6 +1520,13 @@
             ],
             "description": "Patient's second identifier for staff; absent for a coordinator."
           },
+          "patientLanguage": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The patient's message language as a BCP 47 tag from the screening result; absent when unknown or for a coordinator. This is not the AI draft's output language."
+          },
           "displayLabel": {
             "description": "The display step derived from stage and tracks by the Domain.",
             "$ref": "#/components/schemas/CaseDisplayLabel"
@@ -1644,7 +1651,7 @@
             "format": "date-time"
           }
         },
-        "description": "The full coordination state of one case, returned by `GET /cases/{caseId}`."
+        "description": "The full coordination state of one case, returned by `GET /cases` and `GET /cases/{caseId}`."
       },
       "CaseDisplayLabel": {
         "enum": [
@@ -1687,124 +1694,6 @@
           "Closed"
         ],
         "description": "The pathway stage a case is in."
-      },
-      "CaseSummaryResponse": {
-        "required": [
-          "caseId",
-          "facilityId",
-          "displayLabel",
-          "createdAt",
-          "pathwayId",
-          "stage",
-          "owner",
-          "isEscalated",
-          "exceptions",
-          "updatedAt"
-        ],
-        "type": "object",
-        "properties": {
-          "caseId": {
-            "type": "string",
-            "description": "CareLoop's identifier of the case.",
-            "format": "uuid"
-          },
-          "patientReference": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity."
-          },
-          "patientDisplayName": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Patient display name for staff; absent for a coordinator."
-          },
-          "patientSecondaryIdentifier": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Patient's second identifier for staff; absent for a coordinator."
-          },
-          "facilityId": {
-            "type": "string",
-            "description": "The case's facility, for audited team-scoped reads."
-          },
-          "displayLabel": {
-            "description": "The display step derived by the Domain, never recomputed by the dashboard.",
-            "$ref": "#/components/schemas/CaseDisplayLabel"
-          },
-          "closureReason": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "description": "The closure reason, when closed.",
-                "$ref": "#/components/schemas/ClosureReason"
-              }
-            ]
-          },
-          "createdAt": {
-            "type": "string",
-            "description": "When the result opened this case.",
-            "format": "date-time"
-          },
-          "pathwayId": {
-            "type": "string",
-            "description": "Identifier of the pathway the case follows."
-          },
-          "stage": {
-            "description": "The pathway stage the case is in.",
-            "$ref": "#/components/schemas/CaseStage"
-          },
-          "urgency": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "The clinician-reviewed urgency code; `null` until the review arrives."
-          },
-          "owner": {
-            "description": "The one owner accountable for the next action.",
-            "$ref": "#/components/schemas/OwnerResponse"
-          },
-          "nextAction": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Key of the single next action."
-          },
-          "dueAt": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "When the next action is due.",
-            "format": "date-time"
-          },
-          "isEscalated": {
-            "type": "boolean",
-            "description": "`true` while the case has an open escalation."
-          },
-          "exceptions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Names of the unresolved exceptions on the case; empty when there are none."
-          },
-          "updatedAt": {
-            "type": "string",
-            "description": "When the case last changed.",
-            "format": "date-time"
-          }
-        },
-        "description": "One row in the case list returned by `GET /cases`."
       },
       "ClosureEvidenceRule": {
         "required": [

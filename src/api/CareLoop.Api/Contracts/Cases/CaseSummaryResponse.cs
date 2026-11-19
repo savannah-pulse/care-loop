@@ -4,7 +4,7 @@ using CareLoop.Domain.Cases;
 namespace CareLoop.Contracts.Cases;
 
 /// <summary>
-/// One row in the case list returned by <c>GET /cases</c>.
+/// The compact coordination fields used when projecting an exception row.
 /// </summary>
 public sealed record CaseSummaryResponse
 {

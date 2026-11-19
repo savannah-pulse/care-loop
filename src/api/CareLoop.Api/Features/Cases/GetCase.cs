@@ -42,6 +42,6 @@ public static class GetCase
         await ReadAccess.AuditAsync(db, actor, clock, refusal is null ? "case" : "case-denied",
             caseId, outside, reason, null, ct);
         if (refusal is not null) return refusal;
-        return @case is null ? Results.NotFound() : Results.Ok(CaseReadMapping.Detail(@case, actor, pathways));
+        return @case is null ? Results.NotFound() : Results.Ok(await CaseReadMapping.DetailAsync(@case, actor, pathways, db, ct));
     }
 }

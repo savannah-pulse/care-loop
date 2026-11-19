@@ -248,6 +248,9 @@ Because the contracts already exist, every workstream can start now against the 
 **Completion**
 
 All WS6 portions of C1, C3, C4, C5, C9, C10, C11, C15, C19, C20 and decision 19 are **Done**.
+The nurse-summary case-read enhancement is **Done**: `GET /cases` returns `CaseDetailResponse` rows,
+matching the single-case read, with nullable `PatientLanguage` from the latest applied screening event.
+Language is loaded per page and redacted for coordinators; the AI fact boundary is unchanged.
 Facility is the current team boundary; cross-facility reads require a recorded reason. Coordinators have global
 aggregate measures but case reads only for open coordinator escalations, with names/MRNs redacted. This follows the
 design's "Who sees what" table (a coordinator sees one case only when it is escalated to them) and is a requirement

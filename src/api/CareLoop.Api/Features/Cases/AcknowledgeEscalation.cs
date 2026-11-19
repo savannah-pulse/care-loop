@@ -1,6 +1,7 @@
 using System.Text.Json;
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Infrastructure.Auth;
+using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Cases;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
@@ -31,12 +32,13 @@ public static class AcknowledgeEscalation
     /// <param name="reason">Access reason required outside the reader's facility.</param>
     /// <param name="context">The staff identity.</param>
     /// <param name="repository">The single case write path.</param>
+    /// <param name="db">Reads the source-recorded patient language for the response.</param>
     /// <param name="pathways">The display-label rules.</param>
     /// <param name="clock">The acknowledgement clock.</param>
     /// <param name="ct">Cancels the request.</param>
     /// <returns>Updated state, 404, or a 403/409 refusal that leaves accountability and deadlines untouched.</returns>
     public static async Task<IResult> Handle(Guid caseId, Guid escalationId, [FromQuery] string? reason,
-        HttpContext context, ICaseRepository repository, IPathwayProvider pathways, IClock clock, CancellationToken ct)
+        HttpContext context, ICaseRepository repository, CareLoopDbContext db, IPathwayProvider pathways, IClock clock, CancellationToken ct)
     {
         if (ReadAccess.Identity(context, out var actor) is { } identityError) return identityError;
         if (ReadAccess.ValidateReason(reason) is { } invalid) return invalid;
@@ -83,7 +85,7 @@ public static class AcknowledgeEscalation
         {
             return Results.Problem("The case changed while acknowledging. Refresh and try again.", statusCode: 409);
         }
-        return rejection is null ? Results.Ok(CaseReadMapping.Detail(@case, actor, pathways))
+        return rejection is null ? Results.Ok(await CaseReadMapping.DetailAsync(@case, actor, pathways, db, ct))
             : Results.Problem(rejection, statusCode: status);
     }
 }
