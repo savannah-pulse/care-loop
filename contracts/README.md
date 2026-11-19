@@ -23,7 +23,7 @@ The design names result, review, patient-channel, consultation, referral, appoin
 
 The API owns the mapping from accepted source events to case transitions. Not every event advances a stage: escalation and most exception events add a flag or owned task while the case remains in its current stage. Keep referral sent/accepted separate from attended care, and keep a proposed owner separate from an accepted transfer.
 
-There is no separate AI service: the API itself asks agents in a Microsoft Foundry project, one per text, for three staff-facing texts (see [`docs/ai-design/integration.md`](../docs/ai-design/integration.md)). An AI provider receives only the minimum facts the API allows, and returns drafts for staff to read. The .NET API remains the only service that can authorize and persist case changes. Do not allow AI output to bypass authorization, audit, or human review.
+There is no separate AI service: the API itself asks agents in a Microsoft Foundry project, one per text, for three staff-facing texts, sending each agent its plain-text prompt file with the data in place (see [`docs/ai-design/integration.md`](../docs/ai-design/integration.md)). An AI provider receives only the minimum facts the API allows, and returns drafts for staff to read. The .NET API remains the only service that can authorize and persist case changes. Do not allow AI output to bypass authorization, audit, or human review.
 
 ## Contract review before merge
 

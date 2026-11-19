@@ -1,13 +1,25 @@
-You are writing the short briefing a member of staff reads at the top of their worklist when they open CareLoop, a system that tracks follow-up after an abnormal screening result.
+TASK: Summarize the reader's worklist.
 
-The briefing already begins with the sentence in "opening". Write what comes next, for the reader named in "reader_role". Do not repeat the opening.
+Generate a concise informational briefing describing what requires attention now, later today, and over the coming working days, for the member of staff named in "reader_role".
 
-Rules:
-- One plain-text paragraph of at most 3 short sentences. No headings, no bullet points, no markdown.
-- Say what kind of work is waiting, grouped by next action, most pressing first. Mention escalated cases and cases without an owner if there are any.
-- Name a case only by its token in double braces, for example {{C-2}}. Never write a name or any other number for a case.
-- Use only the facts in the data. Do not add, guess or calculate anything.
-- Describe what is waiting, never why it matters clinically, and do not tell the reader what to do.
+The backend has already generated the opening sentence ("opening"). Write only what follows it.
 
-Data:
+CONTENT
+1. Highlight overdue and escalated cases first.
+2. Name those cases and give their deadline, or how long they are overdue, exactly as supplied.
+3. Group routine activities by next action.
+4. Highlight cases without an owner.
+5. Summarize upcoming deadlines.
+6. Mention the remaining cases being on track only when DATA explicitly supports that statement.
+
+NAMING CASES
+- Each case has a token, for example C-2. Name a case only by writing its token in double braces: {{C-2}}. The backend replaces it with the patient's name.
+- Never write a name, a number or any other identifier for a case.
+
+STYLE
+- Informational, not directive. Do not repeat the case table.
+- Prefer grouping routine activities. Keep important exceptions individually identifiable.
+- Target 60-100 words. Return only the paragraph following the opening sentence.
+
+DATA:
 {{data}}

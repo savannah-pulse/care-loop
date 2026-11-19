@@ -24,6 +24,8 @@ public sealed class AiText(IAiClient ai, AiPrompts prompts, IMemoryCache cache, 
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         WriteIndented = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        // Only what there is to say is sent: a field with nothing in it is left out.
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
     /// <summary>Whether AI is switched on.</summary>
@@ -34,15 +36,12 @@ public sealed class AiText(IAiClient ai, AiPrompts prompts, IMemoryCache cache, 
     public static IResult SwitchedOff() =>
         Results.Problem(title: "AI is switched off", detail: "Ai:Provider is NoOp. Nothing was sent.", statusCode: StatusCodes.Status409Conflict);
 
-    /// <summary>Builds the request for a use: the prompt file's instructions, the data as JSON, and the two together.</summary>
+    /// <summary>Builds the request for a use: the prompt file with the data, as JSON, in place.</summary>
     /// <param name="promptName">The prompt file's name, for example <see cref="AiPrompts.RoleBriefing"/>.</param>
     /// <param name="data">The data to summarise, already limited to what may be sent.</param>
     /// <returns>The request exactly as a provider receives it.</returns>
-    public AiRequest Request(string promptName, object data)
-    {
-        var json = JsonSerializer.Serialize(data, data.GetType(), Json);
-        return new AiRequest(promptName, prompts.Task(promptName), json, prompts.Render(promptName, json));
-    }
+    public AiRequest Request(string promptName, object data) =>
+        new(promptName, prompts.Render(promptName, JsonSerializer.Serialize(data, data.GetType(), Json)));
 
     /// <summary>Asks for a text written from the data, reusing a kept answer when the request is unchanged.</summary>
     /// <param name="promptName">The prompt file's name.</param>

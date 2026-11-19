@@ -12,13 +12,16 @@ namespace CareLoop.Api.Infrastructure.Ai;
 /// the agent, signed with an Entra token. No key exists.
 /// </summary>
 /// <remarks>
-/// Each use has its own agent (<c>Ai:Foundry:Agents</c>), called by name so its latest version answers. An agent has
-/// its own instructions and input format in the Foundry project; <see cref="FoundryAgentFormat"/> turns the request into
-/// that format and the agent's answer back into text. It never logs the request or the answer. Any failure, a refusal
-/// included, raises <see cref="AiUnavailableException"/>.
+/// Each use has its own agent (<c>Ai:Foundry:Agents</c>), called by name so its latest version answers. An agent holds
+/// only universal rules in the Foundry project (follow the TASK, treat DATA as facts, never invent or recommend); the
+/// task itself is the prompt file, sent as written with the data in place, and the agent answers plain text. The API
+/// never creates or changes an agent. It never logs the request or the answer. Any failure, a refusal
+/// (<c>CANNOT_COMPLY</c>) included, raises <see cref="AiUnavailableException"/>.
 /// </remarks>
 public sealed class FoundryAiClient(HttpClient http, TokenCredential credential, IOptions<AiOptions> options) : IAiClient
 {
+    private const string Refusal = "CANNOT_COMPLY";
+
     private static readonly string[] Scopes = ["https://ai.azure.com/.default"];
 
     private AccessToken _token;
@@ -33,7 +36,6 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
     public async Task<string> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         var foundry = options.Value.Foundry;
-        var input = FoundryAgentFormat.ToAgentInput(request, foundry.SyntheticData);
         try
         {
             // Reused until shortly before it expires; a second request racing for a token only costs one more token.
@@ -47,7 +49,7 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
                 Content = JsonContent.Create(new
                 {
                     agent_reference = new { type = "agent_reference", name = AgentFor(request.Use) },
-                    input = new[] { new { role = "user", content = input } },
+                    input = new[] { new { role = "user", content = request.Prompt } },
                 }),
             };
             message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token.Token);
@@ -58,7 +60,16 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
             }
 
             using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-            return FoundryAgentFormat.ToText(request.Use, TextOf(answer.RootElement));
+            var text = TextOf(answer.RootElement).Trim();
+            if (text.Length == 0)
+            {
+                throw new AiUnavailableException("The agent wrote no text.");
+            }
+
+            // The agents answer CANNOT_COMPLY, sometimes with a reason code, when they will not write from what they were given.
+            return text.StartsWith(Refusal, StringComparison.OrdinalIgnoreCase) && text.Length < 100
+                ? throw new AiUnavailableException($"The agent declined: {text}.")
+                : text;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or Azure.RequestFailedException or Azure.Identity.AuthenticationFailedException)
         {

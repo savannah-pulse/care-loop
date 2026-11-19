@@ -9,6 +9,7 @@ using CareLoop.Contracts.Metrics;
 using CareLoop.Domain.Pathways;
 using CareLoop.Domain.Time;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace CareLoop.Api.Features.Ai;
 
@@ -25,6 +26,9 @@ public static class ImpactSummary
     /// <summary>Counts above zero and below this are not sent. A placeholder until the team sets the threshold.</summary>
     public const int SmallCount = 5;
 
+    /// <summary>The sentence the API puts at the end of the summary while the data is synthetic.</summary>
+    public const string SyntheticNote = "Simulated on synthetic data; not evidence of real-world improvement.";
+
     /// <summary>What a value too small to send is replaced with.</summary>
     public const string Withheld = "withheld";
 
@@ -40,8 +44,8 @@ public static class ImpactSummary
     }
 
     internal static async Task<IResult> Handle([FromQuery] string? facilityId, [FromQuery] string? reason, HttpContext context,
-        CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, AiText ai, IClock clock, ILoggerFactory loggerFactory,
-        CancellationToken ct, [FromQuery] bool refresh = false)
+        CareLoopDbContext db, IPathwayProvider pathways, MessageFormat format, AiText ai, IOptions<AiOptions> options, IClock clock,
+        ILoggerFactory loggerFactory, CancellationToken ct, [FromQuery] bool refresh = false)
     {
         if (ReadAccess.Identity(context, out var actor) is { } error) return error;
         if (!ai.IsOn) return AiText.SwitchedOff();
@@ -51,8 +55,9 @@ public static class ImpactSummary
         if (read is not IValueHttpResult { Value: MetricsResponse metrics }) return read;
 
         var facility = facilityId ?? (actor.Role == DemoRoles.Coordinator ? null : actor.FacilityId);
+        // Fixed text is the API's, not the model's: while the data is synthetic, the summary always ends by saying so.
         return await ai.WriteAsync(AiPrompts.ImpactSummary, BuildData(metrics, facility is null ? "every facility" : format.Facility(facility), format),
-            refresh, reuse: true, ct);
+            refresh, reuse: true, ct, options.Value.SyntheticData ? text => $"{text}\n\n{SyntheticNote}" : null);
     }
 
     /// <summary>Builds what the model is given from the page's numbers, with small counts withheld.</summary>

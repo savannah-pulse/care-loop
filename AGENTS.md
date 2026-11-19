@@ -95,7 +95,7 @@ care-loop/
 │   │       │   ├── Cases/              ListCases, GetCase, GetTimeline
 │   │       │   ├── Exceptions/         GetExceptions
 │   │       │   ├── Metrics/            GetMetrics, RunSimulation
-│   │       │   └── Ai/                 IAiClient (with AiRequest and AiUnavailableException), AiText, RoleBriefing, ImpactSummary,
+│   │       │   └── Ai/                 IAiClient (with AiRequest(Use, Prompt) and AiUnavailableException), AiText, RoleBriefing, ImpactSummary,
 │   │       │                           PatientMessageDraft
 │   │       ├── Infrastructure/
 │   │       │   ├── Persistence/        CareLoopDbContext, EfCaseRepository, Outbox/, Configurations/, Migrations/
@@ -103,15 +103,15 @@ care-loop/
 │   │       │   ├── Notifications/      SmsNotificationProvider, EmailNotificationProvider (on SimulatorNotificationProvider),
 │   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
 │   │       │   │                       StaffContactOptions
-│   │       │   ├── Ai/                 AiOptions (with FoundryOptions), AiPrompts, NoOpAiClient (default), FoundryAiClient,
-│   │       │   │                       FoundryAgentFormat (the one file that knows each Foundry agent's input and answer format)
+│   │       │   ├── Ai/                 AiOptions (with FoundryOptions), AiPrompts, NoOpAiClient (default), FoundryAiClient
+│   │       │   │                       (sends the prompt file, with the data in place, to the use's Foundry agent)
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
 │   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
 │   │       │   ├── Time/               SystemClock
 │   │       │   └── Auth/               DemoRoles
-│   │       ├── Prompts/                what the AI model is asked, in plain text: role-briefing.md, impact-summary.md,
-│   │       │                           patient-message.md, README.md (the editing guide)
+│   │       ├── Prompts/                what the AI model is asked, in plain text, on every provider: role-briefing.md, impact-summary.md,
+│   │       │                           patient-message.md (with the approved templates), README.md (the editing guide)
 │   │       └── Worker/                 DeadlineWorker
 │   │
 │   ├── web/                            CareLoop dashboard only (React, TypeScript, Vite); a starter today
@@ -313,7 +313,7 @@ public interface ICaseRepository
 | `ICaseRepository` | `Domain/Cases` | `EfCaseRepository`, `InMemoryCaseRepository` (tests) |
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
-| `IAiClient` | `Api/Features/Ai` | `NoOpAiClient` (default), `FoundryAiClient` (asks each use's own Foundry agent; `FoundryAgentFormat` translates) |
+| `IAiClient` | `Api/Features/Ai` | `NoOpAiClient` (default), `FoundryAiClient` (sends the prompt to each use's own Foundry agent and returns its plain text) |
 | `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
 | `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
@@ -340,7 +340,7 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiClient`; `NoOpAiClient` is the default so everything runs with AI off. `FoundryAiClient` asks each use's own agent in a Microsoft Foundry project, by name (`Ai:Foundry:Agents`), signing in with `Azure.Identity` (no key). The API never creates or changes an agent. `FoundryAgentFormat` is the one file that translates between the request and each agent's own format. The prompts are plain-text files in `Prompts/`; a provider that takes a prompt is sent `request.Prompt`. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
+| AI | `IAiClient`; `NoOpAiClient` is the default so everything runs with AI off. `FoundryAiClient` asks each use's own agent in a Microsoft Foundry project, by name (`Ai:Foundry:Agents`), signing in with `Azure.Identity` (no key). The API never creates or changes an agent. The agents hold only universal rules; the prompts are plain-text files in `Prompts/` (a `TASK:` with a `DATA:` section), and every provider, Foundry included, is sent `request.Prompt`: the file with the data in place. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |

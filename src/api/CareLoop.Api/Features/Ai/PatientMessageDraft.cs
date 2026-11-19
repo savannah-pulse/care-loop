@@ -19,39 +19,28 @@ namespace CareLoop.Api.Features.Ai;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The model is told only what the message is for, in a sentence that reveals no result (<see cref="PurposeFor"/>), the
-/// clinic's name, the channel and its length limit, and an upcoming appointment's day and time. It is never given the
-/// patient's name, contact details, identifiers, the result, the appointment's place or the case's next action: the
-/// reporting physician gives results, so a next action such as "review the result" must not reach the prompt.
+/// The draft is one approved administrative template with its placeholders filled in. The API chooses the template from
+/// what is recorded on the case (<see cref="TemplateFor"/>) and supplies the values; the model changes no other wording.
+/// The templates' wording is in <c>Prompts/patient-message.md</c>.
 /// </para>
-/// <para>The wording rules for the message are in <c>Prompts/patient-message.md</c>.</para>
+/// <para>
+/// The model is never given the patient's name, contact details, identifiers, the result, the appointment's place or
+/// the case's next action. The name and the clinic's contact number go as the placeholders
+/// <see cref="FirstNamePlaceholder"/> and <see cref="ClinicContactPlaceholder"/>, which the reviewer fills in. Only
+/// templates with no result content can be chosen: the reporting physician gives results, so the templates that invite
+/// a patient to discuss a result need a clinician's recorded authorization, which CareLoop does not hold.
+/// </para>
 /// </remarks>
 public static class PatientMessageDraft
 {
-    /// <summary>What a message is for when the next action could reveal clinical state, and for any next action not listed.</summary>
-    public const string NeutralPurpose = "The care team would like to talk with the patient.";
+    /// <summary>What stands in the draft for the patient's first name; the name itself is never sent.</summary>
+    public const string FirstNamePlaceholder = "{first name}";
 
-    /// <summary>The situation when an appointment is booked and still to come.</summary>
-    public const string AppointmentReminder = "appointment reminder";
-
-    /// <summary>The situation when earlier attempts to reach the patient failed.</summary>
-    public const string CouldNotReach = "could not reach the patient";
-
-    /// <summary>The situation otherwise: the care team asks the patient to get in touch.</summary>
-    public const string PleaseContactUs = "please contact the care team";
+    /// <summary>What stands in the draft for the clinic's contact number; CareLoop holds none, so the reviewer fills it in.</summary>
+    public const string ClinicContactPlaceholder = "{clinic contact}";
 
     /// <summary>The roles that may ask for a draft.</summary>
     public static readonly IReadOnlyList<string> AllowedRoles = [DemoRoles.NurseNavigator, DemoRoles.Clinician];
-
-    // Only next actions that say nothing about a result have a purpose of their own. This list is code, not prompt
-    // wording, so editing a prompt file can never let a result-revealing next action through.
-    private static readonly Dictionary<string, string> Purposes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["acknowledge-notification"] = "The care team sent the patient a message and would like to know that it arrived.",
-        ["call-patient"] = "The care team will call the patient back, as the patient asked.",
-        ["contact-patient-another-way"] = "The care team asks the patient to get in touch.",
-        ["rebook-appointment"] = "The care team would like to find a new time for the patient's appointment.",
-    };
 
     /// <summary>Maps the route.</summary>
     /// <param name="routes">The application's route builder.</param>
@@ -85,39 +74,45 @@ public static class PatientMessageDraft
         return await ai.WriteAsync(AiPrompts.PatientMessage, BuildData(@case, channel, format, clock.UtcNow), refresh: false, reuse: false, ct);
     }
 
-    /// <summary>What the message is for, in a sentence with no result in it.</summary>
-    /// <param name="nextAction">The case's next action, or <see langword="null"/>.</param>
-    /// <returns>The purpose for one of the few next actions that reveal nothing; otherwise <see cref="NeutralPurpose"/>.</returns>
-    public static string PurposeFor(string? nextAction) =>
-        nextAction is not null && Purposes.TryGetValue(nextAction.Trim(), out var purpose) ? purpose : NeutralPurpose;
+    /// <summary>Chooses the approved template that fits what is recorded on the case.</summary>
+    /// <param name="case">The case.</param>
+    /// <param name="now">The time now.</param>
+    /// <returns>
+    /// <c>T02</c> (appointment reminder) when an appointment is booked and still to come; <c>T03</c> (missed appointment
+    /// follow-up) when the last appointment was missed; <c>T06</c> (unsuccessful contact follow-up) when the patient could
+    /// not be reached; otherwise <c>T05</c> (the care team asks the patient to get in touch).
+    /// </returns>
+    /// <remarks>Chosen in code from recorded state, never by the model, and never from the case's next action, which can reveal clinical state.</remarks>
+    public static string TemplateFor(Case @case, DateTimeOffset now) => @case switch
+    {
+        { Appointment: { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } } when at >= now => "T02",
+        { Appointment: { Status: AppointmentStatus.Missed, ScheduledFor: not null } } => "T03",
+        _ when @case.Exceptions.HasFlag(CaseExceptions.Unreachable) => "T06",
+        _ => "T05",
+    };
 
-    /// <summary>Builds what the model is given for one case.</summary>
+    /// <summary>Builds what the model is given for one case: the template to fill and the values to fill it with.</summary>
     /// <param name="case">The case.</param>
     /// <param name="channel">Text message or email.</param>
     /// <param name="format">Local dates, times and the clinic's name.</param>
     /// <param name="now">The time now.</param>
-    /// <returns>The situation, the purpose, the clinic, the channel and an upcoming appointment's day and time; nothing that identifies the patient.</returns>
+    /// <returns>The template's identifier and its values; nothing that identifies the patient.</returns>
     internal static object BuildData(Case @case, NotificationChannel channel, MessageFormat format, DateTimeOffset now)
     {
-        var upcoming = @case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now ? at : (DateTimeOffset?)null;
+        var template = TemplateFor(@case, now);
+        var appointment = template is "T02" or "T03" ? @case.Appointment!.ScheduledFor : null;
         return new
         {
             Channel = channel == NotificationChannel.Sms ? "text message" : "email",
-            MaxCharacters = channel == NotificationChannel.Sms ? 459 : 1000,
-            Clinic = format.Facility(@case.FacilityId),
-            Situation = SituationFor(@case, upcoming is not null),
-            Purpose = PurposeFor(@case.NextAction),
-            AppointmentDate = upcoming is { } day ? format.Date(day) : "none",
-            AppointmentTime = upcoming is { } time ? format.Time(time) : "none",
+            Template = template,
+            Values = new
+            {
+                PatientName = FirstNamePlaceholder,
+                FacilityName = format.Facility(@case.FacilityId),
+                FacilityContact = ClinicContactPlaceholder,
+                AppointmentDate = appointment is { } day ? format.Date(day) : null,
+                AppointmentTime = template == "T02" && appointment is { } time ? format.Time(time) : null,
+            },
         };
     }
-
-    /// <summary>Which kind of administrative message fits the case, in words that reveal no result.</summary>
-    /// <param name="case">The case.</param>
-    /// <param name="hasUpcomingAppointment">Whether an appointment is booked and still to come.</param>
-    /// <returns><see cref="AppointmentReminder"/>, <see cref="CouldNotReach"/> or <see cref="PleaseContactUs"/>.</returns>
-    public static string SituationFor(Case @case, bool hasUpcomingAppointment) =>
-        hasUpcomingAppointment ? AppointmentReminder
-        : @case.Exceptions.HasFlag(CaseExceptions.Unreachable) ? CouldNotReach
-        : PleaseContactUs;
 }

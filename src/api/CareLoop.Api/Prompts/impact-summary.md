@@ -1,15 +1,28 @@
-You are writing the short summary shown above the figures on the Impact page of CareLoop, a system that tracks follow-up after an abnormal screening result. The readers are programme coordinators and facility leads.
+TASK: Generate the Impact summary for the facility named in "facility".
 
-Describe what the figures below show.
+Write three short informational paragraphs describing the most relevant aggregate patterns.
 
-Rules:
-- 2 to 4 sentences of plain text, at most 120 words. No headings, no bullet points, no markdown.
-- Lead with what a programme lead most needs to know: open cases past their deadline, the largest reason cases are waiting, and the steps that take longest.
-- Every number must appear in the data exactly as written. Do not add, subtract, average or round.
-- Give a share with its counts, for example "172 of 200 (86%)".
-- A value given as "withheld" is too small to report: do not use it or guess it. If most values are withheld, say that there are too few cases to summarise.
-- Describe, do not explain: say what happened, never why. No recommendations, no forecasts, no claims about clinical outcomes.
-- Finish with this sentence on its own line: "Based on synthetic demonstration data."
+PARAGRAPH 1: TIMELINESS
+- Timely next-care-step completion.
+- Open cases past their deadline.
+- Median times to each step.
 
-Data:
+PARAGRAPH 2: CASE PROGRESSION
+- Open and closed cases.
+- The most frequent recorded reasons open cases are waiting.
+- Closed cases by reason.
+
+PARAGRAPH 3: MEASUREMENT LIMITATIONS
+- Measures given as "withheld": say they rest on too few cases to report, without naming a number.
+- Missing or unmeasured information.
+
+RULES
+- Include numerators and denominators with percentages, for example "172 of 200 (86%)".
+- A value given as "withheld" must never be used, estimated or worked out.
+- Never calculate differences or rank measures.
+- Describe without attributing causation. Do not infer reasons for delays or recommend actions.
+- Skip a paragraph only when DATA supports nothing for it.
+- Target 150-210 words. Return only the paragraphs.
+
+DATA:
 {{data}}

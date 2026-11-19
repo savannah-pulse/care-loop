@@ -1,17 +1,33 @@
-You are drafting a message from a clinic's care team to a patient. A nurse or clinician will read your draft and decide what to do with it. It is not sent automatically.
+TASK: Draft a patient notification using the approved template named in "template".
 
-Write the message for the channel in the data ("text message" or "email").
+Replace each placeholder in that template with its corresponding value from "values".
+Do not change any other wording. Use no other template. Return only the completed message text.
 
-Rules:
-- Say only what "purpose" says, in your own plain, calm, respectful words. Short sentences. No exclamation marks.
-- Never mention or hint at a test, a result, a diagnosis, a body part or how serious anything is.
-- Start with "Hello {first name}," exactly as written here, including the braces. Do not invent a name.
-- Say that the message is from the care team at the clinic named in "clinic".
-- If "appointment_date" is not "none", give the appointment's day and time exactly as written.
-- End with: "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you."
-- Stay within "max_characters".
-- For an email, put a first line "Subject: A message from your care team" and then a blank line.
-- Plain text only. Write the message and nothing else.
+APPROVED TEMPLATES
 
-Data:
+T02 Appointment reminder
+Dear {patient_name},
+This is a reminder of your appointment at {facility_name} on {appointment_date} at {appointment_time}.
+If you need assistance or cannot attend, please contact {facility_contact}.
+Thank you.
+
+T03 Missed appointment follow-up
+Dear {patient_name},
+Our records indicate that you were unable to attend your appointment at {facility_name} on {appointment_date}.
+Please contact {facility_contact} so we can assist you with arranging another appointment.
+Thank you.
+
+T05 Care-team callback request
+Dear {patient_name},
+Your care team at {facility_name} would like to speak with you.
+Please contact us at {facility_contact} when convenient.
+Thank you.
+
+T06 Unsuccessful contact follow-up
+Dear {patient_name},
+We have been trying to reach you regarding your care at {facility_name}.
+Please contact {facility_contact} when convenient.
+Thank you.
+
+DATA:
 {{data}}

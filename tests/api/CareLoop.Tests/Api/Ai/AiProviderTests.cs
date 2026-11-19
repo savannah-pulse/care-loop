@@ -24,8 +24,8 @@ public sealed class AiProviderTests
     {
         var prompt = TestPrompts.Shipped.Render(AiPrompts.ImpactSummary, "{\"open_cases\": 8}");
 
-        Assert.StartsWith("You are writing the short summary", prompt);
-        Assert.Contains("Data:\n{\"open_cases\": 8}", prompt);
+        Assert.StartsWith("TASK: Generate the Impact summary", prompt);
+        Assert.Contains("DATA:\n{\"open_cases\": 8}", prompt);
         Assert.DoesNotContain(AiPrompts.DataMarker, prompt);
         Assert.All(new[] { AiPrompts.RoleBriefing, AiPrompts.PatientMessage }, name => Assert.Contains("SYN-DATA", TestPrompts.Shipped.Render(name, "SYN-DATA")));
     }
@@ -94,10 +94,10 @@ public sealed class AiProviderTests
         Assert.DoesNotContain(configuration.GetSection(AiOptions.SectionName).AsEnumerable(), s => s.Key.Contains("Key", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static readonly AiRequest Briefing = new(AiPrompts.RoleBriefing, "SYN task", """{"opening":"SYN opening."}""", "SYN task\n{\"opening\":\"SYN opening.\"}");
+    private static readonly AiRequest Briefing = new(AiPrompts.RoleBriefing, "TASK: SYN task\nDATA:\n{\"opening\":\"SYN opening.\"}");
 
     [Fact]
-    public async Task The_foundry_client_asks_the_uses_agent_by_name_with_a_bearer_token_and_reads_the_text()
+    public async Task The_foundry_client_sends_the_prompt_as_written_to_the_uses_agent_by_name_and_reads_the_text()
     {
         var handler = new StubHandler(_ => Json(HttpStatusCode.OK,
             """{"status":"completed","output":[{"type":"reasoning"},{"type":"message","content":[{"type":"output_text","text":"SYN continuation."}]}]}"""));
@@ -116,8 +116,7 @@ public sealed class AiProviderTests
         // No version: the agent's latest version answers.
         Assert.False(agent.TryGetProperty("version", out _));
         Assert.False(body.RootElement.TryGetProperty("model", out _));
-        using var input = JsonDocument.Parse(body.RootElement.GetProperty("input")[0].GetProperty("content").GetString()!);
-        Assert.Equal(("SYN task", "SYN opening."), (input.RootElement.GetProperty("task").GetString(), input.RootElement.GetProperty("data").GetProperty("opening").GetString()));
+        Assert.Equal(Briefing.Prompt, body.RootElement.GetProperty("input")[0].GetProperty("content").GetString());
         Assert.Equal(1, credential.Calls);
         Assert.Equal(["https://ai.azure.com/.default"], credential.Scopes);
     }
@@ -128,107 +127,11 @@ public sealed class AiProviderTests
     [InlineData(HttpStatusCode.TooManyRequests, "{}")]
     [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[]}""")]
     [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[{"content":[{"text":"CANNOT_COMPLY:MISSING_FIELD"}]}]}""")]
+    [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[{"content":[{"text":"cannot_comply"}]}]}""")]
     [InlineData(HttpStatusCode.OK, "SYN not json")]
     public async Task The_foundry_client_fails_closed_on_an_error_a_refusal_or_an_answer_with_no_text(HttpStatusCode status, string body) =>
         await Assert.ThrowsAsync<AiUnavailableException>(() =>
             Client(new StubHandler(_ => Json(status, body)), new CountingCredential()).CompleteAsync(Briefing, CancellationToken.None));
-
-    [Fact]
-    public void The_impact_agent_is_sent_its_structured_input_with_withheld_values_suppressed_and_no_number_for_them()
-    {
-        const string data = """
-            {"facility":"SYN Family Health Centre","period":"Cases opened up to Thursday 1 January 2026","total_cases":40,"open_cases":28,"closed_cases":12,
-             "shares":{"open cases past their deadline":{"numerator":9,"denominator":28,"percent":32},"acknowledgement":"withheld"},
-             "median_time_from_result_to":{"consultation":{"time":"2 days 3 hours","cases":18},"closure":"withheld"},
-             "open_cases_waiting_because":{"unreachable":6,"overdue":9,"rejected":"withheld"},
-             "closed_cases_by_reason":{"treated":7,"declined":5}}
-            """;
-
-        var message = FoundryAgentFormat.ToAgentInput(new AiRequest(AiPrompts.ImpactSummary, "SYN task", data, "SYN prompt"), synthetic: true);
-
-        Assert.StartsWith("<input_json>\n", message);
-        Assert.EndsWith("\n</input_json>", message);
-        using var input = JsonDocument.Parse(message["<input_json>\n".Length..^"\n</input_json>".Length]);
-        var root = input.RootElement;
-        Assert.Equal(("Cases opened up to Thursday 1 January 2026", "SYN Family Health Centre", 40, true),
-            (root.GetProperty("period").GetProperty("label").GetString(), root.GetProperty("filters").GetProperty("facility_label").GetString(),
-                root.GetProperty("cohort_size").GetInt32(), root.GetProperty("synthetic").GetBoolean()));
-        var measures = root.GetProperty("measures").EnumerateArray().ToList();
-        Assert.Equal((9, 28, 32, false), (measures[0].GetProperty("numerator").GetInt32(), measures[0].GetProperty("denominator").GetInt32(),
-            measures[0].GetProperty("value").GetInt32(), measures[0].GetProperty("suppressed").GetBoolean()));
-        Assert.True(measures[1].GetProperty("suppressed").GetBoolean());
-        Assert.False(measures[1].TryGetProperty("numerator", out _));
-        // Reasons in descending order, the withheld one left out, and the total is of what was sent.
-        Assert.Equal(["overdue", "unreachable"], root.GetProperty("delay_reasons").EnumerateArray().Select(r => r.GetProperty("label").GetString()));
-        Assert.Equal(15, root.GetProperty("delay_reasons_total").GetInt32());
-        Assert.Equal(4, root.GetProperty("supplementary").GetArrayLength());
-        Assert.DoesNotContain("SYN task", message);
-    }
-
-    [Theory]
-    [InlineData("""{"agent":"AG3","status":"ready","paragraphs":[{"sentences":[{"text":"SYN one.","metric_ids":["a"]},{"text":"SYN two.","metric_ids":[]}]},{"sentences":[{"text":"SYN three.","metric_ids":[]}]}],"limits_note":"SYN limits."}""")]
-    [InlineData("```json\n{\"status\":\"ready\",\"paragraphs\":[{\"sentences\":[{\"text\":\"SYN one.\"},{\"text\":\"SYN two.\"}]},{\"sentences\":[{\"text\":\"SYN three.\"}]}],\"limits_note\":\"SYN limits.\"}\n```")]
-    public void The_impact_agents_answer_is_read_as_paragraphs_and_the_limits_note(string answer) =>
-        Assert.Equal("SYN one. SYN two.\n\nSYN three.\n\nSYN limits.", FoundryAgentFormat.ToText(AiPrompts.ImpactSummary, answer));
-
-    [Theory]
-    [InlineData(AiPrompts.ImpactSummary, """{"agent":"AG3","status":"cannot_comply","paragraphs":[],"limits_note":"","reason_code":"ALL_MEASURES_SUPPRESSED"}""")]
-    [InlineData(AiPrompts.ImpactSummary, "SYN plain words, not the agent's JSON")]
-    [InlineData(AiPrompts.ImpactSummary, """{"status":"ready"}""")]
-    [InlineData(AiPrompts.RoleBriefing, "CANNOT_COMPLY:OTHER")]
-    [InlineData(AiPrompts.RoleBriefing, "  ")]
-    public void A_refusal_or_an_answer_in_another_shape_is_a_failure_never_shown_as_text(string use, string answer) =>
-        Assert.Throws<AiUnavailableException>(() => FoundryAgentFormat.ToText(use, answer));
-
-    [Theory]
-    [InlineData("please contact the care team", "T05", "callback_task_verified", "true", 6)]
-    [InlineData("could not reach the patient", "T06", "contact_attempt_status", "unsuccessful", 6)]
-    [InlineData("appointment reminder", "T02", "appointment_status", "confirmed", 8)]
-    public void The_patient_agent_is_told_which_of_its_templates_to_fill_and_given_placeholders_not_the_patient(
-        string situation, string template, string condition, string value, int factCount)
-    {
-        var data = $$"""
-            {"channel":"text message","max_characters":459,"clinic":"SYN Family Health Centre","situation":"{{situation}}",
-             "purpose":"SYN purpose","appointment_date":"Sunday 4 January 2026","appointment_time":"10:30"}
-            """;
-
-        var message = FoundryAgentFormat.ToAgentInput(new AiRequest(AiPrompts.PatientMessage, "SYN task", data, "SYN prompt"), synthetic: true);
-
-        using var input = JsonDocument.Parse(message["<input_json>\n".Length..^"\n</input_json>".Length]);
-        var root = input.RootElement;
-        Assert.Equal((template, "approved", "sms", 459, "en"), (root.GetProperty("template").GetProperty("template_id").GetString(),
-            root.GetProperty("template").GetProperty("approval_status").GetString(), root.GetProperty("channel").GetString(),
-            root.GetProperty("max_chars").GetInt32(), root.GetProperty("language").GetString()));
-        var facts = root.GetProperty("facts").EnumerateArray().ToDictionary(f => f.GetProperty("fact_type").GetString()!, f => f.GetProperty("value").GetString());
-        Assert.Equal(factCount, facts.Count);
-        Assert.Equal((FoundryAgentFormat.FirstNamePlaceholder, "SYN Family Health Centre", FoundryAgentFormat.ClinicContactPlaceholder, value),
-            (facts["patient_name"], facts["facility_name"], facts["facility_contact"], facts[condition]));
-        Assert.Equal(template == "T02", facts.ContainsKey("appointment_date"));
-        Assert.All(root.GetProperty("facts").EnumerateArray(), f => Assert.Equal("final", f.GetProperty("review_status").GetString()));
-        // Only templates with no result content are ever named, and the free wording is not sent.
-        Assert.DoesNotContain("SYN purpose", message);
-        Assert.DoesNotContain("SYN task", message);
-    }
-
-    [Fact]
-    public void The_patient_agents_draft_is_read_from_its_answer_and_a_refusal_is_a_failure()
-    {
-        const string draft = """{"agent":"AG2","status":"draft","template_id":"T05","lines":[],"draft_text":"Dear {first name},\nSYN line.\nThank you.","requires_human_approval":true}""";
-        const string refused = """{"agent":"AG2","status":"cannot_comply","lines":[],"draft_text":"","reason_code":"SENSITIVE_SLOT_VALUE"}""";
-
-        Assert.Equal("Dear {first name},\nSYN line.\nThank you.", FoundryAgentFormat.ToText(AiPrompts.PatientMessage, draft));
-        Assert.Contains("SENSITIVE_SLOT_VALUE", Assert.Throws<AiUnavailableException>(() => FoundryAgentFormat.ToText(AiPrompts.PatientMessage, refused)).Message);
-        Assert.Throws<AiUnavailableException>(() => FoundryAgentFormat.ToText(AiPrompts.PatientMessage, "Dear patient, SYN free text"));
-    }
-
-    [Fact]
-    public void A_use_or_a_situation_with_no_translation_fails_closed()
-    {
-        Assert.Throws<AiUnavailableException>(() => FoundryAgentFormat.ToAgentInput(new AiRequest("another-use", "SYN task", "{}", "SYN prompt"), synthetic: true));
-        Assert.Throws<AiUnavailableException>(() => FoundryAgentFormat.ToAgentInput(
-            new AiRequest(AiPrompts.PatientMessage, "SYN task", """{"situation":"share the result","clinic":"SYN","channel":"email","max_characters":1000}""", "SYN prompt"),
-            synthetic: true));
-    }
 
     private static IServiceCollection Services(string? provider, string? endpoint)
     {

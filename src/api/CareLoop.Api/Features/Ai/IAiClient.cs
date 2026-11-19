@@ -6,8 +6,7 @@ namespace CareLoop.Api.Features.Ai;
 /// <remarks>
 /// <c>Ai:Provider</c> chooses the implementation: <c>NoOp</c> (AI off) or <c>Foundry</c>. To use another provider, write
 /// one more class that implements this and register it in <c>DependencyInjection.AddAi</c>; the endpoints and the prompt
-/// files do not change. A provider that takes a prompt sends <see cref="AiRequest.Prompt"/>; one with its own input
-/// format (the Foundry agents) builds it from the parts. Every part already holds only what the endpoint may send.
+/// files do not change. The prompt already holds only what the endpoint may send.
 /// </remarks>
 public interface IAiClient
 {
@@ -20,7 +19,7 @@ public interface IAiClient
     bool IsEnabled { get; }
 
     /// <summary>Asks for one text and returns it.</summary>
-    /// <param name="request">The use, its instructions and its data.</param>
+    /// <param name="request">The use and its prompt.</param>
     /// <param name="ct">Cancels the call.</param>
     /// <returns>The text, never empty.</returns>
     /// <exception cref="AiUnavailableException">The provider could not be reached, refused, answered an error or wrote nothing.</exception>
@@ -28,11 +27,9 @@ public interface IAiClient
 }
 
 /// <summary>One request for a text.</summary>
-/// <param name="Use">Which text: the prompt file's name, for example <c>role-briefing</c>.</param>
-/// <param name="Task">The prompt file's instructions, without the data.</param>
-/// <param name="Data">The data to summarise, as JSON.</param>
-/// <param name="Prompt">The prompt file with the data in place: everything a provider that takes one prompt needs.</param>
-public sealed record AiRequest(string Use, string Task, string Data, string Prompt);
+/// <param name="Use">Which text: the prompt file's name, for example <c>role-briefing</c>. A provider with one agent or model per use chooses by it.</param>
+/// <param name="Prompt">The prompt file with the data in place: the task and the facts, everything the provider is sent.</param>
+public sealed record AiRequest(string Use, string Prompt);
 
 /// <summary>The AI provider could not write the text. Never replaced by stand-in words.</summary>
 /// <param name="message">Why, in words safe to log; never the prompt.</param>

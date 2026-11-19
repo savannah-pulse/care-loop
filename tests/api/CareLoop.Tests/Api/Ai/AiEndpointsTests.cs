@@ -34,6 +34,7 @@ namespace CareLoop.Tests.Api.Ai;
 public sealed class AiEndpointsTests : IDisposable
 {
     private const string PatientName = "SYNTHETIC Hessa Example";
+    private const string LatePatient = "SYNTHETIC Noura Example";
     private const string PatientMrn = "SYN-MRN-99887766";
     private const string PatientReference = "SYN-PT-0001";
 
@@ -91,31 +92,22 @@ public sealed class AiEndpointsTests : IDisposable
     [Fact]
     public async Task The_briefing_sends_the_prompt_file_with_the_readers_counts_and_cases_and_returns_the_models_text()
     {
-        var onTime = await SeedAsync(NewCase("SYN-RESULT-1"));
-        var late = await SeedAsync(NewCase("SYN-RESULT-2", overdue: true));
+        await SeedAsync(NewCase("SYN-RESULT-1"));
+        await SeedAsync(NewCase("SYN-RESULT-2", overdue: true, patient: LatePatient));
         _ai.Answer = "  A result review is waiting for {{C-1}}; C-2 is upcoming and {{C-9}} is unknown.  ";
 
         var response = Value<AiTextResponse>(await BriefingAsync());
 
-        // The API writes the opening, and puts the case number in where the model named a case by its token (most pressing first).
-        Assert.Equal($"1 case is overdue and 0 are due today. A result review is waiting for case {NotificationRouter.CaseReferenceFor(late.Id)}; "
-            + $"case {NotificationRouter.CaseReferenceFor(onTime.Id)} is upcoming and {{{{C-9}}}} is unknown.", response.Text);
+        // The API writes the opening, and says who each case is where the model named it by its token (most pressing first).
+        Assert.Equal($"1 case is overdue and 0 are due today. A result review is waiting for {LatePatient}; {PatientName} is upcoming and {{{{C-9}}}} is unknown.",
+            response.Text);
         Assert.Equal(("Fake/role-briefing", _clock.UtcNow, false), (response.Model, response.GeneratedAt, response.Cached));
         var prompt = Assert.Single(_ai.Prompts);
-        Assert.StartsWith("You are writing the short briefing", prompt);
+        Assert.StartsWith("TASK: Summarize the reader's worklist.", prompt);
+        Assert.Contains("\"overdue_by\": \"1 day 0 hours\"", prompt);
         Assert.Contains("\"opening\": \"1 case is overdue and 0 are due today.\"", prompt);
         Assert.Contains("\"token\": \"C-1\"", prompt);
-        var request = Assert.Single(_ai.Requests);
-        Assert.Equal(AiPrompts.RoleBriefing, request.Use);
-        Assert.StartsWith("You are writing the short briefing", request.Task);
-        Assert.DoesNotContain("opening\":", request.Task);
-        Assert.EndsWith(request.Data, prompt.TrimEnd());
-        Assert.Contains("\"reader_role\": \"clinician\"", prompt);
-        Assert.Contains("\"open_cases\": 2", prompt);
-        Assert.Contains("\"overdue\": 1", prompt);
-        Assert.Contains("\"next_action\": \"review result\"", prompt);
-        Assert.Contains("\"status\": \"overdue\"", prompt);
-        Assert.DoesNotContain(AiPrompts.DataMarker, prompt);
+        Assert.Equal(AiPrompts.RoleBriefing, Assert.Single(_ai.Requests).Use);
         using var scope = _services.CreateScope();
         Assert.Equal("role-briefing", Assert.Single(await Db(scope).CaseReads.ToListAsync()).View);
     }
@@ -135,6 +127,7 @@ public sealed class AiEndpointsTests : IDisposable
         {
             Assert.DoesNotContain(PatientName, prompt);
             Assert.DoesNotContain("Hessa", prompt);
+            Assert.DoesNotContain("Noura", prompt);
             Assert.DoesNotContain(PatientMrn, prompt);
             Assert.DoesNotContain(PatientReference, prompt);
             Assert.DoesNotContain("SYN-RESULT-1", prompt);
@@ -184,7 +177,12 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.Equal("AI could not write this", Value<ProblemDetails>(failed).Title);
 
         _ai.Failure = null;
-        Assert.False(Value<AiTextResponse>(await ImpactAsync()).Cached);
+        var written = Value<AiTextResponse>(await ImpactAsync());
+        Assert.False(written.Cached);
+        // The fixed sentence is the API's, added to whatever the model wrote, and only while the data is synthetic.
+        Assert.Equal($"SYN summary.\n\n{ImpactSummary.SyntheticNote}", written.Text);
+        _options.SyntheticData = false;
+        Assert.Equal("SYN summary.", Value<AiTextResponse>(await ImpactAsync()).Text);
     }
 
     [Fact]
@@ -203,7 +201,7 @@ public sealed class AiEndpointsTests : IDisposable
         await SeedAsync(NewCase("SYN-RESULT-1", overdue: true));
         await ImpactAsync();
         var few = _ai.Prompts[^1];
-        Assert.StartsWith("You are writing the short summary", few);
+        Assert.StartsWith("TASK: Generate the Impact summary", few);
         Assert.Contains("\"facility\": \"SYN Family Health Centre\"", few);
         Assert.Contains("\"open_cases\": \"withheld\"", few);
         Assert.Contains("\"open cases past their deadline\": \"withheld\"", few);
@@ -217,7 +215,7 @@ public sealed class AiEndpointsTests : IDisposable
         await ImpactAsync();
         var enough = _ai.Prompts[^1];
         Assert.Contains("\"open_cases\": 8", enough);
-        using var data = System.Text.Json.JsonDocument.Parse(_ai.Requests[^1].Data);
+        using var data = System.Text.Json.JsonDocument.Parse(enough[(enough.IndexOf("DATA:", StringComparison.Ordinal) + 5)..]);
         var late = data.RootElement.GetProperty("shares").GetProperty("open cases past their deadline");
         Assert.Equal((8, 8, 100), (late.GetProperty("numerator").GetInt32(), late.GetProperty("denominator").GetInt32(), late.GetProperty("percent").GetInt32()));
         Assert.Equal(0, data.RootElement.GetProperty("shares").GetProperty("open cases without an owner").GetProperty("numerator").GetInt32());
@@ -239,39 +237,39 @@ public sealed class AiEndpointsTests : IDisposable
     [InlineData("start-treatment")]
     [InlineData("arrange-alternative-referral")]
     [InlineData("decide-closure")]
-    public async Task The_patient_message_prompt_never_carries_a_next_action_that_could_reveal_a_result(string nextAction)
+    public async Task The_patient_message_prompt_names_an_administrative_template_and_never_carries_the_next_action(string nextAction)
     {
         var @case = await SeedAsync(NewCase("SYN-RESULT-1", nextAction: nextAction));
 
         await DraftAsync(@case.Id);
 
         var prompt = Assert.Single(_ai.Prompts);
-        Assert.StartsWith("You are drafting a message", prompt);
-        Assert.Contains($"\"purpose\": \"{PatientMessageDraft.NeutralPurpose}\"", prompt);
-        Assert.Contains("\"clinic\": \"SYN Family Health Centre\"", prompt);
-        Assert.Contains($"\"situation\": \"{PatientMessageDraft.PleaseContactUs}\"", prompt);
-        Assert.Contains("\"appointment_date\": \"none\"", prompt);
-        Assert.Contains("\"channel\": \"text message\"", prompt);
-        Assert.Contains("\"max_characters\": 459", prompt);
-        var data = prompt[prompt.IndexOf("Data:", StringComparison.Ordinal)..];
-        Assert.DoesNotContain(nextAction, data);
-        Assert.DoesNotContain(nextAction.Replace('-', ' '), data);
+        Assert.StartsWith("TASK: Draft a patient notification", prompt);
+        var data = prompt[prompt.IndexOf("DATA:", StringComparison.Ordinal)..];
+        Assert.Contains("\"template\": \"T05\"", data);
+        Assert.Contains("\"channel\": \"text message\"", data);
+        Assert.Contains($"\"patient_name\": \"{PatientMessageDraft.FirstNamePlaceholder}\"", data);
+        Assert.Contains("\"facility_name\": \"SYN Family Health Centre\"", data);
+        Assert.Contains($"\"facility_contact\": \"{PatientMessageDraft.ClinicContactPlaceholder}\"", data);
+        // A value there is nothing to say for is left out, not sent as null.
+        Assert.DoesNotContain("appointment_date", data);
+        Assert.DoesNotContain(nextAction, prompt);
+        Assert.DoesNotContain(nextAction.Replace('-', ' '), prompt);
     }
 
     [Fact]
-    public void Every_pathway_next_action_maps_to_a_purpose_with_no_result_in_it()
+    public void The_template_is_chosen_from_what_is_recorded_and_is_only_ever_an_administrative_one()
     {
-        var actions = _pathways.GetAll().SelectMany(p => p.Deadlines.Select(d => d.NextAction)).Distinct().Append(null).Append("unknown");
+        var plain = NewCase("SYN-RESULT-1");
+        var unreachable = NewCase("SYN-RESULT-2");
+        unreachable.FlagException(CaseExceptions.Unreachable, _clock.UtcNow);
 
-        Assert.All(actions, action =>
-        {
-            var purpose = PatientMessageDraft.PurposeFor(action);
-            Assert.DoesNotContain("result", purpose, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("treatment", purpose, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("referral", purpose, StringComparison.OrdinalIgnoreCase);
-        });
-        Assert.NotEqual(PatientMessageDraft.NeutralPurpose, PatientMessageDraft.PurposeFor("call-patient"));
-        Assert.Equal(PatientMessageDraft.NeutralPurpose, PatientMessageDraft.PurposeFor("review-result"));
+        Assert.Equal("T05", PatientMessageDraft.TemplateFor(plain, _clock.UtcNow));
+        Assert.Equal("T06", PatientMessageDraft.TemplateFor(unreachable, _clock.UtcNow));
+        // Every template the API can name is in the prompt file, and none of them invites a patient to discuss a result.
+        var prompt = TestPrompts.Shipped.Render(AiPrompts.PatientMessage, "{}");
+        Assert.All(new[] { "T02", "T03", "T05", "T06" }, id => Assert.Contains($"\n{id} ", prompt));
+        Assert.DoesNotContain("result", prompt, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -290,8 +288,6 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.False(first.Cached || second.Cached);
         Assert.Equal(2, _ai.Prompts.Count);
         Assert.Contains("\"channel\": \"email\"", _ai.Prompts[0]);
-        Assert.Contains("\"max_characters\": 1000", _ai.Prompts[0]);
-        Assert.Contains("will call the patient back", _ai.Prompts[0]);
         using var scope = _services.CreateScope();
         Assert.Equal(2, await Db(scope).CaseReads.CountAsync(r => r.View == "patient-message-draft" && r.CaseId == @case.Id));
     }
@@ -325,7 +321,7 @@ public sealed class AiEndpointsTests : IDisposable
         {
             ("role briefing", await RoleBriefing.Handle(Identity(), Db(scope), _pathways, _format, live, _clock, CancellationToken.None)),
             ("role briefing again", await RoleBriefing.Handle(Identity(), Db(scope), _pathways, _format, live, _clock, CancellationToken.None)),
-            ("impact summary", await ImpactSummary.Handle(null, null, Identity(), Db(scope), _pathways, _format, live, _clock, NullLoggerFactory.Instance, CancellationToken.None)),
+            ("impact summary", await ImpactSummary.Handle(null, null, Identity(), Db(scope), _pathways, _format, live, Options.Create(options), _clock, NullLoggerFactory.Instance, CancellationToken.None)),
             ("patient text message", await PatientMessageDraft.Handle(called.Id, Identity(), Db(scope), _format, live, _clock, CancellationToken.None)),
             ("patient email", await PatientMessageDraft.Handle(called.Id, Identity(), Db(scope), _format, live, _clock, CancellationToken.None, NotificationChannel.Email)),
         };
@@ -341,17 +337,19 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.All(results, r => Assert.True(Status(r.Result) == 200, report));
         Assert.Equal("Foundry/patient-notification", Value<AiTextResponse>(results[3].Result).Model);
         Assert.StartsWith("Dear {first name},", Value<AiTextResponse>(results[3].Result).Text);
+        Assert.EndsWith(ImpactSummary.SyntheticNote, Value<AiTextResponse>(results[2].Result).Text);
         Assert.True(Value<AiTextResponse>(results[1].Result).Cached);
         Assert.Equal("Foundry/role-briefing", Value<AiTextResponse>(results[0].Result).Model);
         Assert.Equal("Foundry/impact-summary", Value<AiTextResponse>(results[2].Result).Model);
-        Assert.DoesNotContain("Hessa", report);
+        // The briefing names patients, because the API puts the names in after the answer; nothing else identifies anyone.
+        Assert.Contains(PatientName, Value<AiTextResponse>(results[0].Result).Text);
         Assert.DoesNotContain(PatientMrn, report);
     }
 
-    private Case NewCase(string result, bool overdue = false, string nextAction = "review-result")
+    private Case NewCase(string result, bool overdue = false, string nextAction = "review-result", string patient = PatientName)
     {
         var @case = new Case(Guid.NewGuid(), "SYN-HIS", result, PatientReference, "breast-screening", "SYN-FAC-A",
-            TestData.Clinician(), _clock.UtcNow, PatientName, PatientMrn);
+            TestData.Clinician(), _clock.UtcNow, patient, PatientMrn);
         @case.MoveTo(CaseStage.ReviewPending, _clock.UtcNow);
         @case.SetNextAction(nextAction, _clock.UtcNow.AddDays(overdue ? -1 : 2), _clock.UtcNow);
         return @case;
@@ -384,8 +382,8 @@ public sealed class AiEndpointsTests : IDisposable
     private async Task<IResult> ImpactAsync(string? facilityId = null, bool refresh = false)
     {
         using var scope = _services.CreateScope();
-        return await ImpactSummary.Handle(facilityId, null, Identity(), Db(scope), _pathways, _format, _text, _clock, NullLoggerFactory.Instance,
-            CancellationToken.None, refresh);
+        return await ImpactSummary.Handle(facilityId, null, Identity(), Db(scope), _pathways, _format, _text, Options.Create(_options), _clock,
+            NullLoggerFactory.Instance, CancellationToken.None, refresh);
     }
 
     private async Task<IResult> DraftAsync(Guid caseId, string role = DemoRoles.Clinician, string? facility = "SYN-FAC-A",

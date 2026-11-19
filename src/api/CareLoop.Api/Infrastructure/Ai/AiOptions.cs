@@ -18,6 +18,10 @@ public sealed class AiOptions
     /// <summary>Folder holding the prompt files; relative to the content root unless rooted.</summary>
     public string PromptsDirectory { get; set; } = "Prompts";
 
+    /// <summary>Whether the data is synthetic. While <see langword="true"/>, the impact summary ends with a sentence saying so.</summary>
+    /// <remarks><see langword="true"/> until real data is approved for this deployment.</remarks>
+    public bool SyntheticData { get; set; } = true;
+
     /// <summary>Settings for the Microsoft Foundry provider.</summary>
     public FoundryOptions Foundry { get; set; } = new();
 }
@@ -37,7 +41,4 @@ public sealed class FoundryOptions
         [AiPrompts.ImpactSummary] = "impact-summary",
         [AiPrompts.PatientMessage] = "patient-notification",
     };
-
-    /// <summary>Told to an agent that asks whether the figures are synthetic. <see langword="true"/> until real data is approved for this deployment.</summary>
-    public bool SyntheticData { get; set; } = true;
 }
