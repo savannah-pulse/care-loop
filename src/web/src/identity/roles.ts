@@ -21,17 +21,16 @@ export const ROLE_KEYS = [
 export type RoleKey = (typeof ROLE_KEYS)[number]
 
 /**
- * Roles that check and approve AI handoff summaries.
+ * The clinician roles: the clinician who reviews a result and the clinician who receives a referral.
  *
  * @remarks
- * Which roles may approve is still open in the API design (proposed as `summaryApproverRoles` in the
- * pathway definition). The screen offers the summary to these roles; the API decides and answers
- * 403 to anyone else.
+ * The case screen shows a patient's other screening to these roles; the API allows the patient
+ * search to them only and answers 403 to anyone else.
  */
 export const CLINICIAN_ROLES: readonly RoleKey[] = ['clinician', 'receiving-clinician']
 
 /**
- * Tells whether a role checks and approves handoff summaries.
+ * Tells whether a role is a clinician role.
  *
  * @param role - A role key from the API or the signed-in person.
  * @returns `true` for the clinician roles in {@link CLINICIAN_ROLES}.
@@ -115,4 +114,22 @@ export function namesHiddenFor(role: string): boolean {
 export function roleLabel(role: string): string | undefined {
   const key = `roles.${role}`
   return hasMessage(key) ? t(key) : undefined
+}
+
+/**
+ * The roles that may ask AI for a draft of a message to the patient.
+ *
+ * @remarks
+ * The API allows the same two (`PatientMessageDraft.AllowedRoles`) and refuses anyone else.
+ */
+export const PATIENT_MESSAGE_ROLES: readonly RoleKey[] = ['nurse-navigator', 'clinician']
+
+/**
+ * Tells whether a role may ask for a patient message draft.
+ *
+ * @param role - The role key.
+ * @returns `true` for the roles in {@link PATIENT_MESSAGE_ROLES}.
+ */
+export function isPatientMessageRole(role: string): boolean {
+  return (PATIENT_MESSAGE_ROLES as readonly string[]).includes(role)
 }

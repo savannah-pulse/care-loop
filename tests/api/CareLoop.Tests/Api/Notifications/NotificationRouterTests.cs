@@ -34,6 +34,9 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(Envelopes.PatientEmail, message.ContactPoint.Address);
         Assert.Equal(requested.TemplateKey, message.TemplateKey);
         Assert.Contains(NotificationRouter.CaseReferenceFor(requested.CaseId), message.Body);
+        // No contact is configured for the facility here, so the message says "the clinic"; it never names the patient.
+        Assert.Contains($"Please contact us at {MessageFormat.NoFacilityContact} when convenient.", message.Body);
+        Assert.StartsWith("Dear patient,", message.Body);
         Assert.Equal(NotificationSender.AttemptIdFor(requested.EventId, "SYN-PT-0001", NotificationChannel.Email), message.AttemptId);
     }
 
@@ -78,7 +81,6 @@ public sealed class NotificationRouterTests : IDisposable
         var @case = await _store.OpenCaseAsync();
 
         await RouteAsync(new CaseClosed { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, Reason = ClosureReason.Treated, AuthorizedBy = Envelopes.Clinician() });
-        await RouteAsync(new HandoffSummaryApproved { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, SummaryId = Guid.NewGuid(), ApprovedBy = Envelopes.Clinician() });
 
         Assert.Empty(_email.Sent);
     }
@@ -247,7 +249,12 @@ public sealed class NotificationRouterTests : IDisposable
         var scheduled = Assert.Single(await _store.RaisedAsync<AppointmentScheduled>());
         var before = await _store.TheCaseAsync();
 
-        await RouteAsync(scheduled, format: new MessageFormat(new NotificationOptions { TimeZone = "Asia/Dubai" }));
+        await RouteAsync(scheduled, format: new MessageFormat(new NotificationOptions
+        {
+            TimeZone = "Asia/Dubai",
+            FacilityNames = new(StringComparer.OrdinalIgnoreCase) { [before.FacilityId] = "SYN Family Health Centre" },
+            FacilityContacts = new(StringComparer.OrdinalIgnoreCase) { [before.FacilityId] = "SYN-PHONE-A" },
+        }));
 
         var message = Assert.Single(_email.Sent);
         Assert.Equal(RecipientKind.Patient, message.Recipient.Kind);
@@ -255,6 +262,8 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Contains("Tuesday 24 November 2026", message.Body);
         Assert.Contains("13:30", message.Body);
         Assert.Contains("SYN Breast Imaging Clinic", message.Body);
+        Assert.Contains("Your appointment at SYN Family Health Centre is confirmed", message.Body);
+        Assert.Contains("please contact SYN-PHONE-A.", message.Body);
         Assert.Contains("Reply 1 to confirm you got this message", message.Body);
         Assert.Contains(NotificationRouter.CaseReferenceFor(scheduled.CaseId), message.Body);
         // Not the follow-up notification: the track is left as it was.

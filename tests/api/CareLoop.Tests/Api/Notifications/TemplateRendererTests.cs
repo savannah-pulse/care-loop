@@ -7,7 +7,7 @@ namespace CareLoop.Tests.Api.Notifications;
 /// </summary>
 public sealed class TemplateRendererTests
 {
-    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["hisLink"] = "Task/SYN" };
+    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["facility"] = "SYN Family Health Centre", ["facilityContact"] = "SYN-PHONE-A", ["hisLink"] = "Task/SYN" };
 
     [Fact]
     public void Renders_placeholders()
@@ -30,11 +30,42 @@ public sealed class TemplateRendererTests
 
         Assert.True(sms.IsSmsSafe);
         Assert.Null(sms.Subject);
-        Assert.StartsWith("[PLACEHOLDER] ", sms.Body);
+        Assert.DoesNotContain('\n', sms.Body);
         Assert.Contains("Reference: AB12CD34", sms.Body);
-        Assert.Equal("A follow-up step is waiting for you", standard.Subject);
+        Assert.Equal("Your care team would like to speak with you", standard.Subject);
         Assert.Contains("Reference: AB12CD34", standard.Body);
-        Assert.Contains("[PLACEHOLDER WORDING, NOT APPROVED]", standard.Body);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Patient_follow_up_uses_the_care_team_callback_wording_with_the_facility_and_its_contact(bool smsSafe)
+    {
+        var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
+
+        Assert.Contains("our care team at SYN Family Health Centre would like to speak with you.", body);
+        Assert.Contains("Please contact us at SYN-PHONE-A when convenient.", body);
+        Assert.Contains("Thank you.", body);
+        Assert.DoesNotContain("PLACEHOLDER", body);
+    }
+
+    [Theory]
+    [InlineData("patient-appointment", "Place: SYN Clinic", false)]
+    [InlineData("patient-appointment", "Place: SYN Clinic", true)]
+    [InlineData("patient-appointment-place-tbc", "Place: to be confirmed", false)]
+    [InlineData("patient-appointment-place-tbc", "Place: to be confirmed", true)]
+    public void Patient_appointment_uses_the_confirmation_wording_and_keeps_the_place_and_reply_codes(string templateKey, string place, bool smsSafe)
+    {
+        var values = new Dictionary<string, string>(Values) { ["appointmentDate"] = "Tuesday 24 November 2026", ["appointmentTime"] = "13:30", ["place"] = "SYN Clinic" };
+
+        var body = ShippedTemplates().Render(templateKey, "en", smsSafe, values).Body;
+
+        Assert.Contains("our appointment at SYN Family Health Centre is confirmed for Tuesday 24 November 2026 at 13:30.", body);
+        Assert.Contains(place, body);
+        Assert.Contains("If you need assistance or wish to change your appointment, please contact SYN-PHONE-A.", body);
+        Assert.Contains("Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.", body);
+        Assert.Contains("Reference: AB12CD34", body);
+        Assert.DoesNotContain("PLACEHOLDER", body);
     }
 
     [Theory]

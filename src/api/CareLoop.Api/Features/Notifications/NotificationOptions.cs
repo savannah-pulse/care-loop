@@ -34,6 +34,13 @@ public sealed class NotificationOptions
     public Dictionary<string, string> FacilityNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    /// How a patient contacts each facility, keyed by facility identifier: the telephone number or other contact a
+    /// patient message gives after "please contact". A facility with no entry is written as
+    /// <see cref="MessageFormat.NoFacilityContact"/>.
+    /// </summary>
+    public Dictionary<string, string> FacilityContacts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Checks that <see cref="TimeZone"/>, when set, names a time zone this host knows.
     /// </summary>
     /// <param name="options">The options to check.</param>

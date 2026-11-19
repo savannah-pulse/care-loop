@@ -5,7 +5,6 @@ import { EscalationPage, EscalationsPage } from './features/escalations'
 import { ImpactPage } from './features/impact'
 import { NotFoundPage } from './features/not-found'
 import { ProgrammesPage } from './features/programmes'
-import { SummaryPage } from './features/summary'
 import { WorklistPage } from './features/worklist'
 import { t } from './i18n'
 import { useSignedInStaff } from './identity'
@@ -17,8 +16,6 @@ function Screen({ route }: { readonly route: Route }) {
       return <WorklistPage />
     case 'case':
       return <CasePage key={route.caseId} caseId={route.caseId} />
-    case 'summary':
-      return <SummaryPage key={route.caseId} caseId={route.caseId} />
     case 'escalation':
       return <EscalationPage key={route.caseId} caseId={route.caseId} />
     case 'escalations':

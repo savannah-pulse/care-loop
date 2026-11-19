@@ -1,9 +1,9 @@
-[PLACEHOLDER WORDING, NOT APPROVED]
 Subject: Your appointment
 
-Your appointment has been booked.
-Date: {{appointmentDate}}
-Time: {{appointmentTime}}
+Dear patient,
+Your appointment at {{facility}} is confirmed for {{appointmentDate}} at {{appointmentTime}}.
 Place: {{place}}
+If you need assistance or wish to change your appointment, please contact {{facilityContact}}.
 Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.
+Thank you.
 Reference: {{caseReference}}

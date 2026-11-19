@@ -2,6 +2,12 @@ import type { components } from '../api/schema'
 
 type Schemas = components['schemas']
 
+/** A text an AI model wrote for staff to read, as the AI endpoints return it. */
+export type AiText = Schemas['AiTextResponse']
+
+/** The channel a message to the patient would go out on. */
+export type MessageChannel = Schemas['NotificationChannel']
+
 /** One row of the case list, as returned by `GET /cases`. */
 export type CaseSummary = Schemas['CaseDetailResponse']
 
@@ -22,12 +28,6 @@ export type SimulationResult = Schemas['SimulationResponse']
 
 /** One arm of the escalation comparison: the cohort replayed with or without escalation. */
 export type SimulationArm = Schemas['SimulationArmResponse']
-
-/** A handoff summary and where it stands with its reviewer. */
-export type HandoffSummary = Schemas['HandoffSummaryResponse']
-
-/** One section of a handoff summary and the facts it cites. */
-export type SummarySection = Schemas['SummarySectionResponse']
 
 /** The person or queue accountable for a case. */
 export type Owner = Schemas['OwnerResponse']

@@ -24,7 +24,7 @@ export {
 export type { EscalationTarget, LadderInput, LadderRung, Notice, NoticeKind, RungState } from './escalations'
 export { EXCEPTION_NAMES, exceptionLabel, exceptionReason, isExceptionName } from './exceptions'
 export type { ExceptionName } from './exceptions'
-export { NEXT_ACTION_KEYS, REFERRAL_ACTIONS, isNextActionKey, isReferralAction, nextActionText } from './nextActions'
+export { NEXT_ACTION_KEYS, NEXT_ACTION_ROLES, isNextActionKey, nextActionRole, nextActionText } from './nextActions'
 export type { NextActionKey } from './nextActions'
 export {
   caseLinkNames,

@@ -49,6 +49,55 @@ function mrn(digits: string): string {
 }
 
 describe('worklist', () => {
+  it('shows the AI briefing under the greeting, labelled as written by AI, and asks for a new one on Refresh', async () => {
+    answer('GET /cases', json([HESSA, NOURA]))
+    answer('GET /ai/role-briefing', (request) =>
+      json({
+        text: request.query.get('refresh') === 'true' ? 'SYN new briefing.' : 'SYN 1 case is overdue. A call is waiting.',
+        model: 'Foundry/role-briefing',
+        generatedAt: '2026-11-12T06:30:00Z',
+        cached: false,
+      }),
+    )
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+
+    const briefing = await screen.findByRole('region', { name: 'Summary written by AI' })
+    expect(within(briefing).getByText('SYN 1 case is overdue. A call is waiting.')).toBeInTheDocument()
+    expect(within(briefing).getByText(/^Written by AI · Today, /)).toBeInTheDocument()
+    // It sits under the greeting and its one-line count, above the list.
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.compareDocumentPosition(briefing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(sentRequests('GET /ai/role-briefing')[0].query.has('refresh')).toBe(false)
+
+    await user.click(within(briefing).getByRole('button', { name: 'Refresh' }))
+
+    expect(await screen.findByText('SYN new briefing.')).toBeInTheDocument()
+    expect(sentRequests('GET /ai/role-briefing').at(-1)?.query.get('refresh')).toBe('true')
+  })
+
+  it.each([
+    ['AI is switched off', 409],
+    ['AI could not write it', 503],
+  ])('shows no briefing and nothing in its place when %s', async (_why, status) => {
+    answer('GET /cases', json([HESSA]))
+    answer('GET /ai/role-briefing', problem(status))
+    renderApp({ at: '#/', as: 'huda-saleh' })
+
+    await screen.findByRole('button', { name: /^Whole team/ })
+    await vi.waitFor(() => expect(sentRequests('GET /ai/role-briefing')).toHaveLength(1))
+    await vi.waitFor(() => expect(screen.queryByText(/Writing a summary/)).not.toBeInTheDocument())
+    expect(screen.queryByRole('region', { name: 'Summary written by AI' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Written by AI/)).not.toBeInTheDocument()
+  })
+
+  it('asks for no briefing when the reader has no open case', async () => {
+    answer('GET /cases', json([]))
+    renderApp({ at: '#/', as: 'huda-saleh' })
+
+    await screen.findByText('Nothing needs you right now')
+    expect(sentRequests('GET /ai/role-briefing')).toHaveLength(0)
+  })
+
   it.each([
     ['in tables, on a wide screen', 1024],
     ['on cards, on a narrow screen', 640],
