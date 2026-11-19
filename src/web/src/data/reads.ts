@@ -3,6 +3,7 @@ import { api, type CareLoopClient } from './client'
 import { callApi, type ApiOutcome } from './outcome'
 import { useApiRead, type Read, type ReadOptions } from './read'
 import type {
+  AiText,
   CaseDetail,
   CaseSummary,
   Metrics,
@@ -314,4 +315,27 @@ export function readCase(
       signal,
     }),
   )
+}
+
+/**
+ * Reads the AI-written summary of the signed-in person's open cases.
+ *
+ * @param refreshes - How many times the reader has asked for a new summary. Above zero, the API is
+ * asked to write a new one instead of reusing the one it kept.
+ * @returns The summary, or why there is none: `conflict` while AI is switched off, `unavailable`
+ * when AI could not write it.
+ *
+ * @remarks
+ * Side effect: calls `GET /ai/role-briefing`, once per reader and once more per refresh. It is not
+ * re-read on a timer: the API reuses its answer while the cases are unchanged.
+ */
+export function useRoleBriefing(refreshes: number = 0): Read<AiText> {
+  const load = useCallback(
+    (signal: AbortSignal) =>
+      callApi(() =>
+        api.GET('/ai/role-briefing', { params: { query: { refresh: refreshes > 0 ? true : undefined } }, signal }),
+      ),
+    [refreshes],
+  )
+  return useApiRead(load)
 }

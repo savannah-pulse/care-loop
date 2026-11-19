@@ -261,7 +261,7 @@ Run on 19 November 2026: all three uses answered 200 from their own agents, the 
 | Prompt files and `AiPrompts` | Built |
 | Migration `RemoveHandoffSummaries` (drops the `HandoffSummaries` table) | Built |
 | Tests | `tests/api/CareLoop.Tests/Api/Ai/` |
-| Dashboard display of the three texts | Not built yet (WS6). The handoff summary screen is removed from `src/web` |
+| Dashboard display | The worklist shows the role briefing under its greeting, with Refresh. The impact summary and the patient message draft are not shown yet (WS6) |
 
 ## Before real data
 

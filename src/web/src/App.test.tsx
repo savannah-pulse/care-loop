@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { STAFF } from './identity'
 import { answer, json, sentRequests } from './testing/api'
 import { caseDetail, caseSummary, escalation, programme } from './testing/builders'
@@ -45,6 +45,8 @@ describe('who is acting', () => {
     answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'], nextAction: 'call-patient' })]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
     await screen.findByRole('link', { name: 'Hessa Al Dhaheri, MRN 100\u00a0245\u00a0891' })
+    // The worklist also asks for its AI briefing once the list is shown; that request is still the first person's.
+    await vi.waitFor(() => expect(sentRequests('GET /ai/role-briefing')).toHaveLength(1))
     const before = sentRequests().length
 
     await user.click(screen.getByRole('button', { name: (label) => label.startsWith('Signed in as') }))

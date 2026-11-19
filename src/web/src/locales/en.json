@@ -254,6 +254,13 @@
     "errorTitle": "We couldn't load your worklist",
     "forbiddenTitle": "This list is not open to your role",
     "forbiddenBody": "Your role can only see cases sent to you. If you think you should see this list, ask your facility lead.",
+    "briefing": {
+      "label": "Summary written by AI",
+      "writtenByAi": "Written by AI",
+      "refresh": "Refresh",
+      "loading": "Writing a summary of your cases…",
+      "refreshing": "Writing a new summary…"
+    },
     "emptyTitle": "Nothing needs you right now",
     "emptyAllOnTrack": {
       "one": "The only open case is on track. The next deadline is {date}.",

@@ -59,6 +59,10 @@ The dashboard shows what the API sends and makes nothing up: display labels as g
 
 **Staying up to date.** The worklist, a case and its timeline, the escalation screens and the count of open escalations, and Impact's numbers read again by themselves every 30 seconds while the page is visible (`LIVE_REFRESH_MS`, `useApiRead` in `src/data/read.ts`). They stop while the tab is hidden and read again as soon as it is shown or the window regains focus, unless the last answer is under 10 seconds old. These reads are quiet: nothing flickers, moves or is announced, and the chosen list, filters, search, scroll position, focus, open dialogs and half-filled forms stay as they are. A failed read leaves the screen as it was and is tried again next time; only one read is on its way at a time, and it is cancelled when the screen closes. After the person records a call or acknowledges an escalation, the screen shows the API's answer until a newer read arrives (`latestCase`). Nothing that writes or costs money is repeated by itself: not the comparison (`POST /metrics/simulation`); the patient's other screening and programmes are read once. Each repeat is a read the API records like any other.
 
+## AI briefing on the worklist
+
+Under the worklist's greeting and its one-line count, the dashboard shows the role briefing from `GET /ai/role-briefing`: a short AI-written summary of the signed-in person's open cases (`features/worklist/RoleBriefing.tsx`). It is plain text, labelled "Written by AI" with when it was written, and "Refresh" asks the API for a new one (`refresh=true`) instead of the one it reuses while the cases are unchanged. It is shown only on the reader's own team's list and only when that team has open cases. When AI is switched off (409) or could not write it (503), nothing is shown: the worklist below is the record and does not depend on it. The mock API answers with a summary built from its fixtures, marked as a mock. The impact summary and the patient message draft are not shown yet.
+
 ## Test it
 
 ```powershell

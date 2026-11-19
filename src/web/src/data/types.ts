@@ -2,6 +2,9 @@ import type { components } from '../api/schema'
 
 type Schemas = components['schemas']
 
+/** A text an AI model wrote for staff to read, as `GET /ai/role-briefing` returns it. */
+export type AiText = Schemas['AiTextResponse']
+
 /** One row of the case list, as returned by `GET /cases`. */
 export type CaseSummary = Schemas['CaseSummaryResponse']
 

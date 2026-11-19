@@ -232,6 +232,42 @@ function listCases(state: MockState, who: Reader, query: URLSearchParams): CaseS
     .map((detail) => redacted(who, summaryOf(detail)))
 }
 
+/** The briefings the mock has written, by reader, so a repeat request is answered as reused, like the API. */
+const briefings = new Map<string, { text: string; generatedAt: string }>()
+
+/**
+ * Stands in for `GET /ai/role-briefing`: a summary of the reader's open cases, built from the
+ * fixtures so the screen has realistic words to show without an AI provider.
+ *
+ * @param state - The mock's cases.
+ * @param who - The reader.
+ * @param refresh - `true` to write a new summary instead of reusing the one kept for this reader.
+ * @returns The text, when it was written and whether it was reused.
+ */
+function roleBriefing(state: MockState, who: Reader, refresh: boolean): Schemas['AiTextResponse'] {
+  const open = scoped(state, who, null).filter((detail) => detail.stage !== 'Closed')
+  const now = Date.now()
+  const overdue = open.filter((detail) => detail.exceptions.includes('Overdue') || (detail.dueAt && Date.parse(detail.dueAt) < now))
+  const actions = new Map<string, number>()
+  for (const detail of open) {
+    const action = (detail.nextAction ?? 'no next action').replaceAll('-', ' ')
+    actions.set(action, (actions.get(action) ?? 0) + 1)
+  }
+  const waiting = [...actions].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([action, count]) => `${action} (${count})`)
+  const text =
+    `${overdue.length === 1 ? '1 case is' : `${overdue.length} cases are`} overdue. ` +
+    (waiting.length > 0 ? `Waiting work is mostly: ${waiting.join(', ')}. ` : '') +
+    `${open.filter((detail) => detail.isEscalated).length} escalated. [Mock summary, not written by AI]`
+  const key = `${who.reference}|${who.role}|${who.facilityId ?? ''}`
+  const kept = briefings.get(key)
+  if (kept && kept.text === text && !refresh) {
+    return { ...kept, model: 'Mock/role-briefing', cached: true }
+  }
+  const written = { text, generatedAt: new Date().toISOString() }
+  briefings.set(key, written)
+  return { ...written, model: 'Mock/role-briefing', cached: false }
+}
+
 function listExceptions(state: MockState, who: Reader, query: URLSearchParams): Schemas['ExceptionItemResponse'][] {
   const facilityId = query.get('facilityId')
   const owner = query.get('ownerReference')
@@ -433,6 +469,11 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
   if (path === '/exceptions') {
     expect('GET')
     send(res, 200, listExceptions(state, who, query))
+    return true
+  }
+  if (path === '/ai/role-briefing') {
+    expect('GET')
+    send(res, 200, roleBriefing(state, who, query.get('refresh') === 'true'))
     return true
   }
   if (path === '/metrics') {

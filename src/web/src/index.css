@@ -366,6 +366,43 @@ h1 {
   color: var(--ink3);
 }
 
+/* The AI-written briefing under the worklist's greeting: plain text, then who wrote it and when. */
+.ai-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-block-start: 8px;
+  max-inline-size: 72ch;
+}
+
+.ai-brief-text {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.ai-brief-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.ai-brief-meta svg.i {
+  inline-size: 14px;
+  block-size: 14px;
+}
+
+.ai-brief-refresh {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .small {
   font-size: 14px;
 }
