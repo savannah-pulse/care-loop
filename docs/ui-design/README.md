@@ -1,11 +1,14 @@
 # UI design
 
-One flow, 22 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
+One flow, 21 screens and a guide to who sees what, for CareLoop, ready to build. Together they cover user stories US01 to US16 and every point of Challenge 05, Closing the Screening-to-Care Loop. Every person, number and facility shown is invented.
+
+CareLoop is built for any screening programme and, over time, any disease. Each programme is a pathway file, not new code (screen 4). The prototype uses breast screening as its example pathway, and Hessa's story follows it. More programmes come next.
 
 - Screens 1 to 13 are grouped by the component that builds them: 1 to 4 in the CareLoop web app, 5 to 8 in the HIS simulator, 9 to 12 in the messaging simulator, and 13 across all of them.
 - CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal (decisions 21 to 31 in the [gap analysis](../ui-design-gap-analysis.md), C22). Screen 10 is the patient's email, and a nurse navigator records what a patient says on a call on screen 2. A reply of 1 means "I got this message" (decision 31).
 - Screen 14 is the guide to who sees what.
 - Screens 15 to 23 follow one patient, Hessa Al Dhaheri, from her first visit to the all clear. Screens 22 and 23 come after the screening case closes: they are the target design, not part of the hackathon build.
+- Screen 18, Approve the handoff summary, was removed on 19 November 2026 ([Decisions of 19 November](#decisions-of-19-november)). The other screens keep their numbers.
 - For the hackathon, only CareLoop's own screens and the patient's phone are shown. Steps in the hospital system are simulated ([What the judges see](#what-the-judges-see)).
 
 The ten stages on screen are display labels. The code has five stages and four tracks, and the [flow table](#flow) maps one to the other.
@@ -21,13 +24,23 @@ The design follows the seven decisions in the [UI design gap analysis](../ui-des
 | 1 | Five stages in code; the ten on screen are display labels | The flow table maps each label to its stage and track status. The flow has a row "In code". |
 | 2 | The patient does not confirm appointments. "I will come" is an acknowledgement. | Since decision 31, a reply of 1 means "I got this message" and sends `NotificationUpdated/Acknowledged` only; screens 9, 10, 12 and 14 say so (P22). Whether she will come is asked on a call, and the nurse records it on screen 2. |
 | 3 | Build the confidence rating | A nurse navigator records it after a call, on screen 2 (decision 30), as `NotificationUpdated/ConfidenceRated` from 1 to 5. Screen 3 reports it. |
-| 4 | The AI handoff summary is approved in the CareLoop web app | New screen 18. Screen 6 shows the approved summary, read-only. |
+| 4 | The AI handoff summary is approved in the CareLoop web app. No longer applies since 19 November 2026: the AI handoff summary is removed. | New screen 18, since removed. Screen 6 no longer shows a summary from CareLoop. |
 | 5 | Add the roles `nurse-navigator`, `receiving-clinician` and `lab` | Who sees what gives each person their role in CareLoop. |
 | 6 | Separate reply deadlines for consultations and referrals | Screens 4 and 5 show them, as placeholders. |
 | 7 | Build caregiver consent | Screens 12 and 15 show how consent is given, used and withdrawn. The email is shown in the simulator, not sent. |
 | Arabic | The prototype is in English and supports more than one language from the start. Arabic is added once its translations are checked. Agreed in the team chat. | Screen 11 is the target design for Arabic. Screens 9, 10 and 11 say so. |
 | Scope | Agreed in the team call: show CareLoop's own screens and the patient's phone. Steps in the hospital system are simulated, not shown. | [What the judges see](#what-the-judges-see). Simulated screens are marked "Hackathon: simulated", and dashed on the flow. The prototype follows the same scope. |
-| Context | Raised in the team call: a doctor should see a patient's other screening, not only this one. | Screen 18 shows her other screening to doctors (C19). |
+| Context | Raised in the team call: a doctor should see a patient's other screening, not only this one. | Screen 2 shows her other screening to doctors (C19). |
+
+## Decisions of 19 November
+
+Taken in the team call on 19 November 2026. This document and the screens are updated to match the app.
+
+| # | Decision | What changed in the design |
+|---|---|---|
+| Handoffs | Doctors make referrals and handoffs in their hospital system, and CareLoop receives the resulting events through FHIR. The AI handoff summary is removed. | Screen 18 is removed, and the other screens keep their numbers. Screens 6 and 7 show the referring doctor's own note. Decision 4 no longer applies. |
+| AI | The Python AI workflow service is retired. The API asks Microsoft Foundry agents directly and returns the text to the page. AI writes three texts for staff: a role briefing, an impact summary and a draft of a patient message. The workflow is led by people: AI never sends, decides or closes anything. | Screen 1 shows the role briefing. Screens 2 and 3 describe the other two texts, which the web app does not show yet. The plain words on screens 9, 16 and 20 are written by the doctor. |
+| Programmes | CareLoop is for any screening programme and, over time, any disease. Each programme is a pathway file, not new code. The prototype uses breast screening as its example pathway, and more programmes come next. | The introduction, screen 4 and the open questions say so. |
 
 ## What the judges see
 
@@ -35,7 +48,7 @@ The team agreed on 13 November to keep the focus on the loop that CareLoop close
 
 | Hackathon | Screens |
 |---|---|
-| Shown: CareLoop web app | 1 Worklist, 2 Case, 3 Impact, 4 Programmes, 17 Escalation, 18 Handoff summary |
+| Shown: CareLoop web app | 1 Worklist, 2 Case, 3 Impact, 4 Programmes, 17 Escalation |
 | Shown: the patient's text messages and email, in the messaging simulator | 9 Basic phone, 10 Patient email, 12 Caregiver and email |
 | Simulated: a test scenario sends their events | 5 Consultation, 6 Refer, 7 Accept or decline, 8 Close, 15 First visit, 16 Screening result, 19 Assessment, 20 Lab result, 21 Diagnosis and plan |
 | Later | 11 Arabic (deferred), 22 Treatment and 23 All clear (target design) |
@@ -50,17 +63,17 @@ The simulated screens stay in this document because they show which events the h
 | End-to-end case visibility | Flow, 2 Case, 17 Escalation |
 | Clear ownership and timely progression | 1 Worklist, 2 Case, 4 Programmes, 17 Escalation |
 | Patient-centred communication and reassurance | 9 Basic phone, 10 Patient email, 12 Caregiver and email; 11 Arabic later |
-| Cross-provider consultation and coordination | 18 Handoff summary and 2 Case; in the hospital system, simulated: 5 Consultation, 6 Refer, 7 Accept or decline |
-| Safe, human-governed escalation and closure | 2 Case, 13 Empty and error states, 17 Escalation, 18 Handoff summary; closing in the hospital system, simulated: 8 Close |
+| Cross-provider consultation and coordination | 2 Case and 17 Escalation; in the hospital system, simulated: 5 Consultation, 6 Refer, 7 Accept or decline |
+| Safe, human-governed escalation and closure | 2 Case, 13 Empty and error states, 17 Escalation; closing in the hospital system, simulated: 8 Close |
 | Closure and patient impact measures | 3 Impact |
 
 | Judging criterion | How the designs support it |
 |---|---|
-| Health impact and clinical relevance | Impact reports the measures the challenge names, against the same cases replayed with escalation off. Breast screening deadlines come from the DoH standard. |
+| Health impact and clinical relevance | Impact reports the measures the challenge names, against the same cases replayed with escalation off. The example pathway, breast screening, takes its deadlines from the DoH standard. |
 | Technical depth and architecture | Every screen maps to the five stages in code, the events it sends and the endpoints it reads. |
 | Working solution and demonstration quality | One continuous story follows Hessa's case in CareLoop, from her screening result to the start of her treatment, with real dates and named people. Hospital steps arrive as simulated events, so the story stays on the loop. |
-| Responsible AI, safety and data governance | AI only drafts, and a named person approves it in CareLoop (screen 18). Every line of a draft shows its source, and AI never writes the assessment. Each person sees only what their part of the care needs ([Who sees what](#who-sees-what)), and screen 13 shows the safety states. |
-| Scalability and deployment readiness | A new programme is a settings file, not new code (screen 4). Every message and screen supports more than one language from the start, so Arabic needs no new code (screen 11). |
+| Responsible AI, safety and data governance | AI writes three short texts for staff to read, each labelled as written by AI: a role briefing on the worklist (screen 1), an impact summary (screen 3) and a draft of a patient message (screen 2). AI never sends, decides or closes anything, and nothing acts on what it writes. It is never given a person's name, a contact detail or a result. Each person sees only what their part of the care needs ([Who sees what](#who-sees-what)), and screen 13 shows the safety states. |
+| Scalability and deployment readiness | CareLoop is built for any screening programme and, over time, any disease: a new programme is a pathway file, not new code (screen 4). Every message and screen supports more than one language from the start, so Arabic needs no new code (screen 11). |
 | Commercial viability and path to pilot | CareLoop works with existing hospital systems and reaches patients by text message and email, which every patient already has. Nothing new to install. |
 
 ## Flow
@@ -82,12 +95,12 @@ On the flow, dashed screens are not shown in the hackathon. Every case, in every
 | 9 | Closure review | `ClosureReview` | Nothing new: the case waits for an authorised person to decide |
 | 10 | Closed | `Closed` | `ClosureDecided` |
 
-How the web app chooses the label (C9):
+How CareLoop chooses the label (decision 19 in the gap analysis: the API works it out, and the web app shows it):
 
 - Labels 1 to 3 and 8 to 10 follow the stage in code.
 - In `FollowUpActive`, the tracks run side by side, so the label shows the furthest step reached: Follow-up once a referral or appointment exists, otherwise Consultation once one is requested, otherwise Patient acknowledged once the notification track is `Acknowledged` or `Understood`, otherwise Patient notified. Screen 2 shows each track's own status.
 
-Some events can arrive at any stage without moving it: `NotificationUpdated/CallRequested` adds a call-back task, `NotificationUpdated/ConfidenceRated` (recorded by a nurse after a call) adds a rating, and `ConsentRecorded/Granted` or `/Withdrawn` starts or stops messages to a family member. CareLoop also raises two events itself: `DeadlineElapsed` for reminders and escalations, and `HandoffSummaryApproved` when a person approves a summary (screen 18).
+Some events can arrive at any stage without moving it: `NotificationUpdated/CallRequested` adds a call-back task, `NotificationUpdated/ConfidenceRated` (recorded by a nurse after a call) adds a rating, and `ConsentRecorded/Granted` or `/Withdrawn` starts or stops messages to a family member. CareLoop also raises two events itself: `DeadlineElapsed` for reminders and escalations, and `EscalationAcknowledged` when a person acknowledges an escalation (screen 17).
 
 ## Who sees what
 
@@ -99,13 +112,13 @@ Each person sees only the cases they care for, and only what their part of the c
 |---|---|---|---|---|
 | Patient: Hessa by text message on a basic phone, Amna by email | None. A recipient of messages (`Patient`). | Her own next step, appointments and named nurse, by text message or email. A person gives her the result. | Reply 1 to say she got the message or 2 to ask for a call; on a call, say whether she will come, say the next step back and say how sure she feels. Name a family member to get her appointment details, or stop it. | See anyone else's information |
 | Family member the patient named in writing: Saeed | None. A recipient of messages (`Caregiver`), only while her consent is active. | The day, time and place of her appointments, by email | Help her get there. Nothing in CareLoop. | See results or the reason for the visit. Reply for her or change anything. |
-| Nurse navigator: Huda | `nurse-navigator` | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved | Call patients and record on the case what they said (will come, said the next step back, a 1 to 5 confidence rating), hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
-| Screening doctor: Dr. Rekha | `clinician` | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts. | See patients she does not care for |
-| Receiving doctor: Dr. Layla | `receiving-clinician` | Referrals sent to her unit: the request, the approved summary, the screening report and images | Accept or decline with a reason, book, record the outcome and close the case with evidence | See referrals sent to other units, or other cases at the Family Health Centre |
+| Nurse navigator: Huda | `nurse-navigator` | Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor wrote | Call patients and record on the case what they said (will come, said the next step back, a 1 to 5 confidence rating), hand over tasks and ask a doctor to call a patient back | See reports, images, notes or other medical history. Open a case outside her team without giving a reason. |
+| Screening doctor: Dr. Rekha | `clinician` | Her patients' full records in her hospital system, and their cases in CareLoop | Set urgency, ask a specialist and send referrals, in her hospital system. She stays responsible until a unit accepts. | See patients she does not care for |
+| Receiving doctor: Dr. Layla | `receiving-clinician` | Referrals sent to her unit: the request, the referring doctor's note, the screening report and images | Accept or decline with a reason, book, record the outcome and close the case with evidence | See referrals sent to other units, or other cases at the Family Health Centre |
 | Lab and test teams | `lab` | Test requests sent to them, and what each test needs | Accept a request, record that the test was done and send the report to the doctor who asked | See the rest of the patient's case |
 | Facility lead: Joy | `facility-lead` | Every case at her facility, to cover gaps and escalations | Choose or change who is responsible, and acknowledge escalations | See reports, images or notes, or cases at other facilities |
-| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case, by its case number only, when it is escalated to him (decision 35). | Approve the impact summary and act on escalations | See named lists of patients |
-| AI drafting, inside CareLoop | None. Part of CareLoop. | The facts of one case, only while drafting | Draft plain words and summaries for a person to approve | Send, decide, set urgency or close anything. Keep data, or learn from it. |
+| Programme coordinator: Dr. Obaid | `coordinator` | Totals for every programme, with no names. One case, by its case number only, when it is escalated to him (decision 35). | Act on escalations | See named lists of patients |
+| AI writing, inside CareLoop | None. Part of CareLoop. | Only what each text needs, while writing it: never a person's name, a contact detail or a result | Write three texts for staff to read, each labelled as written by AI: a role briefing on the worklist, an impact summary and a draft of a message to a patient, which is never sent | Send, decide, set urgency or close anything. Keep data, or learn from it. |
 | Engineers and support | None | Synthetic data only | Build, test and fix CareLoop | See real patient data, unless it is approved and recorded |
 
 Others in Hessa's journey hold the same roles. Dr. Sara Al Hammadi, her family doctor (screen 15), is a `clinician`. Dr. Karim Nassar, her oncologist (screen 23), is a `receiving-clinician`. Mariam Al Kaabi, her cancer nurse navigator (screens 21 and 22), is a `nurse-navigator` at the Cancer Centre.
@@ -138,14 +151,14 @@ Where each screen is built:
 | 3 | [Impact](#3-impact) | Programme coordinators and facility leads | CareLoop web app | US16 | FR-09 | Shown |
 | 4 | [Programmes](#4-programmes) | Programme coordinators and clinical advisers | CareLoop web app | US13, US14 | FR-03, FR-07 | Shown |
 | 5 | [Consultation](#5-consultation) | Clinicians | HIS simulator | US05, US07 | FR-05 | Simulated |
-| 6 | [Refer to a unit](#6-refer-to-a-unit) | Referring clinicians | HIS simulator | US06, US07 | FR-05, FR-11 | Simulated |
+| 6 | [Refer to a unit](#6-refer-to-a-unit) | Referring clinicians | HIS simulator | US06, US07 | FR-05 | Simulated |
 | 7 | [Accept or decline a referral](#7-accept-or-decline-a-referral) | Receiving clinicians, labs and appointment teams | HIS simulator | US08, US09, US10 | FR-05, FR-06 | Simulated |
 | 8 | [Close the case](#8-close-the-case) | Authorised clinicians | HIS simulator | US11, US12, US14, US15 | FR-08 | Simulated |
 | 9 | [Basic phone, no internet](#9-basic-phone-no-internet) | Patients without a smartphone or internet | Messaging simulator | US02, US03 | FR-04 | Shown |
 | 10 | [Patient email](#10-patient-email) | Patients reached by email | Messaging simulator | US02, US03, US05 | FR-04 | Shown |
 | 11 | [Arabic, right to left](#11-arabic-right-to-left) | Arabic-speaking patients and families | Messaging simulator | US02, US03 | FR-04 | Deferred |
 | 12 | [Caregiver and email](#12-caregiver-and-email) | Family members a patient has named | Messaging simulator | US04, US10 | FR-04, FR-10 | Shown |
-| 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-11 | Reference |
+| 13 | [Empty and error states](#13-empty-and-error-states) | Everyone building or testing CareLoop | All components | US03, US13, US14, US15 | FR-01, FR-04, FR-07, FR-08, FR-09 | Reference |
 
 Hessa's journey:
 
@@ -154,18 +167,20 @@ Hessa's journey:
 | 15 | [First visit](#15-first-visit) | Family doctors | HIS simulator | US01, US04 | Simulated |
 | 16 | [Screening result](#16-screening-result) | Screening doctors | HIS simulator | US01, US02 | Simulated |
 | 17 | [Escalation](#17-escalation) | Facility leads | CareLoop web app | US13 | Shown, with C15 |
-| 18 | [Approve the handoff summary](#18-approve-the-handoff-summary) | Referring and responsible clinicians | CareLoop web app | US06, US07 | Shown, with C9 and C19 |
 | 19 | [Assessment and biopsy](#19-assessment-and-biopsy) | Assessment clinics | HIS simulator | US10 | Simulated |
 | 20 | [Lab result](#20-lab-result) | Treating clinicians | HIS simulator | US10, US11 | Simulated |
 | 21 | [Diagnosis and plan](#21-diagnosis-and-plan) | Treating clinicians | HIS simulator | US11, US12 | Simulated |
 | 22 | [Treatment](#22-treatment) | Cancer nurse navigators | CareLoop web app | US12, US16 | Target design only |
 | 23 | [All clear](#23-all-clear) | Treating clinicians | HIS simulator | US12, US15 | Target design only |
 
+Screen 18, Approve the handoff summary, was removed on 19 November 2026, with the AI handoff summary. Doctors make referrals and handoffs in their hospital system, and CareLoop receives the resulting events through FHIR.
+
 ### 1. Worklist
 
 ![Worklist](01-worklist.png)
 
 - The exception dashboard in the solution design. Read-only; reads `GET /cases` and `GET /exceptions`. Showing only the signed-in person's team is C4.
+- At the top, under the count of open cases, the role briefing sums up the open cases she can see in a few sentences: what is overdue, what is due today and what kind of work is waiting. AI writes it (`GET /ai/role-briefing`), and it names a case only by its case number. It is labelled "Written by AI", with when it was written, and "Refresh" asks for a new one. When AI is off or fails, nothing is shown, and the worklist works the same. The list below is the record.
 - Sorted by risk: urgent and overdue first, then by time left.
 - Each row shows one next action, one responsible person and one due time. Status is always a word with a coloured dot.
 - The filter chips are the exception queues: urgent, overdue (`Overdue`), declined (`Rejected`), not reached (`Unreachable`), not acknowledged (`Unacknowledged`) and needs a new owner (`Unassigned`). A case that needs a new owner stays with the facility lead until someone accepts it.
@@ -174,12 +189,14 @@ Hessa's journey:
 
 ![Case](02-case.png)
 
-- Read-only, except two things: a clinician checks and approves the AI handoff summary from here (screen 18, C9), and a nurse navigator records what a patient said on a call (decision 30). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
+- Read-only, except one thing: a nurse navigator records what a patient said on a call (decision 30). Reads `GET /cases/{id}` and `GET /cases/{id}/timeline`. Only the patient's care team can open it, and every view is logged (C4). Reports, images and notes are links into the hospital system, never copies.
 - The next action shows its escalation ladder and who has acknowledged it (C15).
 - The checklist shows what must happen before the next stage. Missing evidence blocks progress.
 - The four tracks (notification, consultation, referral and appointment) each show their own status. Each timeline entry names where it came from, as the API records it: CareLoop, the hospital system, a text message or an email (C3, decision 34). What a nurse records after a call shows as CareLoop, with her name.
 - "After a call with the patient" is shown to nurse navigators only. After a call, the nurse ticks that the patient said they will come (`NotificationUpdated/Acknowledged`) and that they said the next step back in their own words (`/Understood`), and chooses how sure the patient feels, from 1 (not sure) to 5 (very sure), or "Not asked" (`/ConfidenceRated`). "Record call outcome" sends `POST /cases/{caseId}/call-outcome` and stays off until she ticks something or chooses a rating. The card shows the confidence on record and, once she records a call, what she recorded and when, for example "Recorded at 11:20: said the next step back, 4 out of 5." Recording never changes who is responsible.
 - The card is the only way "will come", understanding and the rating reach CareLoop: a reply by text or email can only say "I got this message" or ask for a call (decisions 24, 30 and 31).
+- Doctors also see the patient's other screening, for context: her other cases in CareLoop, with a pointer to her full history in the hospital record (C19). Nurses do not see this card.
+- AI can also write a draft of a message to the patient, for a nurse navigator or a clinician to read (`GET /cases/{caseId}/patient-message-draft`). It is a preview only: nothing is sent, and patients still get the approved templates. AI is told only what the message is for, the channel, the clinic and the appointment's day and time, never the patient's name, contact details or result. The web app does not show it yet.
 
 ### 3. Impact
 
@@ -187,7 +204,7 @@ Hessa's journey:
 
 - Read-only. The "With escalation" numbers come from `GET /metrics`. The "Escalation off" numbers come from `POST /metrics/simulation`, which replays the same synthetic cases with reminders and escalation switched off. Both need the measures below, in the same shape for both (C5).
 - The numbers show how the design works; they are not evidence of real-world improvement.
-- The AI summary stays a draft until the programme coordinator approves it, and it names no patient.
+- AI writes a short summary of the same numbers for this page (`GET /ai/impact-summary`), labelled as written by AI. It is sent totals only, never a case, and counts too small to share are left out, so it names no patient. It is a reading aid: it is not stored, nothing acts on it, and the figures on the page are the record. The web app does not show it yet.
 
 | Measure | Counts | Out of | With escalation off |
 |---|---|---|---|
@@ -210,8 +227,8 @@ Hessa's journey:
 
 ![Programmes](04-programmes.png)
 
-- Reads `GET /programmes` and `GET /programmes/{pathwayId}` (C1). Each programme is one versioned settings file: steps, deadlines, required evidence and owners.
-- Breast screening deadlines cite the DoH clause they come from. Because every case is an actionable result, the report is due at once (DoH 3.8.1) and the patient is told within 1 working day (a placeholder inside the 15-day limit in DoH 3.7.1).
+- Reads `GET /programmes` and `GET /programmes/{pathwayId}` (C1). Each programme is one versioned pathway file: steps, deadlines, required evidence and owners. Adding a programme, and over time a disease, means adding a file, not new code.
+- The prototype ships one example pathway, breast screening (`breast-screening.json`). The other four programmes on the screen show how more are added. In the example pathway, deadlines cite the DoH clause they come from. Because every case is an actionable result, the report is due at once (DoH 3.8.1) and the patient is told within 1 working day (a placeholder inside the 15-day limit in DoH 3.7.1).
 - Citations, the owner of each step and the change history need C2.
 - "Other deadlines" are placeholders, one for each kind of reply (decision 6, C12): referral replies (`respond-to-referral`), questions between clinicians (`answer-consultation`) and patient call-backs (`call-patient`). Screens 1, 5 and 7 use them.
 - Read-only. The clinical adviser approves changes outside CareLoop. "View change history" lists each version, and past cases keep the version they followed.
@@ -232,7 +249,7 @@ Hessa's journey:
 
 - Hackathon: simulated. A test scenario sends these events, and the screen is not shown.
 - Sends `ReferralUpdated/Sent`.
-- The handoff summary is approved in CareLoop on screen 18 (decision 4) and is read-only here. The HIS receives it as a FHIR `DocumentReference`. If it is not approved yet, the screen says so.
+- The referral note is Dr. Rekha's own, written here in her hospital system, and it goes to the unit with the referral. CareLoop drafts no summary and sends the hospital system no `DocumentReference`: decision 4 no longer applies since 19 November 2026.
 - Suggested units come from a synthetic directory. The clinician chooses, and the unit confirms its own availability.
 - If the HIS simulator gets screens, it needs a referral action (C6).
 
@@ -306,7 +323,7 @@ Hessa's journey:
 | Nothing to do | The worklist says what is on track and when the next deadline is. If cases fail to load, it says so instead. | FR-09 |
 | Patient not reached | A failed or unanswered contact becomes a task with an owner and a deadline. | FR-04, FR-07 |
 | Same result received twice | Results are matched on source and result number, so a resent result never opens a second case. | FR-01 |
-| No AI draft | If AI is off, slow or fails a check, screen 18 shows no draft at all. A person writes the summary, and every step still works ([AI specification](../ai-design/ai-spec.md), section 5). | FR-11 |
+| No AI text | If AI is off or fails, CareLoop shows no AI text at all, and nothing in its place: the worklist shows no briefing. Nothing else depends on it, and every step still works ([AI integration](../ai-design/integration.md)). | FR-09 |
 | Closing blocked | The close button stays off until every step has evidence. | FR-08 |
 | No signal or internet | There is no app to work offline. A text needs no internet and arrives when the phone has signal; an email arrives when the patient is next online. A message that cannot be delivered raises `Unreachable`, shown as not reached, and her nurse gets a task to reach her another way (P16). | FR-04 |
 
@@ -324,7 +341,7 @@ Hessa's journey:
 
 - Hackathon: simulated. A test scenario sends these events, and the screen is not shown.
 - Signing sends the result (`ScreeningResultReceived`) and the doctor's review with its urgency (`ClinicalReviewCompleted`). Only a doctor sets urgency; AI never does.
-- The plain words for Hessa are an AI draft, approved by signing and said to her by a person. They are never sent by text.
+- Dr. Rekha writes the plain words for Hessa and signs them with the result. A person says them to her; they are never sent by text.
 - A normal result opens no case.
 
 ### 17. Escalation
@@ -332,19 +349,8 @@ Hessa's journey:
 ![Escalation](17-escalation.png)
 
 - When a deadline passes, CareLoop raises an escalation (`DeadlineElapsed`) to the next person on the ladder. Here Hessa's new referral is late, so it goes to Joy, the facility lead.
-- Joy sees the ladder and what happened, and acknowledges it. Acknowledging needs C15: today an escalation ends only when the late step is done.
+- Joy sees the ladder and what happened, and acknowledges it (C15). Acknowledging records that she has seen it and changes no owner or deadline: the escalation ends only when the late step is done.
 - Reads `GET /cases/{id}` and its timeline, like screen 2.
-
-### 18. Approve the handoff summary
-
-![Approve the handoff summary](18-handoff-summary.png)
-
-- In the CareLoop web app, opened from the case (decision 4, C9). `POST /cases/{caseId}/handoff-summary` drafts it, and `POST /cases/{caseId}/handoff-summary/{summaryId}/approval` approves it and records `HandoffSummaryApproved`.
-- Every line shows the facts it came from, and anything the facts do not cover is listed for the clinician to check. AI never writes the assessment part ([AI specification](../ai-design/ai-spec.md), sections 2.1 and 7).
-- The clinician approves, edits or rejects the draft. Her edits go with the approval. Rejecting is `POST /cases/{caseId}/handoff-summary/{summaryId}/rejection`, added in #27; she then writes the summary herself. Her name, the time, the facts used, her changes and the AI version are kept with her decision.
-- Doctors also see the patient's other screening, for context: her other cases in CareLoop, with a pointer to her full history in the hospital record. Nurses do not see this card. It needs C19.
-- Approving sends nothing. She sends the referral from her hospital system (screen 6), with the approved summary attached.
-- If there is no draft, she writes the summary herself (screen 13).
 
 ### 19. Assessment and biopsy
 
@@ -361,7 +367,7 @@ Hessa's journey:
 - Hackathon: simulated. A test scenario sends these events, and the screen is not shown.
 - The lab's report stays in the hospital system. CareLoop is told only that it is back, as `OutcomeRecorded`.
 - Dr. Layla must review it in time, or CareLoop reminds her. A deadline for that review is future work.
-- The plain words are an AI draft that her signature approves. She says them to Hessa in person; they are never sent by text.
+- Dr. Layla writes the plain words and signs them with her review. She says them to Hessa in person; they are never sent by text.
 
 ### 21. Diagnosis and plan
 
@@ -393,12 +399,12 @@ The screens shown in the hackathon raise six gaps that C1 to C13 do not cover. C
 |---|---|---|---|---|
 | C4, added | 14 | Opening a case outside your team asks for a reason, which has no endpoint (P4) | Keep the prompt. Add the reason to the case read in C4, and record it in the same audit entry as the view. | WS6 |
 | C15 | 2, 17 | An escalation cannot be acknowledged | Record who acknowledged an escalation, and when, from the web app | WS1, WS5, WS6 |
-| C19 | 18 | Doctors cannot see a patient's other cases | Add a `patientReference` filter to `GET /cases`, allowed for `clinician` and `receiving-clinician` only, that returns each case's programme, dates, stage and closure reason | WS6 |
-| C20 | 1, 2, 17, 18 | Staff screens show names: the patient's name with a second identifier (date of birth or MRN), and each owner's name and role. Case reads and the timeline return only references. | Either return display names with each case read for staff roles, taken from the result event or from the hospital system's FHIR `Patient` and `Practitioner`, or agree that staff screens show references only. Storing names in CareLoop widens what it holds, so decide this as a team. | WS1, WS2, WS3, WS6 |
+| C19 | 2 | Doctors cannot see a patient's other cases | Add a `patientReference` filter to `GET /cases`, allowed for `clinician` and `receiving-clinician` only, that returns each case's programme, dates, stage and closure reason | WS6 |
+| C20 | 1, 2, 17 | Staff screens show names: the patient's name with a second identifier (date of birth or MRN), and each owner's name and role. Case reads and the timeline return only references. | Either return display names with each case read for staff roles, taken from the result event or from the hospital system's FHIR `Patient` and `Practitioner`, or agree that staff screens show references only. Storing names in CareLoop widens what it holds, so decide this as a team. | WS1, WS2, WS3, WS6 |
 | C21 | 1 | The worklist shows each case's display stage (one of ten), which needs track statuses, but `CaseSummaryResponse` has the code stage only | Add the four track statuses, or the computed display stage, to `CaseSummaryResponse` | WS6 |
-| C22 | 13, 18 | A summary cannot be read back after drafting, and a person cannot submit a summary they wrote when there is no AI draft or after rejecting one | Add a read of the case's latest summary, and a way to submit a summary written by a person for approval | WS6, WS9 |
+| C22 | 13 | A summary cannot be read back after drafting, and a person cannot submit a summary they wrote when there is no AI draft or after rejecting one. No longer applies since 19 November 2026: the AI handoff summary is removed. | Add a read of the case's latest summary, and a way to submit a summary written by a person for approval | WS6, WS9 |
 
-Withdrawn after the 13 November call: C14, C17 and C18 served hospital-system screens, which are now simulated. C16 is covered by #27, which adds the rejection endpoint.
+Withdrawn after the 13 November call: C14, C17 and C18 served hospital-system screens, which are now simulated. C16 was covered by #27, which added the rejection endpoint; it no longer applies since 19 November 2026, when the AI handoff summary was removed.
 
 ## Design system
 
@@ -442,7 +448,7 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Staff screens use the 24-hour clock (15:00); patient messages use 9:00 am.
 - Staff screens show two patient identifiers (name with date of birth or MRN), and the Emirates ID is always masked.
 - Texts, automated calls and emails never contain results, diagnoses, body parts or links.
-- AI output is labelled "AI draft" and needs a named person's approval. AI never sets urgency, sends messages or closes cases.
+- AI text is labelled "Written by AI", with the spark icon, and is only there to read: nothing acts on it. AI never sets urgency, sends messages or closes cases.
 - Patients get text messages and emails, never a screen. The simulator shows them at 16 px or larger, and every template is ready for right-to-left languages.
 - Names from the code (stages, events and roles) appear only on the flow and on who sees what, in a monospace font. Product screens use plain words.
 - Text meets WCAG 2.2 AA contrast (4.5:1), and field borders meet 3:1. Every text element was checked automatically.
@@ -455,20 +461,21 @@ Type is Segoe UI, falling back to the system font. All spacing is a multiple of 
 - Text messages and emails, to patients, family members and staff, are shown in the messaging simulator, not sent. Automated calls are future work.
 - The prototype runs in English. Arabic is added once a qualified bilingual reviewer approves the wording.
 - Screens 22 and 23 show care after the screening case closes. They are the target design, not part of the hackathon build.
-- Breast screening deadlines come from the DoH 2025 standard. All other deadlines are placeholders until a clinical adviser approves them.
+- The prototype ships one example pathway, breast screening, whose deadlines come from the DoH 2025 standard. All other deadlines are placeholders until a clinical adviser approves them. More programmes, and over time other diseases, are added as pathway files.
 - Impact numbers come from replaying the same synthetic cases with escalation off. They show how the design works, not real-world improvement.
-- CareLoop does not diagnose, set urgency or make clinical decisions. AI only drafts, and a named person approves.
+- Every screen works with AI switched off, which is the default. When AI is on, the API asks Microsoft Foundry agents for the three texts directly; there is no separate AI service.
+- CareLoop does not diagnose, set urgency or make clinical decisions. AI only writes three texts for staff to read, and never sends, decides or closes anything.
 
 ## Open questions
 
 - Does the hospital system send results to CareLoop, or does CareLoop fetch them? Brian is checking how Malaffi and hospital systems share data, and common FHIR practice; the team may support both. The screens work either way.
 - Does the HIS simulator get screens, or run in the background? Screens 5 to 8, 15, 16 and 19 to 21 show what its screens would be.
-- Should the worklist and programmes keep other screening programmes, or show breast screening only? The team agreed to keep them for now and decide during practice runs.
-- Peninah suggested a short AI summary at the top of the nurse's view. It is not in the AI specification. Decide after the first full run-through.
+- Should the worklist and programmes keep other screening programmes, or show breast screening only? Answered on 19 November 2026: keep them. CareLoop is for every programme, and breast screening is the example pathway.
+- Peninah suggested a short AI summary at the top of the nurse's view. Answered on 19 November 2026: it is the role briefing on the worklist (screen 1).
 - Who approves the wording of the consent form for family members?
 - Which roles may record that a patient withdraws consent? This design lets anyone in her care team record it in the hospital system, at her request.
 - Who is the qualified bilingual reviewer for Arabic? The AI specification asks the same.
-- The [AI specification](../ai-design/ai-spec.md) names the receiving or responsible clinician as the reviewer of a handoff summary. This design has the referring clinician approve it before sending (screen 18), and the receiving clinician can decline for missing information (screen 7). Confirm this with the AI workstream.
+- Who reviews an AI handoff summary: the referring clinician or the receiving one? No longer applies since 19 November 2026: the AI handoff summary is removed.
 - The placeholder reply deadlines differ: screen 4 shows 4 working hours for referrals, 1 working day for questions between clinicians and 2 working hours for call-backs, while the programme file uses 1 day for each. Agree one set until a clinical adviser approves them.
 - The case closes when treatment starts, as in the solution design, and later care keeps a named owner. Confirm this with the clinical adviser.
 - A patient who cannot decide for themselves is represented by a legal guardian. That needs its own design and a legal review.

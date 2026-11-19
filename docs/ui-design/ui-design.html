@@ -423,7 +423,14 @@ code.role{margin-top:6px}
 .ropts .radio{margin-top:0}
 .ropts.notasked{margin-bottom:8px}
 .rate .note{margin-top:8px}
-.callform .btn{align-self:flex-start}</style></head><body>
+.callform .btn{align-self:flex-start}
+/* AI role briefing on the worklist, as built in the web app */
+.brief{display:flex;flex-direction:column;gap:4px;max-width:72ch}
+.brief p{font-size:16px;color:var(--ink)}
+.brief .brief-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--ink2)}
+.brief .brief-meta svg.i{width:14px;height:14px;color:var(--ink3)}
+.brief .brief-refresh{color:var(--accent);text-decoration:underline}
+</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
 <symbol id="logo" viewBox="0 0 28 28"><circle cx="14" cy="14" r="10" fill="none" stroke="#1D5FA8" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="50 13" transform="rotate(-60 14 14)"/><circle cx="19" cy="5.4" r="2.7" fill="#1D5FA8"/></symbol>
@@ -508,7 +515,7 @@ code.role{margin-top:6px}
 <div class="cell">Records sent, delivered and failed. No answer creates a task.</div>
 <div class="cell">Records "acknowledged" and "understood" separately.</div>
 <div class="cell">Starts the clock for the next step.</div>
-<div class="cell">Keeps the sender responsible until a unit accepts. AI drafts the handoff summary.</div>
+<div class="cell">Keeps the sender responsible until a unit accepts.</div>
 <div class="cell">Asks for evidence of each care step.</div>
 <div class="cell">Blocks closing until the list is complete.</div>
 <div class="cell">Counts the case on the Impact page. Keeps continuing care visible.</div>
@@ -532,7 +539,7 @@ code.role{margin-top:6px}
 <div class="refs"><span>9 Basic phone</span><span>10 Patient email</span><span class="sim">11 Arabic</span></div>
 <div class="refs"><span>9 Basic phone</span><span>10 Patient email</span><span>2 Case</span></div>
 <div class="refs"><span class="sim">5 Consultation</span></div>
-<div class="refs"><span>17 Escalation</span><span>18 Handoff summary</span><span class="sim">6 Refer</span><span class="sim">7 Accept</span><span>12 Caregiver</span><span class="sim">19 Assessment</span></div>
+<div class="refs"><span>17 Escalation</span><span class="sim">6 Refer</span><span class="sim">7 Accept</span><span>12 Caregiver</span><span class="sim">19 Assessment</span></div>
 <div class="refs"><span class="sim">20 Lab result</span><span class="sim">21 Diagnosis and plan</span><span>2 Case</span></div>
 <div class="refs"><span class="sim">8 Close</span></div>
 <div class="refs"><span class="sim">8 Close</span><span>3 Impact</span><span class="sim">22 Treatment</span><span class="sim">23 All clear</span></div>
@@ -556,14 +563,14 @@ code.role{margin-top:6px}
 </div></div>
 
 <div class="band aib"><div class="lane">Where AI helps</div><div class="body">
-<b>AI drafts, people decide.</b> Plain-language explanations for patients, checked by a clinician. Arabic translations later, once a qualified reviewer checks them. Handoff summaries, approved by the referring clinician in CareLoop. Impact summaries, approved by the programme coordinator. AI never sets urgency, sends a message or closes a case.
+<b>AI writes, people decide.</b> Three short texts for staff, each labelled as written by AI: a briefing on the worklist, a summary of the figures on the Impact page, and a draft of a message to the patient, which is never sent. AI never sets urgency, sends a message or closes a case.
 </div></div>
 <p class="flowfoot">The same ten stages work for breast, bowel, cervical and lung screening and for heart, kidney and diabetes checks. Each programme only changes its settings on screen 4: steps, deadlines and required evidence.</p>
 </div>
 </section>
 
 <section class="board" id="b01" data-file="01-worklist">
-<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case for her team, across all screening programmes, sorted by risk, with one next action and one person responsible. In the solution design, this is the exception dashboard.</p>
+<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case for her team, across all screening programmes, sorted by risk, with one next action and one person responsible. At the top, a short summary written by AI says what is waiting. In the solution design, this is the exception dashboard.</p>
 <div class="meta"><span>For: care coordinators, nurse navigators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US05, US13, US16</span><span>Requirements: FR-07, FR-09, FR-10</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -578,6 +585,10 @@ code.role{margin-top:6px}
 <div class="head">
 <div><h1>Worklist</h1><p class="sub">Thursday 12 November 2026, 09:00 · 24 open cases for your team. Each case has one next action and one person responsible.</p></div>
 <div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">My team<svg class="i"><use href="#i-down"/></svg></span><span class="field search"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span></div>
+</div>
+<div class="brief" aria-label="Summary written by AI">
+<p>1 case is overdue and 5 are due today. The overdue case is a referral to send again, and it is escalated. Due today are three calls to patients, one next step to agree and one case that needs a new owner.</p>
+<p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span></p>
 </div>
 <div class="chips">
 <span class="chip on">All open <b>24</b></span>
@@ -609,7 +620,7 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b02" data-file="02-case">
-<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except two things: a clinician approves the AI handoff summary (screen 18), and a nurse navigator records what a patient said on a call. Clinical actions happen in the hospital system.</p>
+<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except one thing: a nurse navigator records what a patient said on a call. Clinical actions happen in the hospital system.</p>
 <div class="meta"><span>For: care team and clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US01, US03, US08, US10, US13, US14, US16</span><span>Requirements: FR-02, FR-03, FR-06, FR-07</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -803,8 +814,8 @@ code.role{margin-top:6px}
 </ul>
 </div>
 <div class="card">
-<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft, approved by Dr. Obaid Al Suwaidi</span></span></h3>
-<div class="aitext"><p>Most delays came from referrals that Regional Hospital declined for lack of capacity (11 cases). Re-referring them to General Hospital took a median of one working day.</p><p>Patients who were not reached at first were usually reached at a second time they chose. No patient is named in this summary.</p></div>
+<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>Written by AI</span></span></h3>
+<div class="aitext"><p>9 of the 56 open cases are past their deadline. The next care step was completed by the agreed deadline in 172 of 200 cases (86%).</p><p>The step that takes longest is care starting, a median of 19 working days from the result. Referrals were accepted and attended in 201 of 214 cases (94%).</p></div>
 </div>
 </div>
 </div>
@@ -880,7 +891,7 @@ code.role{margin-top:6px}
 </div>
 </div>
 </div>
-<p class="note">Read-only in the prototype. Each programme is one settings file; the ten stages and the screens stay the same.</p>
+<p class="note">Read-only in the prototype. Each programme is one pathway file; the ten stages and the screens stay the same. The prototype ships breast screening as its example pathway; the other four show how more programmes are added.</p>
 </div>
 </div>
 </section>
@@ -939,8 +950,8 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b06" data-file="06-refer">
-<div class="cap"><span class="n">6</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions, and sends the referral with the handoff summary she approved in CareLoop (screen 18). Here the summary can be read, not changed.</p>
-<div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05, FR-11</span><span>Hackathon: simulated</span></div></div></div>
+<div class="cap"><span class="n">6</span><div><h2>Refer to a unit</h2><p>Dr. Rekha chooses where Hessa goes next from matched suggestions, and sends the referral from her hospital system with her own note. CareLoop is told that the referral was sent.</p>
+<div class="meta"><span>For: referring clinicians</span><span>Built in: HIS simulator</span><span>Stories: US06, US07</span><span>Requirements: FR-05</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar his">
@@ -979,14 +990,14 @@ code.role{margin-top:6px}
 <p class="note" style="margin-top:16px">Suggestions come from a synthetic directory. You choose the unit; the unit confirms its own availability.</p>
 </div>
 <div class="card">
-<h3>Handoff summary for Dr. Layla Haddad<span class="r"><span class="badge green">Approved in CareLoop, 09:22</span></span></h3>
+<h3>Referral note for Dr. Layla Haddad</h3>
 <div class="sbar">
 <div><small>Situation</small>Hessa Al Dhaheri, 66. Her screening mammogram on Mon 9 Nov 2026 needs further assessment.</div>
 <div><small>Background</small>A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic. With her written consent, her son Saeed gets her appointment details.</div>
-<div><small>Assessment</small>See the screening report in the clinical record. AI never writes this part.</div>
+<div><small>Assessment</small>See the screening report in the clinical record.</div>
 <div><small>Request</small>Please accept her and offer an assessment by Mon 16 Nov.</div>
 </div>
-<p class="note" style="margin-top:16px">Drafted by AI and approved by you in CareLoop. To change it, reopen it there. It goes to the unit with the referral.</p>
+<p class="note" style="margin-top:16px">Written by you, here in the hospital system. It goes to the unit with the referral. CareLoop is told only that the referral was sent.</p>
 </div>
 </div>
 </div>
@@ -998,7 +1009,7 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b07" data-file="07-accept-referral">
-<div class="cap"><span class="n">7</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and the approved summary. She accepts responsibility, or declines with a fixed reason. Labs use the same screen, because a test request is a referral to the lab.</p>
+<div class="cap"><span class="n">7</span><div><h2>Accept or decline a referral</h2><p>Dr. Layla sees the request and Dr. Rekha's referral note. She accepts responsibility, or declines with a fixed reason. Labs use the same screen, because a test request is a referral to the lab.</p>
 <div class="meta"><span>For: receiving clinicians, labs and appointment teams</span><span>Built in: HIS simulator</span><span>Stories: US08, US09, US10</span><span>Requirements: FR-05, FR-06</span><span>Hackathon: simulated</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -1033,7 +1044,7 @@ code.role{margin-top:6px}
 <div class="docs"><span class="doc"><svg class="i"><use href="#i-doc"/></svg>Screening report</span><span class="doc"><svg class="i"><use href="#i-doc"/></svg>Mammogram images</span></div>
 </div>
 <div class="card">
-<h3>Handoff summary<span class="r"><span class="badge green">Approved by Dr. Rekha Varghese, 09:22</span></span></h3>
+<h3>Referral note<span class="r small muted">From Dr. Rekha Varghese</span></h3>
 <div class="sbar">
 <div><small>Situation</small>Hessa Al Dhaheri, 66. Her screening mammogram on Mon 9 Nov 2026 needs further assessment.</div>
 <div><small>Background</small>A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic. With her written consent, her son Saeed gets her appointment details.</div>
@@ -1152,7 +1163,7 @@ code.role{margin-top:6px}
 <li><small>How sure</small>And how sure do you feel about what happens next, from 1, not sure, to 5, very sure?</li>
 </ul>
 <div class="result"><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><span><b>Said it back, 4 out of 5 sure.</b> Huda records both on the case after the call (screen 2).</span></div>
-<p class="note" style="margin-top:8px">Plain words drafted by AI and approved by Dr. Rekha Varghese.</p>
+<p class="note" style="margin-top:8px">Plain words written by Dr. Rekha Varghese when she signed the result.</p>
 </div>
 <div class="pcol">
 <div class="fphone">
@@ -1319,7 +1330,7 @@ code.role{margin-top:6px}
 </section>
 <section class="board" id="b13" data-file="13-empty-and-error-states">
 <div class="cap"><span class="n">13</span><div><h2>Empty and error states</h2><p>Six states every component must handle. In each one, the patient still has a next step and the case still has an owner.</p>
-<div class="meta"><span>For: everyone building or testing CareLoop</span><span>Built in: all components</span><span>Stories: US03, US13, US14, US15</span><span>Requirements: FR-01, FR-04, FR-07, FR-08, FR-11</span></div></div></div>
+<div class="meta"><span>For: everyone building or testing CareLoop</span><span>Built in: all components</span><span>Stories: US03, US13, US14, US15</span><span>Requirements: FR-01, FR-04, FR-07, FR-08, FR-09</span></div></div></div>
 <div class="states">
 <div class="state">
 <div class="state-head"><b>Nothing to do</b><span>1 Worklist</span></div>
@@ -1347,14 +1358,13 @@ code.role{margin-top:6px}
 <p class="when">Results are matched on their source and result number, so a resent result never opens a second case.</p>
 </div>
 <div class="state">
-<div class="state-head"><b>No AI draft</b><span>18 Handoff summary</span></div>
+<div class="state-head"><b>No AI text</b><span>1 Worklist</span></div>
 <div class="frag">
-<b style="font-size:16px">Handoff summary for Dr. Layla Haddad</b>
-<div class="notice"><svg class="i"><use href="#i-spark"/></svg><span>No AI draft: the service is off or did not answer. Write the summary yourself, then approve it.</span></div>
-<div class="textarea">Situation, background, assessment and request</div>
-<div class="btns"><span class="btn primary off" role="button" aria-disabled="true">Approve summary</span></div>
+<b style="font-size:16px">Worklist</b>
+<span class="note">Thursday 12 November 2026, 09:00 · 24 open cases for your team.</span>
+<div class="chips"><span class="chip on">All open <b>24</b></span><span class="chip"><i class="d red"></i>Urgent <b>1</b></span><span class="chip"><i class="d red"></i>Overdue <b>1</b></span></div>
 </div>
-<p class="when">If AI is off, slow or fails a check, CareLoop never shows a half-made draft. A person writes it, and every step still works.</p>
+<p class="when">If AI is off or fails, CareLoop shows no AI text at all: here the worklist has no summary at the top, and no message in its place. Nothing else depends on it, and every step still works.</p>
 </div>
 <div class="state">
 <div class="state-head"><b>Closing blocked</b><span>8 Close</span></div>
@@ -1395,14 +1405,14 @@ code.role{margin-top:6px}
 <tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by text message on a basic phone. Amna, by email.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse, by text message or email. A person gives her the result.</td><td>Reply 1 to say she got a message, or 2 for a call. On a call, say whether she will come, the next step back and how sure she feels. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
 <tr><td><b>Saeed Al Dhaheri</b><span class="l2">Her son, named by Hessa in writing</span><code class="role">recipient: caregiver</code></td><td>The day, time and place of her appointments, by email</td><td>Help her get there. Nothing in CareLoop.</td><td>See results or the reason for the visit. Reply for her or change anything.</td></tr>
 <tr class="grp"><td colspan="4">Care team: notices come by email or text message, with only the case number to look for in CareLoop: no link and no patient details</td></tr>
-<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor approved</td><td>Call patients and record what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
-<tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span><code class="role">clinician</code></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, approve what AI drafts in CareLoop, ask a specialist and send referrals. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
-<tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span><code class="role">receiving-clinician</code></td><td>Referrals sent to her unit: the request, the approved summary, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
+<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor wrote</td><td>Call patients and record what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
+<tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span><code class="role">clinician</code></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, ask a specialist and send referrals, in her hospital system. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
+<tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span><code class="role">receiving-clinician</code></td><td>Referrals sent to her unit: the request, the referring doctor's note, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
 <tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span><code class="role">lab</code></td><td>Test requests sent to them, and what each test needs</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
 <tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span><code class="role">facility-lead</code></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, and acknowledge escalations</td><td>See reports, images or notes, or cases at other facilities</td></tr>
 <tr class="grp"><td colspan="4">Oversight and systems</td></tr>
-<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Approve the impact summary and act on escalations</td><td>See named lists of patients</td></tr>
-<tr><td><b>AI drafting</b><span class="l2">Part of CareLoop</span></td><td>The facts of one case, only while drafting</td><td>Draft plain words and summaries for a person to approve</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
+<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Act on escalations</td><td>See named lists of patients</td></tr>
+<tr><td><b>AI writing</b><span class="l2">Part of CareLoop</span></td><td>Only what each text needs, while writing it: never a person's name, a contact detail or a result</td><td>Write three texts for staff to read: a briefing on the worklist, a summary on the Impact page and a draft of a message to a patient</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
 <tr><td><b>Engineers and support</b><span class="l2">The CareLoop team</span></td><td>Synthetic data only</td><td>Build, test and fix CareLoop</td><td>See real patient data, unless it is approved and recorded</td></tr>
 </tbody></table>
 </div>
@@ -1502,9 +1512,9 @@ code.role{margin-top:6px}
 </div>
 </div>
 <div class="card">
-<h3>Plain words for Hessa<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft</span></span></h3>
+<h3>Plain words for Hessa</h3>
 <div class="aitext"><p>Your mammogram needs a closer look, so Dr. Rekha would like you to have more tests. Most women who are asked back do not have cancer.</p></div>
-<p class="note" style="margin-top:12px">Signing also approves these words. A person says them to Hessa, by phone in Arabic. They are never sent by text.</p>
+<p class="note" style="margin-top:12px">Written by Dr. Rekha and signed with the result. A person says them to Hessa, by phone in Arabic. They are never sent by text.</p>
 </div>
 </div>
 </div>
@@ -1564,63 +1574,6 @@ code.role{margin-top:6px}
 </div>
 </div>
 <div class="actionbar"><span class="events">Sends to CareLoop:<span class="ev">Escalation acknowledged</span></span><div class="btns"><span class="btn primary">Acknowledge</span></div></div>
-</div>
-</section>
-<section class="board" id="b18" data-file="18-handoff-summary">
-<div class="cap"><span class="n">18</span><div><h2>Approve the handoff summary</h2><p>Before Dr. Rekha sends a referral, she checks the summary that AI drafted from the facts in Hessa's case. Every line shows where it came from, and anything the facts do not cover is listed for her to check. Only her approval lets the summary go with the referral.</p>
-<div class="meta"><span>For: referring and responsible clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US06, US07</span><span>Requirements: FR-11</span></div></div></div>
-<div class="frame">
-<div class="win"><i></i><i></i><i></i></div>
-<div class="appbar">
-<div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
-<div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">RV</span><div><b>Dr. Rekha Varghese</b><small>Screening physician · Family Health Centre</small></div></div>
-</div>
-<div class="page">
-<div class="crumb"><svg class="i"><use href="#i-left"/></svg>Hessa Al Dhaheri</div>
-<div class="head"><div><h1>Handoff summary for a new referral</h1><p class="sub">Thursday 12 November 2026, 09:15 · For the Breast Assessment Unit, General Hospital</p></div></div>
-<div class="pbanner compact"><span class="av">HA</span><div class="who"><div class="nm">Hessa Al Dhaheri</div><div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Speaks Arabic</span><span>Saeed (son) gets appointment details</span></div></div></div>
-<div class="grid2" style="grid-template-columns:minmax(0,1fr) 440px">
-<div class="card">
-<h3>Summary for Dr. Layla Haddad<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft</span></span></h3>
-<div class="sbar">
-<div><small>Situation</small>Hessa Al Dhaheri, 66. Her screening mammogram on Mon 9 Nov 2026 needs further assessment.<div class="srcs"><span><svg class="i"><use href="#i-doc"/></svg>Screening report, Tue 10 Nov</span></div></div>
-<div><small>Background</small>A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic. With her written consent, her son Saeed gets her appointment details.<div class="srcs"><span><svg class="i"><use href="#i-doc"/></svg>Referral declined, Tue 10 Nov</span><span><svg class="i"><use href="#i-doc"/></svg>Consent form, Mon 9 Nov</span></div></div>
-<div><small>Assessment</small>See the screening report in the clinical record. AI never writes this part.</div>
-<div><small>Request</small>Please accept her and offer an assessment by Mon 16 Nov.<div class="srcs"><span><svg class="i"><use href="#i-doc"/></svg>Breast screening programme, version 1</span></div></div>
-</div>
-<p class="note" style="margin-top:16px">AI used only the facts in this case and adds nothing they do not say. It cannot send, change urgency or edit the record.</p>
-</div>
-<div class="stack">
-<div class="card">
-<h3>Check before you approve</h3>
-<ul class="check">
-<li><span class="mk todo"></span><div><b>Preferred appointment time</b><span>Not in the facts. Add it if Hessa told you.</span></div><span class="r"></span></li>
-<li><span class="mk todo"></span><div><b>Help to get there</b><span>Not recorded. The unit offers hospital transport.</span></div><span class="r"></span></li>
-</ul>
-</div>
-<div class="card">
-<h3>Her other screening</h3>
-<ul class="reach">
-<li><svg class="i"><use href="#i-doc"/></svg><span>Bowel screening, Mon 3 Mar 2025: she needed a colonoscopy, which found no cancer. Closed on Thu 24 Apr 2025.</span></li>
-</ul>
-<p class="note" style="margin-top:12px">From her other cases in CareLoop. Only doctors see this. Her full history is in her hospital record.</p>
-</div>
-<div class="card">
-<h3>Kept with your decision</h3>
-<ul class="reach">
-<li><svg class="i"><use href="#i-user"/></svg><span>Your name, the time, and whether you approved, edited or rejected it</span></li>
-<li><svg class="i"><use href="#i-doc"/></svg><span>The facts used, and every change you make</span></li>
-<li><svg class="i"><use href="#i-spark"/></svg><span>The AI version that drafted it</span></li>
-</ul>
-<p class="note" style="margin-top:12px">Approving sends nothing. You send the referral from your hospital system, with this summary attached.</p>
-</div>
-</div>
-</div>
-</div>
-<div class="actionbar"><span class="events">Sends to CareLoop:<span class="ev">Summary approved</span></span><div class="btns"><span class="btn">Reject</span><span class="btn">Edit</span><span class="btn primary">Approve summary</span></div></div>
 </div>
 </section>
 <section class="board" id="b19" data-file="19-assessment">
@@ -1687,9 +1640,9 @@ code.role{margin-top:6px}
 <p class="note" style="margin-top:12px">The full report stays in the hospital system. CareLoop is only told that the result is back.</p>
 </div>
 <div class="card">
-<h3>Plain words for Hessa<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>AI draft</span></span></h3>
+<h3>Plain words for Hessa</h3>
 <div class="aitext"><p>The test found a breast cancer. It is small, it was found early, and it can be treated. Dr. Layla will explain it, and what happens next.</p></div>
-<p class="note" style="margin-top:12px">Signing also approves these words. Dr. Layla says them to Hessa in person. They are never sent by text.</p>
+<p class="note" style="margin-top:12px">Written by Dr. Layla and signed with her review. She says them to Hessa in person. They are never sent by text.</p>
 </div>
 </div>
 <div class="card">
