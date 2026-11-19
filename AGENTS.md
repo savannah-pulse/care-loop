@@ -4,7 +4,7 @@ Guidance for anyone working in this repository: people and AI coding agents alik
 
 ## What this is
 
-CareLoop is a coordination and accountability layer for screening follow-up. Every actionable screening result becomes a **case** that always has a stage, an owner, a deadline and, at the end, closure evidence. The prototype targets one Abu Dhabi breast-screening follow-up pathway and is being built for a hackathon ("Closing the Screening-to-Care Loop").
+CareLoop is a coordination and accountability layer for screening follow-up. Every actionable screening result becomes a **case** that always has a stage, an owner, a deadline and, at the end, closure evidence. It is built for any screening programme and, over time, any disease: each programme is a pathway file, not new code. The prototype uses Abu Dhabi breast screening as its example pathway, with more programmes to come, and is being built for a hackathon ("Closing the Screening-to-Care Loop").
 
 The goal is a production system that handles real patient data. The current build is a prototype that runs on simulators and synthetic data. Treat that as the current stage, not as a design limit: do not write code, contracts or documentation that assume data is always synthetic.
 

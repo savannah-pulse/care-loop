@@ -1,8 +1,9 @@
 # CareLoop
 
 CareLoop is a coordination and accountability layer for screening follow-up. Every actionable screening result becomes
-a **case** that always has a stage, an owner, a deadline and, at the end, closure evidence. The prototype targets one
-Abu Dhabi breast-screening follow-up pathway.
+a **case** that always has a stage, an owner, a deadline and, at the end, closure evidence. It is built for any
+screening programme and, over time, any disease: each programme is a pathway file, not new code. The prototype uses
+Abu Dhabi breast screening as its example pathway, and more programmes come next.
 
 CareLoop is **not** a clinical system. Hospital systems remain the systems of record. CareLoop correlates events,
 tracks ownership and deadlines, raises escalations and blocks unsafe closure.
