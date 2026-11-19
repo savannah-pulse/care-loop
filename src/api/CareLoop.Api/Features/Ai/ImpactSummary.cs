@@ -107,10 +107,17 @@ public static class ImpactSummary
 
     private static string Pascal(string key) => key.Length == 0 ? key : char.ToUpperInvariant(key[0]) + key[1..];
 
-    private static string Duration(TimeSpan span) =>
-        span.TotalDays >= 1 ? $"{Count((int)span.TotalDays, "day")} {Count(span.Hours, "hour")}"
-        : span.TotalHours >= 1 ? $"{Count(span.Hours, "hour")} {Count(span.Minutes, "minute")}"
-        : Count(Math.Max(1, span.Minutes), "minute");
+    // Rounded to the second and split as the impact page splits it (formatSpan in the web app), so the summary gives the
+    // times the cards give: "4 seconds" where a card says 4 s, never "1 minute".
+    private static string Duration(TimeSpan span)
+    {
+        var total = (long)Math.Round(span.TotalSeconds, MidpointRounding.AwayFromZero);
+        var (days, hours, minutes, seconds) = ((int)(total / 86_400), (int)(total % 86_400 / 3600), (int)(total % 3600 / 60), (int)(total % 60));
+        return days > 0 ? (hours > 0 ? $"{Count(days, "day")} {Count(hours, "hour")}" : Count(days, "day"))
+            : hours > 0 ? (minutes > 0 ? $"{Count(hours, "hour")} {Count(minutes, "minute")}" : Count(hours, "hour"))
+            : minutes > 0 ? (seconds > 0 ? $"{Count(minutes, "minute")} {Count(seconds, "second")}" : Count(minutes, "minute"))
+            : Count(Math.Max(1, seconds), "second");
+    }
 
     private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 }

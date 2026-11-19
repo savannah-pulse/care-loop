@@ -13,7 +13,7 @@ PARAGRAPH 2: CASE PROGRESSION
 - Closed cases by reason.
 
 PARAGRAPH 3: MEASUREMENT LIMITATIONS
-- Measures given as "withheld": say they rest on too few cases to report, without naming a number.
+- Measures given as "withheld": name them once, in plain words, and say they are left out of this summary because the numbers are small, and that the figures below show them. Do not write the word "withheld", and never say they rest on too few cases.
 - Missing or unmeasured information.
 
 RULES

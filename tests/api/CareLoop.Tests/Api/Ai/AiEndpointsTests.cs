@@ -243,6 +243,22 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.Equal("Across your team's 1 open case, nothing is overdue or due today.", RoleBriefing.Opening(cases[1..], _format, _clock.UtcNow));
     }
 
+    [Theory]
+    [InlineData(DemoRoles.NurseNavigator, "SYN-STAFF-9", "call-patient", true)]
+    [InlineData(DemoRoles.NurseNavigator, "SYN-STAFF-9", "acknowledge-notification", true)]
+    [InlineData(DemoRoles.NurseNavigator, "SYN-STAFF-9", "contact-patient-another-way", true)]
+    [InlineData(DemoRoles.NurseNavigator, "SYN-STAFF-9", "review-result", false)]
+    [InlineData(DemoRoles.Clinician, "SYN-STAFF-0001", "call-patient", true)]
+    [InlineData(DemoRoles.Clinician, "SYN-STAFF-9", "review-result", false)]
+    [InlineData(DemoRoles.FacilityLead, "SYN-STAFF-9", "review-result", false)]
+    public void A_case_is_the_readers_own_when_their_worklist_lists_it_under_my_cases(string role, string reader, string nextAction, bool yours)
+    {
+        // The case's owner is the clinician SYN-STAFF-0001; a nurse navigator's steps are hers whoever is responsible.
+        var @case = NewCase("SYN-RESULT-1", nextAction: nextAction);
+
+        Assert.Equal(yours, RoleBriefing.IsReaders(@case, new CareLoop.Domain.Events.Actor { Reference = reader, Role = role }, _pathways.Get(@case.PathwayId)));
+    }
+
     [Fact]
     public void A_case_number_that_starts_a_sentence_starts_with_a_capital()
     {
@@ -257,10 +273,14 @@ public sealed class AiEndpointsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(50, "1 minute")]
-    [InlineData(3660, "1 hour 1 minute")]
-    [InlineData(183600, "2 days 3 hours")]
-    public void A_median_time_is_sent_in_words_with_one_written_singular(int seconds, string words)
+    [InlineData(1.0, "1 second")]
+    [InlineData(3.6, "4 seconds")]
+    [InlineData(50.0, "50 seconds")]
+    [InlineData(90.0, "1 minute 30 seconds")]
+    [InlineData(3600.0, "1 hour")]
+    [InlineData(3660.0, "1 hour 1 minute")]
+    [InlineData(183600.0, "2 days 3 hours")]
+    public void A_median_time_is_sent_in_words_as_the_page_gives_it(double seconds, string words)
     {
         var empty = new Dictionary<string, int>();
         var metrics = new CareLoop.Contracts.Metrics.MetricsResponse
