@@ -1,8 +1,6 @@
 using System.Net;
 using CareLoop.Api.Features.Fhir;
 using CareLoop.Api.Features.Fhir.Outbound;
-using CareLoop.Api.Infrastructure.Persistence.Summaries;
-using CareLoop.Contracts.Summaries;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using CareLoop.Domain.Events.DomainEvents;
@@ -34,15 +32,9 @@ public sealed class FhirPublisherTests : IDisposable
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task HandoffProposed_sends_only_the_case_Task_even_when_an_approved_summary_exists()
+    public async System.Threading.Tasks.Task HandoffProposed_sends_only_the_case_Task()
     {
         var @case = await StoredCaseAsync();
-        await using (var db = _store.NewContext())
-        {
-            db.HandoffSummaries.Add(Summary(@case.Id, HandoffSummaryStatus.Approved));
-            await db.SaveChangesAsync();
-        }
-
         await PublishAsync(Proposed(@case.Id));
 
         var request = Assert.Single(_http.Requests);
@@ -51,34 +43,6 @@ public sealed class FhirPublisherTests : IDisposable
         Assert.Equal($"http://his.invalid/fhir/Task/{@case.Id:D}", request.Uri.ToString());
         var task = Assert.IsType<FhirTask>(Assert.Single(_http.Sent));
         Assert.Equal(StatusMap.CaseTaskCode, StatusMap.CodeIn(task.Code, StatusMap.TaskCodeSystem));
-    }
-
-    [Fact]
-    public async System.Threading.Tasks.Task HandoffSummaryApproved_sends_a_DocumentReference_for_exactly_that_summary()
-    {
-        var @case = await StoredCaseAsync();
-        var older = Summary(@case.Id, HandoffSummaryStatus.Approved);
-        var approved = Summary(@case.Id, HandoffSummaryStatus.Approved);
-        await using (var db = _store.NewContext())
-        {
-            db.HandoffSummaries.AddRange(older, approved, Summary(@case.Id, HandoffSummaryStatus.Draft));
-            await db.SaveChangesAsync();
-        }
-
-        await PublishAsync(Approval(@case.Id, approved.Id));
-
-        var request = Assert.Single(_http.Requests);
-        Assert.Equal($"http://his.invalid/fhir/DocumentReference/handoff-{approved.Id:N}", request.Uri.ToString());
-        Assert.IsType<DocumentReference>(Assert.Single(_http.Sent));
-    }
-
-    [Fact]
-    public async System.Threading.Tasks.Task HandoffSummaryApproved_for_a_missing_summary_fails_so_the_outbox_retries()
-    {
-        var @case = await StoredCaseAsync();
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => PublishAsync(Approval(@case.Id, Guid.NewGuid())));
-        Assert.Empty(_http.Requests);
     }
 
     [Fact]
@@ -143,7 +107,7 @@ public sealed class FhirPublisherTests : IDisposable
     {
         var @case = await StoredCaseAsync();
         await using var db = _store.NewContext();
-        var publisher = new FhirPublisher(UnconfiguredClient(), new EscalationTaskMapper(), new HandoffDocumentReferenceMapper(), new CaseTaskMapper(), db);
+        var publisher = new FhirPublisher(UnconfiguredClient(), new EscalationTaskMapper(), new CaseTaskMapper(), db);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             publisher.HandleAsync(new CaseClosed { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, Reason = ClosureReason.Treated, AuthorizedBy = Envelopes.Clinician() }, CancellationToken.None));
@@ -155,7 +119,7 @@ public sealed class FhirPublisherTests : IDisposable
         var @case = await StoredCaseAsync();
         var refusing = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError));
         await using var db = _store.NewContext();
-        var publisher = new FhirPublisher(Client(refusing), new EscalationTaskMapper(), new HandoffDocumentReferenceMapper(), new CaseTaskMapper(), db);
+        var publisher = new FhirPublisher(Client(refusing), new EscalationTaskMapper(), new CaseTaskMapper(), db);
 
         await Assert.ThrowsAsync<HttpRequestException>(() =>
             publisher.HandleAsync(new CaseClosed { EventId = Guid.NewGuid(), CaseId = @case.Id, OccurredAt = _store.Clock.UtcNow, Reason = ClosureReason.Treated, AuthorizedBy = Envelopes.Clinician() }, CancellationToken.None));
@@ -171,7 +135,7 @@ public sealed class FhirPublisherTests : IDisposable
     private async System.Threading.Tasks.Task PublishAsync(IDomainEvent domainEvent)
     {
         await using var db = _store.NewContext();
-        var publisher = new FhirPublisher(Client(_http), new EscalationTaskMapper(), new HandoffDocumentReferenceMapper(), new CaseTaskMapper(), db);
+        var publisher = new FhirPublisher(Client(_http), new EscalationTaskMapper(), new CaseTaskMapper(), db);
         await publisher.HandleAsync(domainEvent, CancellationToken.None);
     }
 
@@ -184,28 +148,4 @@ public sealed class FhirPublisherTests : IDisposable
         ProposedOwner = TestData.Clinician("SYN-STAFF-0002"),
         RespondBy = _store.Clock.UtcNow.AddHours(4),
     };
-
-    private HandoffSummaryApproved Approval(Guid caseId, Guid summaryId) => new()
-    {
-        EventId = Guid.NewGuid(),
-        CaseId = caseId,
-        OccurredAt = _store.Clock.UtcNow,
-        SummaryId = summaryId,
-        ApprovedBy = Envelopes.Clinician(),
-    };
-
-    private HandoffSummaryRecord Summary(Guid caseId, HandoffSummaryStatus status)
-    {
-        return new HandoffSummaryRecord
-        {
-            Id = Guid.NewGuid(),
-            CaseId = caseId,
-            RequestId = Guid.NewGuid(),
-            Status = status,
-            Text = "PLACEHOLDER - synthetic handoff summary",
-            DraftedAt = _store.Clock.UtcNow,
-            ApprovedBy = status == HandoffSummaryStatus.Approved ? "SYN-STAFF-0001" : null,
-            ApprovedAt = status == HandoffSummaryStatus.Approved ? _store.Clock.UtcNow : null,
-        };
-    }
 }

@@ -9,9 +9,9 @@ import type { NotImplemented, Problem } from './types'
  * - `notFound`: HTTP 404.
  * - `forbidden`: HTTP 403; the signed-in person may not do this: their role may not, or the case is
  *   outside their team and no reason was given.
- * - `conflict`: HTTP 409; the case changed first. For a handoff summary, AI is off or a summary is
- *   already approved; for an escalation, it was already acknowledged or a newer one replaced it.
- * - `unavailable`: HTTP 503; for a handoff summary, AI could not produce a valid draft.
+ * - `conflict`: HTTP 409; the case changed first. For an escalation, it was already acknowledged or
+ *   a newer one replaced it.
+ * - `unavailable`: HTTP 503; the API could not answer this time.
  * - `invalid`: HTTP 400 or 422; the request was refused as malformed.
  * - `aborted`: the read was cancelled because its answer was no longer wanted; screens ignore it.
  * - `error`: anything else, including a network failure.

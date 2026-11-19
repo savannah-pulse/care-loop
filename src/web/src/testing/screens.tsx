@@ -2,14 +2,13 @@ import { render, type RenderResult } from '@testing-library/react'
 import { userEvent, type UserEvent } from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { App } from '../App'
-import { forgetOpenDrafts } from '../features/summary'
 import { DEFAULT_STAFF_MEMBER, forgetAccessReasons, signInAs } from '../identity'
 import { DEFAULT_SCREEN_WIDTH, setScreenWidth } from './browser'
 import { TEST_NOW } from './builders'
 
 /** Where, as whom and how wide {@link renderApp} opens the dashboard. */
 export interface OpenAt {
-  /** The address to open, for example `#/cases/case-1/summary`. */
+  /** The address to open, for example `#/cases/case-1/escalation`. */
   readonly at: string
   /** The `id` of the person to sign in as, from the prototype's staff list; the nurse navigator by default. */
   readonly as?: string
@@ -31,8 +30,8 @@ export interface RenderedApp extends RenderResult {
  * @returns The rendered dashboard and a user to act on it.
  *
  * @remarks
- * Each test starts afresh: reasons given for other teams' cases and open summary drafts left by an
- * earlier test are forgotten. The clock reads {@link TEST_NOW}, so due times read the same on any
+ * Each test starts afresh: reasons given for other teams' cases by an earlier test are
+ * forgotten. The clock reads {@link TEST_NOW}, so due times read the same on any
  * day; only `Date` is fixed and timers still run. The test setup puts the real clock back after
  * each test.
  */
@@ -40,7 +39,6 @@ export function renderApp({ at, as = DEFAULT_STAFF_MEMBER.id, width = DEFAULT_SC
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(TEST_NOW)
   forgetAccessReasons()
-  forgetOpenDrafts()
   signInAs(as)
   setScreenWidth(width)
   window.location.hash = at

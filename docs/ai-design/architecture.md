@@ -1,6 +1,6 @@
 # CareLoop architecture
 
-> **AI implementation status:** The Python AI workflow service shown in this design has been removed from the repository. This document and the related AI documents describe a future design; the current API keeps AI off by default.
+> **AI implementation status (19 November 2026):** The API asks the agents in a Microsoft Foundry project itself, through `IAiClient`, for three texts shown to staff: the role briefing, the impact summary and the patient message draft. Each use has its own agent, called by name (`role-briefing`, `impact-summary`, `patient-notification`); the API never creates or changes one. The agents hold only universal rules; the plain-text prompt files in the API say what each one writes. The patient message draft is an approved template from its prompt file, chosen by the API from recorded state and filled in. The Python AI workflow service and the AI handoff summary in the earlier design are not built and have been removed; nothing AI writes is published to the HIS. AI is off by default (`Ai:Provider` = `NoOp`). [`integration.md`](integration.md) is the contract.
 
 ## Purpose and constraints
 
@@ -20,8 +20,7 @@ flowchart LR
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
     UI[Demo UI<br/>exception dashboard · call outcomes · impact view]
-    AIWORKFLOW[Proposed Python AI service<br/>on-demand summaries and stage insights]
-    AIPROVIDER[Optional AI provider interface<br/>reviewable drafts]
+    MODEL[Agents in a Microsoft Foundry project<br/>role briefing · impact summary · patient message draft]
     HUMAN[Authorized staff]
 
     HIS --> HISADAPTER --> API
@@ -31,15 +30,14 @@ flowchart LR
     WORKER -->|escalation events; stage unchanged| API
     STORE --> UI
     HUMAN -->|reviewed actions and closure evidence| API
-    API -->|approved minimum facts or aggregate metrics| AIWORKFLOW
-    AIWORKFLOW -->|reviewable summary or narrative draft| API
-    AIWORKFLOW -->|inference request| AIPROVIDER
-    AIPROVIDER -->|generated draft| AIWORKFLOW
+    UI -->|asks for an AI text| API
+    API -->|IAiClient: minimum facts or aggregate numbers, to the use's agent| MODEL
+    MODEL -->|draft text| API
 ```
 
 The event log is the source for audit and timeline reconstruction; the case projection supports worklist queries. FHIR-shaped exchange may be used at the adapter boundary, but the prototype's internal coordination model is not a clinical FHIR repository. The choice of relational database and local hosting method is still a team decision.
 
-The backend coordinates the ten-stage journey. In this proposed design, a Python AI service would be invoked on demand for the FR-11 clinician handoff summary and, as governed extensions, patient-friendly drafts, reviewed English-to-UAE-Arabic translation, and descriptive narratives over backend-computed aggregate metrics. It would not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Outputs would be drafts with source references and require authorized human review. The .NET API remains the case-state, authorization, audit, and closure gate. See the [AI specification](ai-spec.md).
+The backend coordinates the ten-stage journey. When a member of staff opens the home page, the impact page or a case, the web app may ask the API for an AI text. The API reads what that person may see, builds the data from the fields each use allows, puts it into that use's prompt file and hands the request to the provider behind `IAiClient` (`NoOpAiClient` by default, `FoundryAiClient` for Microsoft Foundry). On Foundry each use goes to its own agent, which is sent the prompt as written and answers plain text; any other provider is sent the same prompt. The API does not check the text against the data. It puts its own opening sentence in front of the role briefing and swaps the case tokens (`C-1`, `C-2`, …) for the patients' names as the reader already sees them (`case` and the case number for the programme coordinator), so names and case numbers are never sent. While `Ai:SyntheticData` is `true` it ends the impact summary with a fixed sentence saying the data is synthetic. An agent's refusal (`CANNOT_COMPLY`), or an answer with no text, is a failure (503) and is never shown as text. The three texts are the role briefing, the impact summary over backend-computed numbers, and a draft of a patient message for staff to read. AI does not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Its output is a draft labelled as written by AI; it is not stored and nothing acts on it. The .NET API remains the case-state, authorization, audit, and closure gate. See the [integration contract](integration.md); the [AI specification](ai-spec.md) is the earlier proposal, including the handoff summary and translation, which are not built.
 
 ## Ten-stage case lifecycle
 
@@ -72,7 +70,7 @@ sequenceDiagram
     participant HIS as HIS simulator
     participant API as Orchestration API
     participant Store as Coordination store
-    participant AI as Python AI service
+    participant AI as Foundry agent
     participant Channel as messaging simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
@@ -80,10 +78,6 @@ sequenceDiagram
     HIS->>API: Result event (source, patient, result, reviewed urgency)
     API->>API: Validate, correlate, deduplicate
     API->>Store: Append event, create case, assign owner or queue
-    API->>AI: Approved report facts and recorded stage outcomes
-    AI-->>API: Source-linked clinician handoff summary draft
-    Staff->>API: Review, edit, approve, or reject draft
-    API->>Store: Audit review decision
     API-->>Channel: Approved text message or email (JSON)
     Channel->>API: Delivery / failure / reply (1 = got the message, anything else = call request)
     API->>Store: Append attributed event; update coordination projection
@@ -92,9 +86,11 @@ sequenceDiagram
     Worker->>Store: Check approved clocks and missing events
     Worker->>API: Owned escalation event (does not advance stage)
     UI->>API: Read case, timeline, exceptions, synthetic metrics
-    API->>AI: Precomputed, privacy-reviewed aggregate metrics (scheduled)
-    AI-->>API: Descriptive stage-insight narrative draft
-    Staff->>API: Review narrative before publication
+    UI->>API: Ask for a role briefing, impact summary or patient message draft
+    API->>Store: Record the read in the read audit
+    API->>AI: Minimum facts or small-number-suppressed aggregate numbers
+    AI-->>API: Draft text
+    API-->>UI: The text, labelled as written by AI (not stored, not sent)
     Staff->>API: Authorized decision with evidence or documented exception
     API->>Store: Guard transition, append audit; close only if valid
 ```
@@ -108,10 +104,10 @@ sequenceDiagram
 - Patient receipt, understanding, help request, and consent are distinct. A caregiver's action is attributed to the caregiver and limited to approved permissions.
 - Clinical records stay in source systems. The coordination store keeps references, evidence references, workflow status, deadlines, and audit events.
 - Only an authorized human can record a clinical disposition or close a case; the API enforces the gate and records the decision.
-- Python returns source-linked summary and narrative drafts only. It cannot diagnose, set urgency, infer consent, send patient messages, accept referrals, change case state, calculate metrics, or close cases.
+- AI returns draft text for staff only: the role briefing, the impact summary and the patient message draft. It cannot diagnose, set urgency, infer consent, send patient messages, accept referrals, change case state, calculate metrics, or close cases, and it never discloses a result. Patients receive approved templates.
 - Deadline checks are deterministic and configured from approved rules. Missing configuration must surface review work rather than inventing a deadline or urgency.
 - Mark all simulator data, AI drafts, and impact metrics as synthetic. Report cohort denominators and assumptions; do not claim real clinical improvement.
 
 ## Decisions to resolve as a team
 
-Before implementation depends on them, record the chosen relational database, local orchestration/hosting approach, event envelope and versioning, identity/role model for the demo, pathway clock/evidence configuration, and who reviews patient-facing language. Until approved, these remain open; no production integration or credentials belong in this repository.
+Before implementation depends on them, record the chosen relational database, local orchestration/hosting approach, event envelope and versioning, identity/role model for the demo, pathway clock/evidence configuration, and who reviews patient-facing language. Which component calls the model is settled: the API asks the agents in a Foundry project directly (see [`integration.md`](integration.md), which also lists the open AI points). Until approved, these remain open; no production integration or credentials belong in this repository.

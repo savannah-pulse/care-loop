@@ -1,5 +1,8 @@
-[PLACEHOLDER WORDING, NOT APPROVED]
-Subject: A follow-up step is waiting for you
+Subject: Your care team would like to speak with you
 
-Your screening provider has a follow-up step for you and will be in touch about it. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.
+Dear patient,
+Your care team at {{facility}} would like to speak with you.
+Please contact us at {{facilityContact}} when convenient.
+Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you.
+Thank you.
 Reference: {{caseReference}}

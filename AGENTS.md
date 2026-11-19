@@ -15,7 +15,7 @@ CareLoop is **not** a clinical system. Hospital systems (HIS/EMR) remain the sys
 1. **Real patient data never enters the repository.** Source, tests, samples, scenarios, simulators, fixtures and local or demo environments use synthetic data only. Never commit real patient data, credentials or live endpoint addresses. The API and the dashboard are built as for production: they do not know or care whether the systems they talk to are simulators, and carry no simulated-data flags, labels or branches. Labelling simulated records and messages as simulated is the simulators' job.
 2. **No clinical decisions.** CareLoop never diagnoses, never sets or changes urgency, and never creates a clinical outcome. Urgency always arrives clinician-reviewed from the HIS.
 3. **Closure needs a human.** A case closes only on an authorized human closure event carrying pathway-specific evidence or a documented exception. The API must reject anything else and audit the attempt.
-4. **AI output is a draft.** AI can draft a handoff summary from facts a person has finalized. A person approves or rejects it, and approval is an event. AI cannot set urgency, alter source data, close a case or send a message, because it is given no way to. Under the DoH standard (§3.8.1) the reporting physician informs the patient, so AI never discloses a result. [`docs/ai-design/integration.md`](docs/ai-design/integration.md) is the full boundary: what AI may do, what it is sent, and what happens when it fails.
+4. **AI output is a draft.** AI writes three texts for staff, from facts already recorded: a role briefing, an impact summary and a draft of a patient message. Each is shown labelled as written by AI; it is not stored and nothing acts on it. The patient message draft is a preview: patients still receive approved templates. AI cannot set urgency, alter source data, close a case or send a message, because it is given no way to. Under the DoH standard (§3.8.1) the reporting physician informs the patient, so AI never discloses a result. [`docs/ai-design/integration.md`](docs/ai-design/integration.md) is the full boundary: what AI may do, what it is sent, and what happens when it fails.
 5. **Deadlines are configuration.** Never hard-code a clinical deadline. All deadlines come from the pathway definition and are placeholders until a clinical adviser approves them. CareLoop always runs on real time and never speeds up its clock: a live demo uses the demo pathway folder, whose deadlines are shortened, selected through `Pathways:Directory`.
 
 If a task appears to conflict with any of these, stop and ask.
@@ -27,7 +27,7 @@ These are deferred, not forbidden. Build the seams for them now and leave the im
 - **Real SMS and email delivery.** CareLoop reaches patients, caregivers and staff by text message and email only; there is no patient app or portal. The `Sms` and `Email` providers are built, but in the prototype both send to the messaging simulator. Providers for a real SMS or email service come later, behind the same `INotificationProvider` interface, and are switched on through configuration.
 - **Arabic templates and right-to-left layout.** English only for now; keep everything language-keyed. A template missing in the recipient's language falls back to English, so a patient is never left unnotified; a malformed language tag fails.
 - **Live HIS or Malaffi integration.** The simulators stand in for these.
-- **AI beyond the handoff summary.** Patient-facing wording comes from approved templates, not a model; AI translation and the periodic stage-insight narrative are designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) proposes all three as extensions; they are deferred here, and the handoff summary is the only AI capability in scope.
+- **AI beyond the three texts.** AI writes the role briefing, the impact summary and the patient message draft, and nothing else. The messages that reach patients come from approved templates, not a model. The AI handoff summary was removed, and AI translation is designed but not built. [`docs/ai-design/ai-spec.md`](docs/ai-design/ai-spec.md) is the earlier proposal for these; [`docs/ai-design/integration.md`](docs/ai-design/integration.md) says what is built.
 
 ## Before real patient data
 
@@ -68,8 +68,7 @@ care-loop/
 │   │   │   ├── Recipients/             Recipient, ContactPoint, NotificationChannel
 │   │   │   ├── Events/                 SourceEvent, CaseEventType, AuditEvent
 │   │   │   │   └── DomainEvents/       IDomainEvent, NotificationRequested, HandoffProposed, HandoffRejected,
-│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed,
-│   │   │   │                           HandoffSummaryApproved
+│   │   │   │                           ReferralRejected, CallRequested, DeadlineApproaching, EscalationRaised, CaseClosed
 │   │   │   ├── Rules/                  TransitionRules, OwnershipRules, ClosureGate, DeadlinePolicy
 │   │   │   ├── Pathways/               PathwayDefinition, IPathwayProvider
 │   │   │   └── Time/                   IClock
@@ -83,7 +82,7 @@ care-loop/
 │   │       │   ├── Cases/              CaseSummaryResponse, CaseDetailResponse, TimelineEntryResponse
 │   │       │   ├── Exceptions/         ExceptionItemResponse
 │   │       │   ├── Metrics/            MetricsResponse, SimulationResponse
-│   │       │   └── Summaries/          HandoffSummaryResponse
+│   │       │   └── Ai/                 AiTextResponse
 │   │       ├── Features/
 │   │       │   ├── Events/             EventIngestor, IEventHandler, Handlers/ (one per event type)
 │   │       │   ├── Fhir/               FhirEndpoints, GetCapabilityStatement, IFhirInboundMapper, StatusMap
@@ -96,20 +95,23 @@ care-loop/
 │   │       │   ├── Cases/              ListCases, GetCase, GetTimeline
 │   │       │   ├── Exceptions/         GetExceptions
 │   │       │   ├── Metrics/            GetMetrics, RunSimulation
-│   │       │   └── Summaries/          IAiProvider, fact and draft contracts, DraftHandoffSummary,
-│   │       │                           ApproveSummary, RejectSummary, AutoDraftOnHandoff
+│   │       │   └── Ai/                 IAiClient (with AiRequest(Use, Prompt) and AiUnavailableException), AiText, RoleBriefing, ImpactSummary,
+│   │       │                           PatientMessageDraft
 │   │       ├── Infrastructure/
 │   │       │   ├── Persistence/        CareLoopDbContext, EfCaseRepository, Outbox/, Configurations/, Migrations/
 │   │       │   ├── Fhir/               FhirHttpClient
 │   │       │   ├── Notifications/      SmsNotificationProvider, EmailNotificationProvider (on SimulatorNotificationProvider),
 │   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
 │   │       │   │                       StaffContactOptions
-│   │       │   ├── Ai/                 NoOpAiProvider (default), FoundryDirectProvider (deferred)
+│   │       │   ├── Ai/                 AiOptions (with FoundryOptions), AiPrompts, NoOpAiClient (default), FoundryAiClient
+│   │       │   │                       (sends the prompt file, with the data in place, to the use's Foundry agent)
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
 │   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
 │   │       │   ├── Time/               SystemClock
 │   │       │   └── Auth/               DemoRoles
+│   │       ├── Prompts/                what the AI model is asked, in plain text, on every provider: role-briefing.md, impact-summary.md,
+│   │       │                           patient-message.md (with the approved templates), README.md (the editing guide)
 │   │       └── Worker/                 DeadlineWorker
 │   │
 │   ├── web/                            CareLoop dashboard only (React, TypeScript, Vite); a starter today
@@ -128,7 +130,7 @@ care-loop/
 └── tests/
     ├── api/CareLoop.Tests/             xUnit, references Domain and Api
     │   ├── Domain/                     rule tests
-    │   ├── Api/                        ingest, journeys, Fhir/ (with Samples/), Outbox/, Notifications/
+    │   ├── Api/                        ingest, journeys, Fhir/ (with Samples/), Outbox/, Notifications/, Ai/
     │   └── Fakes/                      FakeClock, InMemoryCaseRepository, TestData
     ├── simulators/
     │   ├── his/HisSimulator.Tests/
@@ -150,7 +152,7 @@ File names inside folders are a starting point. Folder boundaries and dependency
 - **Notification providers are the door for text messages and email.** Reaching a patient, a caregiver or a member of staff, and hearing back from them, belongs to the enabled notification provider, not to the FHIR boundary. No FHIR travels on this path. Outbound goes through `INotificationProvider`. Inbound (delivery reports and patient replies) arrives at `POST /notifications/inbound/{provider}` and is translated by that provider's `IInboundNotificationHandler` into `EventEnvelope`s for `EventIngestor`. A handler only verifies and translates; it contains no business logic.
 - **The dashboard is the exception.** `src/web/` is CareLoop's own UI and uses the plain REST read endpoints.
 - **Outbox for everything outbound.** Domain rules raise domain events. `OutboxDispatcher` delivers each to every `IDomainEventSubscriber` and tracks delivery per subscriber (`OutboxDelivery`), so subscribers retry independently and must be idempotent.
-- **Interfaces only at real seams.** `ICaseRepository`, `IPathwayProvider`, `IClock`, `IAiProvider`, `INotificationProvider`, `IInboundNotificationHandler`, `IDomainEventSubscriber`, `IEventHandler`, `IFhirInboundMapper`. Do not add generic repositories or an interface per handler.
+- **Interfaces only at real seams.** `ICaseRepository`, `IPathwayProvider`, `IClock`, `IAiClient`, `INotificationProvider`, `IInboundNotificationHandler`, `IDomainEventSubscriber`, `IEventHandler`, `IFhirInboundMapper`. Do not add generic repositories or an interface per handler.
 - **Simulators share no code with CareLoop.** They build and parse FHIR themselves, as a real hospital system would. Do not add project references between `src/simulators/` and `src/api/`.
 
 ## Domain model
@@ -213,7 +215,6 @@ Outbound:
 | From CareLoop | FHIR resource |
 |---|---|
 | Escalation notice | `Task` |
-| Handoff summary | `DocumentReference`, sent when a person approves it |
 | Case status | `Task` via `GET /fhir/Task/{id}` |
 
 Case to `Task` field mapping: handoff status to `Task.status`; pathway stage to `Task.businessStatus`; owner to `Task.owner`; who handed over to `Task.requester`; the result or referral to `Task.focus`; patient to `Task.for`; deadline to `Task.restriction.period`; rejection or closure reason to `Task.statusReason`. Keep all code mappings in `StatusMap`.
@@ -234,7 +235,6 @@ A contact point with `ContactPoint.system` `sms` is reached by text message and 
 |---|---|---|
 | `NotificationRequested` | None | Patient |
 | `HandoffProposed` | `Task` | Proposed owner |
-| `HandoffSummaryApproved` | `DocumentReference` (exactly the approved text) | None |
 | `HandoffRejected`, `ReferralRejected` | `Task` update | Current owner |
 | `CallRequested` | `Task` | The role the pathway names for the call-back (the nurse navigator); the current owner when it names none |
 | `DeadlineApproaching` | None | Current owner |
@@ -252,7 +252,7 @@ Notification rules:
 - A patient reply can say only two things. CareLoop reads `1` as "I got this message" (an acknowledgement; the message goes out before any appointment exists, so it never asks whether the patient will attend) and `2`, or any other text, as a request for a call. No reply is ever teach-back or a confidence rating: a nurse navigator records those after a call (`POST /cases/{caseId}/call-outcome`). Recording a call answers the patient's request for one; a later text reply of `1` does not.
 - Every channel a patient notification goes out on is recorded on the case as sent before anything is sent, so a failure on one channel marks the patient unreachable only once every channel has failed.
 - Staff notifications carry no patient detail: "a case at {facility} needs your action", and the case number to look for in CareLoop, with no link.
-- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`.
+- Dates and times in messages are local (`Notifications:TimeZone`, an IANA zone such as `Asia/Dubai`) and written as people read them; facilities are named from `Notifications:FacilityNames`, and a patient message gives a facility's contact from `Notifications:FacilityContacts` ("the clinic" when none is set).
 - Every stored event says where it came from (`SourceEvent.Origin`: `careloop`, `sms` or `email`; empty for the case's own source system), so the timeline never has to guess.
 - Templates come from `Infrastructure/Templates/{language}/`. English only for now; keep everything language-keyed so Arabic can be added later.
 
@@ -282,7 +282,8 @@ public interface IInboundNotificationHandler
   "Email": { "BaseUrl": "...", "InboundSecret": "..." },
   "StaffContacts": { "nurse-navigator": { "Channel": "Email", "Address": "..." } },
   "TimeZone": "Asia/Dubai",
-  "FacilityNames": { "family-health-centre": "Family Health Centre" }
+  "FacilityNames": { "family-health-centre": "Family Health Centre" },
+  "FacilityContacts": { "family-health-centre": "..." }
 }
 ```
 
@@ -313,7 +314,7 @@ public interface ICaseRepository
 | `ICaseRepository` | `Domain/Cases` | `EfCaseRepository`, `InMemoryCaseRepository` (tests) |
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
-| `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `FoundryDirectProvider` |
+| `IAiClient` | `Api/Features/Ai` | `NoOpAiClient` (default), `FoundryAiClient` (sends the prompt to each use's own Foundry agent and returns its plain text) |
 | `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
 | `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
@@ -340,7 +341,7 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. External providers remain deferred. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
+| AI | `IAiClient`; `NoOpAiClient` is the default so everything runs with AI off. `FoundryAiClient` asks each use's own agent in a Microsoft Foundry project, by name (`Ai:Foundry:Agents`), signing in with `Azure.Identity` (no key). The API never creates or changes an agent. The agents hold only universal rules; the prompts are plain-text files in `Prompts/` (a `TASK:` with a `DATA:` section), and every provider, Foundry included, is sent `request.Prompt`: the file with the data in place. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |
@@ -454,7 +455,7 @@ Work in this order. Finish and test each step before starting the next.
 7. **Outbox and notifications.** Dispatcher, `FhirPublisher`, `NotificationRouter`, `NotificationSender`, SMS and email providers, templates.
 8. **Dashboard.** Exception queue, case timeline, metrics.
 9. **Simulators.** HIS first, then the messaging simulator, each with its scenario runner; UIs last.
-10. **AI handoff summary.** Draft, approval and rejection behind `IAiProvider`; see [`docs/ai-design/integration.md`](docs/ai-design/integration.md).
+10. **AI texts.** Role briefing, impact summary and patient message draft behind `IAiClient`; see [`docs/ai-design/integration.md`](docs/ai-design/integration.md).
 11. **Scenarios and simulation.** Scenario scripts, cohort, the with-and-without-escalation comparison, end-to-end tests.
 
 ## Working agreements

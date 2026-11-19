@@ -39,8 +39,7 @@ function forgetPreviousPerson(): void {
  *
  * @remarks
  * Prototype identity scheme, to be replaced by real sign-in. Anything kept in memory for the person
- * signed in, such as an open handoff summary draft, registers here so it is forgotten the moment
- * someone else signs in.
+ * signed in registers here, so it is forgotten the moment someone else signs in.
  */
 export function onSignedInChange(listener: () => void): () => void {
   signInListeners.add(listener)

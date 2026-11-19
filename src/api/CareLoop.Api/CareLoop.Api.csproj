@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0" />
     <PackageReference Include="Hl7.Fhir.R4" Version="6.8.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.15">
@@ -31,6 +32,7 @@
   <!-- Pathway definitions and approved message templates ship with the API. -->
   <ItemGroup>
     <Content Update="Infrastructure\Pathways\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Prompts\**\*.md" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Infrastructure\Templates\**\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

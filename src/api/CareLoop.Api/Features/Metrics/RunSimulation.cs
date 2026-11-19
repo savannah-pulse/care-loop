@@ -4,7 +4,6 @@ using CareLoop.Contracts.Cases;
 using CareLoop.Contracts.Common;
 using CareLoop.Contracts.Exceptions;
 using CareLoop.Contracts.Metrics;
-using CareLoop.Contracts.Summaries;
 using CareLoop.Domain.Cases;
 using Microsoft.AspNetCore.Mvc;
 

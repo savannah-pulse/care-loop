@@ -7,7 +7,13 @@ This specification is part of the [AI design set](README.md).
 **Related work:** FR-04 (messaging simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
 **Alignment basis:** CareLoop AI Layer Engineering Design Specification v0.3; proposed extensions remain subject to team and clinical-adviser review.
 
-> **Implementation status:** This document is a design proposal. The Python AI service described here has been removed from the repository, and no external AI provider is currently enabled.
+> **Status note (19 November 2026).** This document is the earlier design proposal and is kept for reference. It is superseded by [`integration.md`](integration.md), which describes what is built, wherever the two differ.
+>
+> - **Not built:** the clinician handoff summary (AG1, FR-11) and the Python AI service with its routes and contracts in §3 and §4. The API asks the agents in a Microsoft Foundry project itself, one agent per text, called by name (`role-briefing`, `impact-summary`, `patient-notification`); it never creates or changes an agent. The plain-text prompt files (`src/api/CareLoop.Api/Prompts/`) hold what each agent is asked (a `TASK:` with a `DATA:` section) and apply on Foundry for all three; the agents themselves hold only universal rules. AG2 (closure review pack), AG4 (translation) and AG5 (reply triage) are not built either.
+> - **Built, three texts:**
+>   - Role briefing (`role-briefing.md`): not in this document's AG1 to AG6 list; informally called AG7.
+>   - Impact summary (`impact-summary.md`): closest to AG6, the stage-insights narrative. It is asked for on demand from the impact page, not on a schedule.
+>   - Patient message draft (`patient-message.md`): closest to AG3. It is a preview for staff only; nothing AI writes is sent, and patients receive approved templates. The `patient-notification` agent fills one approved administrative template from `patient-message.md`, which the API chooses from recorded state, and returns that wording as the draft.
 
 ## 1. Purpose and design boundary
 

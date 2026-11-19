@@ -7,7 +7,7 @@
  * test states only what it is about. Nothing in the app imports this module.
  */
 
-import type { CaseDetail, CaseSummary, Escalation, HandoffSummary, Owner, Programme, TimelineEntry } from '../data'
+import type { CaseDetail, CaseSummary, Escalation, Owner, Programme, TimelineEntry } from '../data'
 
 /** The moment the test cases describe: Thursday 12 November 2026, 09:00 in Abu Dhabi. */
 export const TEST_NOW = new Date('2026-11-12T05:00:00Z')
@@ -171,51 +171,6 @@ export function programme(overrides: Partial<Programme> = {}): Programme {
     closureRules: [],
     evidenceKinds: [],
     changeLog: [],
-    ...overrides,
-  }
-}
-
-/**
- * Builds a handoff summary draft, as `POST /cases/{caseId}/handoff-summary` returns it.
- *
- * @param overrides - Fields to change.
- * @returns A draft for the case of {@link caseSummary}, drafted at {@link TEST_NOW}, with three
- * sections (the situation, the assessment AI leaves to the clinician and a recommendation) run
- * together as its text, and one fact for the reviewer to check, unless overridden.
- */
-export function handoffSummary(overrides: Partial<HandoffSummary> = {}): HandoffSummary {
-  const sections = [
-    {
-      heading: 'Situation',
-      text: 'Screening found a change that needs further assessment.',
-      sourceFactIds: ['screening-report-2026-11-10'],
-    },
-    { heading: 'Assessment', text: 'For the clinician to write.', sourceFactIds: [] },
-    {
-      heading: 'Recommendation',
-      text: 'Book the assessment clinic at the General Hospital.',
-      sourceFactIds: ['referral-declined-2026-11-10'],
-    },
-  ]
-  return {
-    summaryId: '7e8f9a0b-1c2d-4e3f-8a4b-100245891501',
-    caseId: caseSummary().caseId,
-    status: 'Draft',
-    sections,
-    text: sections.map((section) => `${section.heading}\n${section.text}`).join('\n\n'),
-    missingOrConflictingFacts: ['The referral does not say which clinic the patient prefers.'],
-    humanReviewRequired: true,
-    draftedBy: 'careloop-ai',
-    modelDeployment: 'synthetic-model',
-    promptVersion: 'handoff-v1',
-    trigger: 'manual',
-    language: 'en',
-    draftedAt: TEST_NOW.toISOString(),
-    approvedBy: null,
-    approvedAt: null,
-    rejectedBy: null,
-    rejectedAt: null,
-    rejectionReason: null,
     ...overrides,
   }
 }

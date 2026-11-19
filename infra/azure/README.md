@@ -22,8 +22,8 @@ One resource group, `rg-careloop-<environment>`, holding:
 | Container registry | Holds the images. No admin user; pushes and pulls use Entra ID |
 | PostgreSQL flexible server | The `careloop` database (see "Database choice") |
 | Key Vault | The database password, the connection string and the inbound-message secret |
-| Microsoft Foundry account, project, model deployment and guardrail | Optional for future direct API integration; created only with `CREATE_FOUNDRY=true` |
-| Managed identity | `apps` pulls images and reads Key Vault; it can also be granted Foundry access for a future direct API provider |
+| Microsoft Foundry account, project, model deployment and guardrail | Optional; created only with `CREATE_FOUNDRY=true`. Without it the API can use the agents in an existing Foundry project. A created Foundry has no agents (see "AI and Foundry") |
+| Managed identity | `apps` pulls images and reads Key Vault. The API also calls the Foundry project's agents as this identity, which needs the Foundry User role on the Foundry account |
 | Log Analytics and Application Insights | Container logs (optional) |
 | Virtual network, private endpoints, private DNS zones | Only with private networking |
 
@@ -53,7 +53,7 @@ An environment is a parameter file. `deploy.sh <name>` reads `environments/<name
 | Simulators | Deployed, public | Not deployed |
 | Timing | Demo pathway (deadlines in seconds) | Real pathway |
 | Database | Burstable B1ms, 7-day backups | General Purpose D2ds v5, 35-day geo-redundant backups |
-| AI | API uses `NoOp`; Foundry resources can optionally be provisioned for future direct API integration | API uses `NoOp`; no AI provider is enabled |
+| AI | Off (`NoOp`) unless `API_AI_PROVIDER=Foundry` is set for the deployment; then the API asks the agents in the Foundry project `AZURE_AI_PROJECT_ENDPOINT` names | Off: `apiAiProvider = 'NoOp'` in the parameter file |
 | Key Vault purge protection | Off | On |
 
 The switches are parameters of `main.bicep`: `privateNetworking`, `deploySimulators`, `deployMonitoring`, plus `exposeApi`, `exposeSimulators` and `allowedIpRanges` for what is reachable from the internet.
@@ -93,8 +93,10 @@ Settings the script reads from the shell:
 | Variable | Default | |
 | --- | --- | --- |
 | `AZURE_LOCATION` | `uaenorth` | Region |
-| `AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME` | unset | Optional Foundry configuration for a future direct API provider; AI remains off by default |
-| `CREATE_FOUNDRY`, `AZURE_AI_LOCATION` | `false`, the region | Create a Foundry here for future API integration |
+| `API_AI_PROVIDER` | `NoOp` | `NoOp` keeps AI off; `Foundry` has the API ask the agents in the Foundry project (`dev`). See "AI and Foundry" |
+| `AZURE_AI_PROJECT_ENDPOINT` | unset | The Foundry project whose agents the API asks, `https://<account>.services.ai.azure.com/api/projects/<project>`. Needed for `API_AI_PROVIDER=Foundry`. It is the only Foundry setting the API is given |
+| `AZURE_AI_FOUNDRY_ACCOUNT_ID` | unset | Resource ID of that project's Foundry account. When set, and `ASSIGN_ROLES` is `true`, the API's identity is given Foundry User on it |
+| `CREATE_FOUNDRY`, `AZURE_AI_LOCATION` | `false`, the region | Create a Foundry account, project and model deployment here instead of using an existing one; the API is pointed at the project. It has no agents, so AI does not work against it until the three agents exist there |
 | `NAME_PREFIX` | `careloop` | Prefix of every resource name. Change it to run two copies of one environment in a subscription |
 | `RESOURCE_GROUP` | unset | Deploy into this existing resource group instead of creating `rg-careloop-<environment>` |
 | `ASSIGN_ROLES` | `true` | `false` when you are Contributor only; see "Deploying without the right to assign roles" |
@@ -133,7 +135,7 @@ No role assignment is made, and three things work differently:
 
 - **Image pulls.** The registry's admin user is switched on and each app pulls with its password, kept as a secret on the app, instead of with its managed identity.
 - **Key Vault.** The vault uses access policies instead of Azure roles. The apps still read their secrets through Key Vault references.
-- **Foundry.** No model role is assigned; the Foundry account's owner must grant access to the intended runtime identity when a provider is enabled.
+- **Foundry.** The Foundry User role is not assigned. Before AI is switched on, the Foundry account's owner must grant it to the `apps` identity by hand; see "AI and Foundry".
 
 This is weaker than the default: anyone who can read an app's configuration can read the registry password. Use it for a prototype, and move to the default once someone with the right to assign roles can deploy. Do not flip `ASSIGN_ROLES` on an environment that already exists without checking the Key Vault afterwards: changing a vault between roles and access policies changes who can read it.
 
@@ -210,19 +212,64 @@ There is still one nginx configuration, `src/web/nginx.conf`. `apps.bicep` reads
 
 ## AI and Foundry
 
-The Python AI workflow service is not included in this repository or deployment. The API uses `Ai:Provider = NoOp` by default, and its direct Foundry provider is still a stub. No model calls are made by this deployment.
+The API asks the agents in a Microsoft Foundry project itself, for three texts shown to staff: the role briefing, the impact summary and the patient message draft. Each text has its own agent, called by name at its latest version: `role-briefing`, `impact-summary` and `patient-notification`. There is no separate AI service. AI is off by default: `apiAiProvider` is `NoOp`, the API's AI endpoints answer 409 and no model call is made. The agents, with their instructions, models and tools, are owned in the Foundry project; neither the API nor this deployment creates or changes one. Their instructions hold only universal rules: what each one writes is the API's prompt file (`src/api/CareLoop.Api/Prompts/`), sent with the data in place. The deployment does not set `Ai:SyntheticData`, so it keeps its default, `true`, and the impact summary ends with a sentence saying the data is synthetic. All three answered from their agents in a live run on 19 November 2026. The contract is [`docs/ai-design/integration.md`](../../docs/ai-design/integration.md).
 
-The optional `CREATE_FOUNDRY=true` setting creates a Foundry account, project, model deployment and a Prompt Shields guardrail for a future AI integration. To create one:
+### Switching AI on in an environment
+
+Three things are needed:
+
+1. **The agents exist.** The Foundry project must hold the three agents the API asks by name: `role-briefing`, `impact-summary` and `patient-notification` (the API's defaults, `Ai:Foundry:Agents`). Their owner creates them in the project. No model deployment name is passed.
+2. **The API is pointed at the project.** For `dev`, set these before running the script. They are read from the environment, never written to a parameter file:
+
+   ```bash
+   API_AI_PROVIDER=Foundry AZURE_AI_PROJECT_ENDPOINT=https://<account>.services.ai.azure.com/api/projects/<project> AZURE_AI_FOUNDRY_ACCOUNT_ID=<resource ID of the Foundry account> infra/azure/scripts/deploy.sh dev
+   ```
+
+   `API_AI_PROVIDER` becomes the API setting `Ai__Provider`. `AZURE_AI_PROJECT_ENDPOINT` becomes `Ai__Foundry__ProjectEndpoint`, the only Foundry setting the API is given. With `Foundry` and no project endpoint the API refuses to start. Set the same values on every later run, or the next deployment switches AI off again. `prod` sets `apiAiProvider = 'NoOp'` in its parameter file and reads none of these variables.
+3. **The API's identity may call the project.** There is no key. The API signs in as the `apps` managed identity, which needs the **Foundry User** role (`53ca6127-db72-4b80-b1b0-d745d6d5456d`) on the Foundry account. Without it every call is refused with 403 and the dashboard shows "AI could not write this".
+
+Who grants Foundry User:
+
+| Case | Who grants it |
+| --- | --- |
+| `ASSIGN_ROLES=true` (the default) and `AZURE_AI_FOUNDRY_ACCOUNT_ID` set | The deployment, on that existing account (`modules/foundry-access.bicep`). The person deploying needs the right to assign roles on that account, which may be in another resource group or subscription |
+| `ASSIGN_ROLES=true` and `CREATE_FOUNDRY=true` | The deployment, on the Foundry it creates |
+| `ASSIGN_ROLES=false`, or an existing project with no `AZURE_AI_FOUNDRY_ACCOUNT_ID` | Nobody. The Foundry account's owner grants it by hand to the `apps` identity (`id-<prefix>-<environment>-apps`) |
+
+### Creating a Foundry
+
+`CREATE_FOUNDRY=true` creates a Foundry account, a project named `careloop`, one model deployment and a Prompt Shields guardrail, and points the API at that project (`AZURE_AI_PROJECT_ENDPOINT` and `AZURE_AI_FOUNDRY_ACCOUNT_ID` are then ignored):
 
 ```bash
-CREATE_FOUNDRY=true AZURE_AI_LOCATION=<region that offers the model> infra/azure/scripts/deploy.sh dev
+CREATE_FOUNDRY=true API_AI_PROVIDER=Foundry AZURE_AI_LOCATION=<region that offers the model> infra/azure/scripts/deploy.sh dev
 ```
 
-For an existing project, `AZURE_AI_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` are read from the environment, not written to parameter files. The deployment does not grant a runtime identity the Foundry User role; the account owner must grant access to the intended caller when a provider is implemented and approved. These settings do not turn AI on: `apiAiProvider` remains `NoOp` by default.
+A Foundry created this way has no agents. With `API_AI_PROVIDER=Foundry` the API starts, but every AI endpoint answers 503 until the three agents (`role-briefing`, `impact-summary`, `patient-notification`) exist in that project. Their owner creates them there, on the model deployment this creates or another; this deployment does not. Without `API_AI_PROVIDER=Foundry` the Foundry is created and AI stays off.
 
 The model defaults to `gpt-4.1-mini` on the `GlobalStandard` deployment type, which may process prompts in any region. Change `foundryModelName`, `foundryModelVersion` and `foundryModelSku` in the parameter file to suit; a model that is not offered in the region, or a subscription with no quota for it, fails the deployment. Deleting the environment soft-deletes the account; purge it (`az cognitiveservices account purge`) before creating it again under the same name.
 
 With private networking the Foundry account is reached over its public endpoint; a private endpoint for it is not set up here.
+
+### Leftovers from the retired AI workflow service
+
+An environment first deployed while the Python AI workflow service existed may still hold its container app, `ai-workflow`, and its managed identity, `id-<prefix>-<environment>-ai`. Deployments are incremental: a new deployment does not remove resources that have left the template, so both stay, with any roles the identity was given, until someone removes them. Nothing in the current deployment uses them.
+
+Removing them is a manual, deliberate clean-up by the environment's owner. The deployment never does it. Check each name first, and make sure nothing else uses the identity:
+
+```bash
+# 1. The container app.
+az containerapp delete --name ai-workflow --resource-group <resource group>
+
+# 2. The identity's roles. List them first, then delete each one. Foundry User on the Foundry account is the one that matters.
+AI_PRINCIPAL_ID=$(az identity show --name id-<prefix>-<environment>-ai --resource-group <resource group> --query principalId -o tsv)
+az role assignment list --assignee "$AI_PRINCIPAL_ID" --all -o table
+az role assignment delete --assignee "$AI_PRINCIPAL_ID" --role 53ca6127-db72-4b80-b1b0-d745d6d5456d --scope <resource ID of the Foundry account>
+
+# 3. The identity itself, last.
+az identity delete --name id-<prefix>-<environment>-ai --resource-group <resource group>
+```
+
+Deleting a role assignment needs Owner or Role Based Access Control Administrator on its scope. An environment deployed with `ASSIGN_ROLES=false` was given no role assignments, so step 2 lists nothing unless the account's owner granted one by hand.
 
 ## Before real patient data
 

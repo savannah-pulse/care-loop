@@ -1,5 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { STAFF } from './identity'
 import { answer, json, sentRequests } from './testing/api'
 import { caseDetail, caseSummary, escalation, programme } from './testing/builders'
@@ -45,6 +45,8 @@ describe('who is acting', () => {
     answer('GET /cases', json([caseSummary({ isEscalated: true, exceptions: ['Overdue'], nextAction: 'call-patient' })]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
     await screen.findByRole('link', { name: 'Hessa Al Dhaheri, MRN 100\u00a0245\u00a0891' })
+    // The worklist also asks for its AI briefing once the list is shown; that request is still the first person's.
+    await vi.waitFor(() => expect(sentRequests('GET /ai/role-briefing')).toHaveLength(1))
     const before = sentRequests().length
 
     await user.click(screen.getByRole('button', { name: (label) => label.startsWith('Signed in as') }))
@@ -58,5 +60,15 @@ describe('who is acting', () => {
       expect(request.headers.get('X-Demo-Role')).toBe('coordinator')
       expect(request.headers.has('X-Demo-Facility')).toBe(false)
     }
+  })
+})
+
+describe('addresses', () => {
+  it('shows "Page not found" at the address of the handoff summary, which is gone, and asks the API for no case', async () => {
+    renderApp({ at: '#/cases/3f6b1c2a-8d4e-4f5a-9b7c-100245891000/summary', as: 'rekha-varghese' })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the worklist' })).toHaveAttribute('href', '#/')
+    expect(sentRequests()).toHaveLength(0)
   })
 })

@@ -22,7 +22,7 @@ namespace CareLoop.Api.Features.Notifications;
 /// <see cref="ReferralRejected"/> and <see cref="DeadlineApproaching"/> to the current owner; <see cref="CallRequested"/>
 /// to the role the pathway names for the call (the nurse navigator), or the current owner when it names none; <see cref="EscalationRaised"/> to the step of the escalation ladder it reached (the facility
 /// lead, then the coordinator); <see cref="AppointmentScheduled"/> to the patient and, while the case's caregiver
-/// consent is active, to the caregiver; <see cref="CaseClosed"/> and <see cref="HandoffSummaryApproved"/> to nobody.
+/// consent is active, to the caregiver; <see cref="CaseClosed"/> to nobody.
 /// The Domain holds no contact data, so patient contact points are read from the stored screening-result
 /// event, the caregiver's from the case's <see cref="Consent"/>, and a staff role's from configuration
 /// (<see cref="StaffContactOptions"/>). Everyone is reached by text message or email.

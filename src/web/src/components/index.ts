@@ -1,9 +1,11 @@
 /**
  * Shared components: the header, icons, status pills, the dialog and toast, the form that asks
- * why someone opens a case outside their team, the error boundary, and the loading, empty, "not
+ * why someone opens a case outside their team, the AI-written summary, the error boundary, and the loading, empty, "not
  * ready yet", "not open to you" and error states every screen uses.
  */
 
+export { AiSummary } from './AiSummary'
+export type { AiSummaryProps } from './AiSummary'
 export { AccessReasonForm } from './AccessReasonForm'
 export type { AccessReasonFormProps } from './AccessReasonForm'
 export { AppHeader } from './AppHeader'
