@@ -367,7 +367,7 @@ export interface components {
              */
             confidence?: null | number | string;
         };
-        /** @description The full coordination state of one case, returned by `GET /cases/{caseId}`. */
+        /** @description The full coordination state of one case, returned by `GET /cases` and `GET /cases/{caseId}`. */
         CaseDetailResponse: {
             /**
              * Format: uuid
@@ -384,6 +384,8 @@ export interface components {
             patientDisplayName?: null | string;
             /** @description Patient's second identifier for staff; absent for a coordinator. */
             patientSecondaryIdentifier?: null | string;
+            /** @description The patient's message language as a BCP 47 tag from the screening result; absent when unknown or for a coordinator. This is not the AI draft's output language. */
+            patientLanguage?: null | string;
             /** @description The display step derived from stage and tracks by the Domain. */
             displayLabel: components["schemas"]["CaseDisplayLabel"];
             /** @description The escalation history, including acknowledgements and resolutions. */
@@ -449,54 +451,6 @@ export interface components {
          * @enum {unknown}
          */
         CaseStage: "Received" | "ReviewPending" | "FollowUpActive" | "ClosureReview" | "Closed";
-        /** @description One row in the case list returned by `GET /cases`. */
-        CaseSummaryResponse: {
-            /**
-             * Format: uuid
-             * @description CareLoop's identifier of the case.
-             */
-            caseId: string;
-            /** @description Source-system reference of the patient. Never a name. `null` for the coordinator, who sees no one's identity. */
-            patientReference?: null | string;
-            /** @description Patient display name for staff; absent for a coordinator. */
-            patientDisplayName?: null | string;
-            /** @description Patient's second identifier for staff; absent for a coordinator. */
-            patientSecondaryIdentifier?: null | string;
-            /** @description The case's facility, for audited team-scoped reads. */
-            facilityId: string;
-            /** @description The display step derived by the Domain, never recomputed by the dashboard. */
-            displayLabel: components["schemas"]["CaseDisplayLabel"];
-            closureReason?: null | components["schemas"]["ClosureReason"];
-            /**
-             * Format: date-time
-             * @description When the result opened this case.
-             */
-            createdAt: string;
-            /** @description Identifier of the pathway the case follows. */
-            pathwayId: string;
-            /** @description The pathway stage the case is in. */
-            stage: components["schemas"]["CaseStage"];
-            /** @description The clinician-reviewed urgency code; `null` until the review arrives. */
-            urgency?: null | string;
-            /** @description The one owner accountable for the next action. */
-            owner: components["schemas"]["OwnerResponse"];
-            /** @description Key of the single next action. */
-            nextAction?: null | string;
-            /**
-             * Format: date-time
-             * @description When the next action is due.
-             */
-            dueAt?: null | string;
-            /** @description `true` while the case has an open escalation. */
-            isEscalated: boolean;
-            /** @description Names of the unresolved exceptions on the case; empty when there are none. */
-            exceptions: string[];
-            /**
-             * Format: date-time
-             * @description When the case last changed.
-             */
-            updatedAt: string;
-        };
         /** @description What a pathway requires before a case may be closed for a given reason. */
         ClosureEvidenceRule: {
             /** @description The closure reason the rule applies to. */
@@ -1192,7 +1146,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CaseSummaryResponse"][];
+                    "application/json": components["schemas"]["CaseDetailResponse"][];
                 };
             };
             /** @description Bad Request */

@@ -4,7 +4,7 @@ using CareLoop.Domain.Cases;
 namespace CareLoop.Contracts.Cases;
 
 /// <summary>
-/// The full coordination state of one case, returned by <c>GET /cases/{caseId}</c>.
+/// The full coordination state of one case, returned by <c>GET /cases</c> and <c>GET /cases/{caseId}</c>.
 /// </summary>
 public sealed record CaseDetailResponse
 {
@@ -25,6 +25,9 @@ public sealed record CaseDetailResponse
 
     /// <summary>Patient's second identifier for staff; absent for a coordinator.</summary>
     public string? PatientSecondaryIdentifier { get; init; }
+
+    /// <summary>The patient's message language as a BCP 47 tag from the screening result; absent when unknown or for a coordinator. This is not the AI draft's output language.</summary>
+    public string? PatientLanguage { get; init; }
 
     /// <summary>The display step derived from stage and tracks by the Domain.</summary>
     public required CaseDisplayLabel DisplayLabel { get; init; }

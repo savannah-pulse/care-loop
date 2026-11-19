@@ -48,6 +48,15 @@ export function caseSummary(overrides: Partial<CaseSummary> = {}): CaseSummary {
     patientReference: 'p-100245891',
     patientDisplayName: 'Hessa Al Dhaheri',
     patientSecondaryIdentifier: '100245891',
+    patientLanguage: 'ar',
+    sourceSystem: 'fhc-his',
+    sourceResultId: 'DiagnosticReport/r-100245891',
+    escalations: [],
+    outcomeEvidenceKind: null,
+    confidence: null,
+    proposedOwner: null,
+    tracks: [],
+    outcomeEvidenceReference: null,
     facilityId: TEST_FACILITY,
     displayLabel: 'FollowUp',
     closureReason: null,
@@ -75,14 +84,6 @@ export function caseSummary(overrides: Partial<CaseSummary> = {}): CaseSummary {
 export function caseDetail(overrides: Partial<CaseDetail> = {}): CaseDetail {
   return {
     ...caseSummary(),
-    sourceSystem: 'fhc-his',
-    sourceResultId: 'DiagnosticReport/r-100245891',
-    escalations: [],
-    outcomeEvidenceKind: null,
-    confidence: null,
-    proposedOwner: null,
-    tracks: [],
-    outcomeEvidenceReference: null,
     ...overrides,
   }
 }

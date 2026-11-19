@@ -34,7 +34,6 @@ import {
 type Schemas = components['schemas']
 type Problem = Schemas['ProblemDetails']
 type CaseDetail = Schemas['CaseDetailResponse']
-type CaseSummary = Schemas['CaseSummaryResponse']
 
 /** Roles that may approve or reject a handoff summary in the mock, like the clinician roles in the app. */
 const SUMMARY_REVIEWER_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
@@ -172,28 +171,7 @@ function redacted<T extends { patientDisplayName?: string | null; patientSeconda
     ...hidden,
     ...('patientReference' in value ? { patientReference: null } : {}),
     ...('sourceResultId' in value ? { sourceResultId: null } : {}),
-  }
-}
-
-function summaryOf(detail: CaseDetail): CaseSummary {
-  return {
-    caseId: detail.caseId,
-    patientReference: detail.patientReference,
-    patientDisplayName: detail.patientDisplayName,
-    patientSecondaryIdentifier: detail.patientSecondaryIdentifier,
-    facilityId: detail.facilityId,
-    displayLabel: detail.displayLabel,
-    closureReason: detail.closureReason,
-    createdAt: detail.createdAt,
-    pathwayId: detail.pathwayId,
-    stage: detail.stage,
-    urgency: detail.urgency,
-    owner: detail.owner,
-    nextAction: detail.nextAction,
-    dueAt: detail.dueAt,
-    isEscalated: detail.isEscalated,
-    exceptions: [...detail.exceptions],
-    updatedAt: detail.updatedAt,
+    ...('patientLanguage' in value ? { patientLanguage: null } : {}),
   }
 }
 
@@ -215,7 +193,7 @@ function scoped(state: MockState, who: Reader, facilityId: string | null): CaseD
     .filter((detail) => !facility || detail.facilityId === facility)
 }
 
-function listCases(state: MockState, who: Reader, query: URLSearchParams): CaseSummary[] {
+function listCases(state: MockState, who: Reader, query: URLSearchParams): CaseDetail[] {
   const stage = query.get('stage')
   const owner = query.get('ownerReference')
   const escalated = query.get('escalated')
@@ -237,7 +215,7 @@ function listCases(state: MockState, who: Reader, query: URLSearchParams): CaseS
     .filter((detail) => patient === null || detail.patientReference === patient)
     .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.caseId.localeCompare(b.caseId))
     .slice(skip, skip + take)
-    .map((detail) => redacted(who, summaryOf(detail)))
+    .map((detail) => redacted(who, detail))
 }
 
 function listExceptions(state: MockState, who: Reader, query: URLSearchParams): Schemas['ExceptionItemResponse'][] {

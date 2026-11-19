@@ -171,7 +171,13 @@ Read audits do not change case state and are not timeline events.
 
 `GET /cases` supports `stage`, `ownerReference`, `escalated`, `facilityId`, `patientReference`, `skip` and `take`.
 Patient searches are restricted to `clinician` and `receiving-clinician`. Paging defaults to 50, is capped at 200,
-and uses newest-updated order with a case-ID tie-break. `GET /exceptions` returns open flagged cases in deadline
+and uses newest-updated order with a case-ID tie-break. Each row is a `CaseDetailResponse`, matching
+`GET /cases/{caseId}`: source references, proposed owner, tracks, escalations, confidence and outcome evidence
+are included alongside the existing list fields. Both reads include nullable `patientLanguage`, the BCP 47 tag
+recorded in the latest applied screening event, not an inferred language or the AI draft's output language.
+It is null when not recorded and redacted for coordinators. Language reads are batched per page and require no
+schema migration. The expanded staff response does not change which facts may be sent to AI.
+`GET /exceptions` returns open flagged cases in deadline
 order, pageable with `skip` and `take` (default and maximum 200); a row with no deadline or next action carries
 nulls instead of failing the list. Timelines include applied and rejected events in received-time/projection-version order, joined to their
 source event for source attribution. Display labels come from the Domain rule, never the dashboard.

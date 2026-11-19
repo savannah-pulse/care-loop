@@ -19,7 +19,7 @@ public static class ListCases
     public static IEndpointRouteBuilder MapListCases(this IEndpointRouteBuilder routes)
     {
         routes.MapGet("/cases", Handle).WithName("ListCases").WithTags("Cases")
-            .Produces<IReadOnlyList<CaseSummaryResponse>>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(403);
+            .Produces<IReadOnlyList<CaseDetailResponse>>().ProducesProblem(400).ProducesProblem(401).ProducesProblem(403);
         return routes;
     }
 
@@ -71,7 +71,7 @@ public static class ListCases
         if (patientReference is not null) query = query.Where(c => c.PatientReference == patientReference);
         var cases = await query.OrderByDescending(c => c.UpdatedAt).ThenBy(c => c.Id)
             .Skip(skip ?? 0).Take(take ?? 50).ToListAsync(ct);
-        var response = cases.Select(c => CaseReadMapping.Summary(c, actor, pathways)).ToList();
+        var response = await CaseReadMapping.DetailsAsync(cases, actor, pathways, db, ct);
         await ReadAccess.AuditAsync(db, actor, clock, "case-list", null, outside, reason, queryText, ct);
         return Results.Ok(response);
     }

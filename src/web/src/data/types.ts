@@ -3,7 +3,7 @@ import type { components } from '../api/schema'
 type Schemas = components['schemas']
 
 /** One row of the case list, as returned by `GET /cases`. */
-export type CaseSummary = Schemas['CaseSummaryResponse']
+export type CaseSummary = Schemas['CaseDetailResponse']
 
 /** The full coordination state of one case, as returned by `GET /cases/{caseId}`. */
 export type CaseDetail = Schemas['CaseDetailResponse']
