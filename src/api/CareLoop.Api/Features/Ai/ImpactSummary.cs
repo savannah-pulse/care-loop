@@ -107,10 +107,12 @@ public static class ImpactSummary
 
     private static string Pascal(string key) => key.Length == 0 ? key : char.ToUpperInvariant(key[0]) + key[1..];
 
+    // Under a minute in seconds, as the page shows it, so a step of 8 seconds is never "1 minute".
     private static string Duration(TimeSpan span) =>
         span.TotalDays >= 1 ? $"{Count((int)span.TotalDays, "day")} {Count(span.Hours, "hour")}"
         : span.TotalHours >= 1 ? $"{Count(span.Hours, "hour")} {Count(span.Minutes, "minute")}"
-        : Count(Math.Max(1, span.Minutes), "minute");
+        : span.TotalMinutes >= 1 ? Count(span.Minutes, "minute")
+        : Count(Math.Max(1, span.Seconds), "second");
 
     private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 }

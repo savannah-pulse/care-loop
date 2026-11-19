@@ -188,8 +188,10 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   token for the patient's display name as the reader already sees it in the list; for the programme coordinator, or a
   case with no name, it writes `case` and the case number. Names and case numbers are never sent.
 - **Impact summary.** Each of `shares` is sent as `numerator`, `denominator` and `percent`; a withheld value is the
-  word `withheld` (`ImpactSummary.SmallCount`). The prompt asks for three short paragraphs: timeliness, case
-  progression and measurement limitations. While `Ai:SyntheticData` is `true` the API, not the model, ends the summary
+  word `withheld` (`ImpactSummary.SmallCount`). The page shows staff every exact number, so the prompt has the model
+  say a withheld measure is left out of the summary because the numbers are small and that the figures below show it,
+  never that it rests on too few cases. Times under a minute are given in seconds, as the page gives them. The prompt
+  asks for three short paragraphs: timeliness, case progression and measurement limitations. While `Ai:SyntheticData` is `true` the API, not the model, ends the summary
   with "Simulated on synthetic data; not evidence of real-world improvement."
 - **Patient message draft.** `patient-message.md` holds the approved administrative templates, and the model fills the
   one the API names, changing no other wording. The API chooses it in code from recorded state

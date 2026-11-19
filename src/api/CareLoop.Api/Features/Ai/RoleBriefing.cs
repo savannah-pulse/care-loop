@@ -29,6 +29,9 @@ public static partial class RoleBriefing
     /// <summary>Most cases described one by one; the counts still cover every case.</summary>
     public const int MaxCasesListed = 25;
 
+    // The lab's part while a follow-up is under way: recording its outcome.
+    private const string ArrangeFollowUpAction = "arrange-follow-up";
+
     /// <summary>Maps the route.</summary>
     /// <param name="routes">The application's route builder.</param>
     /// <returns>The same route builder.</returns>
@@ -139,10 +142,34 @@ public static partial class RoleBriefing
             Escalated = c.IsEscalated,
             NeedsOwner = c.Exceptions.HasFlag(CaseExceptions.Unassigned),
             HeldBy = c.Owner.IsQueue ? $"{MessageFormat.Role(c.Owner.Role)} queue" : MessageFormat.Role(c.Owner.Role),
-            Yours = !c.Owner.IsQueue && string.Equals(c.Owner.Reference, reader.Reference, StringComparison.OrdinalIgnoreCase),
+            Yours = IsReaders(c, reader, pathways.Get(c.PathwayId)),
             PatientMessage = c.Notification is null ? "not sent" : Words(c.Notification.Status.ToString()),
         }).ToList(),
     };
+
+    /// <summary>Tells whether a case is the reader's own: one their worklist lists under "My cases".</summary>
+    /// <param name="case">An open case.</param>
+    /// <param name="reader">Who is reading.</param>
+    /// <param name="pathway">The case's pathway, which says whose step each next action is.</param>
+    /// <returns>
+    /// For a clinician, the cases they are responsible for. For the nurse navigator, the cases whose next step the pathway
+    /// gives to a nurse navigator (a call back, making sure the patient has the message, reaching the patient another way),
+    /// whoever is responsible. For the facility lead, the escalated cases and those with no named owner. For the lab, the
+    /// cases whose follow-up is under way with no outcome recorded yet. For anyone else, every case they are shown.
+    /// </returns>
+    /// <remarks>The same rule as the worklist's "My cases", so the briefing never tells a nurse that none of her calls is hers.</remarks>
+    internal static bool IsReaders(Case @case, Actor reader, PathwayDefinition pathway) => reader.Role switch
+    {
+        DemoRoles.Clinician or DemoRoles.ReceivingClinician =>
+            !@case.Owner.IsQueue && string.Equals(@case.Owner.Reference, reader.Reference, StringComparison.OrdinalIgnoreCase),
+        DemoRoles.NurseNavigator => @case.NextAction is { } action
+            && pathway.Deadlines.Any(d => d.NextAction == action && d.OwnerRole == DemoRoles.NurseNavigator),
+        DemoRoles.FacilityLead => @case.IsEscalated || @case.Owner.IsQueue,
+        DemoRoles.Lab => @case.Stage == CaseStage.FollowUpActive && @case.NextAction == ArrangeFollowUpAction
+            && CaseDisplayLabels.From(@case, pathway) == CaseDisplayLabel.FollowUp,
+        _ => true,
+    };
+
 
     /// <summary>Writes a duration in words, to the largest two units.</summary>
     /// <param name="span">The duration.</param>
