@@ -342,6 +342,16 @@
     "noProblem": "Nothing is blocking this case.",
     "youAct": "You need to do this.",
     "otherActs": "{name} needs to do this.",
+    "whoActs": {
+      "youCall": "Your step: call {patient}, then record it in \"{card}\".",
+      "nurseCalls": "A nurse navigator calls the patient and records the call here.",
+      "youInHospital": "You do this in the hospital system. CareLoop moves on once it is recorded there.",
+      "otherInHospital": "{name} does this in the hospital system. CareLoop moves on once it is recorded there.",
+      "roleInHospital": "The {role} does this in the hospital system. CareLoop moves on once it is recorded there.",
+      "youStayResponsible": "You stay responsible for the case.",
+      "staysResponsible": "{name} stays responsible for the case.",
+      "thePatient": "the patient"
+    },
     "tracksTitle": "How each part is going",
     "timelineTitle": "Timeline",
     "timelineOrder": "Newest first",
