@@ -1,8 +1,10 @@
-# API and AI workflow integration: the handoff summary
+# AI integration design: the handoff summary
 
-How the .NET API and the Python AI workflow service work together to draft a clinician handoff summary, what the API can and cannot do with AI, and what is built today.
+Design contract for a future clinician handoff-summary capability: the API boundary, the proposed provider integration, and what remains unimplemented.
 
 This is FR-11, and this document is the contract. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](../ui-design-gap-analysis.md) section 5). [`ai-spec.md`](ai-spec.md) is the design proposal behind it and is superseded here where the two differ.
+
+> The Python workflow service has been removed from the repository. No external AI provider is currently enabled; `NoOp` remains the working default. References below to the Python service describe the original proposed integration, not a component that can currently be built or run.
 
 ## The boundary
 
@@ -12,7 +14,7 @@ AI makes already-recorded information easier to read and hand over. It does not 
 |---|---|---|
 | Case state, ownership, deadlines, exceptions, referrals, appointments, closure | .NET API and the deadline worker | Nothing. No AI decisions, no AI writes |
 | Counts, rates, denominators, timing, overdue status | API read models | Nothing today. A narrative over precomputed aggregates is designed, not built |
-| Clinician handoff summary | Python AI workflow service, calling a Microsoft Foundry deployment | Organize supplied facts into cited sections. A draft only |
+| Clinician handoff summary | Deferred external provider, originally designed as a Python service calling Microsoft Foundry | Organize supplied facts into cited sections. A draft only |
 | Patient-facing wording | Approved templates under `Infrastructure/Templates/{language}/` | Nothing. Patient wording is templated, not generated |
 | Arabic | Deferred | Nothing. English only, everything language-keyed |
 
@@ -25,16 +27,16 @@ The four rules that do not bend, from `AGENTS.md`:
 
 ## Who calls the model
 
-The Python service does (decision 8). The prompt, the response schema and the Foundry credentials live in one place, and the API holds no model credential.
+The original design selected the Python service for this role (decision 8), keeping its prompt, response schema and Foundry credentials together while the API held no model credential. That service has since been removed; this remains a proposal, not a supported provider route.
 
-A second route exists: the API can call a Foundry deployment directly. It is there so the summary still works when the Python service is not running, and so the two can be compared on the same fact set. Both sit behind `IAiProvider`, so nothing outside `AddSummaries` knows which is in use.
+A direct API-to-Foundry route was also designed, but `FoundryDirectProvider` is still a stub. Both routes were intended to sit behind `IAiProvider`; currently only `NoOp` is working.
 
 ```mermaid
 flowchart LR
     SCREEN[Case screen]
     API[".NET API<br/>facts, validation, audit"]
     STORE[(Case projection<br/>and event log)]
-    PY["Python AI workflow<br/>prompt and schema"]
+    PY["Future AI provider<br/>prompt and schema"]
     FOUNDRY["Microsoft Foundry<br/>model deployment"]
     REVIEWER[Authorized clinician]
     HIS[HIS]
@@ -55,8 +57,8 @@ flowchart LR
 | Value | Meaning |
 |---|---|
 | `NoOp` | Default. AI is off. Drafting answers 409 and every other feature runs untouched |
-| `AiWorkflow` | The API calls the Python service, which calls Foundry |
-| `FoundryDirect` | The API calls a Foundry deployment itself |
+| `AiWorkflow` | Retired. The Python service is no longer included |
+| `FoundryDirect` | Deferred. The API-side provider remains a stub |
 
 ## Draft-request integration
 
@@ -186,15 +188,14 @@ API, in the `Ai` section. No API key exists: the direct route authenticates with
 
 | Setting | Purpose |
 |---|---|
-| `Ai:Provider` | `NoOp`, `AiWorkflow` or `FoundryDirect` |
+| `Ai:Provider` | `NoOp` (working default) or `FoundryDirect` (deferred); `AiWorkflow` is no longer supported |
 | `Ai:AutoDraftOnHandoff` | Draft when a handoff is proposed |
 | `Ai:TimeoutSeconds` | Bounded wait before reporting a draft unavailable |
 | `Ai:MaxRequestBytes` | Request-size guardrail, checked before any call |
 | `Ai:PromptVersion` | Recorded with every draft |
-| `Ai:AiWorkflow:BaseUrl` | The Python service |
 | `Ai:FoundryDirect:ProjectEndpoint`, `:DeploymentName` | The direct route. The deployment name is the model identifier on the OpenAI-compatible path, and is often not the catalogue name |
 
-Python service, from the environment: `AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME`, `CARELOOP_AI_ENABLED`, `CARELOOP_AI_TIMEOUT_SECONDS`, `CARELOOP_AI_MAX_INPUT_BYTES`.
+The former Python service's settings (`AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME`, `CARELOOP_AI_ENABLED`, `CARELOOP_AI_TIMEOUT_SECONDS`, `CARELOOP_AI_MAX_INPUT_BYTES`) are not used by the current repository.
 
 Endpoint and deployment are configuration, never constants in source. Nothing live is committed, even though an endpoint URL is not itself confidential: it names a real deployment and belongs in the environment's configuration service.
 
@@ -209,8 +210,8 @@ Authentication is Entra ID throughout: `DefaultAzureCredential` locally with the
 | `HandoffSummaryRecord` and its EF configuration | Written. In the `InitialCreate` migration |
 | `HandoffFactCollector`, `HandoffSummaryDrafter`, `AutoDraftOnHandoff` | Stubs, `TODO(WS-9)` |
 | `DraftHandoffSummary`, `ApproveSummary`, `RejectSummary` | Stubs, answering 501 |
-| `AiWorkflowProvider`, `FoundryDirectProvider` | Stubs |
-| `POST /summaries/handoff` in `src/ai_workflow/` | Not built. Specified here and in the WS9 proposal |
+| `FoundryDirectProvider` | Stub |
+| Python service and its `POST /summaries/handoff` endpoint | Removed; the integration contract is retained as a future design |
 | Tests | 18, skipped, in `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs` |
 
 Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first.
@@ -224,5 +225,5 @@ Two DoH boundaries shape this design rather than being model instructions that c
 ## Open
 
 - Which roles may approve a summary. Proposed as `summaryApproverRoles` in the pathway definition, so it is configuration like every other role rule.
-- Who owns `src/ai_workflow/`. It has no workstream today.
+- Which provider will implement this design, and who will own it.
 - Whether the periodic stage-insight narrative is built for the hackathon. Screen 3 promises it; nothing implements it.

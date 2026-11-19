@@ -36,8 +36,6 @@ param postgresGeoRedundantBackup = true
 // 'ZoneRedundant' where the region has availability zones and the cost is accepted.
 param postgresHighAvailability = 'Disabled'
 
-// The AI workflow service stays off until data residency, retention and the guardrail are approved.
-param deployAi = false
 param apiAiProvider = 'NoOp'
 
 // Set by scripts/deploy.sh and the Deploy workflow. Never write a value here.

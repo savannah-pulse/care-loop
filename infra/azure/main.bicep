@@ -41,9 +41,6 @@ param privateNetworking bool = false
 @description('Deploy the HIS and messaging simulators, so the environment can run the demo scenarios.')
 param deploySimulators bool = true
 
-@description('Deploy the Python AI workflow service. It is pointed at an existing Microsoft Foundry project (aiProjectEndpoint) or, with createFoundry, at one created here.')
-param deployAi bool = true
-
 @description('Deploy a Log Analytics workspace and Application Insights, and send container logs there.')
 param deployMonitoring bool = true
 
@@ -69,8 +66,8 @@ param demoTiming bool = deploySimulators
 @description('Apply EF Core migrations when the API starts. Nothing else in this project applies them.')
 param migrateOnStartup bool = true
 
-@description('The API setting Ai:Provider. AiWorkflow sends drafting to the AI workflow service; leave NoOp until WS9 finishes that provider.')
-@allowed(['NoOp', 'AiWorkflow'])
+@description('The API setting Ai:Provider. NoOp keeps AI off; FoundryDirect is a deferred API-side provider.')
+@allowed(['NoOp', 'FoundryDirect'])
 param apiAiProvider string = 'NoOp'
 
 @description('Time zone used in messages to patients and staff.')
@@ -96,7 +93,7 @@ param postgresAdminPassword string
 @minLength(16)
 param simulatorInboundSecret string
 
-@description('true: give the managed identities their access with Azure role assignments, which needs Owner or Role Based Access Control Administrator. false: for a deployer with Contributor only. The apps then pull images with the registry admin password, Key Vault uses access policies instead of roles, and nobody is given the Foundry User role (its owner grants it by hand).')
+@description('true: give the managed identity its access with Azure role assignments, which needs Owner or Role Based Access Control Administrator. false: for a deployer with Contributor only. The apps then pull images with the registry admin password, Key Vault uses access policies instead of roles, and the Foundry owner must grant any needed model access by hand.')
 param assignRoles bool = true
 
 @description('Object ID of the person or service principal deploying. When set, it can read and write the Key Vault secrets, which lets scripts/deploy.sh reuse them on the next run.')
@@ -146,8 +143,7 @@ param keyVaultPurgeProtection bool = false
 param registryPublicAccess bool = true
 
 // ---------------------------------------------------------------------------------------------------
-// AI (used only when deployAi is true). The AI workflow service is pointed at a Foundry project:
-// an existing one (the usual case; give its endpoint), or one created here (createFoundry).
+// Optional Foundry resources for a future direct API provider. The API remains on NoOp by default.
 // ---------------------------------------------------------------------------------------------------
 
 @description('Endpoint of an existing Foundry project, https://<account>.services.ai.azure.com/api/projects/<project>. Never write the value in a parameter file; it is read from the environment. Ignored when createFoundry is true.')
@@ -155,9 +151,6 @@ param aiProjectEndpoint string = ''
 
 @description('Name of the model deployment in the existing project. Ignored when createFoundry is true.')
 param aiModelDeploymentName string = ''
-
-@description('Resource ID of the existing Foundry account, /subscriptions/.../providers/Microsoft.CognitiveServices/accounts/<name>. When set, the AI workflow service identity is given the Foundry User role on it. Empty: someone who owns the account grants the role by hand. Ignored when createFoundry is true.')
-param aiFoundryAccountId string = ''
 
 @description('Create a Foundry account, project, model deployment and Prompt Shields guardrail in this environment, for a subscription that has no Foundry to use. false, the default, creates nothing.')
 param createFoundry bool = false
@@ -175,9 +168,6 @@ param foundryModelSku string = 'GlobalStandard'
 @description('Thousands of tokens per minute.')
 param foundryModelCapacity int = 10
 
-@description('Operator attestation that Prompt Shields block user and document attacks on the model deployment in use.')
-param aiPromptShieldsAttested bool = false
-
 param logRetentionDays int = 30
 
 // ---------------------------------------------------------------------------------------------------
@@ -194,7 +184,6 @@ var names = {
   appInsights: 'appi-${baseName}'
   virtualNetwork: 'vnet-${baseName}'
   appsIdentity: 'id-${baseName}-apps'
-  aiIdentity: 'id-${baseName}-ai'
   // Registry and Key Vault names are global and short, so they carry the token instead of the environment.
   registry: 'cr${namePrefix}${token}'
   keyVault: 'kv-${namePrefix}-${take(token, 10)}'
@@ -252,7 +241,6 @@ module identity 'modules/identity.bicep' = {
     location: location
     tags: allTags
     appsIdentityName: names.appsIdentity
-    aiIdentityName: names.aiIdentity
   }
 }
 
@@ -264,7 +252,7 @@ module registry 'modules/registry.bicep' = {
     location: location
     tags: allTags
     name: names.registry
-    pullPrincipalIds: [identity.outputs.appsPrincipalId, identity.outputs.aiPrincipalId]
+    pullPrincipalIds: [identity.outputs.appsPrincipalId]
     assignRoles: assignRoles
     publicAccess: !privateNetworking || registryPublicAccess
     privateEndpointSubnetId: privateNetworking ? network!.outputs.privateEndpointSubnetId : ''
@@ -316,7 +304,7 @@ module keyVault 'modules/keyvault.bicep' = {
   }
 }
 
-var useCreatedFoundry = deployAi && createFoundry
+var useCreatedFoundry = createFoundry
 
 module foundry 'modules/foundry.bicep' = if (useCreatedFoundry) {
   scope: resourceGroup(targetGroupName)
@@ -331,18 +319,6 @@ module foundry 'modules/foundry.bicep' = if (useCreatedFoundry) {
     modelVersion: foundryModelVersion
     modelSku: foundryModelSku
     modelCapacity: foundryModelCapacity
-    userPrincipalIds: assignRoles ? [identity.outputs.aiPrincipalId] : []
-  }
-}
-
-var foundryIdParts = split(aiFoundryAccountId, '/')
-
-module foundryAccess 'modules/foundry-access.bicep' = if (assignRoles && deployAi && !createFoundry && !empty(aiFoundryAccountId)) {
-  scope: resourceGroup(foundryIdParts[?2] ?? subscription().subscriptionId, foundryIdParts[?4] ?? targetGroupName)
-  name: 'foundry-access-${environmentName}'
-  params: {
-    accountName: last(foundryIdParts)!
-    principalId: identity.outputs.aiPrincipalId
   }
 }
 
@@ -374,13 +350,10 @@ module apps 'modules/apps.bicep' = if (deployApps) {
     imageTag: imageTag
     appsIdentityId: identity.outputs.appsId
     appsIdentityClientId: identity.outputs.appsClientId
-    aiIdentityId: identity.outputs.aiId
-    aiIdentityClientId: identity.outputs.aiClientId
     connectionStringSecretUri: keyVault.outputs.connectionStringSecretUri
     inboundSecretUri: keyVault.outputs.inboundSecretUri
     appInsightsConnectionString: deployMonitoring ? monitoring!.outputs.appInsightsConnectionString : ''
     deploySimulators: deploySimulators
-    deployAi: deployAi
     exposeApi: exposeApi
     exposeSimulators: exposeSimulators
     allowedIpRanges: allowedIpRanges
@@ -392,7 +365,6 @@ module apps 'modules/apps.bicep' = if (deployApps) {
     webMaxReplicas: webMaxReplicas
     aiProjectEndpoint: useCreatedFoundry ? foundry!.outputs.projectEndpoint : aiProjectEndpoint
     aiModelDeploymentName: useCreatedFoundry ? foundry!.outputs.deploymentName : aiModelDeploymentName
-    aiPromptShieldsAttested: aiPromptShieldsAttested
   }
 }
 
@@ -406,10 +378,6 @@ output registryLoginServer string = registry.outputs.loginServer
 output keyVaultName string = keyVault.outputs.name
 output postgresServerName string = postgres.outputs.name
 output deploySimulators bool = deploySimulators
-output deployAi bool = deployAi
-// The identity the AI workflow service signs in with. It needs the Foundry User role on the existing
-// Foundry account: given here when aiFoundryAccountId is set, by hand otherwise.
-output aiIdentityPrincipalId string = identity.outputs.aiPrincipalId
 output webUrl string = deployApps ? apps!.outputs.webUrl : ''
 output apiUrl string = deployApps ? apps!.outputs.apiUrl : ''
 output hisSimulatorUrl string = deployApps ? apps!.outputs.hisSimulatorUrl : ''

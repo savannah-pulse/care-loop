@@ -34,7 +34,6 @@ jobs:
       dotnet: ${{ steps.filter.outputs.dotnet }}
       web: ${{ steps.filter.outputs.web }}
       simulator-ui: ${{ steps.filter.outputs.simulator-ui }}
-      ai-workflow: ${{ steps.filter.outputs.ai-workflow }}
     steps:
       - id: filter
         env:
@@ -44,7 +43,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          areas="dotnet web simulator-ui ai-workflow"
+          areas="dotnet web simulator-ui"
 
           if [ "$EVENT_NAME" != "pull_request" ]; then
             for area in $areas; do echo "$area=true" >> "$GITHUB_OUTPUT"; done
@@ -73,7 +72,6 @@ jobs:
             # The web job also checks the dashboard's API types against the contract.
             echo "web=$(match '^(src/web/|contracts/openapi/)')"
             echo "simulator-ui=$(match '^src/simulators/[^/]+/[^/]+/ClientApp/')"
-            echo "ai-workflow=$(match '^src/ai_workflow/')"
           } | tee -a "$GITHUB_OUTPUT"
 
   dotnet:
@@ -157,23 +155,3 @@ jobs:
       - run: corepack yarn typecheck
       - run: corepack yarn test
       - run: corepack yarn build
-
-  ai-workflow:
-    name: Python workflow lint and tests
-    needs: changes
-    if: needs.changes.outputs.ai-workflow == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: src/ai_workflow
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: src/ai_workflow/pyproject.toml
-      - run: python -m pip install --editable ".[dev]"
-      - run: ruff check .
-      - run: pytest

@@ -184,28 +184,28 @@ public static class DependencyInjection
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration; supplies the <c>Ai</c> section.</param>
     /// <returns>The same service collection, for chaining.</returns>
+    /// <exception cref="InvalidOperationException">The configured AI provider is not supported.</exception>
     /// <remarks>
     /// The no-op provider is the default, so the API runs with no AI service and no credential.
-    /// <c>AiWorkflow</c> calls the Python service, which owns the prompt and the Foundry
-    /// credentials; <c>FoundryDirect</c> calls a deployment from here instead. Both sit behind
-    /// <see cref="IAiProvider"/>, so nothing outside this method knows which is in use.
+    /// <c>FoundryDirect</c> is a deferred provider that calls a deployment from here instead.
+    /// Both sit behind <see cref="IAiProvider"/>, so nothing outside this method knows which is in use.
     /// </remarks>
     public static IServiceCollection AddSummaries(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
 
         var provider = configuration.GetValue<string>($"{AiOptions.SectionName}:{nameof(AiOptions.Provider)}");
-        if (string.Equals(provider, "AiWorkflow", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddHttpClient<IAiProvider, AiWorkflowProvider>();
-        }
-        else if (string.Equals(provider, "FoundryDirect", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(provider, "FoundryDirect", StringComparison.OrdinalIgnoreCase))
         {
             services.AddHttpClient<IAiProvider, FoundryDirectProvider>();
         }
-        else
+        else if (string.IsNullOrWhiteSpace(provider) || string.Equals(provider, "NoOp", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IAiProvider, NoOpAiProvider>();
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported AI provider '{provider}'. Configure NoOp or FoundryDirect.");
         }
 
         services.AddScoped<HandoffFactCollector>();

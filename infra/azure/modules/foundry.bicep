@@ -1,7 +1,7 @@
 // Optional: a Microsoft Foundry account, project and one model deployment, with a guardrail that
 // blocks prompt attacks. Used only when createFoundry is true, for a subscription that has no
-// Foundry to point at. Keys are disabled: callers sign in with a managed identity holding the
-// Foundry User role. The account is reached over its public endpoint.
+// Foundry to use. Keys are disabled. The deployment does not grant model access to a runtime
+// identity; the account owner must authorize the intended caller when an AI provider is enabled.
 param location string
 param tags object
 param accountName string
@@ -10,10 +10,6 @@ param modelName string
 param modelVersion string
 param modelSku string
 param modelCapacity int
-param userPrincipalIds array
-
-// Foundry User (formerly Azure AI User): read the project and call its models.
-var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var guardrailName = 'careloop-prompt-shields'
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
@@ -39,13 +35,11 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
   identity: { type: 'SystemAssigned' }
   properties: {
     displayName: 'CareLoop'
-    description: 'CareLoop AI workflow service'
+    description: 'CareLoop'
   }
 }
 
-// The AI workflow service requires Prompt Shields for user and document (indirect) attacks, both
-// blocking, on the model deployment. This creates that guardrail; an operator still has to verify it
-// in the Foundry guardrail playground before setting aiPromptShieldsAttested.
+// Prompt Shields block user and document (indirect) attacks on the model deployment.
 resource guardrail 'Microsoft.CognitiveServices/accounts/raiPolicies@2025-06-01' = {
   parent: account
   name: guardrailName
@@ -88,18 +82,6 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01
     raiPolicyName: guardrail.name
   }
 }
-
-resource users 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
-  for principalId in userPrincipalIds: {
-    scope: account
-    name: guid(account.id, principalId, foundryUserRoleId)
-    properties: {
-      principalId: principalId
-      principalType: 'ServicePrincipal'
-      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUserRoleId)
-    }
-  }
-]
 
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
 output deploymentName string = deployment.name

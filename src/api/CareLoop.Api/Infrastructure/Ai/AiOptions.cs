@@ -4,17 +4,15 @@ namespace CareLoop.Api.Infrastructure.Ai;
 /// AI settings, bound to the <c>Ai</c> configuration section.
 /// </summary>
 /// <remarks>
-/// Two routes to a model are supported and both sit behind <c>IAiProvider</c>: the API can call
-/// the Python AI workflow service, which owns the prompt and calls Foundry (the agreed route,
-/// decision 8), or it can call a Foundry deployment directly. The second exists so the summary
-/// still works when the Python service is not running, and so the two can be compared.
+/// The no-op provider is the default. A direct Foundry provider remains a deferred option behind
+/// <c>IAiProvider</c>; no external AI workflow service is currently included.
 /// </remarks>
 public sealed class AiOptions
 {
     /// <summary>Name of the configuration section.</summary>
     public const string SectionName = "Ai";
 
-    /// <summary>Which provider to use: <c>NoOp</c> (default, AI off), <c>AiWorkflow</c> or <c>FoundryDirect</c>.</summary>
+    /// <summary>Which provider to use: <c>NoOp</c> (default, AI off) or the deferred <c>FoundryDirect</c> provider.</summary>
     public string Provider { get; set; } = "NoOp";
 
     /// <summary>Whether a draft is produced automatically when a handoff is proposed (decision 11).</summary>
@@ -31,9 +29,6 @@ public sealed class AiOptions
 
     /// <summary>Version of the prompt and template to ask the provider for, recorded with every draft.</summary>
     public string PromptVersion { get; set; } = "fr11-v1";
-
-    /// <summary>Settings for calling the Python AI workflow service.</summary>
-    public AiWorkflowOptions AiWorkflow { get; set; } = new();
 
     /// <summary>Settings for calling a Foundry deployment directly from the API.</summary>
     public FoundryOptions FoundryDirect { get; set; } = new();

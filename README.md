@@ -45,7 +45,6 @@ infra/local/                Local environment notes
 infra/azure/                Azure deployment: Bicep, parameter files per environment and the deploy script
 src/
   api/                      The CareLoop engine (.NET 10): CareLoop.Domain, CareLoop.Api and its Dockerfile
-  ai_workflow/              Python AI workflow service, stage/agent contracts, and Dockerfile
   web/                      React + TypeScript + Vite staff dashboard and Dockerfile
   simulators/
     scenarios/              Scripted synthetic journeys shared by both simulators (scenario.schema.json)
@@ -64,13 +63,12 @@ tests/
 |---|---|
 | API and Domain | [`src/api/README.md`](src/api/README.md) |
 | Dashboard | [`src/web/README.md`](src/web/README.md) |
-| AI workflow | [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 | HIS simulator | [`src/simulators/his/README.md`](src/simulators/his/README.md) |
 | Messaging simulator | [`src/simulators/messaging/README.md`](src/simulators/messaging/README.md) |
 
 ```text
 HIS simulator ──FHIR R4──▶ ┌──────────────┐ ◀──REST── dashboard (src/web/)
-                           │ CareLoop API │ ◀──proposals── AI workflow (src/ai_workflow/)
+                           │ CareLoop API │
 Messaging      ◀─JSON──▶  └──────┬───────┘
 simulator                         │
                               PostgreSQL
@@ -79,8 +77,7 @@ simulator                         │
 The HIS simulator talks to CareLoop only through `/fhir/...`. CareLoop reaches patients, caregivers and staff by text
 message and email only (there is no patient app or portal): its `Sms` and `Email` providers post plain JSON to the
 messaging simulator, which calls back on `/notifications/inbound/sms` and `/email`. Neither simulator shares code
-with CareLoop. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit; the
-Python workflow proposes actions for the API and authorized people to review.
+with CareLoop. The .NET API owns validation, correlation, idempotency, authorization, transitions, and audit.
 
 ## Test environment
 
@@ -117,7 +114,6 @@ docker compose up --build
 |---|---|---|
 | API | http://localhost:8080 | `/health` |
 | Dashboard | http://localhost:4173 | |
-| AI workflow | http://localhost:8081 | `/health` |
 | HIS simulator | http://localhost:5081 | `/health` |
 | Messaging simulator | http://localhost:5082 | `/health` |
 | PostgreSQL | localhost:5432 | |
@@ -128,7 +124,7 @@ live runs, and applies database migrations at startup.
 ## Work on one part
 
 Prerequisites: .NET 10 SDK, Node.js 24 with npm for the dashboard and Corepack/Yarn for the simulator
-ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for the AI workflow.
+ClientApps (call `corepack yarn`, do not run `corepack enable`).
 
 | Part | Build and test |
 |---|---|
@@ -138,7 +134,6 @@ ClientApps (call `corepack yarn`, do not run `corepack enable`), Python 3.13 for
 | Messaging simulator | `dotnet run --project src/simulators/messaging/MessagingSimulator` (http://localhost:5082) |
 | Simulator ClientApps | in each `ClientApp/`: `corepack yarn install && corepack yarn lint && corepack yarn typecheck && corepack yarn test && corepack yarn build` |
 | Dashboard | `cd src/web && npm ci && npm run dev` |
-| AI workflow | see [`src/ai_workflow/README.md`](src/ai_workflow/README.md) |
 
 The HIS simulator supports headless HIS replay, source clinician actions, a staff inbox for what CareLoop sends it as FHIR, and exact FHIR logs. Staff notices go by email and show in the messaging simulator.
 See its [demo and test guide](src/simulators/his/README.md). Replay completion does not assert completed care:
@@ -152,7 +147,7 @@ CI fails if the committed document is out of date.
 - .NET: nullable enabled, warnings are errors, and a missing XML documentation comment (`CS1591`) is an error. Test
   projects are exempt from `CS1591` only.
 - TypeScript (simulator ClientApps): strict mode, and ESLint requires a TSDoc comment on every export.
-- CI builds and tests the whole solution, both ClientApps, the dashboard and the Python workflow on every pull request.
+- CI builds and tests the whole solution, both ClientApps and the dashboard on every pull request.
 
 ## Demo acceptance gate
 

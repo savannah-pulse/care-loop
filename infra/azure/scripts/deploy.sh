@@ -16,9 +16,8 @@
 #   POSTGRES_LOCATION         region of the database, default AZURE_LOCATION
 #   POSTGRES_SKU_NAME, POSTGRES_SKU_TIER
 #                             database size where the parameter file reads them, default Standard_B1ms and Burstable
-#   AZURE_AI_PROJECT_ENDPOINT, AZURE_AI_MODEL_DEPLOYMENT_NAME, AZURE_AI_FOUNDRY_ACCOUNT_ID,
-#   CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED
-#                             the existing Foundry project the AI workflow service calls; unset leaves inference off
+#   AZURE_AI_PROJECT_ENDPOINT, AZURE_AI_MODEL_DEPLOYMENT_NAME
+#                             optional Foundry configuration for the deferred direct API provider
 #   CREATE_FOUNDRY            true creates a Foundry account, project and model here instead (AZURE_AI_LOCATION picks its region)
 #   NAME_PREFIX               resource name prefix, default careloop
 #   RESOURCE_GROUP            deploy into this existing resource group instead of creating rg-<prefix>-<environment>
@@ -181,11 +180,10 @@ echo "Checking the deployment ..."
 export IMAGE_TAG="$TAG"
 SWITCHES="$(az deployment sub validate --name "$DEPLOYMENT_NAME" --location "$AZURE_LOCATION" \
   --parameters "$PARAM_FILE" --only-show-errors -o tsv \
-  --query "[properties.parameters.deployAi.value, properties.parameters.deploySimulators.value]" | tr '\n' ' ')"
+  --query "[properties.parameters.deploySimulators.value]" | tr '\n' ' ')"
 # shellcheck disable=SC2086
 set -- $SWITCHES
-DEPLOY_AI="${1:-}"
-DEPLOY_SIMULATORS="${2:-}"
+DEPLOY_SIMULATORS="${1:-}"
 [ -n "$DEPLOY_SIMULATORS" ] || { echo "Could not read the deployment's parameters." >&2; exit 1; }
 
 # --- Platform, first run only: the images need a registry before the apps can be deployed ----------
@@ -202,10 +200,6 @@ fi
 # name | Dockerfile | build context, as in docker-compose.yml
 IMAGES="api|src/api/CareLoop.Api/Dockerfile|.
 web|src/web/Dockerfile|src/web"
-if [ "$DEPLOY_AI" = "true" ]; then
-  IMAGES="$IMAGES
-ai-workflow|src/ai_workflow/Dockerfile|src/ai_workflow"
-fi
 if [ "$DEPLOY_SIMULATORS" = "true" ]; then
   IMAGES="$IMAGES
 his-simulator|src/simulators/his/Dockerfile|.

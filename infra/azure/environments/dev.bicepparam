@@ -24,18 +24,11 @@ param deployMonitoring = true
 // days, so that open cases stay on time long enough to be looked at (see infra/demo/README.md).
 param demoTiming = toLower(readEnvironmentVariable('DEMO_TIMING', 'true')) == 'true'
 
-// The AI workflow service is deployed and pointed at the team's existing Foundry project, named by
-// the environment variables below. To create a Foundry here instead, for a subscription that has
-// none, set CREATE_FOUNDRY=true (and AZURE_AI_LOCATION for a region that offers the model).
-// The API keeps Ai:Provider = NoOp until WS9 is finished.
-param deployAi = true
+// Optional Foundry configuration for the future API-side provider. AI stays off by default.
 param aiProjectEndpoint = readEnvironmentVariable('AZURE_AI_PROJECT_ENDPOINT', '')
 param aiModelDeploymentName = readEnvironmentVariable('AZURE_AI_MODEL_DEPLOYMENT_NAME', '')
-param aiFoundryAccountId = readEnvironmentVariable('AZURE_AI_FOUNDRY_ACCOUNT_ID', '')
 param createFoundry = toLower(readEnvironmentVariable('CREATE_FOUNDRY', 'false')) == 'true'
 param foundryLocation = readEnvironmentVariable('AZURE_AI_LOCATION', readEnvironmentVariable('AZURE_LOCATION', 'uaenorth'))
-// Attested for the dev environment (synthetic data only) by the team. Set the variable to false to withdraw it.
-param aiPromptShieldsAttested = toLower(readEnvironmentVariable('CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED', 'true')) == 'true'
 param apiAiProvider = 'NoOp'
 
 // Set by scripts/deploy.sh and the Deploy workflow. Never write a value here.

@@ -62,7 +62,7 @@ From the repository root:
 infra/azure/scripts/deploy.sh dev --what-if
 ```
 
-It should list about 20 resources to create, including five container apps, and end without an error.
+It should list about 20 resources to create, including four container apps, and end without an error.
 
 ## 4. Deploy
 
@@ -75,7 +75,7 @@ What you will see, in order:
 1. `Registering Microsoft.…` lines the first time a subscription is used. A few minutes.
 2. `Checking the deployment ...`
 3. `Deploying the platform ...` About ten minutes. The Container Apps environment and PostgreSQL are the slow parts.
-4. `Building images ...` Five images, one to two minutes each. The build output is long; that is normal.
+4. `Building images ...` Four images, one to two minutes each. The build output is long; that is normal.
 5. `Deploying ...` Key Vault and the container apps. A few minutes.
 6. `Done.` followed by the addresses of the dashboard, the API and both simulators.
 
@@ -121,32 +121,10 @@ infra/azure/scripts/deploy.sh dev
 
 Later runs skip the platform step. The API is stopped for a minute or two while the new version starts.
 
-## Connecting the AI service (optional)
-
-The AI workflow service is deployed either way. To point it at the team's existing Foundry project, set these before running the deploy command, using the account, project and deployment names the AI workflow owner gives you:
-
-```bash
-export AZURE_AI_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
-```
-
-```bash
-export AZURE_AI_MODEL_DEPLOYMENT_NAME="<deployment name>"
-```
-
-```bash
-export AZURE_AI_FOUNDRY_ACCOUNT_ID="$(az cognitiveservices account show --name <account> --resource-group <its resource group> --query id -o tsv)"
-```
-
-The last one lets the deployment give the service permission to call the model. With `ASSIGN_ROLES=false` it cannot, and the owner of the Foundry account has to grant the Foundry User role by hand; the command is in the "AI" section of [README.md](README.md).
-
-If your subscription has no Foundry to point at, the deployment can create one instead. Skip the variables above and add `CREATE_FOUNDRY=true AZURE_AI_LOCATION=<region that offers the model>` to your settings.
-
-Note that on `main` at the time of writing the AI workflow service is a scaffold that does not call Foundry yet, so connecting it changes nothing you can see.
-
 ## What you are deploying
 
 - Everything is **public** and nothing is restricted by address: the dashboard, the API and both simulators. This is deliberate for the prototype. Synthetic data only.
-- **AI:** the AI workflow service is deployed and can be pointed at a Foundry project. The API uses `Ai:Provider = NoOp`, so it does not call it.
+- **AI:** no external AI workflow is deployed. The API uses `Ai:Provider = NoOp`, and no model calls are made.
 - **Timing is the demo timing**: pathway deadlines last seconds, to match the simulators.
 
 ## If something goes wrong

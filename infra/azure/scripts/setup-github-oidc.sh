@@ -11,7 +11,7 @@
 # environment <environment>, and gives it two roles on the subscription:
 #   Contributor                              create the resources
 #   Role Based Access Control Administrator  give the managed identities their roles, limited by a
-#                                            condition to the four roles the deployment assigns
+#                                            condition to the three roles the deployment assigns
 # It then prints the values to store in the GitHub environment.
 set -euo pipefail
 
@@ -50,10 +50,10 @@ SCOPE="/subscriptions/$SUBSCRIPTION_ID"
 az role assignment create --assignee-object-id "$PRINCIPAL_ID" --assignee-principal-type ServicePrincipal \
   --role "Contributor" --scope "$SCOPE" --output none
 
-# The deployment gives the managed identities four roles and nothing else, so the deploy identity
+# The deployment gives the managed identity three roles and nothing else, so the deploy identity
 # may assign or remove only those. Without this condition it could make itself Owner.
-#   AcrPull, Key Vault Secrets User, Key Vault Secrets Officer, Foundry User
-ASSIGNABLE="7f951dda-4ed3-4680-a7ca-43fe172d538d, 4633458b-17de-408a-b874-0445c86b69e6, b86a8fe4-44ce-4948-aee5-eccb2c155cd7, 53ca6127-db72-4b80-b1b0-d745d6d5456d"
+#   AcrPull, Key Vault Secrets User, Key Vault Secrets Officer
+ASSIGNABLE="7f951dda-4ed3-4680-a7ca-43fe172d538d, 4633458b-17de-408a-b874-0445c86b69e6, b86a8fe4-44ce-4948-aee5-eccb2c155cd7"
 CONDITION="((!(ActionMatches{'Microsoft.Authorization/roleAssignments/write'})) OR (@Request[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ASSIGNABLE})) AND ((!(ActionMatches{'Microsoft.Authorization/roleAssignments/delete'})) OR (@Resource[Microsoft.Authorization/roleAssignments:RoleDefinitionId] ForAnyOfAnyValues:GuidEquals {$ASSIGNABLE}))"
 
 # Replace rather than add, so an earlier assignment without the condition does not survive.

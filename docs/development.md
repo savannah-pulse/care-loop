@@ -4,16 +4,13 @@
 
 - .NET 10 SDK (the repository pins the .NET 10 SDK feature band in `global.json`).
 - Node.js 24 and npm for the web app.
-- Python 3.13 for the AI workflow service.
 - Docker Compose v2 for the local container setup.
 
 Run `dotnet build CareLoop.sln` and `dotnet test CareLoop.sln` for the API, the Domain and both simulators; the build fails on any warning, including a missing XML documentation comment. Run `dotnet run --project src/api/CareLoop.Api` to start the API on `http://localhost:5080`; its routes and configuration are in `src/api/README.md`, and each simulator's README covers its own host and ClientApp. In `src/web`, run `npm ci`, then `npm run dev`. The staff dashboard proxies `/api` to the API; it is not a patient-facing product. Run `npm run test` and `npm run build` for unit tests, documentation lint, strict type-checking and the production build. Regenerate API types with `npm run generate:api` after building the API, and commit them with the contract: CI fails when they no longer match `contracts/openapi/careloop.json`.
 
-`docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the dashboard on port 4173, the Python workflow service on port 8081, the HIS simulator on 5081 and the messaging simulator on 5082 (ports come from `.env`, template in `.env.example`). nginx proxies the dashboard's `/api/` requests to the API. No production deployment environment is configured.
+`docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the dashboard on port 4173, the HIS simulator on 5081 and the messaging simulator on 5082 (ports come from `.env`, template in `.env.example`). nginx proxies the dashboard's `/api/` requests to the API. No production deployment environment is configured.
 
-The Python workflow package is under `src/ai_workflow`. Create and activate a virtual environment there, install `python -m pip install --editable ".[dev]"`, then run `uvicorn careloop_ai_workflow.main:app --reload --port 8081`. Run `ruff check .` and `pytest` from that directory.
-
-The Python service defines stage and agent interfaces but has no model provider or case-write credentials. It coordinates by proposing actions; the .NET API remains the authority for state changes and authorization.
+AI handoff-summary contracts and design are retained, but no external AI workflow service is currently included or enabled. The API's `NoOp` provider keeps AI off.
 
 ## Working agreements
 

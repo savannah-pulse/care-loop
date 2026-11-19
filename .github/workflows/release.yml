@@ -20,9 +20,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.13"
       - run: dotnet restore CareLoop.sln
       - run: dotnet publish src/api/CareLoop.Api/CareLoop.Api.csproj --configuration Release --no-restore --output artifacts/api -p:OpenApiGenerateDocuments=false
       - run: dotnet publish src/simulators/his/HisSimulator/HisSimulator.csproj --configuration Release --no-restore --output artifacts/his-simulator
@@ -31,17 +28,13 @@ jobs:
         working-directory: src/web
       - run: npm run build
         working-directory: src/web
-      - run: |
-          python -m pip install --upgrade build
-          python -m build --wheel --outdir ../../artifacts
-        working-directory: src/ai_workflow
       - name: Package release
         run: |
           mkdir -p artifacts
           cp -R src/web/dist artifacts/web
           cp LICENSE README.md artifacts/
           cd artifacts
-          zip -r "../care-loop-${GITHUB_REF_NAME}.zip" api his-simulator messaging-simulator web careloop_ai_workflow-*.whl LICENSE README.md
+          zip -r "../care-loop-${GITHUB_REF_NAME}.zip" api his-simulator messaging-simulator web LICENSE README.md
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         env:

@@ -4,13 +4,11 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Api.Infrastructure.Ai;
 
 /// <summary>
-/// Drafts handoff summaries by calling a Microsoft Foundry deployment straight from the API.
+/// Placeholder for a future provider that will draft handoff summaries through Microsoft Foundry.
 /// </summary>
 /// <remarks>
-/// The second route to a model, kept so the summary still works when the Python AI workflow
-/// service is not running and so the two can be compared on the same fact set. It owns a copy of
-/// the prompt; when the prompt changes, both routes change, and
-/// <see cref="AiOptions.PromptVersion"/> is what tells two drafts apart afterwards.
+/// A deferred route to a model. It owns a copy of the prompt, and
+/// <see cref="AiOptions.PromptVersion"/> identifies the prompt version used for a draft.
 /// <para>
 /// The prompt must tell the model to write only from the supplied facts, to cite the fact
 /// identifier behind every section, to report anything missing or contradictory instead of filling
