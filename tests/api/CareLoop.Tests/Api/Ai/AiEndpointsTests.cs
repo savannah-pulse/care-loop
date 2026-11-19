@@ -121,6 +121,19 @@ public sealed class AiEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_case_number_that_starts_a_sentence_starts_with_a_capital()
+    {
+        var first = await SeedAsync(NewCase("SYN-RESULT-1", overdue: true));
+        var second = await SeedAsync(NewCase("SYN-RESULT-2"));
+        _ai.Answer = "{{C-1}} awaits a call. {{C-2}} is upcoming: C-1 first.";
+
+        var response = Value<AiTextResponse>(await BriefingAsync());
+
+        Assert.EndsWith($"Case {NotificationRouter.CaseReferenceFor(first.Id)} awaits a call. Case {NotificationRouter.CaseReferenceFor(second.Id)} is upcoming: "
+            + $"case {NotificationRouter.CaseReferenceFor(first.Id)} first.", response.Text);
+    }
+
+    [Fact]
     public async Task No_prompt_carries_a_name_a_record_number_a_reference_or_a_case_or_staff_identifier()
     {
         var @case = await SeedAsync(NewCase("SYN-RESULT-1", overdue: true));
@@ -221,6 +234,30 @@ public sealed class AiEndpointsTests : IDisposable
         var late = data.RootElement.GetProperty("shares").GetProperty("open cases past their deadline");
         Assert.Equal((8, 8, 100), (late.GetProperty("numerator").GetInt32(), late.GetProperty("denominator").GetInt32(), late.GetProperty("percent").GetInt32()));
         Assert.Equal(0, data.RootElement.GetProperty("shares").GetProperty("open cases without an owner").GetProperty("numerator").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(50, "1 minute")]
+    [InlineData(3660, "1 hour 1 minute")]
+    [InlineData(183600, "2 days 3 hours")]
+    public void A_median_time_is_sent_in_words_with_one_written_singular(int seconds, string words)
+    {
+        var empty = new Dictionary<string, int>();
+        var metrics = new CareLoop.Contracts.Metrics.MetricsResponse
+        {
+            GeneratedAt = _clock.UtcNow, TotalCases = 0, OpenCases = 0, ClosedCases = 0, CasesByStage = empty, CasesByException = empty,
+            OverdueCases = 0, EscalatedCases = 0, UnassignedCases = 0, Measures = new Dictionary<string, CareLoop.Contracts.Metrics.RateMeasureResponse>(),
+            TimeToStep = new Dictionary<string, CareLoop.Contracts.Metrics.DurationMeasureResponse>
+            {
+                ["acknowledgement"] = new() { Denominator = 6, Median = TimeSpan.FromSeconds(seconds) },
+            },
+            ClosuresByReason = empty, CasesReachingDisplayLabel = new Dictionary<string, CareLoop.Contracts.Metrics.RateMeasureResponse>(),
+            CasesByDisplayLabel = empty, ConfidenceDenominator = 0, ConfidenceResponses = 0,
+        };
+
+        var data = System.Text.Json.JsonSerializer.Serialize(ImpactSummary.BuildData(metrics, "SYN Family Health Centre", _format));
+
+        Assert.Contains($"\"Time\":\"{words}\"", data);
     }
 
     [Fact]

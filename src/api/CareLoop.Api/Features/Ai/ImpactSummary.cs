@@ -103,7 +103,9 @@ public static class ImpactSummary
     private static string Pascal(string key) => key.Length == 0 ? key : char.ToUpperInvariant(key[0]) + key[1..];
 
     private static string Duration(TimeSpan span) =>
-        span.TotalDays >= 1 ? $"{(int)span.TotalDays} days {span.Hours} hours"
-        : span.TotalHours >= 1 ? $"{span.Hours} hours {span.Minutes} minutes"
-        : $"{Math.Max(1, span.Minutes)} minutes";
+        span.TotalDays >= 1 ? $"{Count((int)span.TotalDays, "day")} {Count(span.Hours, "hour")}"
+        : span.TotalHours >= 1 ? $"{Count(span.Hours, "hour")} {Count(span.Minutes, "minute")}"
+        : Count(Math.Max(1, span.Minutes), "minute");
+
+    private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 }

@@ -68,11 +68,14 @@ public static partial class RoleBriefing
     /// <summary>Puts the dashboard's case number where the text names a case by its token.</summary>
     /// <param name="text">The model's text, naming cases as <c>{{C-1}}</c> or <c>C-1</c>.</param>
     /// <param name="cases">The cases, in the order their tokens were given.</param>
-    /// <returns>The text with each known token replaced by <c>case</c> and its number; an unknown token is left as it is.</returns>
+    /// <returns>The text with each known token replaced by <c>case</c> (<c>Case</c> at the start of a sentence) and its number; an unknown token is left as it is.</returns>
     internal static string WithCaseNumbers(string text, IReadOnlyList<Case> cases) =>
         Token().Replace(text, match => int.TryParse(match.Groups[1].Value, out var n) && n >= 1 && n <= Math.Min(cases.Count, MaxCasesListed)
-            ? $"case {NotificationRouter.CaseReferenceFor(cases[n - 1].Id)}"
+            ? $"{(StartsSentence(text, match.Index) ? "Case" : "case")} {NotificationRouter.CaseReferenceFor(cases[n - 1].Id)}"
             : match.Value);
+
+    // The text follows the opening sentence, so a token at its very start also starts a sentence.
+    private static bool StartsSentence(string text, int index) => text[..index].TrimEnd() is var before && (before.Length == 0 || before[^1] is '.' or '!' or '?');
 
     private static bool IsOverdue(Case c, DateTimeOffset now) => c.DueAt < now || c.Exceptions.HasFlag(CaseExceptions.Overdue);
 
