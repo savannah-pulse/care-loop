@@ -424,12 +424,21 @@ code.role{margin-top:6px}
 .ropts.notasked{margin-bottom:8px}
 .rate .note{margin-top:8px}
 .callform .btn{align-self:flex-start}
-/* AI role briefing on the worklist, as built in the web app */
+/* AI texts, as built in the web app: the worklist briefing, the impact summary and the patient message draft */
+.eyebrow{font-size:14px;color:var(--ink2);margin-bottom:4px}
 .brief{display:flex;flex-direction:column;gap:4px;max-width:72ch}
-.brief p{font-size:16px;color:var(--ink)}
-.brief .brief-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--ink2)}
-.brief .brief-meta svg.i{width:14px;height:14px;color:var(--ink3)}
-.brief .brief-refresh{color:var(--accent);text-decoration:underline}
+.brief-text{font-size:16px;color:var(--ink);white-space:pre-line}
+.clamp3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;overflow:hidden}
+.brief-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--ink2)}
+.brief-meta svg.i{width:14px;height:14px;color:var(--ink3)}
+.brief-refresh{color:var(--accent);text-decoration:underline}
+.msgcard{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.msgcard .draft{display:flex;flex-direction:column;gap:6px;width:100%;padding:12px;border:1px solid var(--accent-line);border-radius:8px;background:var(--accent-soft)}
+.msgcard .draft .brief-meta{flex-wrap:nowrap;align-items:flex-start}
+.msgcard .draft .brief-meta svg.i{flex:none;margin-top:3px}
+/* Who takes the next step, under the next-action card */
+.who-acts{display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding:12px 16px;border-radius:8px;background:var(--soft);color:var(--ink2);font-size:15px}
+.who-acts svg.i{margin-top:1px;color:var(--ink3)}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
@@ -583,12 +592,12 @@ code.role{margin-top:6px}
 </div>
 <div class="page">
 <div class="head">
-<div><h1>Worklist</h1><p class="sub">Thursday 12 November 2026, 09:00 · 24 open cases for your team. Each case has one next action and one person responsible.</p></div>
+<div><p class="eyebrow">Thursday 12 November 2026, 09:00</p><h1>Good morning, Huda</h1><p class="sub">24 open cases · 1 overdue · 5 due today</p></div>
 <div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">My team<svg class="i"><use href="#i-down"/></svg></span><span class="field search"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span></div>
 </div>
 <div class="brief" aria-label="Summary written by AI">
-<p>1 case is overdue and 5 are due today. The overdue case is a referral to send again, and it is escalated. Due today are three calls to patients, one next step to agree and one case that needs a new owner.</p>
-<p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span></p>
+<p class="brief-text clamp3">Across your team's 24 open cases, 1 is overdue and 5 are due today. Hessa Al Dhaheri is 18 hours overdue for a new referral, and her case is escalated. Due today are three calls to patients: a call-back for Salem Al Ketbi by 10:40, and calls to Maricel Reyes and Nasreen Akhtar by 17:00. Noura Al Shamsi's next step is due by 12:00, and Khalid Al Marzouqi's case has no owner, also due by 12:00. Two more deadlines fall on Friday 13 November.</p>
+<p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span><span class="brief-refresh">Show more</span></p>
 </div>
 <div class="chips">
 <span class="chip on">All open <b>24</b></span>
@@ -620,7 +629,7 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b02" data-file="02-case">
-<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except one thing: a nurse navigator records what a patient said on a call. Clinical actions happen in the hospital system.</p>
+<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except one thing: a nurse navigator records what a patient said on a call. Nurse navigators and clinicians can also ask AI for a draft of a message to the patient, which is never sent. Clinical actions happen in the hospital system.</p>
 <div class="meta"><span>For: care team and clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US01, US03, US08, US10, US13, US14, US16</span><span>Requirements: FR-02, FR-03, FR-06, FR-07</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -671,6 +680,7 @@ code.role{margin-top:6px}
 <div class="now"><div class="k"><span class="num">2</span>Joy Bautista, facility lead</div>Escalated Wed, 15:00. Acknowledged today, 08:30.</div>
 <div><div class="k"><span class="num">3</span>Dr. Obaid Al Suwaidi</div>Programme coordinator, at 12:00 today if still open</div>
 </div>
+<p class="who-acts"><svg class="i"><use href="#i-user"/></svg><span>Dr. Rekha Varghese does this in the hospital system. CareLoop moves on once it is recorded there.</span></p>
 </div>
 <div class="card">
 <h3>Needed before the outcome can be recorded</h3>
@@ -721,6 +731,16 @@ code.role{margin-top:6px}
 </div>
 <p class="note" style="margin-top:12px">Recording a call never changes who is responsible for the case.</p>
 </div>
+<div class="card msgcard">
+<h3>Draft a message to the patient</h3>
+<p class="note">AI writes a draft for you to read. Nothing is sent from here, and the patient's name and details are left as placeholders.</p>
+<div class="ropts"><span><span class="radio on"></span>Text message</span><span><span class="radio"></span>Email</span></div>
+<span class="btn">Write another draft</span>
+<div class="draft">
+<p>Dear {first name},<br>Your care team at Family Health Centre would like to speak with you.<br>Please contact us at 02 000 0000 when convenient.<br>Thank you.</p>
+<p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · 09:05 · Draft, not sent</span></p>
+</div>
+</div>
 <div class="card">
 <h3>How to reach Hessa</h3>
 <ul class="reach">
@@ -758,6 +778,16 @@ code.role{margin-top:6px}
 <div class="head">
 <div><h1>Impact</h1><p class="sub">All screening programmes · 1 September to 12 November 2026 · 240 actionable results</p></div>
 <div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">All facilities<svg class="i"><use href="#i-down"/></svg></span></div>
+</div>
+<div class="brief" aria-label="Summary of the figures, written by AI">
+<p class="brief-text clamp3">The next care step was completed by the agreed deadline in 172 of 200 cases (86%), and 9 of the 56 open cases (16%) are past their deadline. From the result, the median time was 0.5 working days to the patient being told, 1 to the consultation answered, 5 to confirmatory tests and 19 to care starting.
+
+Of the 240 cases, 184 are closed and 56 are open. Referrals were accepted and attended in 201 of 214 cases (94%), and appointments were attended in 412 of 429 (96%).
+
+Treatment started by the deadline rests on too few cases to report.
+
+Simulated on synthetic data; not evidence of real-world improvement.</p>
+<p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span><span class="brief-refresh">Show more</span></p>
 </div>
 <div class="kpis">
 <div class="card kpi"><span class="lbl">Next care step completed by the agreed deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">With escalation off: <b>61%</b> (122 of 200)</div></div>
@@ -812,10 +842,6 @@ code.role{margin-top:6px}
 <li><span>Declined: missing information</span><span class="bar amberbar"><i style="width:36.4%"></i></span><span class="v">4</span></li>
 <li><span>Patient declined care</span><span class="bar amberbar"><i style="width:18.2%"></i></span><span class="v">2</span></li>
 </ul>
-</div>
-<div class="card">
-<h3>Summary for this period<span class="r"><span class="ai"><svg class="i"><use href="#i-spark"/></svg>Written by AI</span></span></h3>
-<div class="aitext"><p>9 of the 56 open cases are past their deadline. The next care step was completed by the agreed deadline in 172 of 200 cases (86%).</p><p>The step that takes longest is care starting, a median of 19 working days from the result. Referrals were accepted and attended in 201 of 214 cases (94%).</p></div>
 </div>
 </div>
 </div>
@@ -1360,11 +1386,12 @@ code.role{margin-top:6px}
 <div class="state">
 <div class="state-head"><b>No AI text</b><span>1 Worklist</span></div>
 <div class="frag">
-<b style="font-size:16px">Worklist</b>
-<span class="note">Thursday 12 November 2026, 09:00 · 24 open cases for your team.</span>
+<span class="note">Thursday 12 November 2026, 09:00</span>
+<b style="font-size:16px">Good morning, Huda</b>
+<span class="note">24 open cases · 1 overdue · 5 due today</span>
 <div class="chips"><span class="chip on">All open <b>24</b></span><span class="chip"><i class="d red"></i>Urgent <b>1</b></span><span class="chip"><i class="d red"></i>Overdue <b>1</b></span></div>
 </div>
-<p class="when">If AI is off or fails, CareLoop shows no AI text at all: here the worklist has no summary at the top, and no message in its place. Nothing else depends on it, and every step still works.</p>
+<p class="when">If AI is off or fails, the worklist and Impact show no summary at all, and nothing in its place. On a case, the message card says calmly that no draft can be written. Nothing else depends on AI, and every step still works.</p>
 </div>
 <div class="state">
 <div class="state-head"><b>Closing blocked</b><span>8 Close</span></div>
@@ -1412,7 +1439,7 @@ code.role{margin-top:6px}
 <tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span><code class="role">facility-lead</code></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, and acknowledge escalations</td><td>See reports, images or notes, or cases at other facilities</td></tr>
 <tr class="grp"><td colspan="4">Oversight and systems</td></tr>
 <tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Act on escalations</td><td>See named lists of patients</td></tr>
-<tr><td><b>AI writing</b><span class="l2">Part of CareLoop</span></td><td>Only what each text needs, while writing it: never a person's name, a contact detail or a result</td><td>Write three texts for staff to read: a briefing on the worklist, a summary on the Impact page and a draft of a message to a patient</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
+<tr><td><b>AI writing</b><span class="l2">Part of CareLoop</span></td><td>Only what each text needs, while writing it: never a person's name or contact details, or a result</td><td>Write three texts for staff to read: a briefing on the worklist, a summary on the Impact page and a draft of a message to a patient</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
 <tr><td><b>Engineers and support</b><span class="l2">The CareLoop team</span></td><td>Synthetic data only</td><td>Build, test and fix CareLoop</td><td>See real patient data, unless it is approved and recorded</td></tr>
 </tbody></table>
 </div>
