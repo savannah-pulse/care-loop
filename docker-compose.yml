@@ -49,9 +49,9 @@ services:
       Notifications__FacilityNames__general-hospital: General Hospital
       Notifications__FacilityNames__regional-hospital: Regional Hospital
       # How a patient message says to contact each facility. Synthetic, like every address here.
-      Notifications__FacilityContacts__family-health-centre: SYN-PHONE-FAMILY-HEALTH-CENTRE
-      Notifications__FacilityContacts__general-hospital: SYN-PHONE-GENERAL-HOSPITAL
-      Notifications__FacilityContacts__regional-hospital: SYN-PHONE-REGIONAL-HOSPITAL
+      Notifications__FacilityContacts__family-health-centre: 02 000 0000
+      Notifications__FacilityContacts__general-hospital: 02 000 0001
+      Notifications__FacilityContacts__regional-hospital: 02 000 0002
       # Where each staff role is notified. Synthetic addresses, one per role.
       Notifications__StaffContacts__nurse-navigator__Channel: Email
       Notifications__StaffContacts__nurse-navigator__Address: SYN-EMAIL-NURSE-NAVIGATORS

@@ -290,10 +290,11 @@ function patientMessageDraft(detail: CaseDetail, who: Reader, channel: string | 
   if (channel !== null && channel !== 'Sms' && channel !== 'Email') {
     throw new HttpError(400, 'The channel must be Sms or Email.')
   }
+  const firstName = detail.patientDisplayName?.trim().split(/\s+/)[0] ?? 'patient'
   const text = [
-    'Dear {first name},',
-    `Your care team at ${detail.facilityId.replaceAll('-', ' ')} would like to speak with you.`,
-    'Please contact us at {clinic contact} when convenient.',
+    `Dear ${firstName},`,
+    `Your care team at ${detail.facilityId.replaceAll('-', ' ')} would like to talk with you about the next step in your care.`,
+    'Please call {clinic contact}.',
     'Thank you.',
   ].join('\n')
   return { text, generatedAt: new Date().toISOString(), model: 'Mock/patient-notification', cached: false }

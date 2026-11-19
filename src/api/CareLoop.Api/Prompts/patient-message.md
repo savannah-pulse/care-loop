@@ -19,8 +19,8 @@ Thank you.
 
 T05 Care-team callback request
 Dear {patient_name},
-Your care team at {facility_name} would like to speak with you.
-Please contact us at {facility_contact} when convenient.
+Your care team at {facility_name} would like to talk with you about the next step in your care.
+Please call {facility_contact}.
 Thank you.
 
 T06 Unsuccessful contact follow-up

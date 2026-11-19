@@ -71,9 +71,10 @@ internal sealed class NotificationStore : IDisposable
     }
 
     /// <summary>Opens a case and reviews it, which requests the patient notification.</summary>
-    public async Task<NotificationRequested> ReviewedCaseAsync()
+    /// <param name="patientDisplayName">The patient's name as the source sends it, or <see langword="null"/> for none.</param>
+    public async Task<NotificationRequested> ReviewedCaseAsync(string? patientDisplayName = null)
     {
-        await IngestAsync(Envelopes.ScreeningResult(Clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ScreeningResult(Clock.UtcNow, namedOwner: Envelopes.Clinician(), patientDisplayName: patientDisplayName));
         Clock.Advance(TimeSpan.FromHours(1));
         await IngestAsync(Envelopes.ClinicalReview(Clock.UtcNow));
         Clock.Advance(TimeSpan.FromMinutes(5));
