@@ -83,12 +83,13 @@ Messaging simulator and gives each staff role a synthetic address; Docker Compos
 | `Outbox:LeaseDuration` | `00:05:00` | How long one instance's claim on a delivery lasts. Several API instances may share the database; a claim left by a stopped instance lapses after this and the delivery is picked up again. |
 | `DeadlineWorker:Enabled` | `true` (in `appsettings.json`) | Run the deadline worker. Test hosts can disable the background loop and call `SweepAsync` explicitly. |
 | `DeadlineWorker:Interval` | `00:00:30` | Technical sweep interval, positive and within `Task.Delay`'s supported range; not a clinical deadline. Development settings and Docker Compose use `00:00:01` because the demo pathway's deadlines last seconds. |
-| `Ai:Provider` | `NoOp` | `NoOp` (AI off: every AI endpoint answers 409) or `Foundry` (the API calls a model deployment in a Microsoft Foundry project). Any other value stops the host at start-up. |
+| `Ai:Provider` | `NoOp` | `NoOp` (AI off: every AI endpoint answers 409) or `Foundry` (the API asks each use's own agent in a Microsoft Foundry project). Any other value stops the host at start-up. |
 | `Ai:TimeoutSeconds` | `30` | How long to wait for an answer before answering 503. |
 | `Ai:CacheHours` | `6` | How long a role briefing or impact summary is reused while the data sent is unchanged; `0` switches reuse off. |
 | `Ai:PromptsDirectory` | `Prompts` | Folder the prompt files are read from; relative to the content root unless rooted. |
 | `Ai:Foundry:ProjectEndpoint` | empty | `https://{resource}.services.ai.azure.com/api/projects/{project}`. Required, `https` only, for `Foundry`. Set it from the environment (`AZURE_AI_PROJECT_ENDPOINT` in Docker Compose), never in a committed file. There is no key. |
-| `Ai:Foundry:Model` | `gpt-6.1-sol` | The model deployment that writes the texts (`AZURE_AI_MODEL_DEPLOYMENT_NAME` in Docker Compose). Required for `Foundry`. |
+| `Ai:Foundry:Agents` | `role-briefing`, `impact-summary`, `patient-notification` | Which agent writes each text, by name, so its latest version answers. The key is the use (`role-briefing`, `impact-summary`, `patient-message`). The API never creates or changes an agent. |
+| `Ai:Foundry:SyntheticData` | `true` | Told to an agent that asks whether the figures are synthetic. |
 
 Clinical deadlines are **not** configuration keys here. They live in
 `src/api/CareLoop.Api/Infrastructure/Pathways/breast-screening.json`, where every value is a placeholder.
@@ -150,10 +151,12 @@ signed by the service that sent them.
 
 ### AI (WS9)
 
-AI writes three texts for staff. Each endpoint builds a small data object, puts it into a prompt file and sends the
-prompt to a model through `IAiClient` (`Features/Ai`). The model's text is returned trimmed; the API does not parse or
-check it. [`docs/ai-design/integration.md`](../../docs/ai-design/integration.md) is the contract: what is sent and what
-is withheld.
+AI writes three texts for staff. Each endpoint builds a small data object, puts it into a prompt file and hands the
+request to the provider through `IAiClient` (`Features/Ai`). On Foundry each use goes to its own agent, called by name:
+role briefing to `role-briefing`, impact summary to `impact-summary`, patient message draft to `patient-notification`.
+The API does not check the text against the data.
+[`docs/ai-design/integration.md`](../../docs/ai-design/integration.md) is the contract: what is sent and what is
+withheld.
 
 | Route | Query | Text | Shown on |
 |---|---|---|---|
@@ -162,7 +165,8 @@ is withheld.
 | `GET /cases/{caseId}/patient-message-draft` | `channel` (`Sms` or `Email`), `reason` | A draft message to the patient, for a nurse navigator or a clinician to read | Case page |
 
 Each answers 409 while `Ai:Provider` is `NoOp`, 200 with `AiTextResponse` (`text`, `model`, `generatedAt`, `cached`),
-or 503 when the model could not write it. The text is a draft labelled as written by AI. It is not stored and nothing
+or 503 when the provider could not write it (it could not be reached, refused, or answered in an unexpected shape).
+The text is a draft labelled as written by AI. It is not stored and nothing
 acts on it. The patient message draft is a preview: nothing is sent, and patients still receive the approved templates.
 
 - **Prompts.** `CareLoop.Api/Prompts/` holds one plain-text file per use: `role-briefing.md`, `impact-summary.md` and
@@ -170,14 +174,32 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   the model is asked, edit the file and restart the API; no code changes. A file that is missing, or does not contain
   `{{data}}` exactly once, stops the API at start-up. Which data is sent is decided in code, not in the file. See
   [`CareLoop.Api/Prompts/README.md`](CareLoop.Api/Prompts/README.md).
-- **Reuse.** The role briefing and the impact summary are kept in the API's memory for `Ai:CacheHours`, under the model
-  and the exact prompt, so unchanged data does not call the model again. `?refresh=true` asks again and replaces the
+- **Foundry agents.** `FoundryAiClient` is the one Foundry client. An agent has instructions of its own, set in the
+  Foundry project by its owner, and they fix the input it accepts and the shape of its answer.
+  `Infrastructure/Ai/FoundryAgentFormat.cs` is the one file that knows those shapes. `role-briefing` is sent
+  `{task, data}`, so the prompt file's instructions apply. `impact-summary` is sent a structured `<input_json>` and
+  follows its own instructions; only the data is used, and its JSON answer is turned into text. `patient-notification`
+  is sent an `<input_json>` that names one of the agent's own templates, chosen from the `situation` in the data
+  (`appointment reminder` is `T02`, `could not reach the patient` is `T06`, `please contact the care team` is `T05`),
+  and the facts to fill it with. `patient_name` and `facility_contact` go as the placeholders `{first name}` and
+  `{clinic contact}`: the name is never sent, and CareLoop holds no clinic contact number, so the reviewer fills it
+  in. `recipient_verified` and `channel_permitted` go as `true`, a proposal still to confirm: the draft goes to a
+  nurse or clinician, who checks before anything is sent. The agent answers with the template's fixed wording as the
+  draft; the prompt file's instructions are not sent. The agents are called at their latest version, so a
+  change to an agent can make its use answer 503 until `FoundryAgentFormat` is updated.
+- **Role briefing.** The API writes the opening sentence (`opening` in the data) and the model continues from it. The
+  model knows a case only as a token (`C-1`, `C-2`, …); the API swaps each token for the dashboard's case number after
+  the text comes back, after any reuse, so case numbers are never sent.
+- **Impact summary.** Each of `shares` is sent as `numerator`, `denominator` and `percent`; a withheld value is the
+  word `withheld` (`ImpactSummary.SmallCount`).
+- **Reuse.** The role briefing and the impact summary are kept in the API's memory for `Ai:CacheHours`, under the
+  provider and the exact prompt, so unchanged data does not call the model again. `?refresh=true` asks again and replaces the
   kept answer. `cached` is `true` for a reused answer. The patient message draft is never reused.
 - **Audit.** Access checks and the read audit (`CaseReads`) run on every request, reused answer or not. The views are
   `role-briefing`; `metrics` for the impact summary, because it reads through the `GET /metrics` handler; and
   `patient-message-draft` or `patient-message-draft-denied`. Prompts and answers are not stored or logged.
 
-There are two ways to try it against a live model. Use synthetic cases only.
+There are two ways to try it against the live agents. Use synthetic cases only.
 
 Run the API (it needs its database):
 
@@ -193,20 +215,25 @@ does nothing unless the endpoint is set:
 CARELOOP_LIVE_FOUNDRY_ENDPOINT=https://<account>.services.ai.azure.com/api/projects/<project> dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~Live_"
 ```
 
-The signed-in account needs the Foundry User role on the Foundry account. The model deployment is `Ai:Foundry:Model`
-(`gpt-6.1-sol` by default; `CARELOOP_LIVE_FOUNDRY_MODEL` for the test). A container has no `az login`, so Docker
+The signed-in account needs the Foundry User role on the Foundry account, and the three agents must exist in the
+project. The test is `Live_the_endpoints_get_text_from_their_foundry_agents`. A container has no `az login`, so Docker
 Compose cannot run this check.
+
+Run on 19 November 2026: all three uses answered 200 from their own agents. The repeated briefing was reused, and
+the briefing named the seeded cases by their case numbers.
 
 To use another AI provider, for example the Anthropic API:
 
-1. Write one class that implements `IAiClient`: send the prompt, return the text.
+1. Write one class that implements `IAiClient` (`IsEnabled`, `Describe(use)`, `CompleteAsync(AiRequest request, ct)`):
+   send `request.Prompt`, return the text.
 2. Add a case for it in `DependencyInjection.AddAi`, with whatever settings it needs. An API key belongs in the
    environment's secret store, never in the repository.
 3. Set `Ai:Provider`.
 
-The endpoints, the prompt files, the data and the tests do not change.
+The endpoints, the prompt files, the data and their tests do not change. Nothing about Foundry reaches them: its agent
+names and formats are inside the Foundry client.
 
-Run the focused tests:
+Run the focused tests (`AiEndpointsTests` and `AiProviderTests`, which holds the translation file's tests):
 
 ```bash
 dotnet test tests/api/CareLoop.Tests --filter "FullyQualifiedName~CareLoop.Tests.Api.Ai"

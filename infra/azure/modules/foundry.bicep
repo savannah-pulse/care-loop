@@ -1,7 +1,7 @@
 // Optional: a Microsoft Foundry account, project and one model deployment, with a guardrail that
 // blocks prompt attacks. Used only when createFoundry is true, for a subscription that has no
 // Foundry to use. Keys are disabled: the API signs in with its managed identity, which is given the
-// Foundry User role here, and calls the model deployment created below.
+// Foundry User role here. The agents the API asks are created in the project by their owner, not by this file.
 param location string
 param tags object
 param accountName string

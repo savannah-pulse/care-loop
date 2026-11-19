@@ -8,10 +8,15 @@ using Microsoft.Extensions.Options;
 namespace CareLoop.Api.Infrastructure.Ai;
 
 /// <summary>
-/// Calls a model deployment in a Microsoft Foundry project: <c>POST {ProjectEndpoint}/openai/v1/responses</c> with the
-/// prompt, signed with an Entra token. No key exists.
+/// Asks the Microsoft Foundry agent for a use to write its text: <c>POST {ProjectEndpoint}/openai/v1/responses</c> naming
+/// the agent, signed with an Entra token. No key exists.
 /// </summary>
-/// <remarks>It never logs the prompt or the answer. Any failure raises <see cref="AiUnavailableException"/>.</remarks>
+/// <remarks>
+/// Each use has its own agent (<c>Ai:Foundry:Agents</c>), called by name so its latest version answers. An agent has
+/// its own instructions and input format in the Foundry project; <see cref="FoundryAgentFormat"/> turns the request into
+/// that format and the agent's answer back into text. It never logs the request or the answer. Any failure, a refusal
+/// included, raises <see cref="AiUnavailableException"/>.
+/// </remarks>
 public sealed class FoundryAiClient(HttpClient http, TokenCredential credential, IOptions<AiOptions> options) : IAiClient
 {
     private static readonly string[] Scopes = ["https://ai.azure.com/.default"];
@@ -19,15 +24,16 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
     private AccessToken _token;
 
     /// <inheritdoc/>
-    public string Model => $"Foundry/{options.Value.Foundry.Model}";
-
-    /// <inheritdoc/>
     public bool IsEnabled => true;
 
     /// <inheritdoc/>
-    public async Task<string> CompleteAsync(string prompt, CancellationToken ct)
+    public string Describe(string use) => $"Foundry/{AgentFor(use)}";
+
+    /// <inheritdoc/>
+    public async Task<string> CompleteAsync(AiRequest request, CancellationToken ct)
     {
         var foundry = options.Value.Foundry;
+        var input = FoundryAgentFormat.ToAgentInput(request, foundry.SyntheticData);
         try
         {
             // Reused until shortly before it expires; a second request racing for a token only costs one more token.
@@ -36,26 +42,34 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
                 _token = await credential.GetTokenAsync(new TokenRequestContext(Scopes), ct);
             }
 
-            using var request = new HttpRequestMessage(HttpMethod.Post, $"{foundry.ProjectEndpoint!.TrimEnd('/')}/openai/v1/responses")
+            using var message = new HttpRequestMessage(HttpMethod.Post, $"{foundry.ProjectEndpoint!.TrimEnd('/')}/openai/v1/responses")
             {
-                Content = JsonContent.Create(new { model = foundry.Model, input = prompt }),
+                Content = JsonContent.Create(new
+                {
+                    agent_reference = new { type = "agent_reference", name = AgentFor(request.Use) },
+                    input = new[] { new { role = "user", content = input } },
+                }),
             };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token.Token);
-            using var response = await http.SendAsync(request, ct);
+            message.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token.Token);
+            using var response = await http.SendAsync(message, ct);
             if (!response.IsSuccessStatusCode)
             {
-                throw new AiUnavailableException($"Foundry answered HTTP {(int)response.StatusCode}.");
+                throw new AiUnavailableException($"Foundry answered HTTP {(int)response.StatusCode} for agent {AgentFor(request.Use)}.");
             }
 
             using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
-            var text = TextOf(answer.RootElement);
-            return string.IsNullOrWhiteSpace(text) ? throw new AiUnavailableException("Foundry wrote no text.") : text;
+            return FoundryAgentFormat.ToText(request.Use, TextOf(answer.RootElement));
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or Azure.RequestFailedException or Azure.Identity.AuthenticationFailedException)
         {
             throw new AiUnavailableException($"Foundry could not be called: {ex.GetType().Name}.", ex);
         }
     }
+
+    private string AgentFor(string use) =>
+        options.Value.Foundry.Agents.TryGetValue(use, out var agent) && !string.IsNullOrWhiteSpace(agent)
+            ? agent
+            : throw new AiUnavailableException($"No Foundry agent is configured for '{use}' (Ai:Foundry:Agents).");
 
     // The Responses API returns the text in output[].content[].text.
     private static string TextOf(JsonElement root)

@@ -16,9 +16,8 @@
 #   POSTGRES_LOCATION         region of the database, default AZURE_LOCATION
 #   POSTGRES_SKU_NAME, POSTGRES_SKU_TIER
 #                             database size where the parameter file reads them, default Standard_B1ms and Burstable
-#   API_AI_PROVIDER           NoOp (default, AI off) or Foundry (the API calls a model in the Foundry project)
-#   AZURE_AI_PROJECT_ENDPOINT, AZURE_AI_MODEL_DEPLOYMENT_NAME
-#                             the Foundry project and the model deployment the API calls; needed for API_AI_PROVIDER=Foundry
+#   API_AI_PROVIDER           NoOp (default, AI off) or Foundry (the API asks the Foundry project's agents)
+#   AZURE_AI_PROJECT_ENDPOINT the Foundry project whose agents the API asks; needed for API_AI_PROVIDER=Foundry
 #   AZURE_AI_FOUNDRY_ACCOUNT_ID
 #                             resource ID of that project's Foundry account; when set, the API identity is given Foundry User on it
 #   CREATE_FOUNDRY            true creates a Foundry account, project and model here instead (AZURE_AI_LOCATION picks its region)

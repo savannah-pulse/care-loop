@@ -6,11 +6,11 @@ namespace CareLoop.Api.Infrastructure.Ai;
 public sealed class NoOpAiClient : IAiClient
 {
     /// <inheritdoc/>
-    public string Model => "NoOp";
+    public string Describe(string use) => "NoOp";
 
     /// <inheritdoc/>
     public bool IsEnabled => false;
 
     /// <inheritdoc/>
-    public Task<string> CompleteAsync(string prompt, CancellationToken ct) => throw new AiUnavailableException("AI is switched off.");
+    public Task<string> CompleteAsync(AiRequest request, CancellationToken ct) => throw new AiUnavailableException("AI is switched off.");
 }

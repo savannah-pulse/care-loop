@@ -9,11 +9,11 @@ This specification is part of the [AI design set](README.md).
 
 > **Status note (19 November 2026).** This document is the earlier design proposal and is kept for reference. It is superseded by [`integration.md`](integration.md), which describes what is built, wherever the two differ.
 >
-> - **Not built:** the clinician handoff summary (AG1, FR-11) and the Python AI service with its routes and contracts in §3 and §4. The API calls a model deployment in a Microsoft Foundry project itself, with plain-text prompt files (`src/api/CareLoop.Api/Prompts/`); it does not call hosted Foundry agents. AG2 (closure review pack), AG4 (translation) and AG5 (reply triage) are not built either.
+> - **Not built:** the clinician handoff summary (AG1, FR-11) and the Python AI service with its routes and contracts in §3 and §4. The API asks the agents in a Microsoft Foundry project itself, one agent per text, called by name (`role-briefing`, `impact-summary`, `patient-notification`); it never creates or changes an agent. The plain-text prompt files (`src/api/CareLoop.Api/Prompts/`) hold the instructions for a provider that takes a prompt; on Foundry how much of a file applies depends on the agent. AG2 (closure review pack), AG4 (translation) and AG5 (reply triage) are not built either.
 > - **Built, three texts:**
 >   - Role briefing (`role-briefing.md`): not in this document's AG1 to AG6 list; informally called AG7.
 >   - Impact summary (`impact-summary.md`): closest to AG6, the stage-insights narrative. It is asked for on demand from the impact page, not on a schedule.
->   - Patient message draft (`patient-message.md`): closest to AG3. It is a preview for staff only; nothing AI writes is sent, and patients receive approved templates.
+>   - Patient message draft (`patient-message.md`): closest to AG3. It is a preview for staff only; nothing AI writes is sent, and patients receive approved templates. On Foundry the `patient-notification` agent fills one of its own templates, which the API names, and returns that fixed wording as the draft.
 
 ## 1. Purpose and design boundary
 

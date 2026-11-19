@@ -24,10 +24,9 @@ param deployMonitoring = true
 // days, so that open cases stay on time long enough to be looked at (see infra/demo/README.md).
 param demoTiming = toLower(readEnvironmentVariable('DEMO_TIMING', 'true')) == 'true'
 
-// Foundry: the project and model deployment the API calls. AI stays off (NoOp) unless
-// API_AI_PROVIDER=Foundry is set for the deployment and both values below are given.
+// Foundry: the project whose agents the API asks. AI stays off (NoOp) unless API_AI_PROVIDER=Foundry
+// is set for the deployment and AZURE_AI_PROJECT_ENDPOINT names the project.
 param aiProjectEndpoint = readEnvironmentVariable('AZURE_AI_PROJECT_ENDPOINT', '')
-param aiModelDeploymentName = readEnvironmentVariable('AZURE_AI_MODEL_DEPLOYMENT_NAME', '')
 param aiFoundryAccountId = readEnvironmentVariable('AZURE_AI_FOUNDRY_ACCOUNT_ID', '')
 param createFoundry = toLower(readEnvironmentVariable('CREATE_FOUNDRY', 'false')) == 'true'
 param foundryLocation = readEnvironmentVariable('AZURE_AI_LOCATION', readEnvironmentVariable('AZURE_LOCATION', 'uaenorth'))

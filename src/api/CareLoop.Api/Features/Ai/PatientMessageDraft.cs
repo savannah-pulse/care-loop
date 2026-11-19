@@ -31,6 +31,15 @@ public static class PatientMessageDraft
     /// <summary>What a message is for when the next action could reveal clinical state, and for any next action not listed.</summary>
     public const string NeutralPurpose = "The care team would like to talk with the patient.";
 
+    /// <summary>The situation when an appointment is booked and still to come.</summary>
+    public const string AppointmentReminder = "appointment reminder";
+
+    /// <summary>The situation when earlier attempts to reach the patient failed.</summary>
+    public const string CouldNotReach = "could not reach the patient";
+
+    /// <summary>The situation otherwise: the care team asks the patient to get in touch.</summary>
+    public const string PleaseContactUs = "please contact the care team";
+
     /// <summary>The roles that may ask for a draft.</summary>
     public static readonly IReadOnlyList<string> AllowedRoles = [DemoRoles.NurseNavigator, DemoRoles.Clinician];
 
@@ -87,15 +96,28 @@ public static class PatientMessageDraft
     /// <param name="channel">Text message or email.</param>
     /// <param name="format">Local dates, times and the clinic's name.</param>
     /// <param name="now">The time now.</param>
-    /// <returns>The purpose, the clinic, the channel and an upcoming appointment's time; nothing that identifies the patient.</returns>
-    internal static object BuildData(Case @case, NotificationChannel channel, MessageFormat format, DateTimeOffset now) => new
+    /// <returns>The situation, the purpose, the clinic, the channel and an upcoming appointment's day and time; nothing that identifies the patient.</returns>
+    internal static object BuildData(Case @case, NotificationChannel channel, MessageFormat format, DateTimeOffset now)
     {
-        Channel = channel == NotificationChannel.Sms ? "text message" : "email",
-        MaxCharacters = channel == NotificationChannel.Sms ? 459 : 1000,
-        Clinic = format.Facility(@case.FacilityId),
-        Purpose = PurposeFor(@case.NextAction),
-        Appointment = @case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now
-            ? $"{format.Date(at)} at {format.Time(at)}"
-            : "none",
-    };
+        var upcoming = @case.Appointment is { Status: AppointmentStatus.Scheduled, ScheduledFor: { } at } && at >= now ? at : (DateTimeOffset?)null;
+        return new
+        {
+            Channel = channel == NotificationChannel.Sms ? "text message" : "email",
+            MaxCharacters = channel == NotificationChannel.Sms ? 459 : 1000,
+            Clinic = format.Facility(@case.FacilityId),
+            Situation = SituationFor(@case, upcoming is not null),
+            Purpose = PurposeFor(@case.NextAction),
+            AppointmentDate = upcoming is { } day ? format.Date(day) : "none",
+            AppointmentTime = upcoming is { } time ? format.Time(time) : "none",
+        };
+    }
+
+    /// <summary>Which kind of administrative message fits the case, in words that reveal no result.</summary>
+    /// <param name="case">The case.</param>
+    /// <param name="hasUpcomingAppointment">Whether an appointment is booked and still to come.</param>
+    /// <returns><see cref="AppointmentReminder"/>, <see cref="CouldNotReach"/> or <see cref="PleaseContactUs"/>.</returns>
+    public static string SituationFor(Case @case, bool hasUpcomingAppointment) =>
+        hasUpcomingAppointment ? AppointmentReminder
+        : @case.Exceptions.HasFlag(CaseExceptions.Unreachable) ? CouldNotReach
+        : PleaseContactUs;
 }

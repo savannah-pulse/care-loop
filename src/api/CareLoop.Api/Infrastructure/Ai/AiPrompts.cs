@@ -47,6 +47,15 @@ public sealed class AiPrompts
         }
     }
 
+    /// <summary>The instructions of a prompt file: everything before the data marker.</summary>
+    /// <param name="name">The prompt file's name, without <c>.md</c>.</param>
+    /// <returns>The instructions, without the marker or the "Data:" label above it.</returns>
+    public string Task(string name)
+    {
+        var text = _files[name][.._files[name].IndexOf(DataMarker, StringComparison.Ordinal)].TrimEnd();
+        return text.EndsWith("Data:", StringComparison.OrdinalIgnoreCase) ? text[..^5].TrimEnd() : text;
+    }
+
     /// <summary>Puts the data into a prompt file.</summary>
     /// <param name="name">The prompt file's name, without <c>.md</c>.</param>
     /// <param name="data">The data, as JSON.</param>

@@ -30,7 +30,6 @@ param apiAiProvider string
 param apiExtraEnv array
 param webMaxReplicas int
 param aiProjectEndpoint string
-param aiModelDeploymentName string
 
 var appNames = {
   api: 'api'
@@ -126,14 +125,13 @@ var apiSimulatorEnv = deploySimulators
     ]
   : []
 
-// The API calls the model deployment with the apps identity (AZURE_CLIENT_ID above), which needs
-// Foundry User on the Foundry account. What the model is asked is in the API's prompt files
-// (src/api/CareLoop.Api/Prompts).
-var apiFoundryEnv = empty(aiProjectEndpoint) || empty(aiModelDeploymentName)
+// The API asks the project's agents (role-briefing, impact-summary, patient-notification) with the apps
+// identity (AZURE_CLIENT_ID above), which needs Foundry User on the Foundry account. The agents and their
+// models are owned in the Foundry project, not here.
+var apiFoundryEnv = empty(aiProjectEndpoint)
   ? []
   : [
       { name: 'Ai__Foundry__ProjectEndpoint', value: aiProjectEndpoint }
-      { name: 'Ai__Foundry__Model', value: aiModelDeploymentName }
     ]
 
 module api 'container-app.bicep' = {

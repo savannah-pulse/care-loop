@@ -62,12 +62,10 @@ services:
       Notifications__StaffContacts__coordinator__Channel: Email
       Notifications__StaffContacts__coordinator__Address: SYN-EMAIL-COORDINATORS
       Ai__Provider: ${AI_PROVIDER:-NoOp}
-      # AI is off (NoOp) by default. Foundry has the API call a model in a Microsoft Foundry project with
+      # AI is off (NoOp) by default. Foundry has the API ask the agents in a Microsoft Foundry project with
       # DefaultAzureCredential; no key or token is set here. A container has no `az login`, so for a live
-      # check run the API with `dotnet run` instead (see src/api/README.md). The instructions the model is
-      # given are the plain-text files in src/api/CareLoop.Api/Prompts.
+      # check use the opt-in test or `dotnet run` instead (see src/api/README.md).
       Ai__Foundry__ProjectEndpoint: ${AZURE_AI_PROJECT_ENDPOINT:-}
-      Ai__Foundry__Model: ${AZURE_AI_MODEL_DEPLOYMENT_NAME:-gpt-6.1-sol}
       Ai__TimeoutSeconds: ${AI_TIMEOUT_SECONDS:-30}
       Ai__CacheHours: ${AI_CACHE_HOURS:-6}
     ports:

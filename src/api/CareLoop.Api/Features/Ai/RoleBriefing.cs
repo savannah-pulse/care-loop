@@ -19,7 +19,8 @@ namespace CareLoop.Api.Features.Ai;
 /// <remarks>
 /// The data is the reader's own worklist scope, the same cases <c>GET /cases</c> gives them: counts, and the most
 /// pressing cases with their step, next action and deadline. It carries no patient name, record number, reference,
-/// contact detail, case number, staff name or free text. The wording of the summary is in <c>Prompts/role-briefing.md</c>.
+/// contact detail, case number, staff name or free text: the model knows a case only as a token such as <c>C-1</c>, and
+/// the API writes the opening sentence and puts the case numbers in afterwards. The wording of the summary is in <c>Prompts/role-briefing.md</c>.
 /// </remarks>
 public static partial class RoleBriefing
 {
@@ -43,48 +44,78 @@ public static partial class RoleBriefing
         if (ReadAccess.Identity(context, out var actor) is { } error) return error;
         if (!ai.IsOn) return AiText.SwitchedOff();
 
-        var cases = await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, null)
-            .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct);
+        var cases = Order(await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, null)
+            .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct), clock.UtcNow);
         await ReadAccess.AuditAsync(db, actor, clock, "role-briefing", null, false, null, null, ct);
-        return await ai.WriteAsync(AiPrompts.RoleBriefing, BuildData(actor, cases, pathways, format, clock.UtcNow), refresh, reuse: true, ct);
+        var opening = Opening(cases, format, clock.UtcNow);
+        // The model knows each case only as C-1, C-2, …; the case numbers are put in here and never leave CareLoop.
+        return await ai.WriteAsync(AiPrompts.RoleBriefing, BuildData(actor, cases, opening, pathways, format, clock.UtcNow), refresh, reuse: true, ct,
+            text => $"{opening} {WithCaseNumbers(text, cases)}");
     }
 
-    /// <summary>Builds what the model is given: counts over every case, and the most pressing cases one by one.</summary>
-    /// <param name="reader">Who is reading.</param>
+    /// <summary>The briefing's first sentence, written by the API so its counts are always right.</summary>
     /// <param name="cases">The open cases in the reader's scope.</param>
+    /// <param name="format">Local dates.</param>
+    /// <param name="now">The time now.</param>
+    /// <returns>For example <c>4 cases are overdue and 1 is due today.</c></returns>
+    internal static string Opening(IReadOnlyList<Case> cases, MessageFormat format, DateTimeOffset now)
+    {
+        int overdue = cases.Count(c => IsOverdue(c, now)), today = cases.Count(c => IsDueToday(c, format, now));
+        static string Count(int n) => n == 1 ? "1 case is" : $"{n} cases are";
+        return overdue == 0 && today == 0 ? "Nothing is overdue or due today." : $"{Count(overdue)} overdue and {(today == 1 ? "1 is" : $"{today} are")} due today.";
+    }
+
+    /// <summary>Puts the dashboard's case number where the text names a case by its token.</summary>
+    /// <param name="text">The model's text, naming cases as <c>{{C-1}}</c> or <c>C-1</c>.</param>
+    /// <param name="cases">The cases, in the order their tokens were given.</param>
+    /// <returns>The text with each known token replaced by <c>case</c> and its number; an unknown token is left as it is.</returns>
+    internal static string WithCaseNumbers(string text, IReadOnlyList<Case> cases) =>
+        Token().Replace(text, match => int.TryParse(match.Groups[1].Value, out var n) && n >= 1 && n <= Math.Min(cases.Count, MaxCasesListed)
+            ? $"case {NotificationRouter.CaseReferenceFor(cases[n - 1].Id)}"
+            : match.Value);
+
+    private static bool IsOverdue(Case c, DateTimeOffset now) => c.DueAt < now || c.Exceptions.HasFlag(CaseExceptions.Overdue);
+
+    private static bool IsDueToday(Case c, MessageFormat format, DateTimeOffset now) =>
+        !IsOverdue(c, now) && c.DueAt is { } due && format.Date(due) == format.Date(now);
+
+    // Most pressing first; the tokens follow this order.
+    private static List<Case> Order(List<Case> cases, DateTimeOffset now) =>
+        cases.OrderByDescending(c => IsOverdue(c, now)).ThenByDescending(c => c.IsEscalated).ThenBy(c => c.DueAt ?? DateTimeOffset.MaxValue)
+            .ThenBy(c => c.Id).ToList();
+
+    /// <summary>Builds what the model is given: the opening, counts over every case, and the most pressing cases one by one.</summary>
+    /// <param name="reader">Who is reading.</param>
+    /// <param name="cases">The open cases in the reader's scope, most pressing first.</param>
+    /// <param name="opening">The first sentence, which the model continues from.</param>
     /// <param name="pathways">Gives each case's step.</param>
     /// <param name="format">Local dates and times.</param>
     /// <param name="now">The time now.</param>
-    /// <returns>The data, with nothing that identifies a patient, a case or a member of staff.</returns>
-    internal static object BuildData(Actor reader, IReadOnlyList<Case> cases, IPathwayProvider pathways, MessageFormat format, DateTimeOffset now)
+    /// <returns>The data, with nothing that identifies a patient, a case or a member of staff: a case is only a token.</returns>
+    internal static object BuildData(Actor reader, IReadOnlyList<Case> cases, string opening, IPathwayProvider pathways, MessageFormat format, DateTimeOffset now) => new
     {
-        bool Overdue(Case c) => c.DueAt < now || c.Exceptions.HasFlag(CaseExceptions.Overdue);
-        bool DueToday(Case c) => !Overdue(c) && c.DueAt is { } due && format.Date(due) == format.Date(now);
-        return new
+        Opening = opening,
+        ReaderRole = MessageFormat.Role(reader.Role),
+        Today = format.Date(now),
+        OpenCases = cases.Count,
+        Overdue = cases.Count(c => IsOverdue(c, now)),
+        DueToday = cases.Count(c => IsDueToday(c, format, now)),
+        Escalated = cases.Count(c => c.IsEscalated),
+        WithoutOwner = cases.Count(c => c.Exceptions.HasFlag(CaseExceptions.Unassigned)),
+        Cases = cases.Take(MaxCasesListed).Select((c, i) => new
         {
-            ReaderRole = MessageFormat.Role(reader.Role),
-            Today = format.Date(now),
-            OpenCases = cases.Count,
-            Overdue = cases.Count(Overdue),
-            DueToday = cases.Count(DueToday),
-            Escalated = cases.Count(c => c.IsEscalated),
-            WithoutOwner = cases.Count(c => c.Exceptions.HasFlag(CaseExceptions.Unassigned)),
-            Cases = cases.OrderByDescending(Overdue).ThenByDescending(c => c.IsEscalated).ThenBy(c => c.DueAt ?? DateTimeOffset.MaxValue)
-                .Take(MaxCasesListed)
-                .Select(c => new
-                {
-                    Step = Words(CaseDisplayLabels.From(c, pathways.Get(c.PathwayId)).ToString()),
-                    NextAction = c.NextAction is null ? "none" : MessageFormat.Role(c.NextAction),
-                    Deadline = c.DueAt is { } due ? $"{format.Day(due)} {format.Time(due)}" : "none",
-                    Status = Overdue(c) ? "overdue" : DueToday(c) ? "due today" : "upcoming",
-                    Escalated = c.IsEscalated,
-                    NeedsOwner = c.Exceptions.HasFlag(CaseExceptions.Unassigned),
-                    HeldBy = c.Owner.IsQueue ? $"{MessageFormat.Role(c.Owner.Role)} queue" : MessageFormat.Role(c.Owner.Role),
-                    Yours = !c.Owner.IsQueue && string.Equals(c.Owner.Reference, reader.Reference, StringComparison.OrdinalIgnoreCase),
-                    PatientMessage = c.Notification is null ? "not sent" : Words(c.Notification.Status.ToString()),
-                }).ToList(),
-        };
-    }
+            Token = $"C-{i + 1}",
+            Step = Words(CaseDisplayLabels.From(c, pathways.Get(c.PathwayId)).ToString()),
+            NextAction = c.NextAction is null ? "none" : MessageFormat.Role(c.NextAction),
+            Deadline = c.DueAt is { } due ? $"{format.Day(due)} {format.Time(due)}" : "none",
+            Status = IsOverdue(c, now) ? "overdue" : IsDueToday(c, format, now) ? "due today" : "upcoming",
+            Escalated = c.IsEscalated,
+            NeedsOwner = c.Exceptions.HasFlag(CaseExceptions.Unassigned),
+            HeldBy = c.Owner.IsQueue ? $"{MessageFormat.Role(c.Owner.Role)} queue" : MessageFormat.Role(c.Owner.Role),
+            Yours = !c.Owner.IsQueue && string.Equals(c.Owner.Reference, reader.Reference, StringComparison.OrdinalIgnoreCase),
+            PatientMessage = c.Notification is null ? "not sent" : Words(c.Notification.Status.ToString()),
+        }).ToList(),
+    };
 
     /// <summary>Turns a code such as <c>PatientNotified</c> into words: <c>patient notified</c>.</summary>
     /// <param name="code">The code.</param>
@@ -93,4 +124,7 @@ public static partial class RoleBriefing
 
     [GeneratedRegex("(?<!^)([A-Z])")]
     private static partial Regex Capital();
+
+    [GeneratedRegex(@"\{*\bC-(\d+)\b\}*")]
+    private static partial Regex Token();
 }

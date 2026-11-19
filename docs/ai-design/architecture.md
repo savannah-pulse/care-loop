@@ -1,6 +1,6 @@
 # CareLoop architecture
 
-> **AI implementation status (19 November 2026):** The API calls a model deployment in a Microsoft Foundry project itself, through `IAiClient`, for three texts shown to staff: the role briefing, the impact summary and the patient message draft. The Python AI workflow service and the AI handoff summary in the earlier design are not built and have been removed; nothing AI writes is published to the HIS. AI is off by default (`Ai:Provider` = `NoOp`). [`integration.md`](integration.md) is the contract.
+> **AI implementation status (19 November 2026):** The API asks the agents in a Microsoft Foundry project itself, through `IAiClient`, for three texts shown to staff: the role briefing, the impact summary and the patient message draft. Each use has its own agent, called by name (`role-briefing`, `impact-summary`, `patient-notification`); the API never creates or changes one. On Foundry the patient message draft is one of the agent's own templates, named by the API and filled in. The Python AI workflow service and the AI handoff summary in the earlier design are not built and have been removed; nothing AI writes is published to the HIS. AI is off by default (`Ai:Provider` = `NoOp`). [`integration.md`](integration.md) is the contract.
 
 ## Purpose and constraints
 
@@ -20,7 +20,7 @@ flowchart LR
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
     UI[Demo UI<br/>exception dashboard · call outcomes · impact view]
-    MODEL[Model in a Microsoft Foundry project<br/>role briefing · impact summary · patient message draft]
+    MODEL[Agents in a Microsoft Foundry project<br/>role briefing · impact summary · patient message draft]
     HUMAN[Authorized staff]
 
     HIS --> HISADAPTER --> API
@@ -31,13 +31,13 @@ flowchart LR
     STORE --> UI
     HUMAN -->|reviewed actions and closure evidence| API
     UI -->|asks for an AI text| API
-    API -->|IAiClient: prompt file with minimum facts or aggregate numbers| MODEL
-    MODEL -->|draft text, returned as written| API
+    API -->|IAiClient: minimum facts or aggregate numbers, to the use's agent| MODEL
+    MODEL -->|draft text| API
 ```
 
 The event log is the source for audit and timeline reconstruction; the case projection supports worklist queries. FHIR-shaped exchange may be used at the adapter boundary, but the prototype's internal coordination model is not a clinical FHIR repository. The choice of relational database and local hosting method is still a team decision.
 
-The backend coordinates the ten-stage journey. When a member of staff opens the home page, the impact page or a case, the web app may ask the API for an AI text. The API reads what that person may see, builds the data from the fields each use allows, puts it into that use's prompt file and sends the prompt to the model behind `IAiClient` (`NoOpAiClient` by default, `FoundryAiClient` for Microsoft Foundry). The model's text is returned trimmed; the API does not parse or check it. The three texts are the role briefing, the impact summary over backend-computed numbers, and a draft of a patient message for staff to read. AI does not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Its output is a draft labelled as written by AI; it is not stored and nothing acts on it. The .NET API remains the case-state, authorization, audit, and closure gate. See the [integration contract](integration.md); the [AI specification](ai-spec.md) is the earlier proposal, including the handoff summary and translation, which are not built.
+The backend coordinates the ten-stage journey. When a member of staff opens the home page, the impact page or a case, the web app may ask the API for an AI text. The API reads what that person may see, builds the data from the fields each use allows, puts it into that use's prompt file and hands the request to the provider behind `IAiClient` (`NoOpAiClient` by default, `FoundryAiClient` for Microsoft Foundry). On Foundry each use goes to its own agent, and `FoundryAgentFormat` is the one file that translates the request into that agent's input and its answer into text; any other provider is sent the prompt. The API does not check the text against the data. It puts its own opening sentence in front of the role briefing and swaps the case tokens (`C-1`, `C-2`, …) for case numbers, so case numbers are never sent; an agent's refusal, or an answer in an unexpected shape, is a failure (503) and is never shown as text. The three texts are the role briefing, the impact summary over backend-computed numbers, and a draft of a patient message for staff to read. AI does not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Its output is a draft labelled as written by AI; it is not stored and nothing acts on it. The .NET API remains the case-state, authorization, audit, and closure gate. See the [integration contract](integration.md); the [AI specification](ai-spec.md) is the earlier proposal, including the handoff summary and translation, which are not built.
 
 ## Ten-stage case lifecycle
 
@@ -70,7 +70,7 @@ sequenceDiagram
     participant HIS as HIS simulator
     participant API as Orchestration API
     participant Store as Coordination store
-    participant AI as Foundry model
+    participant AI as Foundry agent
     participant Channel as messaging simulator
     participant Worker as Deadline worker
     participant UI as Demo UI
@@ -110,4 +110,4 @@ sequenceDiagram
 
 ## Decisions to resolve as a team
 
-Before implementation depends on them, record the chosen relational database, local orchestration/hosting approach, event envelope and versioning, identity/role model for the demo, pathway clock/evidence configuration, and who reviews patient-facing language. Which component calls the model is settled: the API calls a model in a Foundry project directly (see [`integration.md`](integration.md), which also lists the open AI points). Until approved, these remain open; no production integration or credentials belong in this repository.
+Before implementation depends on them, record the chosen relational database, local orchestration/hosting approach, event envelope and versioning, identity/role model for the demo, pathway clock/evidence configuration, and who reviews patient-facing language. Which component calls the model is settled: the API asks the agents in a Foundry project directly (see [`integration.md`](integration.md), which also lists the open AI points). Until approved, these remain open; no production integration or credentials belong in this repository.

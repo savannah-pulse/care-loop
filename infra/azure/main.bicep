@@ -66,7 +66,7 @@ param demoTiming bool = deploySimulators
 @description('Apply EF Core migrations when the API starts. Nothing else in this project applies them.')
 param migrateOnStartup bool = true
 
-@description('The API setting Ai:Provider. NoOp keeps AI off; Foundry has the API call a model in the Foundry project (aiProjectEndpoint, aiModelDeploymentName) for the role briefing, the impact summary and the patient message draft.')
+@description('The API setting Ai:Provider. NoOp keeps AI off; Foundry has the API ask the agents in the Foundry project (aiProjectEndpoint) for the role briefing, the impact summary and the patient message draft.')
 @allowed(['NoOp', 'Foundry'])
 param apiAiProvider string = 'NoOp'
 
@@ -143,15 +143,12 @@ param keyVaultPurgeProtection bool = false
 param registryPublicAccess bool = true
 
 // ---------------------------------------------------------------------------------------------------
-// Foundry: the API calls a model deployment of a Foundry project with its own managed identity when
+// Foundry: the API asks the agents of a Foundry project with its own managed identity when
 // apiAiProvider is Foundry. The API remains on NoOp by default.
 // ---------------------------------------------------------------------------------------------------
 
 @description('Endpoint of an existing Foundry project, https://<account>.services.ai.azure.com/api/projects/<project>. Never write the value in a parameter file; it is read from the environment. Ignored when createFoundry is true.')
 param aiProjectEndpoint string = ''
-
-@description('Name of the model deployment in the existing project that writes the texts. Ignored when createFoundry is true.')
-param aiModelDeploymentName string = ''
 
 @description('Resource ID of the existing Foundry account, /subscriptions/.../providers/Microsoft.CognitiveServices/accounts/<name>. When set (and assignRoles is true), the API identity is given the Foundry User role on it. Empty: someone who owns the account grants the role by hand.')
 param aiFoundryAccountId string = ''
@@ -380,7 +377,6 @@ module apps 'modules/apps.bicep' = if (deployApps) {
     apiExtraEnv: apiExtraEnv
     webMaxReplicas: webMaxReplicas
     aiProjectEndpoint: useCreatedFoundry ? foundry!.outputs.projectEndpoint : aiProjectEndpoint
-    aiModelDeploymentName: useCreatedFoundry ? foundry!.outputs.deploymentName : aiModelDeploymentName
   }
 }
 

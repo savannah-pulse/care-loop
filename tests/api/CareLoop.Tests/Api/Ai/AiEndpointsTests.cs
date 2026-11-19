@@ -91,15 +91,25 @@ public sealed class AiEndpointsTests : IDisposable
     [Fact]
     public async Task The_briefing_sends_the_prompt_file_with_the_readers_counts_and_cases_and_returns_the_models_text()
     {
-        await SeedAsync(NewCase("SYN-RESULT-1"));
-        await SeedAsync(NewCase("SYN-RESULT-2", overdue: true));
-        _ai.Answer = "  2 cases are open; 1 is overdue.  ";
+        var onTime = await SeedAsync(NewCase("SYN-RESULT-1"));
+        var late = await SeedAsync(NewCase("SYN-RESULT-2", overdue: true));
+        _ai.Answer = "  A result review is waiting for {{C-1}}; C-2 is upcoming and {{C-9}} is unknown.  ";
 
         var response = Value<AiTextResponse>(await BriefingAsync());
 
-        Assert.Equal(("2 cases are open; 1 is overdue.", "Fake/model", _clock.UtcNow, false), (response.Text, response.Model, response.GeneratedAt, response.Cached));
+        // The API writes the opening, and puts the case number in where the model named a case by its token (most pressing first).
+        Assert.Equal($"1 case is overdue and 0 are due today. A result review is waiting for case {NotificationRouter.CaseReferenceFor(late.Id)}; "
+            + $"case {NotificationRouter.CaseReferenceFor(onTime.Id)} is upcoming and {{{{C-9}}}} is unknown.", response.Text);
+        Assert.Equal(("Fake/role-briefing", _clock.UtcNow, false), (response.Model, response.GeneratedAt, response.Cached));
         var prompt = Assert.Single(_ai.Prompts);
         Assert.StartsWith("You are writing the short briefing", prompt);
+        Assert.Contains("\"opening\": \"1 case is overdue and 0 are due today.\"", prompt);
+        Assert.Contains("\"token\": \"C-1\"", prompt);
+        var request = Assert.Single(_ai.Requests);
+        Assert.Equal(AiPrompts.RoleBriefing, request.Use);
+        Assert.StartsWith("You are writing the short briefing", request.Task);
+        Assert.DoesNotContain("opening\":", request.Task);
+        Assert.EndsWith(request.Data, prompt.TrimEnd());
         Assert.Contains("\"reader_role\": \"clinician\"", prompt);
         Assert.Contains("\"open_cases\": 2", prompt);
         Assert.Contains("\"overdue\": 1", prompt);
@@ -195,8 +205,8 @@ public sealed class AiEndpointsTests : IDisposable
         var few = _ai.Prompts[^1];
         Assert.StartsWith("You are writing the short summary", few);
         Assert.Contains("\"facility\": \"SYN Family Health Centre\"", few);
-        Assert.Contains("\"open_cases\": \"withheld: fewer than 5\"", few);
-        Assert.Contains("\"open_cases_past_deadline\": \"withheld: fewer than 5\"", few);
+        Assert.Contains("\"open_cases\": \"withheld\"", few);
+        Assert.Contains("\"open cases past their deadline\": \"withheld\"", few);
         Assert.DoesNotContain("\"open_cases\": 1", few);
 
         for (var i = 2; i <= 8; i++)
@@ -207,8 +217,10 @@ public sealed class AiEndpointsTests : IDisposable
         await ImpactAsync();
         var enough = _ai.Prompts[^1];
         Assert.Contains("\"open_cases\": 8", enough);
-        Assert.Contains("\"open_cases_past_deadline\": \"8 of 8 (100%)\"", enough);
-        Assert.Contains("\"open_cases_without_owner\": \"0 of 8 (0%)\"", enough);
+        using var data = System.Text.Json.JsonDocument.Parse(_ai.Requests[^1].Data);
+        var late = data.RootElement.GetProperty("shares").GetProperty("open cases past their deadline");
+        Assert.Equal((8, 8, 100), (late.GetProperty("numerator").GetInt32(), late.GetProperty("denominator").GetInt32(), late.GetProperty("percent").GetInt32()));
+        Assert.Equal(0, data.RootElement.GetProperty("shares").GetProperty("open cases without an owner").GetProperty("numerator").GetInt32());
     }
 
     [Fact]
@@ -237,6 +249,8 @@ public sealed class AiEndpointsTests : IDisposable
         Assert.StartsWith("You are drafting a message", prompt);
         Assert.Contains($"\"purpose\": \"{PatientMessageDraft.NeutralPurpose}\"", prompt);
         Assert.Contains("\"clinic\": \"SYN Family Health Centre\"", prompt);
+        Assert.Contains($"\"situation\": \"{PatientMessageDraft.PleaseContactUs}\"", prompt);
+        Assert.Contains("\"appointment_date\": \"none\"", prompt);
         Assert.Contains("\"channel\": \"text message\"", prompt);
         Assert.Contains("\"max_characters\": 459", prompt);
         var data = prompt[prompt.IndexOf("Data:", StringComparison.Ordinal)..];
@@ -283,30 +297,27 @@ public sealed class AiEndpointsTests : IDisposable
     }
 
     /// <summary>
-    /// The whole path against a live model: the real endpoints, the shipped prompt files and the real Foundry client with
-    /// the signed-in identity. Skipped unless <c>CARELOOP_LIVE_FOUNDRY_ENDPOINT</c> names a project (after <c>az login</c>);
-    /// <c>CARELOOP_LIVE_FOUNDRY_MODEL</c> names the model (default <c>gpt-6.1-sol</c>). Synthetic cases only.
+    /// The whole path against the live Foundry agents: the real endpoints, the shipped prompt files and the real Foundry
+    /// client with the signed-in identity, each use going to its own agent's latest version. Does nothing unless
+    /// <c>CARELOOP_LIVE_FOUNDRY_ENDPOINT</c> names a project (after <c>az login</c>). Synthetic cases only.
     /// </summary>
     [Fact]
-    public async Task Live_the_three_endpoints_get_text_from_the_foundry_model()
+    public async Task Live_the_endpoints_get_text_from_their_foundry_agents()
     {
         if (Environment.GetEnvironmentVariable("CARELOOP_LIVE_FOUNDRY_ENDPOINT") is not { Length: > 0 } endpoint)
         {
             return;
         }
 
-        var options = new AiOptions
-        {
-            Provider = "Foundry", TimeoutSeconds = 90,
-            Foundry = new FoundryOptions { ProjectEndpoint = endpoint, Model = Environment.GetEnvironmentVariable("CARELOOP_LIVE_FOUNDRY_MODEL") ?? "gpt-6.1-sol" },
-        };
+        var options = new AiOptions { Provider = "Foundry", TimeoutSeconds = 120, Foundry = new FoundryOptions { ProjectEndpoint = endpoint } };
         using var http = new HttpClient();
+        var logs = new ListLogger();
         var live = new AiText(new FoundryAiClient(http, new Azure.Identity.DefaultAzureCredential(), Options.Create(options)), TestPrompts.Shipped,
-            new MemoryCache(new MemoryCacheOptions()), Options.Create(options), _clock, NullLogger<AiText>.Instance);
+            new MemoryCache(new MemoryCacheOptions()), Options.Create(options), _clock, logs);
         var called = await SeedAsync(NewCase("SYN-RESULT-0", overdue: true, nextAction: "call-patient"));
-        for (var i = 1; i <= 9; i++)
+        for (var i = 1; i <= 11; i++)
         {
-            await SeedAsync(NewCase($"SYN-RESULT-{i}", overdue: i % 3 == 0, nextAction: i % 2 == 0 ? "review-result" : "arrange-follow-up"));
+            await SeedAsync(NewCase($"SYN-RESULT-{i}", overdue: i % 2 == 0, nextAction: i % 3 == 0 ? "review-result" : "arrange-follow-up"));
         }
 
         using var scope = _services.CreateScope();
@@ -321,14 +332,18 @@ public sealed class AiEndpointsTests : IDisposable
 
         var report = string.Join("\n\n", results.Select(r => $"== {r.Name}: HTTP {Status(r.Result)}\n" + (((IValueHttpResult)r.Result).Value is AiTextResponse text
             ? $"[{text.Model}, cached {text.Cached}]\n{text.Text}"
-            : (((IValueHttpResult)r.Result).Value as ProblemDetails)?.Title)));
+            : (((IValueHttpResult)r.Result).Value as ProblemDetails)?.Title))) + "\n\n== log\n" + string.Join("\n", logs.Lines);
         if (Environment.GetEnvironmentVariable("CARELOOP_LIVE_FOUNDRY_REPORT") is { Length: > 0 } path)
         {
             await File.WriteAllTextAsync(path, report);
         }
 
         Assert.All(results, r => Assert.True(Status(r.Result) == 200, report));
+        Assert.Equal("Foundry/patient-notification", Value<AiTextResponse>(results[3].Result).Model);
+        Assert.StartsWith("Dear {first name},", Value<AiTextResponse>(results[3].Result).Text);
         Assert.True(Value<AiTextResponse>(results[1].Result).Cached);
+        Assert.Equal("Foundry/role-briefing", Value<AiTextResponse>(results[0].Result).Model);
+        Assert.Equal("Foundry/impact-summary", Value<AiTextResponse>(results[2].Result).Model);
         Assert.DoesNotContain("Hessa", report);
         Assert.DoesNotContain(PatientMrn, report);
     }
@@ -406,17 +421,33 @@ public sealed class AiEndpointsTests : IDisposable
 
         public bool Hang { get; set; }
 
-        public string Model => "Fake/model";
+        public List<AiRequest> Requests { get; } = [];
 
         public bool IsEnabled { get; set; } = true;
 
-        public async Task<string> CompleteAsync(string prompt, CancellationToken ct)
+        public string Describe(string use) => $"Fake/{use}";
+
+        public async Task<string> CompleteAsync(AiRequest request, CancellationToken ct)
         {
-            Prompts.Add(prompt);
+            Requests.Add(request);
+            Prompts.Add(request.Prompt);
             if (Failure is not null) throw Failure;
             if (Hang) await Task.Delay(Timeout.Infinite, ct);
             return Answer;
         }
+    }
+
+    private sealed class ListLogger : Microsoft.Extensions.Logging.ILogger<AiText>
+    {
+        public List<string> Lines { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) => Lines.Add(formatter(state, exception));
     }
 
     private sealed class UtcModelCustomizer(ModelCustomizerDependencies dependencies) : ModelCustomizer(dependencies)

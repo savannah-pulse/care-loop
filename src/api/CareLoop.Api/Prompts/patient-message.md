@@ -7,7 +7,7 @@ Rules:
 - Never mention or hint at a test, a result, a diagnosis, a body part or how serious anything is.
 - Start with "Hello {first name}," exactly as written here, including the braces. Do not invent a name.
 - Say that the message is from the care team at the clinic named in "clinic".
-- If "appointment" is not "none", give the appointment's day and time exactly as written.
+- If "appointment_date" is not "none", give the appointment's day and time exactly as written.
 - End with: "Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you."
 - Stay within "max_characters".
 - For an email, put a first line "Subject: A message from your care team" and then a blank line.

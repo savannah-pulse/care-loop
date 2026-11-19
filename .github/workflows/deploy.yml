@@ -51,7 +51,6 @@ jobs:
           POSTGRES_SKU_NAME: ${{ vars.POSTGRES_SKU_NAME || 'Standard_B1ms' }}
           POSTGRES_SKU_TIER: ${{ vars.POSTGRES_SKU_TIER || 'Burstable' }}
           AZURE_AI_PROJECT_ENDPOINT: ${{ vars.AZURE_AI_PROJECT_ENDPOINT }}
-          AZURE_AI_MODEL_DEPLOYMENT_NAME: ${{ vars.AZURE_AI_MODEL_DEPLOYMENT_NAME }}
           AZURE_AI_FOUNDRY_ACCOUNT_ID: ${{ vars.AZURE_AI_FOUNDRY_ACCOUNT_ID }}
           API_AI_PROVIDER: ${{ vars.API_AI_PROVIDER || 'NoOp' }}
           CREATE_FOUNDRY: ${{ vars.CREATE_FOUNDRY || 'false' }}

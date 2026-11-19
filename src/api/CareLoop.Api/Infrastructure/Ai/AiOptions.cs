@@ -22,13 +22,22 @@ public sealed class AiOptions
     public FoundryOptions Foundry { get; set; } = new();
 }
 
-/// <summary>Settings for calling a model in a Microsoft Foundry project, bound to <c>Ai:Foundry</c>.</summary>
-/// <remarks>There is no API key: the model is called with an Entra token (the managed identity in Azure, the signed-in developer locally).</remarks>
+/// <summary>Settings for the agents in a Microsoft Foundry project, bound to <c>Ai:Foundry</c>.</summary>
+/// <remarks>There is no API key: the agents are called with an Entra token (the managed identity in Azure, the signed-in developer locally).</remarks>
 public sealed class FoundryOptions
 {
     /// <summary>The project endpoint, <c>https://{resource}.services.ai.azure.com/api/projects/{project}</c>. Supplied by the environment, never committed.</summary>
     public string? ProjectEndpoint { get; set; }
 
-    /// <summary>The name of the model deployment that writes the texts, for example <c>gpt-6.1-sol</c>.</summary>
-    public string? Model { get; set; }
+    /// <summary>Which agent writes each text, by name: the key is the use (the prompt file's name), the value the agent's name in the project.</summary>
+    /// <remarks>Names only, so the agent's latest version always answers. The agents themselves are owned and changed in the Foundry project, not here.</remarks>
+    public Dictionary<string, string> Agents { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [AiPrompts.RoleBriefing] = "role-briefing",
+        [AiPrompts.ImpactSummary] = "impact-summary",
+        [AiPrompts.PatientMessage] = "patient-notification",
+    };
+
+    /// <summary>Told to an agent that asks whether the figures are synthetic. <see langword="true"/> until real data is approved for this deployment.</summary>
+    public bool SyntheticData { get; set; } = true;
 }

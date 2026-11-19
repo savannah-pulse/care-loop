@@ -207,10 +207,9 @@ public static class DependencyInjection
                 services.AddSingleton<IAiClient, NoOpAiClient>();
                 break;
             case "FOUNDRY":
-                if (!Uri.TryCreate(options.Foundry.ProjectEndpoint, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttps
-                    || string.IsNullOrWhiteSpace(options.Foundry.Model))
+                if (!Uri.TryCreate(options.Foundry.ProjectEndpoint, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttps)
                 {
-                    throw new InvalidOperationException("Ai:Provider is Foundry, which needs an https Ai:Foundry:ProjectEndpoint and an Ai:Foundry:Model.");
+                    throw new InvalidOperationException("Ai:Provider is Foundry, which needs an https Ai:Foundry:ProjectEndpoint.");
                 }
 
                 // DefaultAzureCredential: the managed identity in Azure, the developer's own sign-in locally.

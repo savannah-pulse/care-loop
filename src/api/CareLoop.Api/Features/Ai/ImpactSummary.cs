@@ -25,7 +25,8 @@ public static class ImpactSummary
     /// <summary>Counts above zero and below this are not sent. A placeholder until the team sets the threshold.</summary>
     public const int SmallCount = 5;
 
-    private const string Withheld = "withheld: fewer than 5";
+    /// <summary>What a value too small to send is replaced with.</summary>
+    public const string Withheld = "withheld";
 
     /// <summary>Maps the route.</summary>
     /// <param name="routes">The application's route builder.</param>
@@ -50,15 +51,16 @@ public static class ImpactSummary
         if (read is not IValueHttpResult { Value: MetricsResponse metrics }) return read;
 
         var facility = facilityId ?? (actor.Role == DemoRoles.Coordinator ? null : actor.FacilityId);
-        return await ai.WriteAsync(AiPrompts.ImpactSummary, BuildData(metrics, facility is null ? "every facility" : format.Facility(facility)),
+        return await ai.WriteAsync(AiPrompts.ImpactSummary, BuildData(metrics, facility is null ? "every facility" : format.Facility(facility), format),
             refresh, reuse: true, ct);
     }
 
     /// <summary>Builds what the model is given from the page's numbers, with small counts withheld.</summary>
     /// <param name="metrics">The numbers the impact page shows.</param>
     /// <param name="facility">The facility the numbers cover, in words.</param>
-    /// <returns>Totals, rates, median times and reasons; never a case.</returns>
-    internal static object BuildData(MetricsResponse metrics, string facility)
+    /// <param name="format">Local dates.</param>
+    /// <returns>Totals, shares, median times and reasons; never a case. A withheld value is the word <c>withheld</c>.</returns>
+    internal static object BuildData(MetricsResponse metrics, string facility, MessageFormat format)
     {
         // Total = open + closed, so when one is small the other two would give it away.
         var hideTotals = IsSmall(metrics.OpenCases) || IsSmall(metrics.ClosedCases) || IsSmall(metrics.TotalCases);
@@ -67,17 +69,21 @@ public static class ImpactSummary
         return new
         {
             Facility = facility,
+            Period = $"Cases opened up to {format.Date(metrics.GeneratedAt)}",
             TotalCases = hideTotals ? (object)Withheld : metrics.TotalCases,
             OpenCases = hideTotals ? (object)Withheld : metrics.OpenCases,
             ClosedCases = hideTotals ? (object)Withheld : metrics.ClosedCases,
-            OpenCasesPastDeadline = Share(metrics.OverdueCases, metrics.OpenCases),
-            OpenCasesEscalated = Share(metrics.EscalatedCases, metrics.OpenCases),
-            OpenCasesWithoutOwner = Share(metrics.UnassignedCases, metrics.OpenCases),
-            Rates = metrics.Measures.Where(m => m.Value.Denominator > 0)
-                .ToDictionary(m => RoleBriefing.Words(Pascal(m.Key)), m => Share(m.Value.Numerator, m.Value.Denominator)),
+            Shares = new Dictionary<string, object>
+            {
+                ["open cases past their deadline"] = Share(metrics.OverdueCases, metrics.OpenCases),
+                ["open cases escalated"] = Share(metrics.EscalatedCases, metrics.OpenCases),
+                ["open cases without an owner"] = Share(metrics.UnassignedCases, metrics.OpenCases),
+            }.Concat(metrics.Measures.Where(m => m.Value.Denominator > 0)
+                    .Select(m => KeyValuePair.Create(RoleBriefing.Words(Pascal(m.Key)), Share(m.Value.Numerator, m.Value.Denominator))))
+                .ToDictionary(),
             MedianTimeFromResultTo = metrics.TimeToStep.Where(s => s.Value.Median is not null)
                 .ToDictionary(s => RoleBriefing.Words(Pascal(s.Key)),
-                    s => s.Value.Denominator < SmallCount ? Withheld : $"{Duration(s.Value.Median!.Value)} (over {s.Value.Denominator} cases)"),
+                    s => s.Value.Denominator < SmallCount ? (object)Withheld : new { Time = Duration(s.Value.Median!.Value), Cases = s.Value.Denominator }),
             OpenCasesWaitingBecause = metrics.CasesByException.Where(e => e.Value > 0)
                 .ToDictionary(e => RoleBriefing.Words(e.Key), e => IsSmall(e.Value) ? (object)Withheld : e.Value),
             ClosedCasesByReason = closures.Any(c => IsSmall(c.Value))
@@ -92,7 +98,7 @@ public static class ImpactSummary
     private static object Share(int numerator, int denominator) =>
         denominator < SmallCount || IsSmall(numerator) || IsSmall(denominator - numerator)
             ? Withheld
-            : $"{numerator} of {denominator} ({Math.Round(100.0 * numerator / denominator)}%)";
+            : new { Numerator = numerator, Denominator = denominator, Percent = (int)Math.Round(100.0 * numerator / denominator) };
 
     private static string Pascal(string key) => key.Length == 0 ? key : char.ToUpperInvariant(key[0]) + key[1..];
 

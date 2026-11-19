@@ -30,7 +30,8 @@ independently against common contracts. The rules every contributor follows are 
 
 WS1 to WS6 implement Domain rules, persistence/intake, FHIR, outbox/notifications, deadlines and the staff read
 APIs/dashboard. WS9 adds three AI texts for staff (role briefing, impact summary, patient message draft); the API asks
-a model in a Microsoft Foundry project for them, and AI is off by default (`Ai:Provider` = `NoOp`). See
+each text's own agent in a Microsoft Foundry project, and AI is off by default (`Ai:Provider` = `NoOp`). On Foundry
+the patient message draft is one of the agent's own templates, filled in. See
 [`docs/ai-design/integration.md`](docs/ai-design/integration.md). Simulator and end-to-end workstreams still have
 assigned stubs. Remaining stubs are tagged `TODO(WS-n)` with named skipped tests. Search for `TODO(WS-` and read [`docs/workstreams.md`](docs/workstreams.md)
 for ownership and validation. The dashboard reports unavailable capabilities explicitly.
