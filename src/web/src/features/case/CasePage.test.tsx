@@ -1,8 +1,8 @@
-import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
-import type { CaseDetail } from '../../data'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { LIVE_REFRESH_MS, type CaseDetail } from '../../data'
 import { answer, json, problem, sentRequests, type SentRequest } from '../../testing/api'
-import { caseDetail, caseSummary, escalation, programme, timelineEntry } from '../../testing/builders'
+import { TEST_NOW, caseDetail, caseSummary, escalation, programme, timelineEntry } from '../../testing/builders'
 import { renderApp } from '../../testing/screens'
 
 const CASE = caseDetail()
@@ -205,5 +205,40 @@ describe('case', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Arrange the follow-up' })).toBeInTheDocument()
     expect(await screen.findByText('Deadline warning raised')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps up with the case after the next read, without moving focus from the earlier events it showed', async () => {
+    const reminders = Array.from({ length: 8 }, (_, index) =>
+      timelineEntry({
+        auditEventId: `a0000000-0000-4000-8000-00000000010${index}`,
+        sourceTimestamp: `2026-11-11T0${index}:00:00Z`,
+        receivedTimestamp: `2026-11-11T0${index}:00:00Z`,
+        reason: `Reminder ${index + 1} sent`,
+      }),
+    )
+    answerReads(CASE)
+    answer(`GET /cases/${CASE.caseId}/timeline`, json(reminders))
+    const { user } = renderApp({ at: CASE_PAGE, as: 'joy-bautista' })
+    await user.click(await screen.findByRole('button', { name: 'Show 1 earlier event' }))
+    const oldest = screen.getByText('Reminder 1 sent').closest('li')
+    expect(oldest).toHaveFocus()
+
+    const later = { ...CASE, nextAction: 'decide-closure', updatedAt: '2026-11-12T04:30:00Z' }
+    const latest = timelineEntry({
+      auditEventId: 'a0000000-0000-4000-8000-000000000199',
+      sourceTimestamp: '2026-11-12T04:30:00Z',
+      receivedTimestamp: '2026-11-12T04:30:00Z',
+      reason: 'Reminder 9 sent',
+    })
+    answer(CASE_ROUTE, json(later))
+    answer(`GET /cases/${CASE.caseId}/timeline`, json([...reminders, latest]))
+    vi.setSystemTime(TEST_NOW.getTime() + LIVE_REFRESH_MS)
+    fireEvent.focus(window)
+
+    expect(await screen.findByText('Reminder 9 sent')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Decide whether to close the case' })).toBeInTheDocument()
+    expect(oldest).toHaveFocus()
+    expect(screen.queryByText('Loading the case')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading the timeline')).not.toBeInTheDocument()
   })
 })

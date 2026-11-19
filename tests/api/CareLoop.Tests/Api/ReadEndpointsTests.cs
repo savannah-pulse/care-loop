@@ -335,6 +335,64 @@ public sealed class ReadEndpointsTests : IDisposable
         Assert.Equal(2, Value<MetricsResponse>(await MetricsAsync(coordinator)).TotalCases);
     }
 
+    [Fact]
+    public async Task The_coordinator_receives_no_name_record_number_or_hospital_reference_from_any_read()
+    {
+        var (caseId, escalationId) = await CaseWithEveryIdentifierAsync();
+        var coordinator = Identity("coordinator", facility: null);
+
+        var reads = new Dictionary<string, IResult>
+        {
+            ["case list"] = await ListAsync(context: coordinator),
+            ["escalations"] = await ListAsync(escalated: true, context: coordinator),
+            ["case"] = await GetAsync(caseId, coordinator),
+            ["timeline"] = await TimelineAsync(caseId, coordinator),
+            ["exceptions"] = await ExceptionsAsync(coordinator),
+            ["metrics"] = await MetricsAsync(coordinator),
+            ["acknowledgement"] = await AcknowledgeAsync(caseId, escalationId, coordinator),
+        };
+
+        foreach (var (read, result) in reads)
+        {
+            Assert.Equal(200, Status(result));
+            var json = JsonSerializer.Serialize(((IValueHttpResult)result).Value, JsonOptions);
+            Assert.All(IdentifiersOfTheSeededCase, identifier =>
+                Assert.False(json.Contains(identifier, StringComparison.OrdinalIgnoreCase), $"The coordinator's {read} quotes {identifier}."));
+        }
+
+        // Only the identifiers go: the case, its history and the wording around them stay.
+        Assert.Equal(caseId, Assert.Single(Rows<CaseDetailResponse>(reads["escalations"])).CaseId);
+        Assert.Null(Value<CaseDetailResponse>(reads["case"]).OutcomeEvidenceReference);
+        var timeline = Rows<TimelineEntryResponse>(reads["timeline"]);
+        Assert.Equal(8, timeline.Count);
+        Assert.All(timeline, e => Assert.Null(e.EvidenceReference));
+        Assert.Contains(timeline, e => e.Reason == "A case already exists for result 'SYN-HIS/(hidden)'; one result opens one case.");
+        Assert.Contains(timeline, e => e.EventType == CaseEventType.ConsentRecorded && e.ActorReference == CaseReadMapping.Hidden);
+        Assert.Contains(timeline, e => e.EventType == CaseEventType.ClinicalReviewCompleted && e.ActorReference == "SYN-STAFF-0001");
+    }
+
+    [Theory]
+    [InlineData("clinician")]
+    [InlineData("nurse-navigator")]
+    [InlineData("receiving-clinician")]
+    [InlineData("lab")]
+    [InlineData("facility-lead")]
+    public async Task Staff_on_the_case_team_still_read_the_identifiers_hidden_from_the_coordinator(string role)
+    {
+        var (caseId, _) = await CaseWithEveryIdentifierAsync();
+        var staff = Identity(role);
+
+        var detail = Value<CaseDetailResponse>(await GetAsync(caseId, staff));
+        Assert.Equal("SYNTHETIC Patient C", detail.PatientDisplayName);
+        Assert.Equal("SYN-MRN-0042", detail.PatientSecondaryIdentifier);
+        Assert.Equal(Envelopes.ResultId, detail.SourceResultId);
+        Assert.Equal("Procedure/SYN-OUTCOME-0042", detail.OutcomeEvidenceReference);
+        var timeline = Rows<TimelineEntryResponse>(await TimelineAsync(caseId, staff));
+        Assert.Contains(timeline, e => e.EvidenceReference == $"DiagnosticReport/{Envelopes.ResultId}");
+        Assert.Contains(timeline, e => e.Reason == $"A case already exists for result 'SYN-HIS/{Envelopes.ResultId}'; one result opens one case.");
+        Assert.Contains(timeline, e => e.EventType == CaseEventType.ConsentRecorded && e.ActorReference == "SYN-PT-0001");
+    }
+
     [Theory]
     [InlineData("clinician", 200)]
     [InlineData("receiving-clinician", 200)]
@@ -651,6 +709,58 @@ public sealed class ReadEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stage_counts_as_reached_when_its_event_happened_even_if_the_case_moved_on_at_once()
+    {
+        // Completed care: the outcome arrives once every required track is complete, so it goes straight to closure review.
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Attended, _clock.UtcNow));
+        await IngestAsync(Envelopes.Outcome(_clock.UtcNow));
+        await IngestAsync(Envelopes.Closure(_clock.UtcNow));
+
+        // A result still waiting for its review.
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: "SYN-RESULT-0002", namedOwner: Envelopes.Clinician()));
+
+        // An outcome recorded before the appointment, then a closure by documented exception: never in closure review.
+        const string declined = "SYN-RESULT-0003";
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, resultId: declined, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow, resultId: declined));
+        await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Scheduled, _clock.UtcNow.AddDays(1), resultId: declined));
+        await IngestAsync(Envelopes.Outcome(_clock.UtcNow, resultId: declined));
+        await IngestAsync(Envelopes.Closure(_clock.UtcNow, ClosureReason.Declined, evidenceReference: null,
+            exceptionNote: "SYN the patient declined further care", resultId: declined));
+
+        var reached = Value<MetricsResponse>(await MetricsAsync()).CasesReachingDisplayLabel;
+
+        Assert.Equal(new Dictionary<string, int>
+        {
+            ["ResultReceived"] = 3, ["CaseOpened"] = 3, ["OwnerAssigned"] = 3, ["PatientNotified"] = 2,
+            ["PatientAcknowledged"] = 1, ["Consultation"] = 0, ["FollowUp"] = 2, ["OutcomeRecorded"] = 2,
+            ["ClosureReview"] = 1, ["Closed"] = 2,
+        }, reached.ToDictionary(p => p.Key, p => p.Value.Numerator));
+        Assert.All(reached.Values, r => Assert.Equal(3, r.Denominator));
+    }
+
+    [Fact]
+    public async Task An_optional_stage_counts_when_it_happened_even_if_a_further_step_hid_it()
+    {
+        await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician()));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Referral(_clock.UtcNow, ReferralStatus.Sent));
+        await IngestAsync(Envelopes.Consultation(_clock.UtcNow, ConsultationStatus.Requested));
+        var @case = await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        Assert.Equal(CaseDisplayLabel.FollowUp, CaseDisplayLabels.From(@case, _pathways.Get(@case.PathwayId)));
+
+        var reached = Value<MetricsResponse>(await MetricsAsync()).CasesReachingDisplayLabel;
+
+        Assert.Equal(1, reached["PatientAcknowledged"].Numerator);
+        Assert.Equal(1, reached["Consultation"].Numerator);
+        Assert.Equal(1, reached["FollowUp"].Numerator);
+        Assert.Equal(0, reached["OutcomeRecorded"].Numerator);
+    }
+
+    [Fact]
     public async Task A_step_dated_before_its_screening_result_is_left_out_of_that_measure_not_fatal()
     {
         await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow.AddHours(1), namedOwner: Envelopes.Clinician()));
@@ -706,10 +816,47 @@ public sealed class ReadEndpointsTests : IDisposable
         return await GetTimeline.Handle(id, reason, context ?? Identity(), Db(scope), _clock, CancellationToken.None);
     }
 
-    private async Task<IResult> ExceptionsAsync()
+    private async Task<IResult> ExceptionsAsync(HttpContext? context = null)
     {
         using var scope = _services.CreateScope();
-        return await GetExceptions.Handle(null, null, null, null, null, Identity(), Db(scope), _pathways, _clock, CancellationToken.None);
+        return await GetExceptions.Handle(null, null, null, null, null, context ?? Identity(), Db(scope), _pathways, _clock, CancellationToken.None);
+    }
+
+    /// <summary>Every identifier <see cref="CaseWithEveryIdentifierAsync"/> gives its case, none of which the coordinator may receive.</summary>
+    private static readonly string[] IdentifiersOfTheSeededCase =
+    [
+        "SYN-PT-0001", "SYNTHETIC Patient C", "SYN-MRN-0042", Envelopes.ResultId, "SYN-REVIEW-0001", "SYN-COMM-",
+        "SYN-CONSENT-0001", "SYN-APPT-0001", "SYN-OUTCOME-0042",
+    ];
+
+    /// <summary>
+    /// A case escalated to the coordinator that holds every kind of identifier: a name and an MRN, hospital references
+    /// on its timeline (the result, the review, a reply, the consent, the appointment and the outcome), a refused resend
+    /// of its result, which quotes the result number, and a consent the patient recorded herself, which names her as its actor.
+    /// </summary>
+    private async Task<(Guid CaseId, Guid EscalationId)> CaseWithEveryIdentifierAsync()
+    {
+        var @case = await IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow, namedOwner: Envelopes.Clinician(),
+            patientDisplayName: "SYNTHETIC Patient C", patientSecondaryIdentifier: "SYN-MRN-0042"));
+        using (var scope = _services.CreateScope())
+        {
+            var resent = await scope.ServiceProvider.GetRequiredService<EventIngestor>()
+                .IngestAsync(Envelopes.ScreeningResult(_clock.UtcNow), CancellationToken.None);
+            Assert.Equal(IngestOutcome.Rejected, resent.Outcome);
+        }
+
+        _clock.Advance(TimeSpan.FromHours(1));
+        await IngestAsync(Envelopes.ClinicalReview(_clock.UtcNow));
+        await IngestAsync(Envelopes.Notification(_clock.UtcNow, NotificationUpdateKind.Acknowledged));
+        await IngestAsync(Envelopes.Consent(_clock.UtcNow, ConsentUpdateKind.Granted) with
+        {
+            Actor = new Actor { Reference = "SYN-PT-0001", Role = "patient" },
+        });
+        await IngestAsync(Envelopes.Appointment(_clock.UtcNow, AppointmentStatus.Scheduled, _clock.UtcNow.AddDays(1)));
+        await IngestAsync(Envelopes.Outcome(_clock.UtcNow, evidenceReference: "Procedure/SYN-OUTCOME-0042"));
+        await SaveChangeAsync(@case.Id, c => { c.FlagException(CaseExceptions.Overdue, _clock.UtcNow); c.Escalate(Escalation(2, "coordinator")); },
+            CaseEventType.DeadlineElapsed, EventOrigins.CareLoop);
+        return (@case.Id, (await ReadCaseAsync(@case.Id)).Escalations.Single().Id);
     }
 
     private async Task<IResult> MetricsAsync(HttpContext? context = null)

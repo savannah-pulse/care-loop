@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace CareLoop.Api.Features.Cases;
 
 /// <summary>Returns the received-order audit timeline, including rejected events and their source systems.</summary>
+/// <remarks>The coordinator reads it without any identifier of the patient or of a hospital record (<see cref="CaseReadMapping.WithoutIdentity"/>).</remarks>
 public static class GetTimeline
 {
     /// <summary>Maps the timeline route.</summary>
@@ -48,7 +49,7 @@ public static class GetTimeline
             orderby audit.ReceivedTimestamp, audit.Id
             select new { Audit = audit, source.SourceSystem, source.Origin }).ToListAsync(ct);
         var parsed = entries.Select(e => new { e.Audit, e.SourceSystem, e.Origin, New = CaseProjection.FromJson(e.Audit.NewProjectionJson) }).ToList();
-        return Results.Ok(parsed.OrderBy(e => e.Audit.ReceivedTimestamp)
+        var timeline = parsed.OrderBy(e => e.Audit.ReceivedTimestamp)
             .ThenBy(e => e.New.Version).Select(e => new TimelineEntryResponse
         {
             AuditEventId = e.Audit.Id, SourceSystem = e.SourceSystem, EventType = e.Audit.EventType,
@@ -58,7 +59,8 @@ public static class GetTimeline
             NewStage = e.New.Stage,
             Reason = e.Audit.Reason, EvidenceReference = e.Audit.EvidenceReference,
             Origin = OriginOf(e.Origin, e.SourceSystem),
-        }).ToList());
+        }).ToList();
+        return Results.Ok(actor.Role == DemoRoles.Coordinator ? CaseReadMapping.WithoutIdentity(timeline, @case) : timeline);
     }
 
     /// <summary>Where an entry came from, for the timeline; an event with no stored origin came from its source system.</summary>

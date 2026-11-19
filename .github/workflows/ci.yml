@@ -70,7 +70,8 @@ jobs:
 
           {
             echo "dotnet=$dotnet"
-            echo "web=$(match '^src/web/')"
+            # The web job also checks the dashboard's API types against the contract.
+            echo "web=$(match '^(src/web/|contracts/openapi/)')"
             echo "simulator-ui=$(match '^src/simulators/[^/]+/[^/]+/ClientApp/')"
             echo "ai-workflow=$(match '^src/ai_workflow/')"
           } | tee -a "$GITHUB_OUTPUT"
@@ -116,6 +117,10 @@ jobs:
           cache: npm
           cache-dependency-path: src/web/package-lock.json
       - run: npm ci
+      - name: API types match the contract
+        run: |
+          npm run generate:api
+          git diff --exit-code -- src/api/schema.d.ts
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

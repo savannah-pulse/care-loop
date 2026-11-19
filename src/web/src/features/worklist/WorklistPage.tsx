@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { AccessReasonForm, Badge, Dialog, EmptyState, Icon, ReadView } from '../../components'
 import { CASE_LIST_LIMIT, useCaseList, type CaseList } from '../../data'
 import { describeOwner, needsAttention, nextActionText } from '../../domain'
@@ -329,6 +329,11 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const ids = useId()
+  // Where focus goes once the list has changed under a button that is then gone: the "Whole team" chip,
+  // or the line that says how many cases are shown, just above them.
+  const focusNext = useRef<'team' | 'list'>(undefined)
+  const teamChip = useRef<HTMLButtonElement>(null)
+  const showingLine = useRef<HTMLParagraphElement>(null)
 
   const programmes = useMemo(() => programmeOptions(rows), [rows])
   const scoped = rows.filter((row) => matchesProgramme(row, programme) && matchesSearch(row, query))
@@ -341,6 +346,27 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const limitNote = list.complete ? null : (
     <p className="note">{t('worklist.limited', { limit: CASE_LIST_LIMIT })}</p>
   )
+  const showing = tp('worklist.showing', rows.length, { shown: visible.length })
+
+  // Screen readers hear how many cases are shown when the person changes what the list shows, never
+  // when a quiet read changes the list under them: then the words go, rather than say something stale.
+  const choice = [scope, filter, programme, query].join('\n')
+  const [announced, setAnnounced] = useState({ choice, text: '' })
+  if (announced.choice !== choice) {
+    setAnnounced({ choice, text: showing })
+  } else if (announced.text !== '' && announced.text !== showing) {
+    setAnnounced({ choice, text: '' })
+  }
+
+  useEffect(() => {
+    const target = focusNext.current
+    focusNext.current = undefined
+    if (target === 'team') {
+      teamChip.current?.focus()
+    } else if (target === 'list') {
+      showingLine.current?.focus()
+    }
+  })
 
   const clearFilters = (): void => {
     setFilter('all')
@@ -353,6 +379,7 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
       {WORKLIST_SCOPES.map((id) => (
         <button
           key={id}
+          ref={id === 'team' ? teamChip : undefined}
           type="button"
           className="chip"
           aria-pressed={scope === id}
@@ -372,10 +399,13 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   if (rows.length === 0 || (allOnTrack && !showAll && scope === 'team')) {
     const deadline = nextDeadline(rows)
     const noneOfMine = rows.length === 0 && scope === 'mine' && teamRows.length > 0
+    const teamOverdue = noneOfMine ? countOpen(teamRows, now).overdue : 0
     const body =
       rows.length === 0
         ? noneOfMine
-          ? tp('worklist.emptyNoneOfMine', teamRows.length)
+          ? teamOverdue > 0
+            ? tp('worklist.emptyNoneOfMineOverdue', teamRows.length, { overdue: teamOverdue })
+            : tp('worklist.emptyNoneOfMine', teamRows.length)
           : me.role === 'coordinator'
             ? t('worklist.emptyNothingEscalated')
             : t('worklist.emptyNoCases')
@@ -384,7 +414,8 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
           : tp('worklist.emptyAllOnTrackNoDeadline', rows.length)
     return (
       <>
-        <Greeting now={now} summary={summary} />
+        {/* With nothing to list, "0 open cases" would only repeat the message below. */}
+        <Greeting now={now} summary={rows.length > 0 ? summary : undefined} />
         {toolbarExtra}
         {scopeBar}
         <EmptyState
@@ -393,11 +424,25 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
           body={body}
           action={
             rows.length > 0 ? (
-              <button type="button" className="btn" onClick={() => setShowAll(true)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  focusNext.current = 'list'
+                  setShowAll(true)
+                }}
+              >
                 {t('worklist.showAll')}
               </button>
             ) : noneOfMine ? (
-              <button type="button" className="btn" onClick={() => setChosenScope('team')}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  focusNext.current = 'team'
+                  setChosenScope('team')
+                }}
+              >
                 {t('worklist.showTeam')}
               </button>
             ) : undefined
@@ -453,8 +498,11 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
         })}
       </div>
 
-      <p className="showing" aria-live="polite">
-        {tp('worklist.showing', rows.length, { shown: visible.length })}
+      <p className="showing" ref={showingLine} tabIndex={-1}>
+        {showing}
+      </p>
+      <p className="visually-hidden" role="status">
+        {announced.text}
       </p>
 
       {sections.length === 0 ? (
@@ -527,7 +575,9 @@ function TeamBar({ scope, canChoose, onChoose, onBack }: TeamBarProps) {
  *
  * @remarks
  * Read-only; reads `GET /cases` page by page (up to {@link CASE_LIST_LIMIT} cases) and says how many
- * it shows. The API limits the list to the signed-in person's facility, and to the cases escalated
+ * it shows. It reads the list again quietly every 30 seconds while the page is visible, keeping
+ * filters, search and focus; the count is announced only when the person changes what is shown.
+ * The API limits the list to the signed-in person's facility, and to the cases escalated
  * to them for the programme coordinator, whose list shows no names. Staff can look at another
  * team's cases after saying why; the reason goes with every read and with each case they open from
  * that list. On wide screens each group is a table, with a separate status column from 1200 px and
@@ -543,7 +593,7 @@ export function WorklistPage() {
   const me = useSignedInStaff()
   const [scope, setScope] = useState<TeamScope>()
   const [choosing, setChoosing] = useState(false)
-  const read = useCaseList(scope ? { facilityId: scope.facilityId, reason: scope.reason } : {})
+  const read = useCaseList(scope ? { facilityId: scope.facilityId, reason: scope.reason } : {}, { live: true })
   const now = useNow()
 
   useEffect(() => {

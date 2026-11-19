@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { api, type CareLoopClient } from './client'
 import { callApi, type ApiOutcome } from './outcome'
-import { useApiRead, type Read } from './read'
+import { useApiRead, type Read, type ReadOptions } from './read'
 import type {
   CaseDetail,
   CaseSummary,
@@ -133,23 +133,26 @@ export async function loadCaseList(
  * Reads a list of cases for a screen, page by page.
  *
  * @param query - Which cases to read; by default the open and closed cases of the reader's team.
+ * @param options - `{ live: true }` to keep the list up to date while the screen is open, as the
+ * worklist does; off by default.
  * @returns The read of the list.
  *
  * @remarks
  * Side effects: calls `GET /cases`, one call per page, on mount, when the query changes and when
- * someone else signs in.
+ * someone else signs in. With `live`, it polls: it reads again, quietly, every 30 seconds while the
+ * page is visible and when the page comes back into view (see `useApiRead`).
  */
-export function useCaseList(query: CaseListQuery = {}): Read<CaseList> {
+export function useCaseList(query: CaseListQuery = {}, options: ReadOptions = {}): Read<CaseList> {
   const { facilityId, reason, escalated, patientReference } = query
   const load = useCallback(
     (signal: AbortSignal) => loadCaseList({ facilityId, reason, escalated, patientReference }, { signal }),
     [facilityId, reason, escalated, patientReference],
   )
-  return useApiRead(load)
+  return useApiRead(load, undefined, options)
 }
 
 /**
- * Reads one case.
+ * Reads one case, and keeps it up to date while the screen is open.
  *
  * @param caseId - CareLoop's identifier of the case.
  * @param reason - Why the reader opens a case outside their team, when they gave one.
@@ -158,7 +161,8 @@ export function useCaseList(query: CaseListQuery = {}): Read<CaseList> {
  *
  * @remarks
  * Side effects: calls the API on mount, when the case or reason changes and when someone else signs
- * in. The API records every read, with the reason.
+ * in, and polls: it reads again, quietly, every 30 seconds while the page is visible and when the
+ * page comes back into view (see `useApiRead`). The API records every read, with the reason.
  */
 export function useCase(caseId: string, reason?: string): Read<CaseDetail> {
   const load = useCallback(
@@ -171,11 +175,11 @@ export function useCase(caseId: string, reason?: string): Read<CaseDetail> {
       ),
     [caseId, reason],
   )
-  return useApiRead(load)
+  return useApiRead(load, undefined, { live: true })
 }
 
 /**
- * Reads the timeline of one case.
+ * Reads the timeline of one case, and keeps it up to date while the screen is open.
  *
  * @param caseId - CareLoop's identifier of the case.
  * @param reason - Why the reader opens a case outside their team, when they gave one.
@@ -183,7 +187,8 @@ export function useCase(caseId: string, reason?: string): Read<CaseDetail> {
  *
  * @remarks
  * Side effects: calls the API on mount, when the case or reason changes and when someone else signs
- * in.
+ * in, and polls: it reads again, quietly, every 30 seconds while the page is visible and when the
+ * page comes back into view (see `useApiRead`).
  */
 export function useCaseTimeline(caseId: string, reason?: string): Read<TimelineEntry[]> {
   const load = useCallback(
@@ -196,7 +201,7 @@ export function useCaseTimeline(caseId: string, reason?: string): Read<TimelineE
       ),
     [caseId, reason],
   )
-  return useApiRead(load)
+  return useApiRead(load, undefined, { live: true })
 }
 
 /**
@@ -208,8 +213,8 @@ export function useCaseTimeline(caseId: string, reason?: string): Read<TimelineE
  * @returns The read of `GET /cases?patientReference=…`, in the case's facility.
  *
  * @remarks
- * Side effects: calls the API on mount, when the arguments change and when someone else signs in.
- * The API allows this search to clinician roles only and records it.
+ * Side effects: calls the API on mount, when the arguments change and when someone else signs in;
+ * it does not poll. The API allows this search to clinician roles only and records it.
  */
 export function usePatientCases(patientReference: string, facilityId: string, reason?: string): Read<CaseList> {
   return useCaseList({ patientReference, facilityId: reason ? facilityId : undefined, reason })
@@ -217,19 +222,21 @@ export function usePatientCases(patientReference: string, facilityId: string, re
 
 /**
  * Reads the current loop-closure metrics of the reader's team, or of every facility for the
- * programme coordinator.
+ * programme coordinator, and keeps them up to date while the screen is open.
  *
  * @returns The read of `GET /metrics`.
  *
  * @remarks
- * Side effects: calls the API on mount and when someone else signs in.
+ * Side effects: calls the API on mount and when someone else signs in, and polls: it reads again,
+ * quietly, every 30 seconds while the page is visible and when the page comes back into view (see
+ * `useApiRead`).
  */
 export function useMetrics(): Read<Metrics> {
   const load = useCallback(
     (signal: AbortSignal) => callApi(() => api.GET('/metrics', { signal })),
     [],
   )
-  return useApiRead(load)
+  return useApiRead(load, undefined, { live: true })
 }
 
 /**
@@ -239,8 +246,9 @@ export function useMetrics(): Read<Metrics> {
  * @returns The read of `POST /metrics/simulation`, using the scenario's own seed.
  *
  * @remarks
- * Side effects: posts to the API on mount and when someone else signs in. The comparison replays
- * the cohort in isolation and changes no case, so it is safe to repeat.
+ * Side effects: posts to the API on mount, on `retry` and when someone else signs in; it never
+ * polls, because each post replays a whole cohort. The comparison replays the cohort in isolation
+ * and changes no case, so it is safe to repeat.
  */
 export function useSimulation(cohortScenario: string = COMPARISON_COHORT): Read<SimulationResult> {
   const load = useCallback(

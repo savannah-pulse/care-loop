@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { caseSummary, timelineEntry } from '../testing/builders'
+import { t } from '../i18n'
+import { caseDetail, caseSummary, escalation, timelineEntry } from '../testing/builders'
+import { latestCase } from './changes'
 import { caseLinkNames, caseNumber, describePatient } from './patients'
 import { DISPLAY_LABELS, displayLabelText, displayStepIndex, isDisplayLabel } from './stages'
 import { hasOwnReason, sourceLabel, timelineEntryTitle, timelineSource } from './timeline'
+import { urgencyInSentence } from './urgency'
 
 const NBSP = '\u00a0'
 const STAFF_ROLE = 'nurse-navigator'
@@ -139,5 +142,38 @@ describe('case link names', () => {
     expect(caseLinkNames([subject('1a2b3c4d-0000-4000-8000-000000000001', 'Breast screening', 'coordinator')])).toEqual([
       'Case 1A2B3C4D',
     ])
+  })
+})
+
+describe('a case the person just changed', () => {
+  const before = caseDetail({ isEscalated: true, escalations: [escalation()], updatedAt: '2026-11-12T04:00:00Z' })
+  const acknowledged = caseDetail({
+    isEscalated: true,
+    escalations: [escalation({ acknowledgedBy: 'joy-bautista', acknowledgedByRole: 'facility-lead', acknowledgedAt: '2026-11-12T05:00:00Z' })],
+    updatedAt: '2026-11-12T05:00:00Z',
+  })
+  const change = { base: before, detail: acknowledged }
+
+  it('shows what the API returned after the change until a newer read arrives', () => {
+    expect(latestCase(before, undefined)).toBe(before)
+    expect(latestCase(before, change)).toBe(acknowledged)
+    const reread = { ...acknowledged }
+    expect(latestCase(reread, change)).toBe(reread)
+    const newer = caseDetail({ nextAction: 'decide-closure', updatedAt: '2026-11-12T05:30:00Z' })
+    expect(latestCase(newer, change)).toBe(newer)
+  })
+
+  it('never lets a read that was on its way during the change undo it on screen', () => {
+    expect(latestCase({ ...before }, change)).toBe(acknowledged)
+  })
+})
+
+describe('urgency in a sentence', () => {
+  it('writes the urgency in lower case inside a sentence, and a code it does not know exactly as sent', () => {
+    expect(t('programmesPage.forUrgency', { urgency: urgencyInSentence('PLACEHOLDER-URGENCY-A') })).toBe(
+      'For routine results',
+    )
+    expect(urgencyInSentence('PLACEHOLDER-URGENCY-B')).toBe('urgent')
+    expect(urgencyInSentence('SITE-PRIORITY-1')).toBe('SITE-PRIORITY-1')
   })
 })

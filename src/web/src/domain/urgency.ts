@@ -51,3 +51,22 @@ export function urgencyText(code: string | null | undefined): string {
   const level = urgencyLevel(code)
   return level ? t(`urgency.${level}`) : code
 }
+
+/**
+ * Describes a case's urgency in plain words, inside a sentence.
+ *
+ * @param code - The urgency code from the API.
+ * @returns `urgent`, `routine` or `not reviewed yet`, or the code itself, exactly as the API sent
+ * it, when it is not known.
+ *
+ * @remarks
+ * Sentence case keeps a capital for the start of a sentence, so "For routine results" has the word
+ * in lower case; a code the dashboard does not know is never changed.
+ */
+export function urgencyInSentence(code: string | null | undefined): string {
+  if (!code) {
+    return t('urgency.inSentence.notReviewed')
+  }
+  const level = urgencyLevel(code)
+  return level ? t(`urgency.inSentence.${level}`) : code
+}

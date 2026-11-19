@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import type { CaseDetail } from '../../data'
 import { answer, json, problem, sentRequests } from '../../testing/api'
-import { TEST_NOW, caseDetail, caseSummary, escalation, owner, programme, timelineEntry } from '../../testing/builders'
+import { TEST_NOW, caseDetail, caseSummary, escalation, leadQueue, owner, programme, timelineEntry } from '../../testing/builders'
 import { renderApp } from '../../testing/screens'
 
 const TO_LEAD = escalation()
@@ -81,6 +81,22 @@ describe('escalation', () => {
     )
     expect(within(acknowledgementCard()).queryByRole('button', { name: 'Acknowledge' })).not.toBeInTheDocument()
     expect(sentRequests(CASE_ROUTE).at(-1)?.query.get('reason')).toBe('The patient called me and needs help now')
+  })
+
+  it('lets the General Hospital’s facility lead acknowledge its escalations, and names its screening physician', async () => {
+    const atHospital = caseDetail({
+      facilityId: 'general-hospital',
+      owner: owner({ reference: 'yusuf-al-mansoori', facilityId: 'general-hospital' }),
+      isEscalated: true,
+      exceptions: ['Overdue'],
+      escalations: [escalation({ escalatedTo: leadQueue('general-hospital') })],
+    })
+    await openEscalation(atHospital, 'anita-thomas')
+
+    expect(within(acknowledgementCard()).getByRole('button', { name: 'Acknowledge' })).toBeInTheDocument()
+    expect(screen.getAllByText('Dr. Yusuf Al Mansoori').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Clinician, General Hospital/)).not.toBeInTheDocument()
+    expect(sentRequests(CASE_ROUTE).every((request) => !request.query.has('reason'))).toBe(true)
   })
 
   it('asks for a confirmation that says acknowledging changes neither who is responsible nor the clock', async () => {

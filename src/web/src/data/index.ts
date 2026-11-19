@@ -1,6 +1,7 @@
 /**
  * Data access: the typed CareLoop API client, the identity headers it sends, and small hooks that
- * follow each read through loading, data, "not available yet" (HTTP 501) and failure.
+ * follow each read through loading, data, "not available yet" (HTTP 501) and failure, and keep the
+ * screens' data up to date while they are open.
  *
  * @remarks
  * The client is generated from the API's OpenAPI document (`src/api/schema.d.ts`). Nothing here
@@ -31,8 +32,8 @@ export {
 export type { EscalatedCase } from './escalations'
 export { callApi, failureKindFor } from './outcome'
 export type { ApiFailure, ApiOutcome, FailureKind } from './outcome'
-export { useApiRead } from './read'
-export type { Loader, Read, ReadState } from './read'
+export { FRESH_READ_MS, LIVE_REFRESH_MS, useApiRead } from './read'
+export type { Loader, Read, ReadOptions, ReadState } from './read'
 export {
   CASE_LIST_LIMIT,
   COMPARISON_COHORT,

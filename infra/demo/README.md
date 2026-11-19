@@ -34,6 +34,8 @@ Who gets what on the dashboard's sign-in list:
 - **Huda** (nurse navigator): the patient waiting for a call back; the calls she recorded show on the cases.
 - **Joy** (facility lead): the escalated cases and the result with no owner.
 - **Dr. Layla** (receiving clinician, General Hospital): cases she owns after accepting a handoff, including two overdue.
+- **Dr. Yusuf** (screening physician, General Hospital): the General Hospital's results he reviewed that have not been handed to Dr. Layla, such as the patients waiting for Mona's call.
+- **Anita Thomas** (facility lead, General Hospital): the General Hospital's escalated cases; she acknowledges those still with the facility lead.
 - **Khalid** (lab technician, Family Health Centre): cases whose follow-up is under way with no outcome recorded yet.
 - **Mona** (nurse navigator, General Hospital): the patients waiting for a call there; the calls she recorded.
 - **Dr. Obaid** (programme coordinator): every case escalated to programme level, without names.

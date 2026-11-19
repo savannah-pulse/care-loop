@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { LIVE_REFRESH_MS } from '../../data'
 import { answer, json, problem, sentRequests } from '../../testing/api'
-import { caseDetail, caseSummary, owner } from '../../testing/builders'
+import { TEST_NOW, caseDetail, caseSummary, owner } from '../../testing/builders'
 import { renderApp } from '../../testing/screens'
 
 const HESSA = caseSummary({ caseId: '1a2b3c4d-1111-4111-8111-100245891001', exceptions: ['Overdue'] })
@@ -170,13 +171,15 @@ describe('worklist', () => {
     expect(screen.getByRole('button', { name: /^Whole team\s*3$/ })).toBeInTheDocument()
   })
 
-  it('says so when nothing waits for the person, and offers the team’s list', async () => {
+  it('says so when nothing waits for the person, with what is overdue on the team, and offers the team’s list', async () => {
     answer('GET /cases', json([HESSA]))
     const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
 
-    expect(await screen.findByText('No open case is waiting for you. Your team has 1 open case.')).toBeInTheDocument()
+    expect(await screen.findByText('No open case is waiting for you. Your team has 1 open case, 1 overdue.')).toBeInTheDocument()
+    expect(screen.queryByText('0 open cases')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Show the whole team' }))
     expect(await screen.findByRole('link', { name: `Hessa Al Dhaheri, ${mrn('100245891')}` })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Whole team/ })).toHaveFocus()
   })
 
   it('lets the programme coordinator search by case number, and never shows or searches names', async () => {
@@ -193,7 +196,7 @@ describe('worklist', () => {
     await user.type(search, '2b3c 4d5e')
     expect(screen.getByRole('link', { name: 'Case 2B3C4D5E' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Case 1A2B3C4D' })).not.toBeInTheDocument()
-    expect(screen.getByText('Showing 1 of 2 open cases.')).toBeInTheDocument()
+    expect(screen.getByText('Showing 1 of 2 open cases.', { selector: '.showing' })).toBeInTheDocument()
 
     await user.clear(search)
     await user.type(search, 'Noura')
@@ -207,5 +210,45 @@ describe('worklist', () => {
     }
     expect(document.body.textContent).not.toMatch(/100245891|100245892|MRN\s\d/)
     expect(document.querySelector('[title*="p-1002458"]')).toBeNull()
+  })
+
+  it('says when every case on the team’s list is on track, and shows them on request, with focus on how many are shown', async () => {
+    answer('GET /cases', json([caseSummary({ ...NOURA, exceptions: [] }), UNNAMED]))
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+
+    expect(await screen.findByText('No open case is waiting for you. Your team has 2 open cases.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show the whole team' }))
+    expect(screen.getByText(/^All 2 open cases are on track\. The next deadline is /)).toBeInTheDocument()
+    expect(screen.getByText(/^2 open cases/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show all cases' }))
+    expect(screen.getByText('Showing 2 of 2 open cases.', { selector: '.showing' })).toHaveFocus()
+    expect(caseLinks()).toHaveLength(2)
+  })
+
+  it('shows a new case after the next read, keeping the list, filter, search and focus, and announcing nothing', async () => {
+    // Nothing waits for Huda herself, so she starts from the empty "My cases" and asks for the team's list.
+    answer('GET /cases', json([HESSA, UNNAMED]))
+    const { user } = renderApp({ at: '#/', as: 'huda-saleh' })
+    await user.click(await screen.findByRole('button', { name: 'Show the whole team' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Search by name, MRN or patient number' }), 'al')
+    await user.click(screen.getByRole('button', { name: /^Overdue/ }))
+    expect(caseLinks()).toHaveLength(1)
+    const announcement = screen.getByText('Showing 1 of 2 open cases.', { selector: '[role="status"]' })
+
+    answer('GET /cases', json([HESSA, UNNAMED, caseSummary({ ...MARIAM, exceptions: ['Overdue'] })]))
+    vi.setSystemTime(TEST_NOW.getTime() + LIVE_REFRESH_MS)
+    fireEvent.focus(window)
+
+    expect(await screen.findByRole('link', { name: `Mariam Al Mansoori, ${mrn('100245894')}` })).toBeInTheDocument()
+    expect(caseLinks()).toHaveLength(2)
+    expect(screen.getByText('Showing 2 of 3 open cases.', { selector: '.showing' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Overdue/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^Overdue/ })).toHaveFocus()
+    expect(screen.getByRole('button', { name: /^Whole team/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('searchbox', { name: 'Search by name, MRN or patient number' })).toHaveValue('al')
+    expect(announcement).toBeEmptyDOMElement()
+    expect(screen.queryByText('Loading your worklist')).not.toBeInTheDocument()
+    expect(sentRequests('GET /cases')).toHaveLength(2)
   })
 })
