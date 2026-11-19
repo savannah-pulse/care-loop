@@ -273,12 +273,14 @@ public sealed class AiEndpointsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(1, "1 second")]
-    [InlineData(50, "50 seconds")]
-    [InlineData(90, "1 minute")]
-    [InlineData(3660, "1 hour 1 minute")]
-    [InlineData(183600, "2 days 3 hours")]
-    public void A_median_time_is_sent_in_words_with_one_written_singular(int seconds, string words)
+    [InlineData(1.0, "1 second")]
+    [InlineData(3.6, "4 seconds")]
+    [InlineData(50.0, "50 seconds")]
+    [InlineData(90.0, "1 minute 30 seconds")]
+    [InlineData(3600.0, "1 hour")]
+    [InlineData(3660.0, "1 hour 1 minute")]
+    [InlineData(183600.0, "2 days 3 hours")]
+    public void A_median_time_is_sent_in_words_as_the_page_gives_it(double seconds, string words)
     {
         var empty = new Dictionary<string, int>();
         var metrics = new CareLoop.Contracts.Metrics.MetricsResponse
