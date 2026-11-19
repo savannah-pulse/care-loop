@@ -49,7 +49,7 @@ public static partial class RoleBriefing
         var cases = Order(await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, null)
             .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct), clock.UtcNow);
         await ReadAccess.AuditAsync(db, actor, clock, "role-briefing", null, false, null, null, ct);
-        var opening = Opening(cases, format, clock.UtcNow);
+        var opening = Opening(cases, format, clock.UtcNow, escalatedToReader: actor.Role == DemoRoles.Coordinator);
         // The model knows each case only as C-1, C-2, …; who each one is goes in here and never leaves CareLoop.
         return await ai.WriteAsync(AiPrompts.RoleBriefing, BuildData(actor, cases, opening, pathways, format, clock.UtcNow), refresh, reuse: true, ct,
             text => $"{opening} {WithCaseNames(text, cases, actor)}");
@@ -59,12 +59,18 @@ public static partial class RoleBriefing
     /// <param name="cases">The open cases in the reader's scope.</param>
     /// <param name="format">Local dates.</param>
     /// <param name="now">The time now.</param>
-    /// <returns>For example <c>4 cases are overdue and 1 is due today.</c></returns>
-    internal static string Opening(IReadOnlyList<Case> cases, MessageFormat format, DateTimeOffset now)
+    /// <param name="escalatedToReader">Whether the scope is the cases escalated to the reader (the programme coordinator) rather than the reader's team.</param>
+    /// <returns>
+    /// For example <c>Across your team's 18 open cases, 4 are overdue and 1 is due today.</c> It names its scope, because the
+    /// worklist under it opens on the reader's own cases, a smaller list.
+    /// </returns>
+    internal static string Opening(IReadOnlyList<Case> cases, MessageFormat format, DateTimeOffset now, bool escalatedToReader = false)
     {
         int overdue = cases.Count(c => IsOverdue(c, now)), today = cases.Count(c => IsDueToday(c, format, now));
-        static string Count(int n) => n == 1 ? "1 case is" : $"{n} cases are";
-        return overdue == 0 && today == 0 ? "Nothing is overdue or due today." : $"{Count(overdue)} overdue and {(today == 1 ? "1 is" : $"{today} are")} due today.";
+        static string Are(int n) => n == 1 ? "1 is" : $"{n} are";
+        var open = cases.Count == 1 ? "1 open case" : $"{cases.Count} open cases";
+        var scope = escalatedToReader ? $"Of the {open} escalated to you" : $"Across your team's {open}";
+        return overdue == 0 && today == 0 ? $"{scope}, nothing is overdue or due today." : $"{scope}, {Are(overdue)} overdue and {Are(today)} due today.";
     }
 
     /// <summary>Says who a case is where the text names it by its token.</summary>
@@ -87,8 +93,11 @@ public static partial class RoleBriefing
             var named = cases[n - 1];
             return reader.Role != DemoRoles.Coordinator && !string.IsNullOrWhiteSpace(named.PatientDisplayName)
                 ? named.PatientDisplayName
-                : $"case {NotificationRouter.CaseReferenceFor(named.Id)}";
+                : $"{(StartsSentence(text, match.Index) ? "Case" : "case")} {NotificationRouter.CaseReferenceFor(named.Id)}";
         });
+
+    // The text follows the opening sentence, so a token at its very start also starts a sentence.
+    private static bool StartsSentence(string text, int index) => text[..index].TrimEnd() is var before && (before.Length == 0 || before[^1] is '.' or '!' or '?');
 
     private static bool IsOverdue(Case c, DateTimeOffset now) => c.DueAt < now || c.Exceptions.HasFlag(CaseExceptions.Overdue);
 

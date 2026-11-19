@@ -182,7 +182,7 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   `CANNOT_COMPLY` when no valid text can be written. The prompt files say what each agent writes, for all three uses.
   An answer that starts with `CANNOT_COMPLY` is a refusal: `AiUnavailableException`, answered as 503. The agents are
   called at their latest version, so a change to an agent's permanent instructions can change behaviour.
-- **Role briefing.** The API writes the opening sentence (`opening` in the data) and the model continues from it. Each
+- **Role briefing.** The API writes the opening sentence (`opening` in the data), which names its scope ("Across your team's 18 open cases, …"), and the model continues from it. Each
   case carries `overdue_by`, a duration in words, when it is past its deadline, so the model never calculates. The
   model knows a case only as a token (`C-1`, `C-2`, …). After the text comes back, after any reuse, the API swaps each
   token for the patient's display name as the reader already sees it in the list; for the programme coordinator, or a

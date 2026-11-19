@@ -99,13 +99,13 @@ public sealed class AiEndpointsTests : IDisposable
         var response = Value<AiTextResponse>(await BriefingAsync());
 
         // The API writes the opening, and says who each case is where the model named it by its token (most pressing first).
-        Assert.Equal($"1 case is overdue and 0 are due today. A result review is waiting for {LatePatient}; {PatientName} is upcoming and {{{{C-9}}}} is unknown.",
+        Assert.Equal($"Across your team's 2 open cases, 1 is overdue and 0 are due today. A result review is waiting for {LatePatient}; {PatientName} is upcoming and {{{{C-9}}}} is unknown.",
             response.Text);
         Assert.Equal(("Fake/role-briefing", _clock.UtcNow, false), (response.Model, response.GeneratedAt, response.Cached));
         var prompt = Assert.Single(_ai.Prompts);
         Assert.StartsWith("TASK: Summarize the reader's worklist.", prompt);
         Assert.Contains("\"overdue_by\": \"1 day 0 hours\"", prompt);
-        Assert.Contains("\"opening\": \"1 case is overdue and 0 are due today.\"", prompt);
+        Assert.Contains("\"opening\": \"Across your team's 2 open cases, 1 is overdue and 0 are due today.\"", prompt);
         Assert.Contains("\"token\": \"C-1\"", prompt);
         Assert.Equal(AiPrompts.RoleBriefing, Assert.Single(_ai.Requests).Use);
         using var scope = _services.CreateScope();
@@ -230,6 +230,54 @@ public sealed class AiEndpointsTests : IDisposable
 
         Assert.Equal(403, Status(refused));
         Assert.Empty(_ai.Prompts);
+    }
+
+    [Fact]
+    public void The_opening_names_its_scope_the_team_or_the_cases_escalated_to_the_coordinator()
+    {
+        var cases = new[] { NewCase("SYN-RESULT-1", overdue: true), NewCase("SYN-RESULT-2") };
+
+        Assert.Equal("Across your team's 2 open cases, 1 is overdue and 0 are due today.", RoleBriefing.Opening(cases, _format, _clock.UtcNow));
+        Assert.Equal("Of the 2 open cases escalated to you, 1 is overdue and 0 are due today.",
+            RoleBriefing.Opening(cases, _format, _clock.UtcNow, escalatedToReader: true));
+        Assert.Equal("Across your team's 1 open case, nothing is overdue or due today.", RoleBriefing.Opening(cases[1..], _format, _clock.UtcNow));
+    }
+
+    [Fact]
+    public void A_case_number_that_starts_a_sentence_starts_with_a_capital()
+    {
+        // The programme coordinator sees case numbers, not names.
+        var cases = new[] { NewCase("SYN-RESULT-1", overdue: true), NewCase("SYN-RESULT-2") };
+        var coordinator = new CareLoop.Domain.Events.Actor { Reference = "SYN-STAFF-9", Role = DemoRoles.Coordinator };
+
+        var text = RoleBriefing.WithCaseNames("{{C-1}} awaits a call. {{C-2}} is upcoming: C-1 first.", cases, coordinator);
+
+        Assert.Equal($"Case {NotificationRouter.CaseReferenceFor(cases[0].Id)} awaits a call. Case {NotificationRouter.CaseReferenceFor(cases[1].Id)} is upcoming: "
+            + $"case {NotificationRouter.CaseReferenceFor(cases[0].Id)} first.", text);
+    }
+
+    [Theory]
+    [InlineData(50, "1 minute")]
+    [InlineData(3660, "1 hour 1 minute")]
+    [InlineData(183600, "2 days 3 hours")]
+    public void A_median_time_is_sent_in_words_with_one_written_singular(int seconds, string words)
+    {
+        var empty = new Dictionary<string, int>();
+        var metrics = new CareLoop.Contracts.Metrics.MetricsResponse
+        {
+            GeneratedAt = _clock.UtcNow, TotalCases = 0, OpenCases = 0, ClosedCases = 0, CasesByStage = empty, CasesByException = empty,
+            OverdueCases = 0, EscalatedCases = 0, UnassignedCases = 0, Measures = new Dictionary<string, CareLoop.Contracts.Metrics.RateMeasureResponse>(),
+            TimeToStep = new Dictionary<string, CareLoop.Contracts.Metrics.DurationMeasureResponse>
+            {
+                ["acknowledgement"] = new() { Denominator = 6, Median = TimeSpan.FromSeconds(seconds) },
+            },
+            ClosuresByReason = empty, CasesReachingDisplayLabel = new Dictionary<string, CareLoop.Contracts.Metrics.RateMeasureResponse>(),
+            CasesByDisplayLabel = empty, ConfidenceDenominator = 0, ConfidenceResponses = 0,
+        };
+
+        var data = System.Text.Json.JsonSerializer.Serialize(ImpactSummary.BuildData(metrics, "SYN Family Health Centre", _format));
+
+        Assert.Contains($"\"Time\":\"{words}\"", data);
     }
 
     [Fact]

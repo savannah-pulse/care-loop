@@ -82,7 +82,7 @@ The open cases in the reader's own scope, the same ones `GET /cases` gives them.
 
 | Field | Meaning |
 |---|---|
-| `opening` | The briefing's first sentence, written by the API so its counts are always right; the model continues from it |
+| `opening` | The briefing's first sentence, written by the API so its counts are always right; the model continues from it. It names its scope ("Across your team's 18 open cases, 7 are overdue and 1 is due today.", or "Of the 9 open cases escalated to you, …" for the programme coordinator), because the worklist under it opens on the reader's own cases |
 | `reader_role`, `today` | Who is reading, and the date |
 | `open_cases`, `overdue`, `due_today`, `escalated`, `without_owner` | Counts over every case in scope |
 | `cases[]` | Up to 25 of the most pressing cases: `token` (`C-1`, `C-2`, …), `step`, `next_action`, `deadline`, `status` (`overdue`, `due today`, `upcoming`), `overdue_by`, `escalated`, `needs_owner`, `held_by` (a role), `yours`, `patient_message` |
