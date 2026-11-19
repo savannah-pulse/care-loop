@@ -1,6 +1,6 @@
 import type { CaseDetail } from '../../data'
 import { describeOwner, nextActionRole } from '../../domain'
-import { roleLabel, sameReference } from '../../identity'
+import { isClinicianRole, roleLabel, sameReference } from '../../identity'
 import { LOCALE, t } from '../../i18n'
 
 /** The person reading the case: whose reference and role decide whether a step is theirs. */
@@ -24,7 +24,8 @@ export interface WhoActsViewer {
  * nurse navigator is told to make it, and anyone else is told that a nurse navigator makes it.
  * Every other step is done in the hospital system, and CareLoop moves on when the hospital system
  * tells it. The person who takes such a step is the proposed owner while a transfer to them waits,
- * the owner when the step is in their role, and otherwise the step's role, such as the facility
+ * the owner when the step is in their role (any clinician takes a clinician's step, such as the
+ * receiving clinician arranging the follow-up of a case now theirs), and otherwise the step's role, such as the facility
  * lead who chooses an owner. Whenever someone other than the person responsible acts, the line
  * also says who stays responsible, because taking the step never changes that; a nurse navigator
  * who is also the person responsible is just told to make the call. A step the
@@ -55,7 +56,8 @@ export function whoActs(detail: CaseDetail, me: WhoActsViewer): string {
       ? t('case.whoActs.youInHospital')
       : t('case.whoActs.otherInHospital', { name: describeOwner(proposed).subject })
   }
-  if (!detail.owner.isQueue && detail.owner.role === role) {
+  const ownerTakesIt = detail.owner.role === role || (role === 'clinician' && isClinicianRole(detail.owner.role))
+  if (!detail.owner.isQueue && ownerTakesIt) {
     return ownerIsMe ? t('case.whoActs.youInHospital') : t('case.whoActs.otherInHospital', { name: owner.subject })
   }
   if (me.role === role) {

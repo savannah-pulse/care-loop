@@ -34,6 +34,11 @@ describe('whoActs', () => {
     expect(whoActs(review, HUDA)).toBe(`Dr. Rekha Varghese does this in the hospital system. ${IN_HOSPITAL}`)
   })
 
+  it('tells a receiving clinician who is responsible that a clinician step is theirs', () => {
+    const followUp = caseDetail({ nextAction: 'arrange-follow-up', owner: owner({ reference: 'layla-haddad', role: 'receiving-clinician', facilityId: 'general-hospital' }) })
+    expect(whoActs(followUp, LAYLA)).toBe(`You do this in the hospital system. ${IN_HOSPITAL}`)
+  })
+
   it('names the receiving clinician a referral waits for, not the sender who stays responsible', () => {
     const referral = caseDetail({
       nextAction: 'respond-to-referral',
