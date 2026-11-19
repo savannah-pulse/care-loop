@@ -268,6 +268,59 @@ function roleBriefing(state: MockState, who: Reader, refresh: boolean): Schemas[
   return { ...written, model: 'Mock/role-briefing', cached: false }
 }
 
+/** The impact summaries the mock has written, by reader, so a repeat request is answered as reused. */
+const impactSummaries = new Map<string, string>()
+
+/**
+ * Stands in for `GET /ai/impact-summary`: a few sentences built from the mock's metrics.
+ *
+ * @param who - The reader.
+ * @param refresh - `true` to write a new summary instead of reusing the one kept for this reader.
+ * @returns The text, when it was written and whether it was reused.
+ */
+function impactSummary(who: Reader, refresh: boolean): Schemas['AiTextResponse'] {
+  const metrics = createMetrics()
+  const text =
+    `${metrics.overdueCases} of ${metrics.openCases} open cases are past their deadline, and ${metrics.escalatedCases} are escalated. ` +
+    `${metrics.closedCases} of ${metrics.totalCases} cases are closed.\n\n[Mock summary, not written by AI]`
+  const key = `${who.reference}|${who.role}|${who.facilityId ?? ''}`
+  const kept = impactSummaries.get(key)
+  if (kept && !refresh) {
+    return { text, generatedAt: kept, model: 'Mock/impact-summary', cached: true }
+  }
+  const generatedAt = new Date().toISOString()
+  impactSummaries.set(key, generatedAt)
+  return { text, generatedAt, model: 'Mock/impact-summary', cached: false }
+}
+
+/** The roles the API lets ask for a patient message draft. */
+const PATIENT_MESSAGE_ROLES = ['nurse-navigator', 'clinician']
+
+/**
+ * Stands in for `GET /cases/{caseId}/patient-message-draft`: the administrative template the
+ * patient-notification agent fills, with placeholders where the patient's details are withheld.
+ *
+ * @param detail - The case.
+ * @param who - The reader.
+ * @param channel - `Sms` (the default) or `Email`.
+ * @returns The draft; never reused.
+ */
+function patientMessageDraft(detail: CaseDetail, who: Reader, channel: string | null): Schemas['AiTextResponse'] {
+  if (!PATIENT_MESSAGE_ROLES.includes(who.role)) {
+    throw new HttpError(403, 'Only a nurse navigator or a clinician may ask for a draft message to the patient.')
+  }
+  if (channel !== null && channel !== 'Sms' && channel !== 'Email') {
+    throw new HttpError(400, 'The channel must be Sms or Email.')
+  }
+  const text = [
+    'Dear {first name},',
+    `Your care team at ${detail.facilityId.replaceAll('-', ' ')} would like to speak with you.`,
+    'Please contact us at {clinic contact} when convenient.',
+    'Thank you.',
+  ].join('\n')
+  return { text, generatedAt: new Date().toISOString(), model: 'Mock/patient-notification', cached: false }
+}
+
 function listExceptions(state: MockState, who: Reader, query: URLSearchParams): Schemas['ExceptionItemResponse'][] {
   const facilityId = query.get('facilityId')
   const owner = query.get('ownerReference')
@@ -476,6 +529,12 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     send(res, 200, roleBriefing(state, who, query.get('refresh') === 'true'))
     return true
   }
+  if (path === '/ai/impact-summary') {
+    expect('GET')
+    checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
+    send(res, 200, impactSummary(who, query.get('refresh') === 'true'))
+    return true
+  }
   if (path === '/metrics') {
     expect('GET')
     checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
@@ -505,6 +564,12 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     expect('GET')
     checkCase(who, fixture.detail, reason)
     send(res, 200, redacted(who, fixture.detail))
+    return true
+  }
+  if (third === 'patient-message-draft' && fourth === undefined) {
+    expect('GET')
+    checkCase(who, fixture.detail, reason)
+    send(res, 200, patientMessageDraft(fixture.detail, who, query.get('channel')))
     return true
   }
   if (third === 'timeline' && fourth === undefined) {

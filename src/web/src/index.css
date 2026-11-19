@@ -378,6 +378,51 @@ h1 {
 .ai-brief-text {
   font-size: 16px;
   color: var(--ink);
+  /* The text is plain; its paragraphs are kept. */
+  white-space: pre-line;
+}
+
+/* The draft of a message to the patient, on the case screen. */
+.message-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.message-channel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+}
+
+.message-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  inline-size: 100%;
+  padding: 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 8px;
+  background: var(--accent-soft);
+}
+
+.message-draft-text {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* In the narrow card the label wraps; keep its icon beside the first line. */
+.message-draft .ai-brief-meta {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.message-draft .ai-brief-meta svg.i {
+  flex: none;
+  margin-block-start: 3px;
 }
 
 .ai-brief-meta {

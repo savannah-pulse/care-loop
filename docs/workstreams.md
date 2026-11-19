@@ -288,7 +288,7 @@ for 181 Vitest tests in all. Lint, type-check, unit tests and build run in CI.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
 the completed summary UI explicitly shows backend 501/unavailable errors. (Since 19 November 2026 the handoff summary
-screen and its tests are removed; the worklist shows the role briefing under its greeting; the impact summary and the patient message draft are not shown yet (see WS9). The
+screen and its tests are removed; the dashboard shows the three AI texts instead: the role briefing on the worklist, the impact summary on the impact page and the patient message draft on the case page (see WS9). The
 counts above are from before that change.) Eight moderate development-only parser/
 documentation-tool dependency findings remain; production dependency audit has zero findings.
 
@@ -376,7 +376,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 - Reuse (`AiText`): a role briefing or impact summary is kept in memory under the provider and the exact prompt (`Ai:CacheHours`, 6 by default, `0` switches it off; `?refresh=true` asks again). The patient message draft is never reused.
 - Read audit: the normal read audit runs on every request, reused answer or not. The views are `role-briefing`, `metrics` (the impact summary) and `patient-message-draft` or `patient-message-draft-denied`. `CaseReads` has no new columns. The migration `RemoveHandoffSummaries` only drops the `HandoffSummaries` table.
 - Tests: `tests/api/CareLoop.Tests/Api/Ai/AiEndpointsTests.cs` and `AiProviderTests.cs` (the translation file's tests are in it). The opt-in live test `Live_the_endpoints_get_text_from_their_foundry_agents` runs only when `CARELOOP_LIVE_FOUNDRY_ENDPOINT` is set. Run on 19 November 2026: all three uses answered 200 from their own agents.
-- On the dashboard, the worklist shows the role briefing under its greeting (`src/web/src/features/worklist/RoleBriefing.tsx`), with a Refresh action. The impact summary and the patient message draft are not shown yet; that is WS6's work in `src/web`, against the endpoints above.
+- On the dashboard, the worklist shows the role briefing under its greeting (`src/web/src/features/worklist/RoleBriefing.tsx`), with a Refresh action. The impact page shows the impact summary under its heading (`features/impact/ImpactSummary.tsx`), and the case page has a card where a nurse navigator or clinician asks for a patient message draft (`features/case/PatientMessageCard.tsx`); nothing is sent from it.
 
 **Removed**
 
@@ -392,7 +392,7 @@ documentation-tool dependency findings remain; production dependency audit has z
 | WS1 | `CaseEventType`, `SourceEvent`, `TransitionRules`; `HandoffSummaryApproved` removed | Event type 101 is retired and must not be reused |
 | WS3 | `FhirPublisher`; `HandoffDocumentReferenceMapper` removed | No `DocumentReference` is published |
 | WS4 | A comment in `RecipientResolver` | It no longer names `HandoffSummaryApproved` |
-| WS6 | A removed `using` in `RunSimulation`, `contracts/openapi/careloop.json`, `src/web/**` | The three AI routes replace the handoff summary routes in the OpenAPI document; the summary screen is removed from `src/web` (the worklist shows the role briefing; the other two texts are not shown yet). `GetMetrics` is unchanged: the impact summary calls its handler |
+| WS6 | A removed `using` in `RunSimulation`, `contracts/openapi/careloop.json`, `src/web/**` | The three AI routes replace the handoff summary routes in the OpenAPI document; the summary screen is removed from `src/web` (the dashboard shows the three AI texts). `GetMetrics` is unchanged: the impact summary calls its handler |
 | Infra | `infra/azure/**` | `apiAiProvider` is `NoOp` or `Foundry`; the API is given only the project endpoint (`Ai__Foundry__ProjectEndpoint`); the Foundry User role for the API's identity. A Foundry created with `CREATE_FOUNDRY=true` has no agents |
 
 Open contract points for WS9 are in the table below.

@@ -8,6 +8,30 @@
     "separator": " · ",
     "listSeparator": ", "
   },
+  "ai": {
+    "writtenByAi": "Written by AI",
+    "refresh": "Refresh",
+    "refreshing": "Writing a new summary…"
+  },
+  "patientMessage": {
+    "title": "Draft a message to the patient",
+    "lede": "AI writes a draft for you to read. Nothing is sent from here, and the patient's name and details are left as placeholders.",
+    "channel": {
+      "legend": "Write it as",
+      "sms": "Text message",
+      "email": "Email"
+    },
+    "write": "Write a draft",
+    "again": "Write another draft",
+    "writing": "Writing…",
+    "draftLabel": "Draft message",
+    "notSent": "Draft, not sent",
+    "failed": {
+      "off": "AI is switched off here, so no draft can be written.",
+      "forbidden": "Your role cannot ask for a draft of this message.",
+      "other": "AI could not write a draft just now. Nothing else is affected. Try again later."
+    }
+  },
   "nav": {
     "label": "Main",
     "worklist": "Worklist",
@@ -256,10 +280,7 @@
     "forbiddenBody": "Your role can only see cases sent to you. If you think you should see this list, ask your facility lead.",
     "briefing": {
       "label": "Summary written by AI",
-      "writtenByAi": "Written by AI",
-      "refresh": "Refresh",
-      "loading": "Writing a summary of your cases…",
-      "refreshing": "Writing a new summary…"
+      "loading": "Writing a summary of your cases…"
     },
     "emptyTitle": "Nothing needs you right now",
     "emptyAllOnTrack": {
@@ -446,6 +467,10 @@
   },
   "impact": {
     "title": "Impact",
+    "summary": {
+      "label": "Summary of the figures, written by AI",
+      "loading": "Writing a summary of these figures…"
+    },
     "subtitle": "{scope} · Updated {date} · {count}",
     "allFacilities": "All facilities",
     "cases": {

@@ -261,7 +261,7 @@ Run on 19 November 2026: all three uses answered 200 from their own agents, the 
 | Prompt files and `AiPrompts` | Built |
 | Migration `RemoveHandoffSummaries` (drops the `HandoffSummaries` table) | Built |
 | Tests | `tests/api/CareLoop.Tests/Api/Ai/` |
-| Dashboard display | The worklist shows the role briefing under its greeting, with Refresh. The impact summary and the patient message draft are not shown yet (WS6) |
+| Dashboard display | The worklist shows the role briefing under its greeting and the impact page shows the impact summary under its heading, both with Refresh. The case page has a card where a nurse navigator or clinician asks for a patient message draft. See `src/web/README.md` |
 
 ## Before real data
 

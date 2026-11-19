@@ -59,9 +59,15 @@ The dashboard shows what the API sends and makes nothing up: display labels as g
 
 **Staying up to date.** The worklist, a case and its timeline, the escalation screens and the count of open escalations, and Impact's numbers read again by themselves every 30 seconds while the page is visible (`LIVE_REFRESH_MS`, `useApiRead` in `src/data/read.ts`). They stop while the tab is hidden and read again as soon as it is shown or the window regains focus, unless the last answer is under 10 seconds old. These reads are quiet: nothing flickers, moves or is announced, and the chosen list, filters, search, scroll position, focus, open dialogs and half-filled forms stay as they are. A failed read leaves the screen as it was and is tried again next time; only one read is on its way at a time, and it is cancelled when the screen closes. After the person records a call or acknowledges an escalation, the screen shows the API's answer until a newer read arrives (`latestCase`). Nothing that writes or costs money is repeated by itself: not the comparison (`POST /metrics/simulation`); the patient's other screening and programmes are read once. Each repeat is a read the API records like any other.
 
-## AI briefing on the worklist
+## AI texts
 
-Under the worklist's greeting and its one-line count, the dashboard shows the role briefing from `GET /ai/role-briefing`: a short AI-written summary of the signed-in person's open cases (`features/worklist/RoleBriefing.tsx`). It is plain text, labelled "Written by AI" with when it was written, and "Refresh" asks the API for a new one (`refresh=true`) instead of the one it reuses while the cases are unchanged. It is shown only on the reader's own team's list and only when that team has open cases. When AI is switched off (409) or could not write it (503), nothing is shown: the worklist below is the record and does not depend on it. The mock API answers with a summary built from its fixtures, marked as a mock. The impact summary and the patient message draft are not shown yet.
+The dashboard shows the three AI texts the API writes. Each is plain text, labelled "Written by AI" with when it was written, and each is left out or says so calmly when AI is switched off (409) or could not write it (503); nothing else on a page depends on them.
+
+- **Worklist: the role briefing** (`features/worklist/RoleBriefing.tsx`, `GET /ai/role-briefing`). Under the greeting and its one-line count: a short summary of the signed-in person's open cases. Shown only on the reader's own team's list and only when that team has open cases.
+- **Impact: the impact summary** (`features/impact/ImpactSummary.tsx`, `GET /ai/impact-summary`). Under the page's heading: a short reading of the figures below, for the same scope. Shown only when there are cases to describe.
+- **Case: the patient message draft** (`features/case/PatientMessageCard.tsx`, `GET /cases/{caseId}/patient-message-draft`). A card for a nurse navigator or clinician on an open case. Nothing is asked until the reader chooses text message or email and presses "Write a draft". The draft is shown as a draft that was not sent, with placeholders such as `{first name}` where the API withholds the patient's details. Nothing here sends a message.
+
+The briefing and the impact summary share `components/AiSummary.tsx`. "Refresh" asks the API for a new text (`refresh=true`) instead of the one it reuses while the data is unchanged. The mock API answers all three with text built from its fixtures, marked as a mock.
 
 ## Test it
 

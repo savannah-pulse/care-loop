@@ -4,7 +4,7 @@ import { readCase, useCase, useCaseTimeline, type CaseDetail, type Read, type Ti
 import { describePatient, latestCase, openEscalations, programmeName, resultSourceText, type CaseChange } from '../../domain'
 import { facilityName, formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useNow } from '../../hooks'
-import { isClinicianRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
+import { isClinicianRole, isPatientMessageRole, rememberAccessReason, useAccessReason, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { navigate, routeHref } from '../../routing'
 import { EscalationLadder } from '../escalations'
@@ -12,6 +12,7 @@ import { CallOutcomeCard } from './CallOutcomeCard'
 import { callOutcomeOffer } from './callOutcome'
 import { NextActionCard } from './NextActionCard'
 import { OtherScreeningCard } from './OtherScreeningCard'
+import { PatientMessageCard } from './PatientMessageCard'
 import { StageStepper } from './StageStepper'
 import { TimelineCard } from './TimelineCard'
 import { TracksCard } from './TracksCard'
@@ -104,6 +105,9 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
               onConflict={onCallConflict}
             />
           )}
+          {isPatientMessageRole(me.role) && detail.stage !== 'Closed' ? (
+            <PatientMessageCard detail={detail} reason={reason} />
+          ) : null}
           {isClinicianRole(me.role) && detail.patientReference ? (
             <OtherScreeningCard detail={detail} patientReference={detail.patientReference} reason={reason} />
           ) : null}

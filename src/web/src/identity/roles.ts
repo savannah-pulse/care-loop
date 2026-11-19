@@ -115,3 +115,21 @@ export function roleLabel(role: string): string | undefined {
   const key = `roles.${role}`
   return hasMessage(key) ? t(key) : undefined
 }
+
+/**
+ * The roles that may ask AI for a draft of a message to the patient.
+ *
+ * @remarks
+ * The API allows the same two (`PatientMessageDraft.AllowedRoles`) and refuses anyone else.
+ */
+export const PATIENT_MESSAGE_ROLES: readonly RoleKey[] = ['nurse-navigator', 'clinician']
+
+/**
+ * Tells whether a role may ask for a patient message draft.
+ *
+ * @param role - The role key.
+ * @returns `true` for the roles in {@link PATIENT_MESSAGE_ROLES}.
+ */
+export function isPatientMessageRole(role: string): boolean {
+  return (PATIENT_MESSAGE_ROLES as readonly string[]).includes(role)
+}

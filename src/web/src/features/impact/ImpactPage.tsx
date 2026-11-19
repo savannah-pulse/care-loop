@@ -25,6 +25,7 @@ import {
   type BarItem,
   type MeasureKey,
 } from './impact'
+import { ImpactSummary } from './ImpactSummary'
 
 const CLOSURE_REASONS = [
   'Treated',
@@ -455,6 +456,8 @@ export function ImpactPage() {
             })}
           </p>
         ) : null}
+        {/* Only with cases to describe: with none, there is nothing to summarise. */}
+        {data && toCount(data.totalCases) > 0 ? <ImpactSummary /> : null}
       </div>
       <ReadView
         read={metrics}

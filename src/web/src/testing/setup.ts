@@ -9,9 +9,10 @@ fillBrowserGaps()
 installFakeApi()
 
 // AI is switched off unless a test switches it on, as it is by default in the API: the worklist then
-// shows no briefing, and tests about anything else need not answer for it.
+// and the impact page then show no AI summary, and tests about anything else need not answer for it.
 beforeEach(() => {
   answer('GET /ai/role-briefing', problem(409, 'AI is switched off'))
+  answer('GET /ai/impact-summary', problem(409, 'AI is switched off'))
 })
 
 afterEach(() => {

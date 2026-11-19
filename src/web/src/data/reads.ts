@@ -339,3 +339,27 @@ export function useRoleBriefing(refreshes: number = 0): Read<AiText> {
   )
   return useApiRead(load)
 }
+
+/**
+ * Reads the AI-written reading of the impact figures.
+ *
+ * @param refreshes - How many times the reader has asked for a new summary. Above zero, the API is
+ * asked to write a new one instead of reusing the one it kept.
+ * @returns The summary, or why there is none: `conflict` while AI is switched off, `unavailable`
+ * when AI could not write it.
+ *
+ * @remarks
+ * Side effect: calls `GET /ai/impact-summary`, once per reader and once more per refresh, for the
+ * same scope as `GET /metrics`: the reader's facility, or every facility for the coordinator.
+ */
+export function useImpactSummary(refreshes: number = 0): Read<AiText> {
+  const load = useCallback(
+    (signal: AbortSignal) =>
+      callApi(() =>
+        api.GET('/ai/impact-summary', { params: { query: { refresh: refreshes > 0 ? true : undefined } }, signal }),
+      ),
+    [refreshes],
+  )
+  return useApiRead(load)
+}
+
