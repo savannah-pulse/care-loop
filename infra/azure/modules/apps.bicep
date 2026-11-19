@@ -110,9 +110,9 @@ var apiSimulatorEnv = deploySimulators
       { name: 'Notifications__FacilityNames__family-health-centre', value: 'Family Health Centre' }
       { name: 'Notifications__FacilityNames__general-hospital', value: 'General Hospital' }
       { name: 'Notifications__FacilityNames__regional-hospital', value: 'Regional Hospital' }
-      { name: 'Notifications__FacilityContacts__family-health-centre', value: 'SYN-PHONE-FAMILY-HEALTH-CENTRE' }
-      { name: 'Notifications__FacilityContacts__general-hospital', value: 'SYN-PHONE-GENERAL-HOSPITAL' }
-      { name: 'Notifications__FacilityContacts__regional-hospital', value: 'SYN-PHONE-REGIONAL-HOSPITAL' }
+      { name: 'Notifications__FacilityContacts__family-health-centre', value: '02 000 0000' }
+      { name: 'Notifications__FacilityContacts__general-hospital', value: '02 000 0001' }
+      { name: 'Notifications__FacilityContacts__regional-hospital', value: '02 000 0002' }
       { name: 'Notifications__StaffContacts__nurse-navigator__Channel', value: 'Email' }
       { name: 'Notifications__StaffContacts__nurse-navigator__Address', value: 'SYN-EMAIL-NURSE-NAVIGATORS' }
       { name: 'Notifications__StaffContacts__clinician__Channel', value: 'Email' }
