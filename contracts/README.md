@@ -23,7 +23,7 @@ The design names result, review, patient-channel, consultation, referral, appoin
 
 The API owns the mapping from accepted source events to case transitions. Not every event advances a stage: escalation and most exception events add a flag or owned task while the case remains in its current stage. Keep referral sent/accepted separate from attended care, and keep a proposed owner separate from an accepted transfer.
 
-The Python workflow consumes only approved synthetic event references and coordination snapshots. It returns typed action proposals to the .NET API; the API is the only service that can authorize and persist case changes. Do not send raw clinical records to the workflow service or allow agent output to bypass authorization, audit, or human review.
+The AI workflow design is deferred; no Python workflow service currently consumes these contracts. Any future AI integration may receive only the minimum approved facts and references, and may return drafts for review. The .NET API remains the only service that can authorize and persist case changes. Do not allow agent output to bypass authorization, audit, or human review.
 
 ## Contract review before merge
 

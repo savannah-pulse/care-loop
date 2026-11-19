@@ -16,13 +16,10 @@ param assignRoles bool
 param imageTag string
 param appsIdentityId string
 param appsIdentityClientId string
-param aiIdentityId string
-param aiIdentityClientId string
 param connectionStringSecretUri string
 param inboundSecretUri string
 param appInsightsConnectionString string
 param deploySimulators bool
-param deployAi bool
 param exposeApi bool
 param exposeSimulators bool
 param allowedIpRanges array
@@ -34,26 +31,22 @@ param apiExtraEnv array
 param webMaxReplicas int
 param aiProjectEndpoint string
 param aiModelDeploymentName string
-param aiPromptShieldsAttested bool
 
 var appNames = {
   api: 'api'
   web: 'web'
-  aiWorkflow: 'ai-workflow'
   hisSimulator: 'his-simulator'
   messagingSimulator: 'messaging-simulator'
 }
 
 var internalDomain = 'internal.${environmentDefaultDomain}'
 var apiHost = '${appNames.api}.${exposeApi ? environmentDefaultDomain : internalDomain}'
-var aiWorkflowHost = '${appNames.aiWorkflow}.${internalDomain}'
 var hisSimulatorHost = '${appNames.hisSimulator}.${exposeSimulators ? environmentDefaultDomain : internalDomain}'
 var messagingSimulatorHost = '${appNames.messagingSimulator}.${exposeSimulators ? environmentDefaultDomain : internalDomain}'
 
 var images = {
   api: '${registryServer}/careloop/api:${imageTag}'
   web: '${registryServer}/careloop/web:${imageTag}'
-  aiWorkflow: '${registryServer}/careloop/ai-workflow:${imageTag}'
   hisSimulator: '${registryServer}/careloop/his-simulator:${imageTag}'
   messagingSimulator: '${registryServer}/careloop/messaging-simulator:${imageTag}'
 }
@@ -133,11 +126,12 @@ var apiSimulatorEnv = deploySimulators
     ]
   : []
 
-var apiAiEnv = deployAi
-  ? [
-      { name: 'Ai__AiWorkflow__BaseUrl', value: 'https://${aiWorkflowHost}' }
+var apiFoundryEnv = empty(aiProjectEndpoint) || empty(aiModelDeploymentName)
+  ? []
+  : [
+      { name: 'Ai__FoundryDirect__ProjectEndpoint', value: aiProjectEndpoint }
+      { name: 'Ai__FoundryDirect__DeploymentName', value: aiModelDeploymentName }
     ]
-  : []
 
 module api 'container-app.bicep' = {
   name: 'app-api'
@@ -155,7 +149,7 @@ module api 'container-app.bicep' = {
     external: exposeApi
     allowedIpRanges: allowedIpRanges
     secrets: [connectionStringSecret, inboundSecret]
-    env: concat(dotnetEnv, apiBaseEnv, apiDemoEnv, apiSimulatorEnv, apiAiEnv, telemetryEnv, apiExtraEnv)
+    env: concat(dotnetEnv, apiBaseEnv, apiDemoEnv, apiSimulatorEnv, apiFoundryEnv, telemetryEnv, apiExtraEnv)
     // One replica exactly: the deadline worker, the outbox and the in-memory notification send log
     // live in this process, and migrations run at startup.
     minReplicas: 1
@@ -216,38 +210,6 @@ module web 'container-app.bicep' = {
   }
   // nginx resolves the API's host name once, when it starts.
   dependsOn: [api]
-}
-
-// --- AI workflow service ----------------------------------------------------------------------------
-
-// Never public: the service does not yet check who is calling it.
-module aiWorkflow 'container-app.bicep' = if (deployAi) {
-  name: 'app-ai-workflow'
-  params: {
-    location: location
-    tags: tags
-    name: appNames.aiWorkflow
-    environmentId: environmentId
-    identityId: aiIdentityId
-    registryServer: registryServer
-    registryUsername: registryUsername
-    registryPassword: assignRoles ? '' : registry.listCredentials().passwords[0].value
-    image: images.aiWorkflow
-    targetPort: 8080
-    external: false
-    env: concat(
-      [
-        // Inference is on only when an existing Foundry project is named.
-        { name: 'CARELOOP_AI_PROVIDER', value: empty(aiProjectEndpoint) ? 'disabled' : 'foundry' }
-        { name: 'AZURE_AI_PROJECT_ENDPOINT', value: aiProjectEndpoint }
-        { name: 'AZURE_AI_MODEL_DEPLOYMENT_NAME', value: aiModelDeploymentName }
-        { name: 'CARELOOP_AZURE_HOSTED', value: 'true' }
-        { name: 'AZURE_CLIENT_ID', value: aiIdentityClientId }
-        { name: 'CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED', value: string(aiPromptShieldsAttested) }
-      ],
-      telemetryEnv
-    )
-  }
 }
 
 // --- Simulators -------------------------------------------------------------------------------------

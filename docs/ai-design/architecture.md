@@ -1,5 +1,7 @@
 # CareLoop architecture
 
+> **AI implementation status:** The Python AI workflow service shown in this design has been removed from the repository. This document and the related AI documents describe a future design; the current API keeps AI off by default.
+
 ## Purpose and constraints
 
 CareLoop is a coordination and accountability layer around existing provider systems. The prototype uses simulators and synthetic identifiers; it does not connect to live endpoints or hold clinical records. Clinical interpretation, urgency, pathways, and closure requirements are supplied or approved by qualified humans. Deadlines remain configuration placeholders until approved.
@@ -18,7 +20,7 @@ flowchart LR
     STORE[(Coordination event log<br/>and case projection)]
     WORKER[Deadline and missing-event worker]
     UI[Demo UI<br/>exception dashboard · call outcomes · impact view]
-    AIWORKFLOW[Python AI service<br/>on-demand summaries and stage insights]
+    AIWORKFLOW[Proposed Python AI service<br/>on-demand summaries and stage insights]
     AIPROVIDER[Optional AI provider interface<br/>reviewable drafts]
     HUMAN[Authorized staff]
 
@@ -37,7 +39,7 @@ flowchart LR
 
 The event log is the source for audit and timeline reconstruction; the case projection supports worklist queries. FHIR-shaped exchange may be used at the adapter boundary, but the prototype's internal coordination model is not a clinical FHIR repository. The choice of relational database and local hosting method is still a team decision.
 
-The backend coordinates the ten-stage journey. The Python AI service is invoked on demand for the FR-11 clinician handoff summary and, as governed extensions, patient-friendly drafts, reviewed English-to-UAE-Arabic translation, and descriptive narratives over backend-computed aggregate metrics. It does not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Outputs are drafts with source references and require authorized human review. The .NET API remains the case-state, authorization, audit, and closure gate. See the [AI specification](ai-spec.md).
+The backend coordinates the ten-stage journey. In this proposed design, a Python AI service would be invoked on demand for the FR-11 clinician handoff summary and, as governed extensions, patient-friendly drafts, reviewed English-to-UAE-Arabic translation, and descriptive narratives over backend-computed aggregate metrics. It would not create tasks, assign owners, monitor deadlines, advance stages, calculate metrics, send messages, or write case state. Outputs would be drafts with source references and require authorized human review. The .NET API remains the case-state, authorization, audit, and closure gate. See the [AI specification](ai-spec.md).
 
 ## Ten-stage case lifecycle
 

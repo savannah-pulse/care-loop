@@ -1,6 +1,9 @@
 using CareLoop.Api.Features.Summaries;
+using CareLoop.Api.Infrastructure;
 using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Time;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CareLoop.Tests.Api;
 
@@ -38,5 +41,15 @@ public sealed class WorkingInfrastructureTests
 
         Assert.False(provider.IsEnabled);
         Assert.Null(await provider.DraftHandoffSummaryAsync(request, CancellationToken.None));
+    }
+
+    [Fact]
+    public void Summary_registration_rejects_removed_ai_workflow_provider()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Ai:Provider"] = "AiWorkflow" })
+            .Build();
+
+        Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddSummaries(configuration));
     }
 }

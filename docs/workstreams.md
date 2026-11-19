@@ -357,7 +357,6 @@ documentation-tool dependency findings remain; production dependency audit has z
 When `ApproveSummary` and `RejectSummary` are built, their source event is CareLoop's own: set `Origin` to
 `EventOrigins.CareLoop` (decision 34) so the timeline shows it as CareLoop, not the hospital system.
 - `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs`
-- `src/ai_workflow/**` (decision 8: the Python service calls Foundry, so one workstream owns the whole summary path)
 
 **Stubs to implement**
 
@@ -365,12 +364,10 @@ When `ApproveSummary` and `RejectSummary` are built, their source event is CareL
 - `Features/Summaries/HandoffFactCollector.cs`: the single data boundary. Everything a model may write about passes through it
 - `Features/Summaries/HandoffSummaryDrafter.cs`: the single draft path, shared by both triggers, validating every cited fact before anything is stored
 - `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
-- `Infrastructure/Ai/AiWorkflowProvider.cs`: calls the Python service (the default route once AI is on)
 - `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `src/ai_workflow/`: exploratory scaffold code exposes health and an informational stage map only. Purpose-specific draft endpoints, model-provider integration and the .NET API bridge described in [`ai-design/integration.md`](ai-design/integration.md) remain unbuilt.
 - `NoOpAiProvider` already works and stays the default, so everything runs with AI off
 
-The Python service has no model-provider integration. Implement the purpose-specific request contracts and API-supplied minimum-necessary data boundary before connecting Microsoft Foundry. The API-side provider bridge and direct Foundry route are also not built.
+The external model-provider integration is deferred; the Python workflow service is no longer included. Implement the purpose-specific request contracts and API-supplied minimum-necessary data boundary before connecting Microsoft Foundry. The API-side direct Foundry route is also not built.
 
 The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
 
@@ -456,7 +453,7 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Patient appointment confirmation | WS1, WS4, WS8 | Settled (decision 2): dropped. "I will come" is an acknowledgement; a patient reply never changes appointment status. |
 | Confidence rating | WS1, WS2, WS3, WS4, WS6, WS8, WS10 | Settled (decision 3, source changed by decisions 24 and 30): `NotificationUpdateKind.ConfidenceRated` with a 1 to 5 value, recorded by a nurse navigator after a call through `POST /cases/{caseId}/call-outcome`. No reply is a rating. |
 | Where the AI summary is approved | WS6, WS7, WS9 | Settled (decision 4): the CareLoop web app case screen drafts and approves; the HIS simulator receives the approved `DocumentReference` only. The case screen also rejects (decision 10). |
-| Where the model is called | WS9 | Settled (decision 8): the Python AI workflow service calls Foundry and the API calls it; `FoundryDirect` is a second route from the API. Both sit behind `IAiProvider`, whose `NoOp` default keeps AI off. |
+| Where the model is called | WS9 | Decision 8 originally selected a Python AI workflow service and kept `FoundryDirect` as a second API route. The Python service has since been removed; external providers are deferred, and `NoOp` remains the only working provider. |
 | Clinical text in a prompt | WS2, WS9 | Settled (decision 9): clinician-finalized clinical facts may be summarized, as typed facts with a source reference and review status. They are read for one draft and never written to the coordination store. Patient names, contact details, images and unfinalized or conflicting readings are never sent. |
 | Draft shape and reviewer decision | WS6, WS9 | Settled (decision 10): sections cite the fact identifiers they rest on; the record keeps deployment, prompt and policy versions; `Rejected` is a stored status beside `Draft` and `Approved`. |
 | When a draft is produced | WS9 | Settled (decision 11): on request, and when a handoff is proposed behind `Ai:AutoDraftOnHandoff`, off by default. |

@@ -7,6 +7,8 @@ This specification is part of the [AI design set](README.md).
 **Related work:** FR-04 (messaging simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
 **Alignment basis:** CareLoop AI Layer Engineering Design Specification v0.3; proposed extensions remain subject to team and clinical-adviser review.
 
+> **Implementation status:** This document is a design proposal. The Python AI service described here has been removed from the repository, and no external AI provider is currently enabled.
+
 ## 1. Purpose and design boundary
 
 Use a Microsoft Foundry-deployed large language model (LLM) to make already-recorded information easier to understand and hand off. The AI produces drafts and descriptive analysis; it does not operate the care workflow.

@@ -18,12 +18,12 @@ One resource group, `rg-careloop-<environment>`, holding:
 | Resource | Purpose |
 | --- | --- |
 | Container Apps environment | Runs the containers. Apps reach each other over HTTPS inside it |
-| Container apps | `web` and `api` (public), and optionally `ai-workflow`, `his-simulator`, `messaging-simulator` |
+| Container apps | `web` and `api` (public), and optionally `his-simulator` and `messaging-simulator` |
 | Container registry | Holds the images. No admin user; pushes and pulls use Entra ID |
 | PostgreSQL flexible server | The `careloop` database (see "Database choice") |
 | Key Vault | The database password, the connection string and the inbound-message secret |
-| Microsoft Foundry account, project, model deployment and guardrail | Only with `CREATE_FOUNDRY=true`; otherwise an existing Foundry is used |
-| Two managed identities | `apps` pulls images and reads Key Vault. `ai` pulls images and signs in to the existing Foundry project, and nothing else |
+| Microsoft Foundry account, project, model deployment and guardrail | Optional for future direct API integration; created only with `CREATE_FOUNDRY=true` |
+| Managed identity | `apps` pulls images and reads Key Vault; it can also be granted Foundry access for a future direct API provider |
 | Log Analytics and Application Insights | Container logs (optional) |
 | Virtual network, private endpoints, private DNS zones | Only with private networking |
 
@@ -53,10 +53,10 @@ An environment is a parameter file. `deploy.sh <name>` reads `environments/<name
 | Simulators | Deployed, public | Not deployed |
 | Timing | Demo pathway (deadlines in seconds) | Real pathway |
 | Database | Burstable B1ms, 7-day backups | General Purpose D2ds v5, 35-day geo-redundant backups |
-| AI | Service deployed, pointed at an existing Foundry project (or one created with `CREATE_FOUNDRY=true`) | Not deployed |
+| AI | API uses `NoOp`; Foundry resources can optionally be provisioned for future direct API integration | API uses `NoOp`; no AI provider is enabled |
 | Key Vault purge protection | Off | On |
 
-The switches are parameters of `main.bicep`: `privateNetworking`, `deploySimulators`, `deployAi`, `deployMonitoring`, plus `exposeApi`, `exposeSimulators` and `allowedIpRanges` for what is reachable from the internet.
+The switches are parameters of `main.bicep`: `privateNetworking`, `deploySimulators`, `deployMonitoring`, plus `exposeApi`, `exposeSimulators` and `allowedIpRanges` for what is reachable from the internet.
 
 ## Addresses
 
@@ -85,7 +85,6 @@ This is a prototype, so by default everything with a screen or an endpoint is pu
 | `web` (dashboard) | Public | Always public |
 | `api` | Public, so a hospital system can post to `/fhir` | `exposeApi = false`: reachable only from the other apps, and from outside through the web app on `/api/` |
 | `his-simulator`, `messaging-simulator` | Public, so their screens can be opened | `exposeSimulators = false` |
-| `ai-workflow` | Never public | |
 
 `allowedIpRanges` is empty by default. Given a list, only those address ranges can reach the public apps. It has not been tried: a list on an app may also block calls from the other apps, so test it before relying on it.
 
@@ -94,8 +93,8 @@ Settings the script reads from the shell:
 | Variable | Default | |
 | --- | --- | --- |
 | `AZURE_LOCATION` | `uaenorth` | Region |
-| `AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME`, `AZURE_AI_FOUNDRY_ACCOUNT_ID`, `CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED` | unset | The existing Foundry project; see "AI" |
-| `CREATE_FOUNDRY`, `AZURE_AI_LOCATION` | `false`, the region | Create a Foundry here instead; see "AI" |
+| `AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME` | unset | Optional Foundry configuration for a future direct API provider; AI remains off by default |
+| `CREATE_FOUNDRY`, `AZURE_AI_LOCATION` | `false`, the region | Create a Foundry here for future API integration |
 | `NAME_PREFIX` | `careloop` | Prefix of every resource name. Change it to run two copies of one environment in a subscription |
 | `RESOURCE_GROUP` | unset | Deploy into this existing resource group instead of creating `rg-careloop-<environment>` |
 | `ASSIGN_ROLES` | `true` | `false` when you are Contributor only; see "Deploying without the right to assign roles" |
@@ -134,7 +133,7 @@ No role assignment is made, and three things work differently:
 
 - **Image pulls.** The registry's admin user is switched on and each app pulls with its password, kept as a secret on the app, instead of with its managed identity.
 - **Key Vault.** The vault uses access policies instead of Azure roles. The apps still read their secrets through Key Vault references.
-- **Foundry.** Nobody is given the Foundry User role; the Foundry account's owner grants it to the AI service's identity by hand.
+- **Foundry.** No model role is assigned; the Foundry account's owner must grant access to the intended runtime identity when a provider is enabled.
 
 This is weaker than the default: anyone who can read an app's configuration can read the registry password. Use it for a prototype, and move to the default once someone with the right to assign roles can deploy. Do not flip `ASSIGN_ROLES` on an environment that already exists without checking the Key Vault afterwards: changing a vault between roles and access policies changes who can read it.
 
@@ -209,45 +208,21 @@ There is still one nginx configuration, `src/web/nginx.conf`. `apps.bicep` reads
 
 `AGENTS.md` lists the database as an open question: PostgreSQL is assumed and Azure SQL is the alternative. This project deploys PostgreSQL because that is what the API and Docker Compose run on today. It is not a decision. If the team chooses Azure SQL, the change is contained: replace `modules/postgres.bicep`, the connection string built in `main.bicep`, and the `postgres*` parameters.
 
-## AI
+## AI and Foundry
 
-`deployAi` deploys the `ai-workflow` app, internal only, with its own managed identity, and points it at a Foundry project. There are two ways to give it one.
+The Python AI workflow service is not included in this repository or deployment. The API uses `Ai:Provider = NoOp` by default, and its direct Foundry provider is still a stub. No model calls are made by this deployment.
 
-**Where things stand in the code.** On `main` the AI workflow service is a scaffold: it serves `/health` and `/workflow/stages`, reads none of the settings below and makes no call to Foundry. The API's `AiWorkflow` and `FoundryDirect` providers are not implemented either. So today these settings connect nothing; they are in place for when WS9 lands.
-
-### Use an existing Foundry (the usual case)
-
-1. Set these before running `deploy.sh` (the first two are the names the service and Docker Compose use). They are live addresses, so they are read from the environment and never written in a parameter file.
-
-   ```bash
-   export AZURE_AI_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
-   export AZURE_AI_MODEL_DEPLOYMENT_NAME="<deployment name>"
-   export AZURE_AI_FOUNDRY_ACCOUNT_ID="$(az cognitiveservices account show --name <account> --resource-group <its resource group> --query id -o tsv)"
-   ```
-
-2. The service signs in with its own managed identity, which needs the **Foundry User** role on the Foundry account. With `AZURE_AI_FOUNDRY_ACCOUNT_ID` set, the deployment gives it that role (you need the right to assign roles on the account). Without it, someone who owns the account grants the role by hand after the first deployment, to the identity in the `aiIdentityPrincipalId` output.
-
-   The service also refuses to call Foundry until an operator attests that Prompt Shields block both user and document (indirect) attacks on that model deployment. Once that is confirmed in the Foundry guardrail playground:
-
-   ```bash
-   export CARELOOP_FOUNDRY_PROMPT_SHIELDS_ATTESTED=true
-   ```
-
-3. Set `apiAiProvider = 'AiWorkflow'` once WS9 has finished that provider. Until then the API stays on `NoOp`.
-
-### Create a Foundry here
-
-For a subscription with no Foundry to point at:
+The optional `CREATE_FOUNDRY=true` setting creates a Foundry account, project, model deployment and a Prompt Shields guardrail for a future AI integration. To create one:
 
 ```bash
 CREATE_FOUNDRY=true AZURE_AI_LOCATION=<region that offers the model> infra/azure/scripts/deploy.sh dev
 ```
 
-This creates a Foundry account with keys disabled, a project, one model deployment and a guardrail with Prompt Shields blocking user and document attacks, gives the service's identity the Foundry User role, and points the service at it. The existing-Foundry variables are then ignored.
+For an existing project, `AZURE_AI_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME` are read from the environment, not written to parameter files. The deployment does not grant a runtime identity the Foundry User role; the account owner must grant access to the intended caller when a provider is implemented and approved. These settings do not turn AI on: `apiAiProvider` remains `NoOp` by default.
 
 The model defaults to `gpt-4.1-mini` on the `GlobalStandard` deployment type, which may process prompts in any region. Change `foundryModelName`, `foundryModelVersion` and `foundryModelSku` in the parameter file to suit; a model that is not offered in the region, or a subscription with no quota for it, fails the deployment. Deleting the environment soft-deletes the account; purge it (`az cognitiveservices account purge`) before creating it again under the same name.
 
-Either way, with private networking the Foundry account is reached over its public endpoint; a private endpoint for it is not set up here.
+With private networking the Foundry account is reached over its public endpoint; a private endpoint for it is not set up here.
 
 ## Before real patient data
 

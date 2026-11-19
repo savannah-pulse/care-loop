@@ -47,7 +47,7 @@ care-loop/
 ├── CareLoop.sln                        every .NET project (API, Domain, simulators and their tests)
 ├── Directory.Build.props               shared .NET build rules (XML docs enforced, warnings as errors)
 ├── global.json                         .NET SDK pin
-├── docker-compose.yml                  database, api, web, AI workflow, both simulators
+├── docker-compose.yml                  database, api, web and both simulators
 ├── .config/dotnet-tools.json           dotnet-ef
 │
 ├── contracts/
@@ -104,7 +104,7 @@ care-loop/
 │   │       │   ├── Notifications/      SmsNotificationProvider, EmailNotificationProvider (on SimulatorNotificationProvider),
 │   │       │   │                       Sms/EmailInboundNotificationHandler (on SimulatorInboundNotificationHandler),
 │   │       │   │                       StaffContactOptions
-│   │       │   ├── Ai/                 NoOpAiProvider (default), AiWorkflowProvider, FoundryDirectProvider
+│   │       │   ├── Ai/                 NoOpAiProvider (default), FoundryDirectProvider (deferred)
 │   │       │   ├── Pathways/           JsonPathwayProvider, PathwayOptions, breast-screening.json,
 │   │       │   │                       demo/breast-screening.json (same rules, shortened deadlines)
 │   │       │   ├── Templates/en/       approved message templates (standard for email, .sms for text messages)
@@ -113,9 +113,6 @@ care-loop/
 │   │       └── Worker/                 DeadlineWorker
 │   │
 │   ├── web/                            CareLoop dashboard only (React, TypeScript, Vite); a starter today
-│   │
-│   ├── ai_workflow/                    Python AI workflow service (see its README); proposes, never decides.
-│   │                                   Owned by WS9; it owns the handoff summary prompt and the Foundry call
 │   │
 │   ├── worker/                         README only: the deadline worker lives in CareLoop.Api/Worker
 │   │
@@ -136,7 +133,6 @@ care-loop/
     ├── simulators/
     │   ├── his/HisSimulator.Tests/
     │   └── messaging/MessagingSimulator.Tests/
-    ├── ai_workflow/                    Python workflow tests (under src/ai_workflow/tests today)
     ├── contracts/                      contract and schema compatibility tests (reserved)
     └── integration/                    end-to-end synthetic journey tests (reserved)
 ```
@@ -317,7 +313,7 @@ public interface ICaseRepository
 | `ICaseRepository` | `Domain/Cases` | `EfCaseRepository`, `InMemoryCaseRepository` (tests) |
 | `IPathwayProvider` | `Domain/Pathways` | `JsonPathwayProvider` |
 | `IClock` | `Domain/Time` | `SystemClock`, `FakeClock` (tests) |
-| `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `AiWorkflowProvider`, `FoundryDirectProvider` |
+| `IAiProvider` | `Api/Features/Summaries` | `NoOpAiProvider` (default), `FoundryDirectProvider` |
 | `INotificationProvider` | `Api/Features/Notifications` | `SmsNotificationProvider`, `EmailNotificationProvider` |
 | `IInboundNotificationHandler` | `Api/Features/Notifications` | `SmsInboundNotificationHandler`, `EmailInboundNotificationHandler` |
 | `IDomainEventSubscriber` | `Api/Features/Outbox` | `FhirPublisher`, `NotificationRouter` |
@@ -344,11 +340,10 @@ Timestamps are always real. Do not add a fast or fake clock to the API outside t
 | Database | PostgreSQL (not yet confirmed; Azure SQL is the alternative. Keep EF Core code provider-neutral) |
 | FHIR | Firely .NET SDK, R4 (version to confirm) |
 | Background work | `BackgroundService` inside the API: `DeadlineWorker`, `OutboxDispatcher` |
-| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
+| AI | `IAiProvider`; `NoOpAiProvider` is the default so everything runs with AI off. External providers remain deferred. See [`docs/ai-design/integration.md`](docs/ai-design/integration.md) |
 | Dashboard and simulator UIs | React, TypeScript, Vite |
 | .NET tests | xUnit |
 | Web tests | Vitest for unit, Playwright for end-to-end |
-| AI workflow coordination | Python service in `src/ai_workflow/` (see its README); it proposes actions and the API decides. It also owns the handoff summary prompt and the Foundry call |
 | Run | Docker Compose at the repository root |
 
 Ask before adding any dependency not listed here.
@@ -432,7 +427,7 @@ export function ExceptionRow({ item, onOpen }: ExceptionRowProps) {
 
 ### Project documentation
 
-- Each project folder (`src/api/`, `src/web/`, `src/ai_workflow/`, `src/simulators/his/`, `src/simulators/messaging/`) has a `README.md`: what it is, how to run it, how to test it, and its configuration.
+- Each project folder (`src/api/`, `src/web/`, `src/simulators/his/`, `src/simulators/messaging/`) has a `README.md`: what it is, how to run it, how to test it, and its configuration.
 - The root `README.md` explains the whole system and how to start it with Docker Compose.
 
 ## Testing

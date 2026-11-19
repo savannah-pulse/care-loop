@@ -1256,7 +1256,7 @@ export function draftHessaSummary(summaryId: string): HandoffSummary {
       'Help to get there: not recorded.',
     ],
     humanReviewRequired: true,
-    draftedBy: 'AiWorkflow',
+    draftedBy: 'careloop-ai',
     modelDeployment: 'summary-drafter-2026-10',
     promptVersion: 'fr11-v1',
     trigger: 'Requested',
