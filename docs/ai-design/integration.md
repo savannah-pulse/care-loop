@@ -147,7 +147,7 @@ The API does not parse the text or check it against the data. That is a delibera
 - the role briefing gets the API's opening sentence in front, and the patient's name (or `case` and the case number) in place of each token;
 - the impact summary gets the synthetic-data sentence at the end while `Ai:SyntheticData` is `true`;
 - an answer with no text is a failure;
-- an agent's refusal is a failure, never shown as text. An agent that cannot write a valid text answers `CANNOT_COMPLY`, sometimes with a reason code; `FoundryAiClient` treats a short answer that starts with it as a refusal and raises `AiUnavailableException`, which the endpoint answers as 503.
+- an agent's refusal is a failure, never shown as text. An agent that cannot write a valid text answers `CANNOT_COMPLY`, sometimes with a reason code; `FoundryAiClient` treats any answer that starts with it as a refusal, however long, and raises `AiUnavailableException`, which the endpoint answers as 503. An answer whose status is not `completed` (cut short or failed) is refused the same way, even when it carries some text.
 
 ## Reusing an answer
 

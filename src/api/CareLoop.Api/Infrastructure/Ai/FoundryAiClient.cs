@@ -60,15 +60,23 @@ public sealed class FoundryAiClient(HttpClient http, TokenCredential credential,
             }
 
             using var answer = JsonDocument.Parse(await response.Content.ReadAsStringAsync(ct));
+            // An answer cut short (incomplete) or failed can still carry some text; part of a patient message is not a draft.
+            if (answer.RootElement.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String
+                && !string.Equals(status.GetString(), "completed", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new AiUnavailableException($"The agent's answer was not complete (status {status.GetString()}).");
+            }
+
             var text = TextOf(answer.RootElement).Trim();
             if (text.Length == 0)
             {
                 throw new AiUnavailableException("The agent wrote no text.");
             }
 
-            // The agents answer CANNOT_COMPLY, sometimes with a reason code, when they will not write from what they were given.
-            return text.StartsWith(Refusal, StringComparison.OrdinalIgnoreCase) && text.Length < 100
-                ? throw new AiUnavailableException($"The agent declined: {text}.")
+            // The agents answer CANNOT_COMPLY, sometimes with a reason code or a longer explanation, when they will not write
+            // from what they were given. No text they are asked for starts with it, so any such answer is a refusal.
+            return text.StartsWith(Refusal, StringComparison.OrdinalIgnoreCase)
+                ? throw new AiUnavailableException($"The agent declined: {(text.Length > 100 ? text[..100] : text)}.")
                 : text;
         }
         catch (Exception ex) when (ex is HttpRequestException or JsonException or Azure.RequestFailedException or Azure.Identity.AuthenticationFailedException)

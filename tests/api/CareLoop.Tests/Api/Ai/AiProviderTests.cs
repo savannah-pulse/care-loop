@@ -128,6 +128,11 @@ public sealed class AiProviderTests
     [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[]}""")]
     [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[{"content":[{"text":"CANNOT_COMPLY:MISSING_FIELD"}]}]}""")]
     [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[{"content":[{"text":"cannot_comply"}]}]}""")]
+    // A refusal is a refusal however long its explanation is.
+    [InlineData(HttpStatusCode.OK, """{"status":"completed","output":[{"content":[{"text":"CANNOT_COMPLY: the data names no template, so no approved wording can be chosen, and no draft is written for this case."}]}]}""")]
+    // An answer that was cut short can carry some text; it is not a draft.
+    [InlineData(HttpStatusCode.OK, """{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"content":[{"text":"Dear {first name}, your appoint"}]}]}""")]
+    [InlineData(HttpStatusCode.OK, """{"status":"failed","output":[{"content":[{"text":"SYN partial."}]}]}""")]
     [InlineData(HttpStatusCode.OK, "SYN not json")]
     public async Task The_foundry_client_fails_closed_on_an_error_a_refusal_or_an_answer_with_no_text(HttpStatusCode status, string body) =>
         await Assert.ThrowsAsync<AiUnavailableException>(() =>

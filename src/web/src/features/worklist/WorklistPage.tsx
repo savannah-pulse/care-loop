@@ -52,9 +52,11 @@ interface GreetingProps {
   readonly summary?: string
   /** Whether to show the AI briefing: only on the reader's own team's list, and only when it has open cases. */
   readonly briefing?: boolean
+  /** The team's cases as text, so the briefing is read again when they change. */
+  readonly briefingSnapshot?: string
 }
 
-function Greeting({ now, summary, briefing = false }: GreetingProps) {
+function Greeting({ now, summary, briefing = false, briefingSnapshot }: GreetingProps) {
   const me = useSignedInStaff()
   return (
     <div className="page-head">
@@ -64,7 +66,7 @@ function Greeting({ now, summary, briefing = false }: GreetingProps) {
         {t(`worklist.greeting.${partOfDay(now)}`, { name: me.shortName })}
       </h1>
       {summary ? <p className="lede">{summary}</p> : null}
-      {briefing ? <RoleBriefing now={now} /> : null}
+      {briefing ? <RoleBriefing now={now} snapshot={briefingSnapshot} /> : null}
     </div>
   )
 }
@@ -348,6 +350,8 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
   const summary = summaryLine(countOpen(rows, now))
   // The briefing is about the reader's own team's open cases, so it is not shown over another team's list.
   const briefing = ownTeam && teamRows.length > 0
+  // The list is re-read in the background; the same cases give the same text, so the briefing is read again only on a change.
+  const briefingSnapshot = useMemo(() => JSON.stringify(list.cases), [list.cases])
   const namesHidden = namesHiddenFor(me.role)
   const limitNote = list.complete ? null : (
     <p className="note">{t('worklist.limited', { limit: CASE_LIST_LIMIT })}</p>
@@ -421,7 +425,7 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
     return (
       <>
         {/* With nothing to list, "0 open cases" would only repeat the message below. */}
-        <Greeting now={now} summary={rows.length > 0 ? summary : undefined} briefing={briefing} />
+        <Greeting now={now} summary={rows.length > 0 ? summary : undefined} briefing={briefing} briefingSnapshot={briefingSnapshot} />
         {toolbarExtra}
         {scopeBar}
         <EmptyState
@@ -461,7 +465,7 @@ function WorklistBody({ list, now, toolbarExtra, ownTeam }: WorklistBodyProps) {
 
   return (
     <>
-      <Greeting now={now} summary={summary} briefing={briefing} />
+      <Greeting now={now} summary={summary} briefing={briefing} briefingSnapshot={briefingSnapshot} />
       {toolbarExtra}
       {scopeBar}
       <div className="toolbar">

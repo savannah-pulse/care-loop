@@ -1,7 +1,8 @@
-import { useCallback } from 'react'
+import { useCallback, useRef, useState } from 'react'
+import { useSignedInStaff, type StaffMember } from '../identity'
 import { api, type CareLoopClient } from './client'
 import { callApi, type ApiOutcome } from './outcome'
-import { useApiRead, type Read, type ReadOptions } from './read'
+import { useApiRead, type Read, type ReadOptions, type ReadState } from './read'
 import type {
   AiText,
   CaseDetail,
@@ -317,49 +318,79 @@ export function readCase(
   )
 }
 
+/** Asks the API for one AI text; `refresh` asks for a new one instead of the one it kept. */
+type AiTextRequest = (refresh: boolean, signal: AbortSignal) => Promise<ApiOutcome<AiText>>
+
+const requestRoleBriefing: AiTextRequest = (refresh, signal) =>
+  callApi(() => api.GET('/ai/role-briefing', { params: { query: { refresh: refresh ? true : undefined } }, signal }))
+
+const requestImpactSummary: AiTextRequest = (refresh, signal) =>
+  callApi(() => api.GET('/ai/impact-summary', { params: { query: { refresh: refresh ? true : undefined } }, signal }))
+
+/**
+ * Reads an AI text, and reads it again when the data it describes changes.
+ *
+ * @remarks
+ * A change of `snapshot` reads again quietly: the text on screen stays until the new one arrives, and
+ * the API reuses its answer unless the data it sends the model changed too. Only the first read after
+ * the reader asks for a new text (`refreshes` went up) asks the API to write a new one; a text read
+ * for another person, or before that request, is never kept on screen.
+ */
+function useAiText(request: AiTextRequest, refreshes: number, snapshot: string | undefined): Read<AiText> {
+  const person = useSignedInStaff()
+  const asked = useRef(0)
+  const load = useCallback(
+    (signal: AbortSignal) => {
+      const refresh = refreshes > asked.current
+      asked.current = refreshes
+      return request(refresh, signal)
+    },
+    [request, refreshes],
+  )
+  const read = useApiRead(load, snapshot)
+  const [kept, setKept] = useState<{ person: StaffMember; refreshes: number; state: ReadState<AiText> }>()
+  if (read.state.status !== 'loading' && kept?.state !== read.state) {
+    setKept({ person, refreshes, state: read.state })
+  }
+  const keep =
+    read.state.status === 'loading' && kept?.state.status === 'ready' && kept.person === person && kept.refreshes === refreshes
+  return keep ? { state: kept.state, retry: read.retry } : read
+}
+
 /**
  * Reads the AI-written summary of the signed-in person's open cases.
  *
- * @param refreshes - How many times the reader has asked for a new summary. Above zero, the API is
- * asked to write a new one instead of reusing the one it kept.
+ * @param refreshes - How many times the reader has asked for a new summary. Each time it goes up,
+ * the API is asked once to write a new one instead of reusing the one it kept.
+ * @param snapshot - Anything that changes when the cases the summary describes change, for example
+ * the worklist as text. A change reads the summary again, so it never stays beside a newer list.
  * @returns The summary, or why there is none: `conflict` while AI is switched off, `unavailable`
  * when AI could not write it.
  *
  * @remarks
- * Side effect: calls `GET /ai/role-briefing`, once per reader and once more per refresh. It is not
- * re-read on a timer: the API reuses its answer while the cases are unchanged.
+ * Side effect: calls `GET /ai/role-briefing`, once per reader, once more per refresh and once more
+ * each time `snapshot` changes. It is not re-read on a timer: the API reuses its answer while the
+ * cases are unchanged.
  */
-export function useRoleBriefing(refreshes: number = 0): Read<AiText> {
-  const load = useCallback(
-    (signal: AbortSignal) =>
-      callApi(() =>
-        api.GET('/ai/role-briefing', { params: { query: { refresh: refreshes > 0 ? true : undefined } }, signal }),
-      ),
-    [refreshes],
-  )
-  return useApiRead(load)
+export function useRoleBriefing(refreshes: number = 0, snapshot?: string): Read<AiText> {
+  return useAiText(requestRoleBriefing, refreshes, snapshot)
 }
 
 /**
  * Reads the AI-written reading of the impact figures.
  *
- * @param refreshes - How many times the reader has asked for a new summary. Above zero, the API is
- * asked to write a new one instead of reusing the one it kept.
+ * @param refreshes - How many times the reader has asked for a new summary. Each time it goes up,
+ * the API is asked once to write a new one instead of reusing the one it kept.
+ * @param snapshot - Anything that changes when the figures change, for example the figures as text.
+ * A change reads the summary again, so it never stays beside newer figures.
  * @returns The summary, or why there is none: `conflict` while AI is switched off, `unavailable`
  * when AI could not write it.
  *
  * @remarks
- * Side effect: calls `GET /ai/impact-summary`, once per reader and once more per refresh, for the
- * same scope as `GET /metrics`: the reader's facility, or every facility for the coordinator.
+ * Side effect: calls `GET /ai/impact-summary`, once per reader, once more per refresh and once more
+ * each time `snapshot` changes, for the same scope as `GET /metrics`: the reader's facility, or
+ * every facility for the coordinator.
  */
-export function useImpactSummary(refreshes: number = 0): Read<AiText> {
-  const load = useCallback(
-    (signal: AbortSignal) =>
-      callApi(() =>
-        api.GET('/ai/impact-summary', { params: { query: { refresh: refreshes > 0 ? true : undefined } }, signal }),
-      ),
-    [refreshes],
-  )
-  return useApiRead(load)
+export function useImpactSummary(refreshes: number = 0, snapshot?: string): Read<AiText> {
+  return useAiText(requestImpactSummary, refreshes, snapshot)
 }
-

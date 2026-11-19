@@ -7,6 +7,8 @@ import { t } from '../../i18n'
 export interface RoleBriefingProps {
   /** The current time, to say when the summary was written. */
   readonly now: Date
+  /** The worklist the summary describes, as text; when it changes the summary is read again. */
+  readonly snapshot?: string
 }
 
 /**
@@ -14,13 +16,14 @@ export interface RoleBriefingProps {
  *
  * @remarks
  * The words come from `GET /ai/role-briefing`. They are a reading aid: the worklist below is the
- * record. "Refresh" asks for a new summary instead of a reused one.
+ * record. "Refresh" asks for a new summary instead of a reused one. The summary is read again when the
+ * worklist changes, so it does not stay beside a newer list.
  */
-export function RoleBriefing({ now }: RoleBriefingProps) {
+export function RoleBriefing({ now, snapshot }: RoleBriefingProps) {
   const [refreshes, setRefreshes] = useState(0)
   return (
     <AiSummary
-      read={useRoleBriefing(refreshes)}
+      read={useRoleBriefing(refreshes, snapshot)}
       now={now}
       label={t('worklist.briefing.label')}
       loadingLabel={t('worklist.briefing.loading')}
