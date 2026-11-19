@@ -71,7 +71,7 @@ public sealed record CaseDetailResponse
     /// <summary>The state of each parallel track.</summary>
     public required IReadOnlyList<TrackStatusResponse> Tracks { get; init; }
 
-    /// <summary>Reference to the recorded outcome evidence, when there is any.</summary>
+    /// <summary>Reference to the recorded outcome evidence, when there is any. <see langword="null"/> for the coordinator, who sees no one's identity.</summary>
     public string? OutcomeEvidenceReference { get; init; }
 
     /// <summary>The reason the case was closed; <see langword="null"/> while it is open.</summary>

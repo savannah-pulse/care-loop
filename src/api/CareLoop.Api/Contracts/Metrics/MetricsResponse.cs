@@ -54,7 +54,11 @@ public sealed record MetricsResponse
     /// <summary>Closed cases per authorized typed closure reason.</summary>
     public required IReadOnlyDictionary<string, int> ClosuresByReason { get; init; }
 
-    /// <summary>Cases that actually reached each display label in an applied audit projection; no skipped labels are inferred.</summary>
+    /// <summary>
+    /// Cases that reached each display label. A label counts once the event that puts a case there was applied, even when
+    /// the case moved on at once, as it does from result received to owner assigned; an optional step (patient acknowledged,
+    /// consultation, follow-up or closure review) counts only for cases where it happened.
+    /// </summary>
     public required IReadOnlyDictionary<string, RateMeasureResponse> CasesReachingDisplayLabel { get; init; }
 
     /// <summary>Current cases per Domain display label.</summary>

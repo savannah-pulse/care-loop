@@ -153,7 +153,11 @@ Staff reads default to their facility (the current team boundary). An explicit d
 outside that facility, requires a nonblank `reason` of at most 1000 characters. Coordinators have global aggregate
 metrics, but their case reads are limited to cases with an open escalation addressed to the coordinator.
 Names, MRNs, patient references and the hospital's result identifier are null on coordinator case, detail and
-exception responses: the coordinator sees CareLoop's case number only.
+exception responses: the coordinator sees CareLoop's case number only. The outcome evidence reference on the case
+(including the acknowledgement's answer) and every timeline entry's `evidenceReference`, which name hospital records,
+are null for the coordinator too. Where a timeline entry's `reason` or `actorReference` quotes one of the case's
+identifiers, as a refused resend of a result does, the coordinator reads `(hidden)` in its place. Other roles read all
+of these unchanged.
 
 Each timeline entry has an `origin`: `hospital` (the case's source system), `careloop` (CareLoop itself, including a
 call a nurse recorded and CareLoop's record of what it sent), `sms` or `email` (a delivery report or the patient's reply
@@ -192,6 +196,12 @@ Measures use applied audit snapshots only, including source-received progress ra
 - Treatment timeliness uses cases with `treatment-plan` as denominator and subsequent `treatment-started` at or
   before that plan's captured `start-treatment` deadline as numerator. A referral is not completed care.
 - Current and historically reached display-label counts, closure reasons and open exception counts remain distinct.
+- A display label counts as reached once the event that puts a case there was applied, even when the case moved on at
+  once: the screening result receives the result, opens the case and assigns an owner in one event, and an outcome
+  recorded after every required track is complete goes straight to closure review. So every case counts for result
+  received and case opened, and every case past follow-up counts for outcome recorded. The optional steps (patient
+  acknowledged, consultation, follow-up, and closure review, which a closure by documented exception bypasses) count
+  only for cases where they happened, even when a later step hid them from the label.
 - A confidence rating is recorded by a nurse navigator after a call (`POST /cases/{caseId}/call-outcome`), never by a
   text or email reply. `ConfidenceRate` is rating participation among notified cases, not a clinical outcome. `AverageConfidence`
   separately averages each case's latest 1-5 rating.
@@ -199,7 +209,7 @@ Measures use applied audit snapshots only, including source-received progress ra
 Empty populations have null rates/medians, not zero success. The API does not add simulation labels, a working-hours
 calendar, AI narrative or the WS10 escalation-off comparison.
 
-Focused validation (98 passed, none skipped):
+Focused validation (126 passed, none skipped):
 
 ```sh
 dotnet test tests/api/CareLoop.Tests/CareLoop.Tests.csproj --no-restore --filter "FullyQualifiedName~ReadEndpointsTests|FullyQualifiedName~CaseDisplayLabelTests|FullyQualifiedName~EscalationAcknowledgementTests|FullyQualifiedName~DeadlineWorkerTests|FullyQualifiedName~DeadlinePolicyTests" --verbosity minimal

@@ -20,7 +20,7 @@ public sealed record TimelineEntryResponse
     /// <summary>Whether the event was applied or refused (for example a closure attempt without evidence).</summary>
     public required SourceEventDisposition Disposition { get; init; }
 
-    /// <summary>The source system or actor responsible.</summary>
+    /// <summary>The source system or actor responsible. For the coordinator, <c>(hidden)</c> where it would name the patient.</summary>
     public required string ActorReference { get; init; }
 
     /// <summary>The role the actor acted in.</summary>
@@ -38,10 +38,13 @@ public sealed record TimelineEntryResponse
     /// <summary>The stage after the event.</summary>
     public required CaseStage NewStage { get; init; }
 
-    /// <summary>Why the change was made or refused.</summary>
+    /// <summary>
+    /// Why the change was made or refused. For the coordinator, any identifier of the patient or of a hospital record
+    /// that the wording quotes reads <c>(hidden)</c>.
+    /// </summary>
     public required string Reason { get; init; }
 
-    /// <summary>Reference to the supporting evidence, when there is any.</summary>
+    /// <summary>Reference to the supporting evidence, when there is any. <see langword="null"/> for the coordinator, who sees no one's identity.</summary>
     public string? EvidenceReference { get; init; }
 
     /// <summary>

@@ -419,7 +419,7 @@ export interface components {
             exceptions: string[];
             /** @description The state of each parallel track. */
             tracks: components["schemas"]["TrackStatusResponse"][];
-            /** @description Reference to the recorded outcome evidence, when there is any. */
+            /** @description Reference to the recorded outcome evidence, when there is any. `null` for the coordinator, who sees no one's identity. */
             outcomeEvidenceReference?: null | string;
             closureReason?: null | components["schemas"]["ClosureReason"];
             /**
@@ -796,7 +796,11 @@ export interface components {
             closuresByReason: {
                 [key: string]: number | string;
             };
-            /** @description Cases that actually reached each display label in an applied audit projection; no skipped labels are inferred. */
+            /**
+             * @description Cases that reached each display label. A label counts once the event that puts a case there was applied, even when
+             *     the case moved on at once, as it does from result received to owner assigned; an optional step (patient acknowledged,
+             *     consultation, follow-up or closure review) counts only for cases where it happened.
+             */
             casesReachingDisplayLabel: {
                 [key: string]: components["schemas"]["RateMeasureResponse"];
             };
@@ -1009,7 +1013,7 @@ export interface components {
             eventType: components["schemas"]["CaseEventType"];
             /** @description Whether the event was applied or refused (for example a closure attempt without evidence). */
             disposition: components["schemas"]["SourceEventDisposition"];
-            /** @description The source system or actor responsible. */
+            /** @description The source system or actor responsible. For the coordinator, `(hidden)` where it would name the patient. */
             actorReference: string;
             /** @description The role the actor acted in. */
             actorRole: string;
@@ -1026,9 +1030,12 @@ export interface components {
             priorStage?: null | components["schemas"]["CaseStage"];
             /** @description The stage after the event. */
             newStage: components["schemas"]["CaseStage"];
-            /** @description Why the change was made or refused. */
+            /**
+             * @description Why the change was made or refused. For the coordinator, any identifier of the patient or of a hospital record
+             *     that the wording quotes reads `(hidden)`.
+             */
             reason: string;
-            /** @description Reference to the supporting evidence, when there is any. */
+            /** @description Reference to the supporting evidence, when there is any. `null` for the coordinator, who sees no one's identity. */
             evidenceReference?: null | string;
             /**
              * @description Where the entry came from: `hospital` (the case's source system), `careloop` (CareLoop itself, including
