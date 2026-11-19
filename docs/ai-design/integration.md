@@ -1,229 +1,100 @@
-# AI integration design: the handoff summary
+# AI integration: API summaries and Foundry prompt agents
 
-Design contract for a future clinician handoff-summary capability: the API boundary, the proposed provider integration, and what remains unimplemented.
+This document distinguishes the code that exists in `CareLoop.Api` and `src/ai_agents/` from the intended backend-to-agent flow. The names and versions of the hosted agents are visible in source; their prompts, tools, and model settings are managed in Microsoft Foundry and are not represented in this repository.
 
-This is FR-11, and this document is the contract. It implements decisions 8 to 11 (see [ui-design-gap-analysis.md](../ui-design-gap-analysis.md) section 5). [`ai-spec.md`](ai-spec.md) is the design proposal behind it and is superseded here where the two differ.
+## Current implementation
 
-> The Python workflow service has been removed from the repository. No external AI provider is currently enabled; `NoOp` remains the working default. References below to the Python service describe the original proposed integration, not a component that can currently be built or run.
-
-## The boundary
-
-AI makes already-recorded information easier to read and hand over. It does not operate the workflow.
-
-| Capability | Owner | What AI may do |
+| Component | Present in source | Current status |
 |---|---|---|
-| Case state, ownership, deadlines, exceptions, referrals, appointments, closure | .NET API and the deadline worker | Nothing. No AI decisions, no AI writes |
-| Counts, rates, denominators, timing, overdue status | API read models | Nothing today. A narrative over precomputed aggregates is designed, not built |
-| Clinician handoff summary | Deferred external provider, originally designed as a Python service calling Microsoft Foundry | Organize supplied facts into cited sections. A draft only |
-| Patient-facing wording | Approved templates under `Infrastructure/Templates/{language}/` | Nothing. Patient wording is templated, not generated |
-| Arabic | Deferred | Nothing. English only, everything language-keyed |
+| API summary purpose | `SummaryPurpose.ClinicianHandoff`; `PatientStageExplanation` is also declared | Clinician handoff is the only purpose described as built by the API contracts. Role/view selection and mapping to an agent are not implemented. |
+| API provider seam | `IAiProvider.DraftHandoffSummaryAsync(HandoffSummaryRequest, CancellationToken)` | Defined for handoff summaries. |
+| Default provider | `NoOpAiProvider` | Registered when `Ai:Provider` is absent or `NoOp`; returns no draft. |
+| Direct Foundry provider | `FoundryDirectProvider` | Registered only for `Ai:Provider=FoundryDirect`; its draft method is a stub. It does not invoke the prompt agents below. |
+| Fact collection and drafting | `HandoffFactCollector`, `HandoffSummaryDrafter` | Contracts and validation intent are documented in code; methods still throw `NotImplementedException`. |
+| Summary routes | Draft, approve, and reject routes under `/cases/{caseId}/handoff-summary` | Mapped by the API, but the handlers return `501 Not Implemented`. |
+| Automatic draft | `AutoDraftOnHandoff` | Optional subscriber is registered only when configured; its handler is a stub. |
+| Foundry prompt-agent clients | `src/ai_agents/{rolebriefing,patientnotification,impactsummary}/run_agent.py` | Standalone console scripts, not an API or a hosted service. |
 
-The four rules that do not bend, from `AGENTS.md`:
+`Program.cs` maps the three summary routes and `DependencyInjection.AddSummaries` registers only `NoOp` or the deferred `FoundryDirect` provider. No current API code calls `FoundryAgent`, selects an agent by role or view, or sends a request to `src/ai_agents/`. The Python scripts load a local `.env`, authenticate with `DefaultAzureCredential`, connect to a hard-coded Foundry agent name/version, submit the literal `"Hello"`, and stream the output to the console. They do not expose HTTP endpoints or a shared request/response contract. Each agent's actual instructions and configuration are server-side in Foundry.
 
-- AI output is a draft. A person approves it, and the approval is an event.
-- AI cannot set urgency, alter source data, close a case or send a message. It is given no way to.
-- Nothing is published until a person approves it. The FHIR publisher sends a `DocumentReference` only for an approved summary.
-- Failure is visible. There is no success-shaped fallback: "no draft" and "a draft that may be wrong" must never look the same to the person about to sign it.
+| Script folder | Foundry agent name | Version in script |
+|---|---|---:|
+| `src/ai_agents/rolebriefing/` | `role-briefing` | 2 |
+| `src/ai_agents/patientnotification/` | `patient-notification` | 2 |
+| `src/ai_agents/impactsummary/` | `impact-summary` | 4 |
 
-## Who calls the model
+The folder and agent names suggest their areas, but source code does not define the agents' detailed behavior, role/view coverage, or input/output schema. Do not treat names as a complete contract.
 
-The original design selected the Python service for this role (decision 8), keeping its prompt, response schema and Foundry credentials together while the API held no model credential. That service has since been removed; this remains a proposal, not a supported provider route.
+## Intended backend-to-agent flow
 
-A direct API-to-Foundry route was also designed, but `FoundryDirectProvider` is still a stub. Both routes were intended to sit behind `IAiProvider`; currently only `NoOp` is working.
-
-```mermaid
-flowchart LR
-    SCREEN[Case screen]
-    API[".NET API<br/>facts, validation, audit"]
-    STORE[(Case projection<br/>and event log)]
-    PY["Future AI provider<br/>prompt and schema"]
-    FOUNDRY["Microsoft Foundry<br/>model deployment"]
-    REVIEWER[Authorized clinician]
-    HIS[HIS]
-
-    SCREEN -->|draft / approve / reject| API
-    API <--> STORE
-    API -->|finalized facts only| PY
-    PY -->|Entra-authenticated inference| FOUNDRY
-    FOUNDRY -->|schema-constrained draft| PY
-    PY -->|cited draft, or 422 with a reason| API
-    API -->|draft with its sources| REVIEWER
-    REVIEWER -->|approve or reject| API
-    API -->|approved summary only| HIS
-```
-
-`Ai:Provider` selects the route:
-
-| Value | Meaning |
-|---|---|
-| `NoOp` | Default. AI is off. Drafting answers 409 and every other feature runs untouched |
-| `AiWorkflow` | Retired. The Python service is no longer included |
-| `FoundryDirect` | Deferred. The API-side provider remains a stub |
-
-## Draft-request integration
+The desired architecture is for the backend to select the applicable summary purpose/view and the corresponding Foundry agent, using an authorized role and a minimum, purpose-specific set of facts. The agent returns a draft; the API validates and persists it, and an authorized person reviews it before use. This routing is a target, not a description of a working API call:
 
 ```mermaid
 sequenceDiagram
-    actor Clinician
-    participant UI as CareLoop review UI
-    participant API as .NET API
-    participant Store as Coordination store
-    participant AI as Python AI service
-    participant Foundry as Microsoft Foundry
+    actor Reviewer as Authorized staff
+    participant UI as CareLoop UI
+    participant API as CareLoop API
+    participant Provider as IAiProvider (target adapter)
+    participant Agent as Selected Foundry prompt agent
 
-    Clinician->>UI: Request handoff draft
-    UI->>API: Authorized draft request
-    API->>Store: Load eligible finalized facts
-    Store-->>API: Facts and source references
-    API->>AI: Purpose-scoped JSON request
-    AI->>AI: Validate request and assemble versioned prompt
-    AI->>Foundry: Entra-authenticated inference
-    Foundry-->>AI: Model response
-    AI->>AI: Validate schema, citations and language
-    AI-->>API: Draft with source references or explicit failure
-    API->>API: Revalidate and persist draft, audit provenance
-    API-->>UI: Draft state and cited facts
-    Clinician->>UI: Edit, approve or reject
-    UI->>API: Review decision for exact draft version
-    API->>Store: Append review event
+    Reviewer->>UI: Request a role/view-specific draft
+    UI->>API: Draft request
+    API->>API: Authorize; select purpose, view, agent and eligible facts
+    API->>Provider: Purpose-scoped request (contract to be implemented)
+    Provider->>Agent: Invoke selected Foundry agent (transport to be implemented)
+    Agent-->>Provider: Draft response (schema to be agreed)
+    Provider-->>API: Draft
+    API->>API: Validate citations and persist draft
+    API-->>UI: Draft for review
+    Reviewer->>API: Approve edited text or reject with reason
 ```
 
-The design document also proposes patient-message drafting, Arabic translation and aggregate insight narratives. These remain governed extensions; they do not alter the implemented FR-11 boundary or allow the AI service to dispatch messages or mutate case state.
+Before this flow can be implemented, the API needs an explicit role/view-to-purpose/agent mapping, an agent invocation adapter, and a request/response contract. The source does not establish an HTTP route, JSON wire format, model output shape for these agents, or the roles allowed to request/review each purpose. None is inferred here.
 
-## What flows between them
+### Existing API handoff-summary contract
 
-### The API builds the facts
+The API types define the intended handoff request and draft shape. They are internal C# contracts for `IAiProvider`, not the wire format of the Foundry clients.
 
-`HandoffFactCollector` is the whole data boundary. Everything the model may write about passes through it, so one test can hold it to account.
+`HandoffSummaryRequest` contains:
 
-Sent:
+- `RequestId`, `CaseId`, and `PathwayId`.
+- `Purpose` and `Trigger` (`Requested` or `HandoffProposed`).
+- `Facts`, each with `FactId`, `FactType`, `Value`, `RecordedAt`, `SourceReference`, `ReviewStatus`, and optional `RecordedBy`.
+- Optional `RecordedNextStep`; absence must not be filled by the model.
+- `KnownGaps`, `Language`, `PolicyVersion`, and `PromptVersion`.
 
-- Coordination facts from the case and its timeline: stage, owner, next action, due time, unresolved exceptions, correlated events.
-- Clinical facts a clinician finalized, read from the source for the length of one draft (decision 9). They are **not** written to the coordination store; the clinical record stays in the source system.
+The contract says that only finalized facts may be supplied. The fact collector is intended to omit patient names, contact details, images, and unfinalized or conflicting clinical interpretations; clinical source records remain in their system of record. These are intended collector guarantees, not currently executed behavior, because `CollectAsync` is unimplemented.
 
-Never sent:
+`AiDraft` contains `RequestId`, ordered sections (`Heading`, `Text`, `SourceFactIds`), `MissingOrConflictingFacts`, `ProviderName`, `ModelDeployment`, `PromptVersion`, and `Language`. Each section must cite only fact IDs present in the request; an uncited section is reserved for reporting missing information. `HandoffSummaryDrafter` is intended to revalidate the response before storage, but its method is also unimplemented.
 
-- Patient names and contact details.
-- Images. No imaging, pathology or radiology interpretation is ever asked for.
-- Unfinalized or conflicting interpretations. These are named in `known_gaps` so the draft flags them, rather than a person discovering the silence later.
+The public response type, `HandoffSummaryResponse`, adds the summary and case IDs, status, flattened text, human-review flag, trigger, timestamps, and approval/rejection references. It does not include a role, view, or purpose field today.
 
-Every fact carries `fact_id`, `fact_type`, `value`, `recorded_at`, `source_reference` and `review_status`. The identifier is what a draft must cite.
+### API routes and review lifecycle
 
-### The request
-
-`POST {Ai:AiWorkflow:BaseUrl}/summaries/handoff`
-
-| Field | Notes |
-|---|---|
-| `request_id` | Correlates the call, the stored draft and the audit entry |
-| `case_reference` | A coordination reference, never a direct patient identifier |
-| `purpose` | `clinician_handoff`; the only purpose built |
-| `trigger` | `requested` or `handoff_proposed` |
-| `stage` | Backend-owned workflow stage |
-| `facts[]` | At least one, all `finalized` |
-| `recorded_next_step` | Absent means none is recorded, and the draft must say so rather than invent one |
-| `known_gaps[]` | What the collector found unfinalized, conflicting or missing |
-| `language` | `en`. An unsupported tag fails rather than falling back |
-| `policy_version`, `prompt_version` | Stamped onto the draft |
-
-The model gets this and nothing else. It cannot query the event store, call a source system or choose a tool. Text inside a fact that reads like an instruction is therefore summarised, never obeyed: there is no field through which a fact could set urgency, a stage or an action, and the output is validated against the facts before anything is stored.
-
-### The response
-
-```json
-{
-  "request_id": "request-demo-001",
-  "purpose": "clinician_handoff",
-  "language": "en",
-  "status": "draft",
-  "sections": [
-    { "heading": "Recorded progress", "text": "...", "source_fact_ids": ["fact-001"] }
-  ],
-  "missing_or_conflicting_facts": [],
-  "human_review_required": true,
-  "model_deployment": "configured-deployment-name",
-  "prompt_version": "fr11-v1"
-}
-```
-
-`status` is always `draft` and `human_review_required` always `true`. `source_fact_ids` may be empty only for a section stating that something is missing, because an absence has no fact to cite.
-
-### Validation, on both sides
-
-A draft is refused, and nothing stored, when it cites a `fact_id` that was not supplied, answers another `request_id`, used another `prompt_version`, or is not in the requested language. A citation of an unsupplied fact means the model wrote something it was not given, which is the failure this design exists to catch.
-
-The Python service checks this before returning. `HandoffSummaryDrafter` checks it again on receipt, because the provider is a service across the network and trust in it is not a safety argument.
-
-### Failure
-
-The service answers `422` with a reason when AI is off or unconfigured, the request exceeds `CARELOOP_AI_MAX_INPUT_BYTES`, the model times out or is refused by a content filter, or the output does not validate. The API raises `AiDraftUnavailableException` and the endpoint answers `503`, and the case screen shows "draft unavailable, human review needed". No substitute text is ever produced.
-
-## The three things a person can do
-
-| Action | Endpoint | Effect |
+| Method and route | Declared behavior | Current behavior |
 |---|---|---|
-| Draft | `POST /cases/{caseId}/handoff-summary` | Stores a record in status `Draft`. 409 when AI is off or a summary is already approved; 503 when no valid draft could be produced |
-| Approve | `POST /cases/{caseId}/handoff-summary/{summaryId}/approval` | Stores exactly the text submitted, which may differ from the draft, and writes a `HandoffSummaryApproved` source event naming the approver. This is what lets the FHIR publisher send the `DocumentReference` |
-| Reject | `POST /cases/{caseId}/handoff-summary/{summaryId}/rejection` | Records the reviewer and reason. No case event: rejection changes no stage, owner or deadline |
+| `POST /cases/{caseId}/handoff-summary` | Produce a draft; `DraftTrigger.Requested` | Handler returns `501`. |
+| `POST /cases/{caseId}/handoff-summary/{summaryId}/approval` | Approve exact submitted text, which may be edited; writes a `HandoffSummaryApproved` source event | Handler returns `501`. |
+| `POST /cases/{caseId}/handoff-summary/{summaryId}/rejection` | Store reviewer and reason without changing case state | Handler returns `501`. |
 
-Three statuses, not two. A draft a reviewer turned down must be distinguishable from one nobody has read, both on the case screen and for the evaluation question of how often reviewers reject what AI writes.
+The endpoint declarations document `201` for drafting and `200` for review decisions, alongside error responses, but no successful handler behavior exists yet. The code reads demo identity and role headers for approve/reject requests; pathway-based authorization is still a TODO. Approval is designed to raise a domain event so the FHIR publisher can publish only the approved summary. Rejection is designed not to alter stage, owner, or deadline. Neither workflow is currently operational.
 
-Approval happens in the CareLoop web app (decision 4). The HIS simulator receives the approved `DocumentReference` and nothing else.
+## Safety and data boundary
 
-### When a draft is produced
+These are required boundaries for any implementation, not claims that the current stub enforces them:
 
-On request, and automatically when a handoff is proposed (decision 11). `AutoDraftOnHandoff` subscribes to `HandoffProposed` so the receiving clinician finds a draft waiting instead of having to ask.
+- The API remains authoritative for case state, ownership, deadlines, escalation, clinical urgency, and closure.
+- AI output is a draft. A human must approve it; only the exact approved text may be published. AI cannot diagnose, set urgency, alter source data, close a case, or send a patient message.
+- The backend, not an agent, chooses the purpose/view and permitted inputs. Do not pass an unrestricted case object, patient contact details, images, or unfinalized/conflicting interpretations.
+- Facts are data, not instructions. An agent has no tool or credential that can mutate cases, call HIS/FHIR, schedule care, or dispatch messages.
+- Validate the response against the request, including request correlation, language, and citations. A timeout, provider failure, malformed response, unsupported language, or unknown citation must be visible as unavailable; never substitute a plausible-looking draft.
+- Keep provenance for the provider/agent, model deployment, prompt version, source references, trigger, and human decision. Do not persist raw model reasoning.
+- CareLoop must be built to handle production data, but do not send real patient data to an external model until privacy, security, residency, retention, access, and clinical approvals are in place.
 
-It is off by default behind `Ai:AutoDraftOnHandoff`, because an automatic draft spends a model call and sends facts out of CareLoop with nobody having asked. It drafts once per case, which also makes a retried outbox delivery safe, and a failure never fails the handoff: the proposal has already happened, and the clinician can ask for a draft on the case screen.
+Patient-facing message content remains owned by approved templates and the notification pipeline. The presence of a `patient-notification` Foundry agent client is not authorization to generate or send patient text. Aggregate stage insights, Arabic translation, closure packs, and reply triage remain proposals unless separately implemented and approved.
 
-## What is recorded
+## Configuration and remaining work
 
-`HandoffSummaries` keeps the request identifier, the sections and their citations, the flattened text, what the draft reported as missing, the fact identifiers and source references, the provider, model deployment, prompt version, policy version, trigger and language, and the approval or rejection with its reviewer and time.
+The API's `Ai` options expose `Provider` (default `NoOp`), `AutoDraftOnHandoff`, `TimeoutSeconds`, `MaxRequestBytes`, `PromptVersion`, and `FoundryDirect` endpoint/deployment settings. `FoundryDirect` is a stub, not an adapter to the named prompt agents. The Python scripts instead use `AZURE_AI_PROJECT_ENDPOINT` and the agent name/version literals in each script; those scripts are currently manual console examples.
 
-The flattened text is held rather than derived, so the text a person approved cannot be changed later by a change to how sections are flattened. Raw prompts and model reasoning are not stored, and the clinical facts a draft was built from stay in the source system: only identifiers and source references are kept here.
-
-## Configuration
-
-API, in the `Ai` section. No API key exists: the direct route authenticates with Entra ID.
-
-| Setting | Purpose |
-|---|---|
-| `Ai:Provider` | `NoOp` (working default) or `FoundryDirect` (deferred); `AiWorkflow` is no longer supported |
-| `Ai:AutoDraftOnHandoff` | Draft when a handoff is proposed |
-| `Ai:TimeoutSeconds` | Bounded wait before reporting a draft unavailable |
-| `Ai:MaxRequestBytes` | Request-size guardrail, checked before any call |
-| `Ai:PromptVersion` | Recorded with every draft |
-| `Ai:FoundryDirect:ProjectEndpoint`, `:DeploymentName` | The direct route. The deployment name is the model identifier on the OpenAI-compatible path, and is often not the catalogue name |
-
-The former Python service's settings (`AZURE_AI_PROJECT_ENDPOINT`, `AZURE_AI_MODEL_DEPLOYMENT_NAME`, `CARELOOP_AI_ENABLED`, `CARELOOP_AI_TIMEOUT_SECONDS`, `CARELOOP_AI_MAX_INPUT_BYTES`) are not used by the current repository.
-
-Endpoint and deployment are configuration, never constants in source. Nothing live is committed, even though an endpoint URL is not itself confidential: it names a real deployment and belongs in the environment's configuration service.
-
-Authentication is Entra ID throughout: `DefaultAzureCredential` locally with the developer's approved identity, managed identity when hosted, the narrowest inference permission the deployment supports.
-
-## What is built
-
-| Piece | State |
-|---|---|
-| `IAiProvider`, `NoOpAiProvider` | Working. The default, so everything runs with AI off |
-| Fact, request, draft and response contracts | Written |
-| `HandoffSummaryRecord` and its EF configuration | Written. In the `InitialCreate` migration |
-| `HandoffFactCollector`, `HandoffSummaryDrafter`, `AutoDraftOnHandoff` | Stubs, `TODO(WS-9)` |
-| `DraftHandoffSummary`, `ApproveSummary`, `RejectSummary` | Stubs, answering 501 |
-| `FoundryDirectProvider` | Stub |
-| Python service and its `POST /summaries/handoff` endpoint | Removed; the integration contract is retained as a future design |
-| Tests | 18, skipped, in `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs` |
-
-Implementing either provider needs a dependency that is not yet agreed: `Azure.Identity` for the API, `azure-identity` plus a Foundry SDK for the Python service. `AGENTS.md` says to ask first.
-
-## Before real data
-
-Synthetic only today. Before any non-synthetic data reaches a Foundry endpoint, the organization must confirm the region and data residency (all patient data and AI processing stay in the UAE), retention and logging settings, ADHICS controls, access roles, the network path, and the applicable DoH and legal approvals.
-
-Two DoH boundaries shape this design rather than being model instructions that can be relaxed: the reporting physician informs the patient of results (§3.8.1), which is why AI never discloses a result, and assessment outcomes are considered by a multidisciplinary team (§3.9.8), which is why a summary organizes what a team recorded rather than concluding anything.
-
-## Open
-
-- Which roles may approve a summary. Proposed as `summaryApproverRoles` in the pathway definition, so it is configuration like every other role rule.
-- Which provider will implement this design, and who will own it.
-- Whether the periodic stage-insight narrative is built for the hackathon. Screen 3 promises it; nothing implements it.
+To complete the intended integration, implement and test the role/view-purpose-agent mapping, API-to-agent transport and schema, fact selection, output validation, persistence, authorization, audit, and explicit unavailable/error behavior. Until then, the current architecture is the seam and the safety requirements above—not a working AI summary flow.
