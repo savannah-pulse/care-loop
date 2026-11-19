@@ -196,7 +196,7 @@ acts on it. The patient message draft is a preview: nothing is sent, and patient
   (`PatientMessageDraft.TemplateFor`): an appointment booked and still to come is `T02` (appointment reminder); a
   missed last appointment is `T03` (missed appointment follow-up); a case flagged unreachable is `T06` (unsuccessful
   contact follow-up); anything else is `T05` (care-team callback request). The values are `patient_name` and
-  `facility_contact`, (the name is never sent, so it goes as the placeholder `{first name}` for the reviewer to fill in; the contact comes
+  `facility_contact`, (the name is never sent, so it goes as the placeholder `{first name}`, and the API puts the patient's first name in its place once the draft is back; the contact comes
   from `Notifications:FacilityContacts`, or goes as the placeholder `{clinic contact}` when the facility has none), `facility_name`, and the appointment's date
   and time when relevant. To add a template, add its text to the file and a rule to `TemplateFor`; a template the
   code cannot select is never used.

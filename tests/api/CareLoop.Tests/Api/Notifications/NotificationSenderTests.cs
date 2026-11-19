@@ -11,7 +11,7 @@ namespace CareLoop.Tests.Api.Notifications;
 /// </summary>
 public sealed class NotificationSenderTests
 {
-    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["facility"] = "SYN Family Health Centre", ["facilityContact"] = "SYN-PHONE-A" };
+    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["facility"] = "SYN Family Health Centre", ["facilityContact"] = "SYN-PHONE-A", ["firstName"] = "Hessa" };
 
     private readonly FakeClock _clock = new();
     private readonly FakeProvider _sms = new(NotificationChannel.Sms, allowsSensitiveContent: false);

@@ -28,8 +28,9 @@ const FAILURES: Partial<Record<FailureKind, MessageKey>> = {
  * @remarks
  * A draft only: nothing here sends a message, and nothing is stored. The draft comes from
  * `GET /cases/{caseId}/patient-message-draft` when the reader asks for it, never on its own,
- * because each request is written for this one case. It carries placeholders such as
- * `{first name}` where the API withholds the patient's details, and is shown as plain text.
+ * because each request is written for this one case. The AI never sees the patient's name: the API
+ * adds the first name to the draft afterwards. A detail the API has no value for, such as
+ * `{clinic contact}`, stays a placeholder. The draft is shown as plain text.
  * Messages that reach the patient still come from the approved templates.
  */
 export function PatientMessageCard({ detail, reason }: PatientMessageCardProps) {

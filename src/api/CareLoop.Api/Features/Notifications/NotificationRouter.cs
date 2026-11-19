@@ -23,9 +23,10 @@ namespace CareLoop.Api.Features.Notifications;
 /// notice also says who acknowledged the previous level, if anyone (<see cref="PreviousAcknowledgementFor"/>).
 /// </para>
 /// <para>
-/// <see cref="AppointmentScheduled"/> goes to the patient (<see cref="PatientAppointmentTemplateKey"/>), with the
-/// facility, date, time and place, the facility's contact and the reply codes, and to a consented caregiver (<see cref="CaregiverTemplateKey"/>) with the date,
-/// time and place and nothing else; each has a "place to be confirmed" variant for when the source named no place.
+/// <see cref="AppointmentScheduled"/> goes to the patient (<see cref="PatientAppointmentTemplateKey"/>), greeted by first name
+/// only (<see cref="FirstNamePlaceholder"/>), with the place, date and time, the facility's contact and the reply codes, and to a
+/// consented caregiver (<see cref="CaregiverTemplateKey"/>) with the date, time and place and nothing else, not even the patient's
+/// name; each has a "place to be confirmed" variant for when the source named no place.
 /// Times are local (<see cref="MessageFormat"/>). Its attempts are not fed into the case's notification track, which
 /// follows the patient's follow-up notification; the patient's reply to it still counts, as any reply of theirs does,
 /// and a caregiver message is never the patient's acknowledgement or delivery.
@@ -112,6 +113,12 @@ public sealed class NotificationRouter : IDomainEventSubscriber
     /// </summary>
     public const string CaseReferencePlaceholder = "caseReference";
 
+    /// <summary>
+    /// The placeholder a patient template greets the patient with: their first name only (<see cref="MessageFormat.FirstName"/>), or
+    /// <see cref="MessageFormat.NoFirstName"/> when the source gave no name. Never in a staff or caregiver template.
+    /// </summary>
+    public const string FirstNamePlaceholder = "firstName";
+
     /// <summary>The placeholder for the facility's name (<see cref="MessageFormat.Facility"/>), in staff and patient templates.</summary>
     public const string FacilityPlaceholder = "facility";
 
@@ -163,12 +170,15 @@ public sealed class NotificationRouter : IDomainEventSubscriber
             return;
         }
 
-        // The facility is read before anything is sent: a staff notice names it, and a patient message names it and its contact.
-        var facilityId = await _db.Cases.AsNoTracking()
+        // The facility is read before anything is sent: a staff notice names it, and a patient message names it, its contact and
+        // the patient's first name.
+        var named = await _db.Cases.AsNoTracking()
             .Where(c => c.Id == domainEvent.CaseId)
-            .Select(c => c.FacilityId)
+            .Select(c => new { c.FacilityId, c.PatientDisplayName })
             .SingleOrDefaultAsync(ct)
             ?? throw new InvalidOperationException($"Case {domainEvent.CaseId} no longer exists, so its notification cannot name its facility.");
+        var facilityId = named.FacilityId;
+        var firstName = MessageFormat.FirstName(named.PatientDisplayName) ?? MessageFormat.NoFirstName;
         var staffValues = recipients.Any(r => r.Kind == RecipientKind.Staff) ? StaffValues(domainEvent, facilityId) : null;
 
         var eventName = domainEvent.GetType().Name;
@@ -181,7 +191,7 @@ public sealed class NotificationRouter : IDomainEventSubscriber
 
         foreach (var recipient in recipients)
         {
-            var (templateKey, values) = TemplateFor(domainEvent, recipient, staffValues, facilityId);
+            var (templateKey, values) = TemplateFor(domainEvent, recipient, staffValues, facilityId, firstName);
             var attempts = await _sender.SendAsync(domainEvent.CaseId, recipient, templateKey, eventName, values, ct, domainEvent.EventId, _sent.WasSent);
             foreach (var accepted in attempts.Where(a => a.Status == NotificationAttemptStatus.Sent))
             {
@@ -212,11 +222,11 @@ public sealed class NotificationRouter : IDomainEventSubscriber
     }
 
     private (string TemplateKey, IReadOnlyDictionary<string, string> Values) TemplateFor(
-        IDomainEvent domainEvent, Recipient recipient, IReadOnlyDictionary<string, string>? staffValues, string facilityId) =>
+        IDomainEvent domainEvent, Recipient recipient, IReadOnlyDictionary<string, string>? staffValues, string facilityId, string firstName) =>
         domainEvent switch
         {
-            NotificationRequested requested => (requested.TemplateKey, PatientValues(requested.CaseId, facilityId)),
-            AppointmentScheduled scheduled => AppointmentTemplateFor(scheduled, recipient.Kind, facilityId),
+            NotificationRequested requested => (requested.TemplateKey, PatientValues(requested.CaseId, facilityId, firstName)),
+            AppointmentScheduled scheduled => AppointmentTemplateFor(scheduled, recipient.Kind, facilityId, firstName),
             _ => (StaffTemplateKey, staffValues ?? throw new InvalidOperationException("Staff values were not prepared.")),
         };
 
@@ -228,18 +238,21 @@ public sealed class NotificationRouter : IDomainEventSubscriber
         ["previousAcknowledgement"] = domainEvent is EscalationRaised escalation ? PreviousAcknowledgementFor(escalation, _format) : string.Empty,
     };
 
-    // What every patient message can say: the reference to quote, the facility and how to contact it. Never the patient's name.
-    private Dictionary<string, string> PatientValues(Guid caseId, string facilityId) => new()
+    // What every patient message can say: the patient's first name, the reference to quote, the facility and how to contact it.
+    // Never the surname, the result or anything about the patient's care.
+    private Dictionary<string, string> PatientValues(Guid caseId, string facilityId, string firstName) => new()
     {
+        [FirstNamePlaceholder] = firstName,
         [CaseReferencePlaceholder] = CaseReferenceFor(caseId),
         [FacilityPlaceholder] = _format.Facility(facilityId),
         [FacilityContactPlaceholder] = _format.FacilityContact(facilityId) ?? MessageFormat.NoFacilityContact,
     };
 
-    private (string TemplateKey, IReadOnlyDictionary<string, string> Values) AppointmentTemplateFor(AppointmentScheduled scheduled, RecipientKind kind, string facilityId)
+    private (string TemplateKey, IReadOnlyDictionary<string, string> Values) AppointmentTemplateFor(AppointmentScheduled scheduled, RecipientKind kind, string facilityId, string firstName)
     {
-        // The day, time and place as people read them, in local time; never anything about the result.
-        var values = kind == RecipientKind.Patient ? PatientValues(scheduled.CaseId, facilityId) : [];
+        // The day, time and place as people read them, in local time; never anything about the result. A caregiver's message
+        // never names the patient.
+        var values = kind == RecipientKind.Patient ? PatientValues(scheduled.CaseId, facilityId, firstName) : [];
         values["appointmentDate"] = _format.Date(scheduled.ScheduledFor);
         values["appointmentTime"] = _format.Time(scheduled.ScheduledFor);
 

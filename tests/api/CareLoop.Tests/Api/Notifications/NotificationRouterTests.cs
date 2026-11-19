@@ -34,10 +34,23 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(Envelopes.PatientEmail, message.ContactPoint.Address);
         Assert.Equal(requested.TemplateKey, message.TemplateKey);
         Assert.Contains(NotificationRouter.CaseReferenceFor(requested.CaseId), message.Body);
-        // No contact is configured for the facility here, so the message says "the clinic"; it never names the patient.
-        Assert.Contains($"Please contact us at {MessageFormat.NoFacilityContact} when convenient.", message.Body);
-        Assert.StartsWith("Dear patient,", message.Body);
+        // No contact is configured for the facility here, so the message says "the clinic"; the source sent no name, so
+        // the greeting is "Dear patient,".
+        Assert.Contains($"Please call {MessageFormat.NoFacilityContact}, or reply 2 and we will call you.", message.Body);
+        Assert.StartsWith($"Dear {MessageFormat.NoFirstName},", message.Body);
         Assert.Equal(NotificationSender.AttemptIdFor(requested.EventId, "SYN-PT-0001", NotificationChannel.Email), message.AttemptId);
+    }
+
+    [Fact]
+    public async Task NotificationRequested_greets_the_patient_by_first_name_only()
+    {
+        var requested = await _store.ReviewedCaseAsync(patientDisplayName: "Hessa Al Dhaheri");
+
+        await RouteAsync(requested);
+
+        var message = Assert.Single(_email.Sent);
+        Assert.StartsWith("Dear Hessa,", message.Body);
+        Assert.DoesNotContain("Al Dhaheri", $"{message.Subject} {message.Body}");
     }
 
     [Fact]
@@ -219,7 +232,7 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Contains(MessageFormat.Default.Time(scheduled.ScheduledFor), message.Body);
         Assert.Contains("SYN Breast Imaging Clinic", message.Body);
         var text = $"{message.Subject} {message.Body}";
-        foreach (var patientDetail in new[] { "SYN-PT-0001", Envelopes.PatientPhone, Envelopes.PatientEmail, Envelopes.ResultId, NotificationRouter.CaseReferenceFor(scheduled.CaseId), "PLACEHOLDER-URGENCY-A" })
+        foreach (var patientDetail in new[] { "SYN-PT-0001", "Hessa", "Al Dhaheri", Envelopes.PatientPhone, Envelopes.PatientEmail, Envelopes.ResultId, NotificationRouter.CaseReferenceFor(scheduled.CaseId), "PLACEHOLDER-URGENCY-A" })
         {
             Assert.DoesNotContain(patientDetail, text);
         }
@@ -261,10 +274,11 @@ public sealed class NotificationRouterTests : IDisposable
         Assert.Equal(NotificationRouter.PatientAppointmentTemplateKey, message.TemplateKey);
         Assert.Contains("Tuesday 24 November 2026", message.Body);
         Assert.Contains("13:30", message.Body);
-        Assert.Contains("SYN Breast Imaging Clinic", message.Body);
-        Assert.Contains("Your appointment at SYN Family Health Centre is confirmed", message.Body);
-        Assert.Contains("please contact SYN-PHONE-A.", message.Body);
-        Assert.Contains("Reply 1 to confirm you got this message", message.Body);
+        Assert.Contains("Your appointment at SYN Breast Imaging Clinic is on Tuesday 24 November 2026 at 13:30.", message.Body);
+        // The appointment is where the hospital system booked it, never at the clinic that referred the patient.
+        Assert.DoesNotContain("SYN Family Health Centre", message.Body);
+        Assert.Contains("To change it, call SYN-PHONE-A or reply 2 and we will call you.", message.Body);
+        Assert.Contains("Reply 1 to tell us you got this message", message.Body);
         Assert.Contains(NotificationRouter.CaseReferenceFor(scheduled.CaseId), message.Body);
         // Not the follow-up notification: the track is left as it was.
         Assert.Equal(before.Notification!.Attempts.Count, (await _store.TheCaseAsync()).Notification!.Attempts.Count);
@@ -408,7 +422,7 @@ public sealed class NotificationRouterTests : IDisposable
 
     private async Task<AppointmentScheduled> BookedWithConsentAsync(string? location, NotificationChannel channel = NotificationChannel.Email)
     {
-        await _store.ReviewedCaseAsync();
+        await _store.ReviewedCaseAsync(patientDisplayName: "Hessa Al Dhaheri");
         await _store.IngestAsync(Envelopes.Consent(_store.Clock.UtcNow, ConsentUpdateKind.Granted, new ContactPoint { Channel = channel, Address = CaregiverInbox }));
         _store.Clock.Advance(TimeSpan.FromMinutes(5));
         await _store.IngestAsync(Envelopes.Appointment(_store.Clock.UtcNow, AppointmentStatus.Scheduled, scheduledFor: _store.Clock.UtcNow.AddDays(3), location: location));

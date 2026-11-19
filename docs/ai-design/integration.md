@@ -119,7 +119,7 @@ For a nurse navigator or a clinician, for one case they may read. The draft is o
 |---|---|
 | `channel` | "text message" or "email" |
 | `template` | Which approved template to fill: `T02`, `T03`, `T05` or `T06` |
-| `values.patient_name` | Always the placeholder `{first name}`. The name is never sent; the reviewer fills it in |
+| `values.patient_name` | Always the placeholder `{first name}`. The name is never sent; the API puts the patient's first name in its place once the draft is back |
 | `values.facility_name` | The facility's name |
 | `values.facility_contact` | The facility's contact from `Notifications:FacilityContacts`. When the facility has none configured, the placeholder `{clinic contact}`, which the reviewer fills in |
 | `values.appointment_date` | The appointment's day, for `T02` and `T03` only |

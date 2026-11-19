@@ -317,6 +317,19 @@ public sealed class AiEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task The_patient_message_draft_gets_the_patients_first_name_only_after_the_model_has_written_it()
+    {
+        var @case = await SeedAsync(NewCase("SYN-RESULT-1", patient: "Hessa Al Dhaheri"));
+        _ai.Answer = $"Dear {PatientMessageDraft.FirstNamePlaceholder},\nYour care team at SYN Family Health Centre would like to talk with you.";
+
+        var draft = Value<AiTextResponse>(await DraftAsync(@case.Id, DemoRoles.NurseNavigator));
+
+        Assert.StartsWith("Dear Hessa,\n", draft.Text);
+        Assert.DoesNotContain("Al Dhaheri", draft.Text);
+        Assert.DoesNotContain("Hessa", Assert.Single(_ai.Prompts));
+    }
+
+    [Fact]
     public void The_template_is_chosen_from_what_is_recorded_and_is_only_ever_an_administrative_one()
     {
         var plain = NewCase("SYN-RESULT-1");
@@ -395,7 +408,7 @@ public sealed class AiEndpointsTests : IDisposable
 
         Assert.All(results, r => Assert.True(Status(r.Result) == 200, report));
         Assert.Equal("Foundry/patient-notification", Value<AiTextResponse>(results[3].Result).Model);
-        Assert.StartsWith("Dear {first name},", Value<AiTextResponse>(results[3].Result).Text);
+        Assert.StartsWith($"Dear {MessageFormat.FirstName(PatientName)},", Value<AiTextResponse>(results[3].Result).Text);
         Assert.EndsWith(ImpactSummary.SyntheticNote, Value<AiTextResponse>(results[2].Result).Text);
         Assert.True(Value<AiTextResponse>(results[1].Result).Cached);
         Assert.Equal("Foundry/role-briefing", Value<AiTextResponse>(results[0].Result).Model);

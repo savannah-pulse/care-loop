@@ -17,7 +17,7 @@
   },
   "patientMessage": {
     "title": "Draft a message to the patient",
-    "lede": "AI writes a draft for you to read. Nothing is sent from here, and the patient's name and details are left as placeholders.",
+    "lede": "AI writes a draft for you to read. Nothing is sent from here. The AI never sees the patient's name; CareLoop adds it.",
     "channel": {
       "legend": "Write it as",
       "sms": "Text message",

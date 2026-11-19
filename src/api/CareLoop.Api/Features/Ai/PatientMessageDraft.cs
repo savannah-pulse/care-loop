@@ -25,8 +25,9 @@ namespace CareLoop.Api.Features.Ai;
 /// </para>
 /// <para>
 /// The model is never given the patient's name, contact details, identifiers, the result, the appointment's place or
-/// the case's next action. The name goes as the placeholder <see cref="FirstNamePlaceholder"/>, which the reviewer
-/// fills in; so does the clinic's contact (<see cref="ClinicContactPlaceholder"/>) when the facility has none configured
+/// the case's next action. The name goes as the placeholder <see cref="FirstNamePlaceholder"/>, and CareLoop puts the
+/// patient's first name in its place once the draft is written, for the reader, who already sees the name; the reviewer
+/// fills in the clinic's contact (<see cref="ClinicContactPlaceholder"/>) when the facility has none configured
 /// (<see cref="NotificationOptions.FacilityContacts"/>). Only
 /// templates with no result content can be chosen: the reporting physician gives results, so the templates that invite
 /// a patient to discuss a result need a clinician's recorded authorization, which CareLoop does not hold.
@@ -34,7 +35,7 @@ namespace CareLoop.Api.Features.Ai;
 /// </remarks>
 public static class PatientMessageDraft
 {
-    /// <summary>What stands in the draft for the patient's first name; the name itself is never sent.</summary>
+    /// <summary>What stands in the draft for the patient's first name: the name is never sent to the model, and CareLoop puts it in afterwards.</summary>
     public const string FirstNamePlaceholder = "{first name}";
 
     /// <summary>What stands in the draft for the clinic's contact when the facility has none configured; the reviewer fills it in.</summary>
@@ -72,8 +73,16 @@ public static class PatientMessageDraft
         if (@case is null) return Results.NotFound();
         if (refusal is not null) return refusal;
 
-        return await ai.WriteAsync(AiPrompts.PatientMessage, BuildData(@case, channel, format, clock.UtcNow), refresh: false, reuse: false, ct);
+        return await ai.WriteAsync(AiPrompts.PatientMessage, BuildData(@case, channel, format, clock.UtcNow), refresh: false, reuse: false, ct,
+            text => WithFirstName(text, @case));
     }
+
+    /// <summary>Puts the patient's first name where the draft has <see cref="FirstNamePlaceholder"/>.</summary>
+    /// <param name="text">The draft as the model wrote it.</param>
+    /// <param name="case">The case, for the patient's name.</param>
+    /// <returns>The draft with the first name, or unchanged when the source gave no name.</returns>
+    internal static string WithFirstName(string text, Case @case) =>
+        MessageFormat.FirstName(@case.PatientDisplayName) is { } firstName ? text.Replace(FirstNamePlaceholder, firstName, StringComparison.Ordinal) : text;
 
     /// <summary>Chooses the approved template that fits what is recorded on the case.</summary>
     /// <param name="case">The case.</param>
