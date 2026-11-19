@@ -7,7 +7,7 @@ import type { CaseEventType, TimelineEntry } from '../data'
  * Names a timeline entry in plain words, for an entry whose reason says nothing more.
  *
  * @param eventType - The kind of event, from the API.
- * @returns For example `Referral updated` or `Handoff summary approved`.
+ * @returns For example `Referral updated` or `Escalation acknowledged`.
  *
  * @remarks
  * When an entry's reason says what happened, it is the entry's main line; this title stands in when
@@ -21,7 +21,7 @@ export function timelineTitle(eventType: CaseEventType): string {
  * Names the kind of a timeline entry in a word or two, for the small label next to it.
  *
  * @param eventType - The kind of event, from the API.
- * @returns For example `Referral`, `Patient contact`, `Deadline` or `Summary`.
+ * @returns For example `Referral`, `Patient contact`, `Deadline` or `Escalation`.
  */
 export function timelineKind(eventType: CaseEventType): string {
   return t(`timeline.kinds.${eventType}`)

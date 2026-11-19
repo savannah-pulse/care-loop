@@ -14,7 +14,7 @@ export interface ToastProps {
 }
 
 /**
- * A calm, short confirmation at the bottom of the screen, such as "Summary approved."
+ * A calm, short confirmation at the bottom of the screen, such as "Call outcome recorded."
  *
  * @remarks
  * The live region is always on the page, so screen readers announce each new message politely.

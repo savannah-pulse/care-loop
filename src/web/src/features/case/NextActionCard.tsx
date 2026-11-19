@@ -6,7 +6,6 @@ import {
   currentEscalation,
   describeOwner,
   escalationTarget,
-  isReferralAction,
   isUrgent,
   nextActionText,
   nextActionWhy,
@@ -14,7 +13,7 @@ import {
   outcomeEvidenceText,
 } from '../../domain'
 import { describeDue, formatWhen, parseInstant } from '../../format'
-import { isClinicianRole, isEscalationRole, sameReference, useSignedInStaff } from '../../identity'
+import { isEscalationRole, sameReference, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { routeHref } from '../../routing'
 
@@ -78,8 +77,8 @@ function EscalationFact({ detail, now }: EscalationFactProps) {
  * exceptions and any pending transfer: until a proposed owner accepts, the current owner stays
  * responsible. Escalation brings in the facility lead, then the programme coordinator, but never
  * changes who is responsible; the card says who it went to and whether they acknowledged it, and
- * gives those roles a way into the escalation (screen 17). Clinicians get a way into the handoff
- * summary when the action is to send or arrange a referral; everyone else sees who needs to act.
+ * gives those roles a way into the escalation (screen 17). While the case is open it says who needs
+ * to act.
  */
 export function NextActionCard({ detail, now, children }: NextActionCardProps) {
   const headingId = useId()
@@ -89,7 +88,6 @@ export function NextActionCard({ detail, now, children }: NextActionCardProps) {
   const dueAt = parseInstant(detail.dueAt)
   const due = dueAt ? describeDue(dueAt, now) : undefined
   const closed = detail.stage === 'Closed'
-  const offerSummary = !closed && isClinicianRole(me.role) && isReferralAction(detail.nextAction)
   const mine = !detail.owner.isQueue && sameReference(detail.owner.reference, me.reference)
   return (
     <section className="card hero" aria-labelledby={headingId}>
@@ -140,20 +138,12 @@ export function NextActionCard({ detail, now, children }: NextActionCardProps) {
         </div>
       </dl>
       {children}
-      {offerSummary ? (
-        <div className="hero-cta">
-          <a className="btn primary" href={routeHref({ name: 'summary', caseId: detail.caseId })}>
-            <Icon name="spark" />
-            {t('case.reviewSummary')}
-          </a>
-        </div>
-      ) : null}
-      {!offerSummary && !closed ? (
+      {closed ? null : (
         <p className="who-acts">
           <Icon name="user" />
           <span>{mine ? t('case.youAct') : t('case.otherActs', { name: owner.subject })}</span>
         </p>
-      ) : null}
+      )}
     </section>
   )
 }

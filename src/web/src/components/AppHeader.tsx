@@ -10,7 +10,6 @@ function sectionOf(route: Route): Section | undefined {
   switch (route.name) {
     case 'worklist':
     case 'case':
-    case 'summary':
       return 'worklist'
     case 'escalations':
     case 'escalation':
@@ -48,7 +47,7 @@ export interface AppHeaderProps {
  * The bar at the top of every screen: the CareLoop name, the sections and the "Signed in as" menu.
  *
  * @remarks
- * A case and its handoff summary belong to the worklist section, so Worklist stays marked there.
+ * A case belongs to the worklist section, so Worklist stays marked there.
  * The facility lead and the programme coordinator, who are on the escalation ladder, also get
  * Escalations, with the number of open escalations; a case's escalation view belongs to it.
  */

@@ -60,3 +60,13 @@ describe('who is acting', () => {
     }
   })
 })
+
+describe('addresses', () => {
+  it('shows "Page not found" at the address of the handoff summary, which is gone, and asks the API for no case', async () => {
+    renderApp({ at: '#/cases/3f6b1c2a-8d4e-4f5a-9b7c-100245891000/summary', as: 'rekha-varghese' })
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the worklist' })).toHaveAttribute('href', '#/')
+    expect(sentRequests()).toHaveLength(0)
+  })
+})

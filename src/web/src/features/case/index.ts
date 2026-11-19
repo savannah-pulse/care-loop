@@ -1,9 +1,9 @@
 /**
  * Case (screen 2): everything about one case on one page. The patient's name and MRN, the ten
  * display stages, the single next action with its owner, due time and escalation ladder, the four
- * tracks, the timeline with each entry's source and, for clinicians, the patient's other screening
- * and the way into the AI handoff summary. A nurse navigator records what the patient said on a
- * call. A case at another facility asks why first.
+ * tracks, the timeline with each entry's source and, for clinicians, the patient's other screening.
+ * A nurse navigator records what the patient said on a call. A case at another facility asks why
+ * first.
  */
 
 export { CallOutcomeCard } from './CallOutcomeCard'

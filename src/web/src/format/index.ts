@@ -1,7 +1,7 @@
 /**
  * Formatting: dates and times in Abu Dhabi time on the 24-hour clock, durations in plain words,
  * the numbers the API sends as `integer | string`, and readable names for the identifiers the API
- * sends (patients, facilities and the facts a summary cites).
+ * sends (patients and facilities).
  */
 
 export {
@@ -33,5 +33,5 @@ export {
   toCount,
   toNumber,
 } from './numbers'
-export { KNOWN_FACILITIES, factLabel, facilityName, groupDigits, humaniseId, patientLabel } from './names'
+export { KNOWN_FACILITIES, facilityName, groupDigits, humaniseId, patientLabel } from './names'
 export type { KnownFacility } from './names'

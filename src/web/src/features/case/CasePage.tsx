@@ -130,8 +130,7 @@ function CaseView({ detail, timeline, reason, now, onCallRecorded, onCallConflic
  * the result reads as coming from the hospital system, without its number. A case at another
  * facility opens only after the person says why (board 14): the API refuses the read without a
  * reason, the screen asks for one, and the reason then goes with every read of the case. Any other
- * refusal says calmly that the case is not open to
- * the person. Clinicians reach the AI handoff summary from the next action when a referral is due.
+ * refusal says calmly that the case is not open to the person.
  */
 export function CasePage({ caseId }: CasePageProps) {
   const me = useSignedInStaff()

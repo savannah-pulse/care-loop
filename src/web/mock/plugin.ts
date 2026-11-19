@@ -6,9 +6,8 @@
  * `fixtures.ts` and follows the API's read rules: the identity headers, the reader's facility as the
  * default scope, a recorded reason for anything outside it, the programme coordinator's view
  * (cases escalated to them only, without names), the clinician-only patient search, paging limits,
- * and who may acknowledge an escalation. Drafted, approved and rejected summaries and
- * acknowledgements last until the server stops. It is never part of the built app: the app knows
- * nothing about it.
+ * and who may acknowledge an escalation. Acknowledgements and recorded calls last until the server
+ * stops. It is never part of the built app: the app knows nothing about it.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -17,17 +16,14 @@ import type { Connect, Plugin } from 'vite'
 import type { components } from '../src/api/schema.d.ts'
 import {
   COHORT_SEED,
-  HESSA_CASE_ID,
   WITHOUT_ESCALATION,
   WITH_ESCALATION,
   createCases,
   createMetrics,
   createProgrammes,
-  draftHessaSummary,
   mockNow,
   startScenarioClock,
   type CaseFixture,
-  type HandoffSummary,
   type Programme,
 } from './fixtures.ts'
 
@@ -35,9 +31,6 @@ type Schemas = components['schemas']
 type Problem = Schemas['ProblemDetails']
 type CaseDetail = Schemas['CaseDetailResponse']
 type CaseSummary = Schemas['CaseSummaryResponse']
-
-/** Roles that may approve or reject a handoff summary in the mock, like the clinician roles in the app. */
-const SUMMARY_REVIEWER_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
 
 /** Roles allowed to search a patient's cases, as in the API. */
 const PATIENT_SEARCH_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
@@ -54,7 +47,6 @@ const HUMAN_ROLES: readonly string[] = [
 
 interface MockState {
   readonly cases: CaseFixture[]
-  readonly summaries: Map<string, HandoffSummary>
   readonly programmes: Programme[]
 }
 
@@ -326,83 +318,6 @@ function acknowledge(fixture: CaseFixture, escalationId: string, who: Reader, re
   return redacted(who, fixture.detail)
 }
 
-function draftSummary(state: MockState, fixture: CaseFixture): HandoffSummary {
-  const existing = [...state.summaries.values()].find(
-    (summary) => summary.caseId === fixture.detail.caseId && summary.status === 'Approved',
-  )
-  if (existing) {
-    throw new HttpError(409, 'This case already has an approved summary.')
-  }
-  if (fixture.detail.caseId !== HESSA_CASE_ID) {
-    throw new HttpError(503, 'The AI service did not produce a draft that passed its checks.')
-  }
-  for (const [id, summary] of state.summaries) {
-    if (summary.caseId === fixture.detail.caseId && summary.status === 'Draft') {
-      state.summaries.delete(id)
-    }
-  }
-  const draft = draftHessaSummary(randomUUID())
-  state.summaries.set(draft.summaryId, draft)
-  return draft
-}
-
-function openDraft(state: MockState, caseId: string, summaryId: string, who: Reader): HandoffSummary {
-  if (!SUMMARY_REVIEWER_ROLES.includes(who.role)) {
-    throw new HttpError(403, '')
-  }
-  const summary = state.summaries.get(summaryId)
-  if (!summary || summary.caseId !== caseId) {
-    throw new HttpError(404, 'Summary not found.')
-  }
-  if (summary.status !== 'Draft') {
-    throw new HttpError(409, 'This summary has already been decided.')
-  }
-  return summary
-}
-
-function approve(state: MockState, fixture: CaseFixture, summary: HandoffSummary, who: Reader, text: string): HandoffSummary {
-  const now = mockNow().toISOString()
-  const approved: HandoffSummary = {
-    ...summary,
-    status: 'Approved',
-    text,
-    humanReviewRequired: false,
-    approvedBy: who.reference,
-    approvedAt: now,
-  }
-  state.summaries.set(summary.summaryId, approved)
-  const detail = fixture.detail
-  fixture.timeline.push({
-    auditEventId: randomUUID(),
-    sourceSystem: 'careloop',
-    origin: 'careloop',
-    eventType: 'HandoffSummaryApproved',
-    disposition: 'Applied',
-    actorReference: who.reference,
-    actorRole: who.role,
-    sourceTimestamp: now,
-    receivedTimestamp: now,
-    priorStage: detail.stage,
-    newStage: detail.stage,
-    reason: 'Handoff summary approved.',
-    evidenceReference: `DocumentReference/${summary.summaryId}`,
-  })
-  fixture.detail = { ...detail, updatedAt: now }
-  return approved
-}
-
-function reject(state: MockState, summary: HandoffSummary, who: Reader, reason: string): HandoffSummary {
-  const rejected: HandoffSummary = {
-    ...summary,
-    status: 'Rejected',
-    rejectedBy: who.reference,
-    rejectedAt: mockNow().toISOString(),
-    rejectionReason: reason,
-  }
-  state.summaries.set(summary.summaryId, rejected)
-  return rejected
-}
-
 /** How far the patient-contact track has come, so a call outcome never moves it backwards. */
 const CONTACT_RANK: Readonly<Record<string, number>> = { Acknowledged: 1, Understood: 2 }
 
@@ -567,27 +482,6 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     send(res, 200, acknowledge(fixture, fourth, who, reason))
     return true
   }
-  if (third !== 'handoff-summary') {
-    return false
-  }
-  if (fourth === undefined) {
-    expect('POST')
-    send(res, 201, draftSummary(state, fixture))
-    return true
-  }
-  if (fifth === 'approval' || fifth === 'rejection') {
-    expect('POST')
-    const body = await readJson(req)
-    const summary = openDraft(state, caseId, fourth, who)
-    send(
-      res,
-      200,
-      fifth === 'approval'
-        ? approve(state, fixture, summary, who, requireText(body, 'approvedText'))
-        : reject(state, summary, who, requireText(body, 'reason').trim()),
-    )
-    return true
-  }
   return false
 }
 
@@ -605,7 +499,7 @@ export interface MockApiOptions {
  */
 export function careLoopMockApi(options: MockApiOptions = {}): Plugin {
   startScenarioClock(options.now)
-  const state: MockState = { cases: createCases(), summaries: new Map(), programmes: createProgrammes() }
+  const state: MockState = { cases: createCases(), programmes: createProgrammes() }
 
   const handler: Connect.NextHandleFunction = (req, res) => {
     route(state, req, res)

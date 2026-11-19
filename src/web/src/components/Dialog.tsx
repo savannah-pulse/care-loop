@@ -13,8 +13,8 @@ export interface DialogProps {
 }
 
 /**
- * A small modal dialog for a decision that needs a confirmation or a reason, such as approving or
- * rejecting a handoff summary.
+ * A small modal dialog for a decision that needs a confirmation or a reason, such as
+ * acknowledging an escalation.
  *
  * @remarks
  * Built on the native `dialog` element opened as a modal, so focus moves into it and stays there,

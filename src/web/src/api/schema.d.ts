@@ -211,51 +211,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/cases/{caseId}/handoff-summary": {
+    "/ai/role-briefing": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["GetRoleBriefing"];
         put?: never;
-        /** Drafts a handoff summary for a case. */
-        post: operations["DraftHandoffSummary"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/cases/{caseId}/handoff-summary/{summaryId}/approval": {
+    "/ai/impact-summary": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["GetImpactSummary"];
         put?: never;
-        /** Approves a drafted handoff summary. */
-        post: operations["ApproveHandoffSummary"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/cases/{caseId}/handoff-summary/{summaryId}/rejection": {
+    "/cases/{caseId}/patient-message-draft": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["GetPatientMessageDraft"];
         put?: never;
-        /** Rejects a drafted handoff summary. */
-        post: operations["RejectHandoffSummary"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -347,10 +344,19 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Body of the request approving a drafted handoff summary. */
-        ApproveSummaryRequest: {
-            /** @description The text being approved. The approver may have edited the draft; what is approved is exactly this text. */
-            approvedText: string;
+        /** @description Text an AI model wrote for a member of staff to read: the role briefing, the impact summary or a patient message draft. */
+        AiTextResponse: {
+            /** @description The text as the model wrote it, trimmed. Plain text, never markup to render. */
+            text: string;
+            /** @description The provider and model that wrote it, for example `Foundry/gpt-6.1-sol`. */
+            model: string;
+            /**
+             * Format: date-time
+             * @description When the text was written. For a reused answer this is when it was first written, not now.
+             */
+            generatedAt: string;
+            /** @description `true` when this is an earlier answer reused because the data has not changed; ask with `refresh=true` for a new one. */
+            cached?: boolean;
         };
         /**
          * @description What a nurse records after speaking to the patient on the phone
@@ -443,7 +449,7 @@ export interface components {
          * @description The kinds of event that can change a case.
          * @enum {unknown}
          */
-        CaseEventType: "ScreeningResultReceived" | "ClinicalReviewCompleted" | "NotificationUpdated" | "ConsultationUpdated" | "ReferralUpdated" | "AppointmentUpdated" | "OutcomeRecorded" | "ClosureDecided" | "ConsentRecorded" | "DeadlineElapsed" | "HandoffSummaryApproved" | "EscalationAcknowledged";
+        CaseEventType: "ScreeningResultReceived" | "ClinicalReviewCompleted" | "NotificationUpdated" | "ConsultationUpdated" | "ReferralUpdated" | "AppointmentUpdated" | "OutcomeRecorded" | "ClosureDecided" | "ConsentRecorded" | "DeadlineElapsed" | "EscalationAcknowledged";
         /**
          * @description The pathway stage a case is in.
          * @enum {unknown}
@@ -660,65 +666,6 @@ export interface components {
              */
             escalationLevel: number | string;
         };
-        /** @description A handoff summary for a case, returned when one is drafted, approved or rejected. */
-        HandoffSummaryResponse: {
-            /**
-             * Format: uuid
-             * @description Identifier of the summary.
-             */
-            summaryId: string;
-            /**
-             * Format: uuid
-             * @description The case the summary describes.
-             */
-            caseId: string;
-            /** @description Where the summary stands with its reviewer. */
-            status: components["schemas"]["HandoffSummaryStatus"];
-            /** @description The sections of the summary, in reading order. */
-            sections: components["schemas"]["SummarySectionResponse"][];
-            /** @description The sections run together as plain text; what a reviewer signs and what the HIS receives as a `DocumentReference`. */
-            text: string;
-            /** @description What the draft reported as missing, stale or contradictory, for a person to resolve. */
-            missingOrConflictingFacts: string[];
-            /** @description Whether a person must review this before it can be used. Always `true` while the status is `Draft`. */
-            humanReviewRequired: boolean;
-            /** @description Name of the AI provider that produced the draft. */
-            draftedBy: string;
-            /** @description The model deployment that produced the draft. */
-            modelDeployment: string;
-            /** @description Version of the prompt and template used, so a reviewer can tell two drafts apart. */
-            promptVersion: string;
-            /** @description Why the draft was produced: because a person asked, or because a handoff was proposed. */
-            trigger: string;
-            /** @description BCP 47 language tag the summary is written in. */
-            language: string;
-            /**
-             * Format: date-time
-             * @description When the draft was produced.
-             */
-            draftedAt: string;
-            /** @description Reference of the person who approved it; `null` unless the status is `Approved`. */
-            approvedBy?: null | string;
-            /**
-             * Format: date-time
-             * @description When it was approved; `null` unless the status is `Approved`.
-             */
-            approvedAt?: null | string;
-            /** @description Reference of the person who rejected it; `null` unless the status is `Rejected`. */
-            rejectedBy?: null | string;
-            /**
-             * Format: date-time
-             * @description When it was rejected; `null` unless the status is `Rejected`.
-             */
-            rejectedAt?: null | string;
-            /** @description Why the reviewer rejected it; `null` unless the status is `Rejected`. */
-            rejectionReason?: null | string;
-        };
-        /**
-         * @description Where a handoff summary stands with its reviewer.
-         * @enum {unknown}
-         */
-        HandoffSummaryStatus: "Draft" | "Approved" | "Rejected";
         /** @description Body of `GET /health`. */
         HealthResponse: {
             /** @description Always `ok` when the service is able to answer. */
@@ -838,6 +785,11 @@ export interface components {
             /** @description A short explanation for whoever called the endpoint. */
             message: string;
         };
+        /**
+         * @description A channel over which CareLoop can send a notification.
+         * @enum {unknown}
+         */
+        NotificationChannel: "Sms" | "Email";
         /** @description The person or queue accountable for a case, as shown in the dashboard. */
         OwnerResponse: {
             /** @description Source-system reference of the person, or the queue identifier. */
@@ -918,11 +870,6 @@ export interface components {
              */
             rate?: null | number | string;
         };
-        /** @description Body of the request rejecting a drafted handoff summary. */
-        RejectSummaryRequest: {
-            /** @description Why the reviewer turned the draft down. Stored with the rejection and read when the drafts are evaluated. */
-            reason: string;
-        };
         /** @description The result of replaying the cohort under one condition (with or without escalation). */
         SimulationArmResponse: {
             /** @description `true` when deadlines and escalation were active in this arm. */
@@ -990,15 +937,6 @@ export interface components {
             allowedRoles: string[];
             /** @description Key of the next action set when the stage is entered; matches a string DeadlineDefinition.NextAction. */
             nextActionOnEntry?: null | string;
-        };
-        /** @description One section of a handoff summary and the facts it rests on. */
-        SummarySectionResponse: {
-            /** @description Heading of the section. */
-            heading: string;
-            /** @description The text of the section. */
-            text: string;
-            /** @description Identifiers of the facts the section was drafted from, so a reviewer can check each statement against its source. */
-            sourceFactIds: string[];
         };
         /** @description One audit entry in a case timeline, returned by `GET /cases/{caseId}/timeline`. */
         TimelineEntryResponse: {
@@ -1746,33 +1684,34 @@ export interface operations {
             };
         };
     };
-    DraftHandoffSummary: {
+    GetRoleBriefing: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The case to summarise. */
-                caseId: string;
+            query?: {
+                refresh?: boolean;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Created */
-            201: {
+            /** @description OK */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HandoffSummaryResponse"];
+                    "application/json": components["schemas"]["AiTextResponse"];
                 };
             };
-            /** @description Not Found */
-            404: {
+            /** @description Unauthorized */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Conflict */
             409: {
@@ -1781,15 +1720,6 @@ export interface operations {
                 };
                 content: {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Not Implemented */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
                 };
             };
             /** @description Service Unavailable */
@@ -1803,27 +1733,18 @@ export interface operations {
             };
         };
     };
-    ApproveHandoffSummary: {
+    GetImpactSummary: {
         parameters: {
-            query?: never;
-            header?: {
-                "X-Demo-User"?: string;
-                "X-Demo-Role"?: string;
+            query?: {
+                facilityId?: string;
+                reason?: string;
+                refresh?: boolean;
             };
-            path: {
-                /** @description The case the summary belongs to. */
-                caseId: string;
-                /** @description The draft being approved. */
-                summaryId: string;
-            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
-        /** @description Cancels the request. */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ApproveSummaryRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -1831,7 +1752,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HandoffSummaryResponse"];
+                    "application/json": components["schemas"]["AiTextResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Forbidden */
@@ -1839,14 +1778,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
-                content?: never;
             };
             /** @description Conflict */
             409: {
@@ -1857,38 +1791,30 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };
     };
-    RejectHandoffSummary: {
+    GetPatientMessageDraft: {
         parameters: {
-            query?: never;
-            header?: {
-                "X-Demo-User"?: string;
-                "X-Demo-Role"?: string;
+            query?: {
+                channel?: components["schemas"]["NotificationChannel"];
+                reason?: string;
             };
+            header?: never;
             path: {
-                /** @description The case the summary belongs to. */
                 caseId: string;
-                /** @description The draft being rejected. */
-                summaryId: string;
             };
             cookie?: never;
         };
-        /** @description Cancels the request. */
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectSummaryRequest"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -1896,7 +1822,25 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HandoffSummaryResponse"];
+                    "application/json": components["schemas"]["AiTextResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
             /** @description Forbidden */
@@ -1904,7 +1848,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
+                };
             };
             /** @description Not Found */
             404: {
@@ -1922,13 +1868,13 @@ export interface operations {
                     "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
-            /** @description Not Implemented */
-            501: {
+            /** @description Service Unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotImplementedResponse"];
+                    "application/problem+json": components["schemas"]["ProblemDetails"];
                 };
             };
         };

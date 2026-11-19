@@ -48,22 +48,3 @@ export function nextActionText(key: string | null | undefined): string {
   }
   return isNextActionKey(key) ? t(`nextActions.${key}`) : t('nextActions.unknown', { key })
 }
-
-/**
- * Next actions that mean sending or arranging a referral.
- *
- * @remarks
- * Before a referral goes, a clinician checks and approves the AI handoff summary that travels with
- * it, so the case screen offers clinicians the summary for these actions.
- */
-export const REFERRAL_ACTIONS: readonly NextActionKey[] = ['arrange-follow-up', 'arrange-alternative-referral']
-
-/**
- * Tells whether a next action means sending or arranging a referral.
- *
- * @param key - The next-action key from the API.
- * @returns `true` for the actions in {@link REFERRAL_ACTIONS}.
- */
-export function isReferralAction(key: string | null | undefined): boolean {
-  return key !== null && key !== undefined && (REFERRAL_ACTIONS as readonly string[]).includes(key)
-}

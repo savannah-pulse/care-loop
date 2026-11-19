@@ -108,10 +108,6 @@ main:focus {
   outline: none;
 }
 
-html:has(.actionbar) {
-  scroll-padding-block-end: 120px;
-}
-
 .visually-hidden {
   position: absolute !important;
   inline-size: 1px;
@@ -554,25 +550,6 @@ h1 {
 
 .badge.grey::before {
   display: none;
-}
-
-.ai {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-line);
-  border-radius: 999px;
-  padding: 2px 8px;
-  white-space: nowrap;
-}
-
-.ai svg.i {
-  inline-size: 13px;
-  block-size: 13px;
 }
 
 /* Cards and layout */
@@ -1507,57 +1484,7 @@ a.name:focus-visible {
   color: var(--ink3);
 }
 
-/* Handoff summary */
-.summary-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-  gap: 24px;
-  align-items: start;
-}
-
-.sbar {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.sbar h3,
-.sbar label {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink2);
-  margin-block-end: 4px;
-}
-
-.section-text {
-  white-space: pre-wrap;
-}
-
-.srcs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-block-start: 8px;
-}
-
-.srcs li {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--ink2);
-  background: var(--soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.srcs svg.i {
-  inline-size: 14px;
-  block-size: 14px;
-  color: var(--ink3);
-}
+/* Text areas, field errors, recorded decisions and notices */
 
 .textarea {
   display: block;
@@ -1583,8 +1510,7 @@ a.name:focus-visible {
   margin-block-start: 4px;
 }
 
-.approved,
-.rejected {
+.approved {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -1600,14 +1526,7 @@ a.name:focus-visible {
   background: var(--green-soft);
 }
 
-.rejected {
-  color: var(--ink2);
-  background: var(--soft);
-  border: 1px solid var(--line);
-}
-
-.approved svg.i,
-.rejected svg.i {
+.approved svg.i {
   inline-size: 18px;
   block-size: 18px;
   margin-block-start: 2px;
@@ -1617,21 +1536,6 @@ a.name:focus-visible {
   display: block;
   font-weight: 400;
   color: var(--ink2);
-}
-
-.actionbar {
-  position: sticky;
-  inset-block-end: 16px;
-  z-index: 6;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--white);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-raised);
 }
 
 .notice {
@@ -1651,47 +1555,6 @@ a.name:focus-visible {
   block-size: 16px;
   margin-block-start: 3px;
   color: var(--ink3);
-}
-
-.check li {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 12px;
-  padding-block: 12px;
-  border-block-start: 1px solid var(--line2);
-  align-items: start;
-}
-
-.check li:first-child {
-  border-block-start: 0;
-  padding-block-start: 0;
-}
-
-.mk {
-  inline-size: 22px;
-  block-size: 22px;
-  border-radius: 50%;
-  border: 2px solid #c9d1da;
-}
-
-.reach {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  font-size: 15px;
-}
-
-.reach li {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.reach svg.i {
-  inline-size: 18px;
-  block-size: 18px;
-  color: var(--ink3);
-  margin-block-start: 2px;
 }
 
 .linkrow {
@@ -2188,7 +2051,6 @@ a.name:focus-visible {
     gap: 24px;
   }
 
-  .summary-grid,
   .grid-even,
   .kpis,
   .sk-row {
@@ -2198,20 +2060,6 @@ a.name:focus-visible {
 
   .stack {
     gap: 16px;
-  }
-
-  .actionbar {
-    padding: 8px;
-  }
-
-  .actionbar .btns {
-    flex: 1;
-    flex-wrap: nowrap;
-  }
-
-  .actionbar .btn {
-    flex: 1 1 auto;
-    padding-inline: 12px;
   }
 
   .bars li {
@@ -2232,10 +2080,6 @@ a.name:focus-visible {
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  .actionbar .btns {
-    flex-wrap: wrap;
   }
 }
 
