@@ -1,3 +1,4 @@
+import { useId, useLayoutEffect, useRef, useState } from 'react'
 import type { AiText, Read } from '../data'
 import { formatWhen } from '../format'
 import { t } from '../i18n'
@@ -25,10 +26,29 @@ export interface AiSummaryProps {
  * @remarks
  * The words are a reading aid: the figures or the list beside them are the record. They are never
  * rendered as markup. When AI is switched off, or could not write the text, nothing is shown,
- * because nothing else on the page depends on it. Paragraphs in the text are kept.
+ * because nothing else on the page depends on it. Paragraphs in the text are kept. A text longer
+ * than three lines is cut there with a "Show more" button, so it does not push the record it
+ * describes off the screen; a shorter one is shown whole, with no button.
  */
 export function AiSummary({ read, now, label, loadingLabel, refreshing, onRefresh }: AiSummaryProps) {
   const { state } = read
+  const text = state.status === 'ready' ? state.data.text : ''
+  const textId = useId()
+  const textRef = useRef<HTMLParagraphElement>(null)
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  // Whether the cut text hides anything depends on its width, so measure again when the window changes.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const element = textRef.current
+      if (element && !expanded) {
+        setOverflows(element.scrollHeight > element.clientHeight + 1)
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [text, expanded])
   if (state.status === 'failed') {
     return null
   }
@@ -41,7 +61,9 @@ export function AiSummary({ read, now, label, loadingLabel, refreshing, onRefres
   }
   return (
     <section className="ai-brief" aria-label={label}>
-      <p className="ai-brief-text">{state.data.text}</p>
+      <p id={textId} ref={textRef} className={expanded ? 'ai-brief-text' : 'ai-brief-text ai-brief-clamped'}>
+        {state.data.text}
+      </p>
       <p className="ai-brief-meta muted">
         <Icon name="spark" />
         <span>
@@ -52,6 +74,17 @@ export function AiSummary({ read, now, label, loadingLabel, refreshing, onRefres
         <button type="button" className="ai-brief-refresh" onClick={onRefresh}>
           {t('ai.refresh')}
         </button>
+        {(overflows || expanded) && (
+          <button
+            type="button"
+            className="ai-brief-refresh"
+            aria-expanded={expanded}
+            aria-controls={textId}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? t('ai.showLess') : t('ai.showMore')}
+          </button>
+        )}
       </p>
     </section>
   )

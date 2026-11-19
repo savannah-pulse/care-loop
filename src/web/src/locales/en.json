@@ -11,6 +11,8 @@
   "ai": {
     "writtenByAi": "Written by AI",
     "refresh": "Refresh",
+    "showMore": "Show more",
+    "showLess": "Show less",
     "refreshing": "Writing a new summary…"
   },
   "patientMessage": {

@@ -382,6 +382,15 @@ h1 {
   white-space: pre-line;
 }
 
+/* A long text is cut at three lines until the reader asks for the rest. */
+.ai-brief-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
 /* The draft of a message to the patient, on the case screen. */
 .message-card {
   display: flex;
