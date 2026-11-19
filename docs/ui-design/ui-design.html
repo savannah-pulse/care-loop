@@ -439,6 +439,72 @@ code.role{margin-top:6px}
 /* Who takes the next step, under the next-action card */
 .who-acts{display:flex;align-items:flex-start;gap:8px;margin-top:16px;padding:12px 16px;border-radius:8px;background:var(--soft);color:var(--ink2);font-size:15px}
 .who-acts svg.i{margin-top:1px;color:var(--ink3)}
+/* As built in the web app on main: header menu, worklist, case, impact, programmes and escalation */
+.me .chev{width:16px;height:16px;color:var(--ink3);margin-inline-start:4px}
+.navcount{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-inline-start:6px;border-radius:999px;background:var(--soft);border:1px solid var(--line);color:var(--ink2);font-size:12px;font-weight:700}
+.lede{color:var(--ink2);margin-top:4px}
+.teamline{display:flex;align-items:baseline;gap:8px;font-size:14px;color:var(--ink2)}
+.alink{color:var(--accent);font-weight:600}
+.scopes{display:flex;gap:8px}
+.scope{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--white);font-weight:600;font-size:14px;color:var(--ink2)}
+.scope b{color:var(--ink);font-weight:700}
+.scope.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}.scope.on b{color:var(--accent-ink)}
+.toolbar{display:flex;gap:12px}
+.field.wide{width:380px}.field.select{width:280px;justify-content:space-between;color:var(--ink)}
+.showing{font-size:14px;color:var(--ink2)}
+.wgroup h2{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;margin:8px 0 8px}
+.count{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--soft);color:var(--ink2);font-size:12px;font-weight:700}
+td .l3{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
+td.late b{color:var(--red);font-weight:600}
+.badge.dot::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.stcell{display:flex;gap:6px;flex-wrap:wrap}
+.casehead{display:flex;gap:16px;align-items:flex-start}
+.casehead .pi{width:44px;height:44px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.casehead .pi svg{width:22px;height:22px}
+.casehead h1{font-size:28px}
+.casehead .meta{color:var(--ink2);font-size:15px;margin-top:4px}
+.casehead .meta span+span::before{content:"·";margin:0 8px;color:var(--ink3)}
+.casehead .quiet{color:var(--ink3);font-size:13px;margin-top:2px}
+.card.hero{border-inline-start:4px solid var(--accent)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;border-top:1px solid var(--line2);padding-top:16px}
+.facts small{display:block;font-size:13px;color:var(--ink3);margin-bottom:4px}
+.facts b{display:block;font-weight:600}.facts b.red{color:var(--red)}
+.facts span{display:block;color:var(--ink2);font-size:14px}
+.tracks2{list-style:none;display:flex;flex-direction:column;gap:16px}
+.tracks2 li{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:start}
+.tracks2 .ti{width:32px;height:32px;border-radius:50%;background:var(--soft);color:var(--ink2);display:grid;place-items:center}
+.tracks2 .ti svg{width:16px;height:16px}
+.tracks2 b{display:block;font-weight:600;font-size:15px}.tracks2 span.l2{display:block;color:var(--ink2);font-size:13px;margin-top:2px}
+.tlday{font-size:13px;font-weight:700;color:var(--ink2);margin:12px 0 4px}
+.tlday:first-of-type{margin-top:0}
+.tl2{list-style:none}
+.tl2 li{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;padding:12px 0;border-top:1px solid var(--line2);font-size:15px}
+.tl2 time{color:var(--ink3);font-size:13px}
+.tl2 small{display:block;font-size:13px;font-weight:600;color:var(--ink2);margin-bottom:2px}
+.tl2 .by{display:block;color:var(--ink3);font-size:13px;margin-top:2px}
+.tl2.wide li{grid-template-columns:132px minmax(0,1fr) auto}
+.plist{background:var(--white);border:1px solid var(--line);border-radius:12px;overflow:hidden;list-style:none}
+.plist li{padding:14px 16px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:2px;font-size:13px;color:var(--ink2)}
+.plist li:first-child{border-top:0}
+.plist li b{font-size:15px;color:var(--ink)}
+.plist li.sel{background:var(--accent-soft);border-inline-start:4px solid var(--accent);padding-inline-start:12px}
+.plist .st{font-size:13px}
+.vladder{list-style:none;border:1px solid var(--line);border-radius:10px}
+.vladder li{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line2);font-size:14px;color:var(--ink2)}
+.vladder li:first-child{border-top:0}
+.vladder .num{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--soft);color:var(--ink2);flex:none}
+.vladder b{color:var(--ink);font-weight:600}
+.vladder .r{margin-inline-start:auto}
+.evid{list-style:none;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.evid b{display:block;font-size:15px}.evid span{display:block;color:var(--ink2)}
+.disclose{color:var(--accent);font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:4px}
+.disclose svg{width:14px;height:14px}
+.endrow{display:flex;justify-content:flex-end}
+.mini td.plain{font-weight:400}
+.mini.cmp2 th.num,.mini.cmp2 td.num{width:240px}
+.pgrid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start}
+.mini.cfg2 td{vertical-align:top}
+.mini.cfg2 td .l2{font-size:13px}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
 <defs>
@@ -462,6 +528,9 @@ code.role{margin-top:6px}
 <symbol id="i-lang" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.3 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.3-3.5-8.5s1.1-6.1 3.5-8.5z"/></symbol>
 <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
 <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.4"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5h-8.5l-4.5 3.5v-3.5H5A1.5 1.5 0 0 1 3.5 15V6.5A1.5 1.5 0 0 1 5 5z"/><path d="M8 9.5h8M8 12.5h5"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 3.5L3.5 10.4l6.8 3.3 3.3 6.8z"/><path d="M20.5 3.5l-10.2 10.2"/></symbol>
 </defs>
 </svg>
 
@@ -579,7 +648,7 @@ code.role{margin-top:6px}
 </section>
 
 <section class="board" id="b01" data-file="01-worklist">
-<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. Every open case for her team, across all screening programmes, sorted by risk, with one next action and one person responsible. At the top, a short summary written by AI says what is waiting. In the solution design, this is the exception dashboard.</p>
+<div class="cap"><span class="n">1</span><div><h2>Worklist</h2><p>Huda, a nurse navigator, starts her day here. The worklist opens on her own cases; here she has chosen "Whole team", every open case at her facility, grouped by when it needs action, each with one next action and one person responsible. At the top, a short summary written by AI says what is waiting. In the solution design, this is the exception dashboard.</p>
 <div class="meta"><span>For: care coordinators, nurse navigators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US05, US13, US16</span><span>Requirements: FR-07, FR-09, FR-10</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -587,49 +656,60 @@ code.role{margin-top:6px}
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
 <nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
+<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div><svg class="i chev"><use href="#i-down"/></svg></div>
 </div>
 <div class="page">
-<div class="head">
-<div><p class="eyebrow">Thursday 12 November 2026, 09:00</p><h1>Good morning, Huda</h1><p class="sub">24 open cases · 1 overdue · 5 due today</p></div>
-<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">My team<svg class="i"><use href="#i-down"/></svg></span><span class="field search"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span></div>
-</div>
+<div><p class="eyebrow">Thursday 12 November 2026, 09:00</p><h1>Good morning, Huda</h1><p class="lede">9 open cases · 2 overdue · 5 due today</p></div>
 <div class="brief" aria-label="Summary written by AI">
-<p class="brief-text clamp3">Across your team's 24 open cases, 1 is overdue and 5 are due today. Hessa Al Dhaheri is 18 hours overdue for a new referral, and her case is escalated. Due today are three calls to patients: a call-back for Salem Al Ketbi by 10:40, and calls to Maricel Reyes and Nasreen Akhtar by 17:00. Noura Al Shamsi's next step is due by 12:00, and Khalid Al Marzouqi's case has no owner, also due by 12:00. Two more deadlines fall on Friday 13 November.</p>
+<p class="brief-text clamp3">Across your team's 9 open cases, 2 are overdue and 5 are due today. Latifa Al Mazrouei is 1 day 16 hours overdue for another way to reach her, and Hessa Al Dhaheri is 18 hours overdue for a new referral; both are escalated. Due today are a call-back for Salem Al Ketbi by 10:40, an answer to Noura Al Shamsi's consultation and an owner for Khalid Al Marzouqi's case by 12:00, and calls to Maricel Reyes and Nasreen Akhtar by 17:00. Two more deadlines fall on Friday 13 November.</p>
 <p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span><span class="brief-refresh">Show more</span></p>
 </div>
+<p class="teamline"><span>Cases at Family Health Centre, your team.</span><span class="alink">View another team's cases</span></p>
+<div class="scopes"><span class="scope">My cases <b>1</b></span><span class="scope on">Whole team <b>9</b></span></div>
+<div class="toolbar"><span class="field search wide"><svg class="i"><use href="#i-search"/></svg>Search name or MRN</span><span class="field select">All programmes<svg class="i"><use href="#i-down"/></svg></span></div>
 <div class="chips">
-<span class="chip on">All open <b>24</b></span>
+<span class="chip on">All open <b>9</b></span>
 <span class="chip"><i class="d red"></i>Urgent <b>1</b></span>
-<span class="chip"><i class="d red"></i>Overdue <b>1</b></span>
+<span class="chip"><i class="d red"></i>Overdue <b>2</b></span>
 <span class="chip"><i class="d red"></i>Referral declined <b>1</b></span>
-<span class="chip"><i class="d amber"></i>Not reached <b>1</b></span>
+<span class="chip"><i class="d amber"></i>Not reached <b>2</b></span>
 <span class="chip"><i class="d amber"></i>Not acknowledged <b>1</b></span>
 <span class="chip"><i class="d amber"></i>Needs a new owner <b>1</b></span>
 </div>
+<p class="showing">Showing 9 of 9 open cases.</p>
+<div class="wgroup"><h2>Needs action now<span class="count">3</span></h2>
 <div class="tablecard"><table>
-<colgroup><col style="width:168px"><col style="width:160px"><col style="width:180px"><col><col style="width:176px"><col style="width:152px"><col style="width:224px"></colgroup>
-<thead><tr><th>Patient</th><th>Programme</th><th>Stage</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
+<colgroup><col style="width:260px"><col style="width:330px"><col style="width:220px"><col style="width:210px"><col></colgroup>
+<thead><tr><th>Patient</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td><span class="name">Hessa Al Dhaheri</span><span class="l2">66 · MRN 100 245 891</span></td><td>Breast screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Send a new referral<span class="l2">Regional Hospital declined: no capacity</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td><span class="red" style="font-weight:600">18 hours late</span><span class="l2">Was due Wed, 15:00</span></td><td><span class="st red">Overdue</span><span class="l2">Escalated to Joy Bautista</span></td></tr>
-<tr><td><span class="name">Noura Al Shamsi</span><span class="l2">44 · MRN 100 318 402</span></td><td>Breast screening</td><td>Consultation<span class="l2">Stage 6 of 10</span></td><td>Agree the next step with her today<span class="l2">Result marked urgent by Dr. Rekha Varghese</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st red">Urgent</span><span class="l2">Shorter deadlines</span></td></tr>
-<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">63 · MRN 100 377 615</span></td><td>Lung screening</td><td>Patient acknowledged<span class="l2">Stage 5 of 10</span></td><td>Call him back<span class="l2">He asked for a call at 08:40</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><span class="st amber">Call-back requested</span><span class="l2">By text message</span></td></tr>
-<tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">57 · MRN 100 402 233</span></td><td>Bowel screening</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Choose a new owner<span class="l2">Aisha Al Nuaimi is on leave</span></td><td>Joy Bautista<span class="l2">Facility lead</span></td><td>Today, 12:00<span class="l2">3 hours left</span></td><td><span class="st amber">Needs a new owner</span><span class="l2">Joy covers until someone accepts</span></td></tr>
-<tr><td><span class="name">Maricel Reyes</span><span class="l2">46 · MRN 100 455 790</span></td><td>Cervical screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her between 13:00 and 14:00<span class="l2">Two calls not answered; this is her lunch break</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not reached</span><span class="l2">Tried twice</span></td></tr>
-<tr><td><span class="name">Nasreen Akhtar</span><span class="l2">52 · MRN 100 468 104</span></td><td>Breast screening</td><td>Patient notified<span class="l2">Stage 4 of 10</span></td><td>Call her with an Urdu interpreter<span class="l2">No reply to the text for two working days</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 hours left</span></td><td><span class="st amber">Not acknowledged</span><span class="l2">Text delivered Tue 10 Nov</span></td></tr>
-<tr><td><span class="name">Rashid Al Hosani</span><span class="l2">61 · MRN 100 512 337</span></td><td>Bowel screening</td><td>Follow-up<span class="l2">Stage 7 of 10</span></td><td>Endoscopy Unit to accept the referral<span class="l2">Sent Wed 11 Nov, 10:00</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 12:00<span class="l2">1 day left</span></td><td><span class="st blue">Waiting for acceptance</span><span class="l2">Sender stays responsible</span></td></tr>
-<tr><td><span class="name">Mohammed Rafiq</span><span class="l2">49 · MRN 100 538 920</span></td><td>Heart, kidney and diabetes check</td><td>Owner assigned<span class="l2">Stage 3 of 10</span></td><td>Tell him his blood test result<span class="l2">By phone, in Urdu or English</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 17:00<span class="l2">1 day left</span></td><td><span class="st green">On track</span></td></tr>
-</tbody></table>
-<div class="more">Show 16 more cases that are on track</div>
-</div>
-<p class="note">Read-only. Clinical actions are recorded in each hospital's own system; CareLoop shows where every case is and who must act next.</p>
+<tr><td><span class="name">Latifa Al Mazrouei</span><span class="l2">MRN 100 587 221</span><span class="l3">Cervical screening · Patient notified</span></td><td><span class="name">Contact the patient another way</span><span class="l2">The patient could not be reached.</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td class="late"><b>1 day late</b><span class="l2">Was due Tue 10 Nov, 17:00</span></td><td><div class="stcell"><span class="badge red dot">Overdue</span><span class="badge grey">Escalated</span></div></td></tr>
+<tr><td><span class="name">Hessa Al Dhaheri</span><span class="l2">MRN 100 245 891</span><span class="l3">Breast screening · Follow-up</span></td><td><span class="name">Send a new referral</span><span class="l2">A referral or handoff was declined.</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td class="late"><b>18 h late</b><span class="l2">Was due Wed 11 Nov, 15:00</span></td><td><div class="stcell"><span class="badge red dot">Overdue</span><span class="badge grey">Escalated</span></div></td></tr>
+<tr><td><span class="name">Noura Al Shamsi</span><span class="l2">MRN 100 318 402</span><span class="l3">Breast screening · Consultation</span></td><td><span class="name">Answer the consultation</span><span class="l2">Marked urgent by the reviewing clinician.</span></td><td>Dr. Rekha Varghese<span class="l2">Screening physician</span></td><td>Today, 12:00<span class="l2">3 h left</span></td><td><div class="stcell"><span class="badge red dot">Urgent</span></div></td></tr>
+</tbody></table></div></div>
+<div class="wgroup"><h2>Due today<span class="count">4</span></h2>
+<div class="tablecard"><table>
+<colgroup><col style="width:260px"><col style="width:330px"><col style="width:220px"><col style="width:210px"><col></colgroup>
+<thead><tr><th>Patient</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="name">Salem Al Ketbi</span><span class="l2">MRN 100 377 615</span><span class="l3">Lung screening · Patient acknowledged</span></td><td><span class="name">Call the patient back</span><span class="l2">The patient asked for a call.</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 10:40<span class="l2">1 h 40 min left</span></td><td><div class="stcell"><span class="badge amber dot">Call-back requested</span></div></td></tr>
+<tr><td><span class="name">Khalid Al Marzouqi</span><span class="l2">MRN 100 402 233</span><span class="l3">Bowel screening · Owner assigned</span></td><td><span class="name">Choose an owner</span><span class="l2">No named owner yet. The facility lead covers it.</span></td><td>Facility lead queue<span class="l2">No named owner yet</span></td><td>Today, 12:00<span class="l2">3 h left</span></td><td><div class="stcell"><span class="badge amber dot">Needs a new owner</span></div></td></tr>
+<tr><td><span class="name">Maricel Reyes</span><span class="l2">MRN 100 455 790</span><span class="l3">Cervical screening · Patient notified</span></td><td><span class="name">Contact the patient another way</span><span class="l2">The patient could not be reached.</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 h left</span></td><td><div class="stcell"><span class="badge amber dot">Not reached</span></div></td></tr>
+<tr><td><span class="name">Nasreen Akhtar</span><span class="l2">MRN 100 468 104</span><span class="l3">Breast screening · Patient notified</span></td><td><span class="name">Make sure the patient has the message</span><span class="l2">The message was delivered but not acknowledged.</span></td><td>Huda Saleh<span class="l2">Nurse navigator</span></td><td>Today, 17:00<span class="l2">8 h left</span></td><td><div class="stcell"><span class="badge amber dot">Not acknowledged</span></div></td></tr>
+</tbody></table></div></div>
+<div class="wgroup"><h2>Coming up<span class="count">2</span></h2>
+<div class="tablecard"><table>
+<colgroup><col style="width:260px"><col style="width:330px"><col style="width:220px"><col style="width:210px"><col></colgroup>
+<thead><tr><th>Patient</th><th>Next action</th><th>Responsible</th><th>Due</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="name">Rashid Al Hosani</span><span class="l2">MRN 100 512 337</span><span class="l3">Bowel screening · Follow-up</span></td><td><span class="name">Accept or decline the referral</span><span class="l2">Referral sent. The sender stays responsible until it is accepted.</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 12:00<span class="l2">1 day left</span></td><td><div class="stcell"><span class="badge blue dot">Waiting for acceptance</span></div></td></tr>
+<tr><td><span class="name">Mohammed Rafiq</span><span class="l2">MRN 100 538 920</span><span class="l3">Heart, kidney and diabetes check · Owner assigned</span></td><td><span class="name">Review the result</span></td><td>Dr. Sara Al Hammadi<span class="l2">Family doctor</span></td><td>Fri 13 Nov, 17:00<span class="l2">1 day left</span></td><td><div class="stcell"><span class="badge green dot">On track</span></div></td></tr>
+</tbody></table></div></div>
+<p class="note">Clinical steps are recorded in each hospital system. CareLoop shows where every case is and who acts next.</p>
 </div>
 </div>
 </section>
-
 <section class="board" id="b02" data-file="02-case">
-<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who must act next and what has happened. Read-only, except one thing: a nurse navigator records what a patient said on a call. Nurse navigators and clinicians can also ask AI for a draft of a message to the patient, which is never sent. Clinical actions happen in the hospital system.</p>
+<div class="cap"><span class="n">2</span><div><h2>Case</h2><p>Everything about one case on one page: where it is, what is late, who acts next and what has happened. Read-only, except one thing: a nurse navigator records what a patient said on a call. Nurse navigators and clinicians can also ask AI for a draft of a message to the patient, which is never sent. Clinical actions happen in the hospital system.</p>
 <div class="meta"><span>For: care team and clinicians</span><span>Built in: CareLoop web app</span><span>Stories: US01, US03, US08, US10, US13, US14, US16</span><span>Requirements: FR-02, FR-03, FR-06, FR-07</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
@@ -637,20 +717,12 @@ code.role{margin-top:6px}
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
 <nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div></div>
+<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · Family Health Centre</small></div><svg class="i chev"><use href="#i-down"/></svg></div>
 </div>
 <div class="page">
 <div class="crumb"><svg class="i"><use href="#i-left"/></svg>Worklist</div>
-<div class="pbanner">
-<span class="av">HA</span>
-<div class="who"><div class="nm">Hessa Al Dhaheri</div>
-<div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span><span>Emirates ID 784-1960-•••••••-•</span></div>
-<div class="tags"><span class="tag">Speaks Arabic</span><span class="tag">Calls 10:00 to 12:00</span><span class="tag">Basic phone, no internet</span><span class="tag">Saeed (son) gets appointment details</span></div></div>
-<span class="pill">Synthetic record</span>
-</div>
+<div class="casehead"><span class="pi"><svg class="i"><use href="#i-user"/></svg></span><div><h1>Hessa Al Dhaheri</h1><p class="meta"><span>MRN 100 245 891</span><span>Breast screening</span><span>Family Health Centre</span><span>Opened Tue 10 Nov</span></p><p class="quiet">Result MAMMO-2026-110941 from the hospital system</p><p class="quiet">Reports, images and other details are in the hospital record.</p></div></div>
 <div class="card">
-<div class="casebar"><span>Programme: <b>Breast screening</b></span><span>Urgency: <b>Routine</b>, set by Dr. Rekha Varghese</span><span>Care coordinator: <b>Huda Saleh</b></span><span>Opened: <b>Tue 10 Nov 2026, 09:00</b></span></div>
 <div class="stepper">
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Result received</div>
 <div class="s done"><span class="dot"><svg class="i"><use href="#i-check"/></svg></span>Case opened</div>
@@ -666,60 +738,53 @@ code.role{margin-top:6px}
 </div>
 <div class="grid2">
 <div class="stack">
-<div class="card next">
-<div class="top"><span class="lbl">Next action</span><span class="badge red">Overdue</span><span class="badge grey">Escalated to Joy Bautista, facility lead</span></div>
-<h2>Send a new referral for breast assessment</h2>
-<p class="why">Regional Hospital declined the referral on Tue 10 Nov at 15:00 with the reason "no capacity". Dr. Rekha stays responsible until another unit accepts.</p>
-<div class="kv">
-<div><small>Responsible</small><b>Dr. Rekha Varghese</b><span>Screening physician, Family Health Centre</span></div>
-<div><small>Was due</small><b class="red">Wed 11 Nov, 15:00</b><span>18 hours late</span></div>
-<div><small>Target</small><b>Assessment by Mon 16 Nov</b><span>DoH: within 5 working days of screening</span></div>
+<div class="card hero next">
+<div class="top"><span class="lbl">Next action</span><span class="badge red dot">Overdue</span><span class="badge grey">Escalated</span></div>
+<h2>Send a new referral</h2>
+<p class="why">A referral or handoff was declined, so another must be arranged.</p>
+<div class="facts">
+<div><small>Responsible</small><b>Dr. Rekha Varghese</b><span>Screening physician · Family Health Centre</span></div>
+<div><small>Due</small><b class="red">18 h late</b><span>Was due Wed 11 Nov, 15:00</span></div>
+<div><small>Escalation</small><span>Escalated to the facility lead at Family Health Centre, Wed 11 Nov, 15:00. Not acknowledged yet. The person responsible stays the same.</span></div>
 </div>
 <div class="ladder">
-<div class="done"><div class="k"><span class="num">1</span>Reminder to Dr. Rekha</div>Sent Wed 11 Nov, 11:00</div>
-<div class="now"><div class="k"><span class="num">2</span>Joy Bautista, facility lead</div>Escalated Wed, 15:00. Acknowledged today, 08:30.</div>
-<div><div class="k"><span class="num">3</span>Dr. Obaid Al Suwaidi</div>Programme coordinator, at 12:00 today if still open</div>
+<div class="done"><div class="k"><span class="num">1</span>Reminder to Dr. Rekha Varghese</div>Sent Wed 11 Nov, 11:00</div>
+<div class="now"><div class="k"><span class="num">2</span>Facility lead, Family Health Centre</div>Escalated Wed 11 Nov, 15:00. Not acknowledged yet.</div>
+<div><div class="k"><span class="num">3</span>Programme coordinator</div>Today, 15:00, if still open</div>
 </div>
 <p class="who-acts"><svg class="i"><use href="#i-user"/></svg><span>Dr. Rekha Varghese does this in the hospital system. CareLoop moves on once it is recorded there.</span></p>
 </div>
 <div class="card">
-<h3>Needed before the outcome can be recorded</h3>
-<ul class="check">
-<li><span class="mk ok"><svg class="i"><use href="#i-check"/></svg></span><div><b>Hessa understood the next step</b><span>Said it back on a call with Huda Saleh, Tue 10 Nov</span></div><span class="r">Done</span></li>
-<li><span class="mk no"><svg class="i"><use href="#i-x"/></svg></span><div><b>A receiving clinician accepted the referral</b><span>Declined by Regional Hospital: no capacity</span></div><span class="r red">Missing</span></li>
-<li><span class="mk todo"></span><div><b>Appointment booked, and Hessa has the details</b><span>She replies 1 when she gets the text. Saeed cannot answer for her.</span></div><span class="r">Waiting</span></li>
-<li><span class="mk todo"></span><div><b>The clinic recorded that she attended</b><span>A booking or a reminder does not count</span></div><span class="r">Waiting</span></li>
-<li><span class="mk todo"></span><div><b>Outcome recorded by the responsible clinician</b><span>With a link to the clinical record</span></div><span class="r">Waiting</span></li>
+<h3>Timeline<span class="r small muted">Newest first</span></h3>
+<p class="tlday">Wednesday 11 November</p>
+<ul class="tl2">
+<li><time>15:00</time><div><small>Deadline</small>New referral not sent by the deadline. Escalated to the facility lead.</div><span class="src">CareLoop</span></li>
+<li><time>11:00</time><div><small>Deadline</small>Reminder sent to Dr. Rekha Varghese: the new referral is due at 15:00.</div><span class="src">CareLoop</span></li>
 </ul>
-</div>
-<div class="card">
-<h3>Timeline<span class="r small muted">Newest first, from all systems</span></h3>
-<ul class="tl">
-<li><time>Thu 12 Nov, 08:30</time><div><b>Escalation acknowledged</b><span class="by">Joy Bautista asked Dr. Rekha to refer again by 10:00</span></div><span class="src">CareLoop</span></li>
-<li><time>Wed 11 Nov, 15:00</time><div><b>Escalated to the facility lead</b><span class="by">New referral not sent by the deadline</span></div><span class="src">CareLoop</span></li>
-<li><time>Wed 11 Nov, 11:00</time><div><b>Reminder sent to Dr. Rekha Varghese</b><span class="by">New referral due at 15:00</span></div><span class="src">CareLoop</span></li>
-<li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 11:20</time><div><b>On a call, Hessa said the next step back</b><span class="by">Recorded by Huda Saleh, with her confidence: 4 out of 5</span></div><span class="src">CareLoop</span></li>
-<li><time>Tue 10 Nov, 10:00</time><div><b>Text delivered: please expect our call</b><span class="by">To her basic phone</span></div><span class="src">Text message</span></li>
+<p class="tlday">Tuesday 10 November</p>
+<ul class="tl2">
+<li><time>15:00</time><div><small>Referral</small>Referral declined by the Breast Clinic, Regional Hospital: no capacity.<span class="by">Receiving clinician</span></div><span class="src">Hospital system</span></li>
+<li><time>12:00</time><div><small>Referral</small>Referral sent to the Breast Clinic, Regional Hospital.<span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
+<li><time>11:40</time><div><small>Consultation</small>Consultation outcome recorded: refer for breast assessment.<span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
+<li><time>11:20</time><div><small>Patient contact</small>Next step understood: she said it back on the call.<span class="by">Huda Saleh</span></div><span class="src">CareLoop</span></li>
+<li><time>11:15</time><div><small>Patient contact</small>Result explained by phone, in Arabic.<span class="by">Huda Saleh</span></div><span class="src">CareLoop</span></li>
 </ul>
-<div class="linkrow">Show 6 earlier events</div>
+<div class="linkrow">Show 4 earlier events</div>
 </div>
 </div>
 <div class="stack">
 <div class="card">
-<h3>Where each part stands</h3>
-<ul class="tracks">
-<li><div><b>Patient contact</b><span>Notified and acknowledged, Tue 10 Nov</span></div><span class="badge green">Done</span></li>
-<li><div><b>Consultation</b><span>Refer for breast assessment</span></div><span class="badge green">Done</span></li>
-<li><div><b>Referral</b><span>Regional Hospital: no capacity</span></div><span class="badge red">Declined</span></li>
-<li><div><b>Appointment</b><span>Not booked yet</span></div><span class="badge grey">Not started</span></li>
+<h3>How each part is going</h3>
+<ul class="tracks2">
+<li><span class="ti"><svg class="i"><use href="#i-phone"/></svg></span><div><b>Patient contact</b><span class="l2">Updated Tue 10 Nov, 11:20</span></div><span class="badge green dot">Understood</span></li>
+<li><span class="ti"><svg class="i"><use href="#i-chat"/></svg></span><div><b>Consultation</b><span class="l2">Updated Tue 10 Nov, 11:40</span></div><span class="badge green dot">Done</span></li>
+<li><span class="ti"><svg class="i"><use href="#i-send"/></svg></span><div><b>Referral</b><span class="l2">Updated Tue 10 Nov, 15:00</span></div><span class="badge red dot">Declined</span></li>
+<li><span class="ti"><svg class="i"><use href="#i-cal"/></svg></span><div><b>Appointment</b></div><span class="badge grey">Not started</span></li>
 </ul>
 </div>
 <div class="card callcard">
 <h3>After a call with the patient</h3>
 <p class="note">A text message or email reply can only say "I got this message" or ask for a call. Record here what the patient told you on the phone.</p>
-<p class="cur">Confidence on record: 4 out of 5.</p>
 <div class="callform">
 <div class="ck"><span class="cbox off"></span><span>The patient said they will come</span></div>
 <div class="ck"><span class="cbox off"></span><span>The patient said the next step back in their own words</span></div>
@@ -741,187 +806,204 @@ code.role{margin-top:6px}
 <p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · 09:05 · Draft, not sent</span></p>
 </div>
 </div>
-<div class="card">
-<h3>How to reach Hessa</h3>
-<ul class="reach">
-<li><svg class="i"><use href="#i-phone"/></svg><span>Phone call in Arabic, 10:00 to 12:00</span></li>
-<li><svg class="i"><use href="#i-msg"/></svg><span>Text messages to her basic phone. She has no email.</span></li>
-<li><svg class="i"><use href="#i-user"/></svg><span>Saeed Al Dhaheri, her son, gets the day, time and place of appointments. Hessa signed for this on Mon 9 Nov.</span></li>
-<li><svg class="i"><use href="#i-lock"/></svg><span>Results are given by a person, never by text or email</span></li>
-</ul>
-</div>
-<div class="card">
-<h3>Her contact person</h3>
-<div class="me"><span class="av">HS</span><div><b>Huda Saleh</b><small>Nurse navigator · 02 000 0000</small></div></div>
-<p class="note" style="margin-top:12px">Hessa always has one named person to call. If Huda changes, Hessa is told who replaces her.</p>
 </div>
 </div>
-</div>
-<p class="note">Only Hessa's care team can open this case. Reports, images and notes stay in the hospital system. Every view, and every call you record here, is kept.</p>
+<p class="note">Reports, images and notes stay in the hospital system. Every view, and every call you record here, is kept.</p>
 </div>
 </div>
 </section>
-
 <section class="board" id="b03" data-file="03-impact">
-<div class="cap"><span class="n">3</span><div><h2>Impact</h2><p>Programme leads see whether every actionable result led to timely care, using the measures the challenge names. Every number comes from case events and is compared with the same cases replayed with reminders and escalation switched off.</p>
+<div class="cap"><span class="n">3</span><div><h2>Impact</h2><p>Programme leads see whether every actionable result led to timely care, using the measures the challenge names. A short summary written by AI sits under the heading. The comparison at the bottom needs CareLoop to replay the same cases with reminders and escalation switched off, which is not built yet; until it is, the page leaves that card out.</p>
 <div class="meta"><span>For: programme coordinators and facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US16</span><span>Requirements: FR-09</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span>Worklist</span><span class="on">Impact</span><span>Programmes</span></nav>
+<nav class="nav"><span>Worklist</span><span>Escalations<span class="navcount">1</span></span><span class="on">Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
+<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div><svg class="i chev"><use href="#i-down"/></svg></div>
 </div>
 <div class="page">
-<div class="head">
-<div><h1>Impact</h1><p class="sub">All screening programmes · 1 September to 12 November 2026 · 240 actionable results</p></div>
-<div class="filters"><span class="field">All programmes<svg class="i"><use href="#i-down"/></svg></span><span class="field">All facilities<svg class="i"><use href="#i-down"/></svg></span></div>
-</div>
+<div><h1>Impact</h1><p class="lede">All facilities · Updated Thu 12 Nov, 09:03 · 240 cases</p></div>
 <div class="brief" aria-label="Summary of the figures, written by AI">
-<p class="brief-text clamp3">The next care step was completed by the agreed deadline in 172 of 200 cases (86%), and 9 of the 56 open cases (16%) are past their deadline. From the result, the median time was 0.5 working days to the patient being told, 1 to the consultation answered, 5 to confirmatory tests and 19 to care starting.
+<p class="brief-text clamp3">The next care step was done by the deadline in 172 of 200 cases (86%), and 9 of 56 open cases (16%) are past their deadline. From the result, the median time was 12 hours to the patient acknowledging, 1 day to the consultation answered, 5 days to the appointment attended and 19 days to care starting.
 
-Of the 240 cases, 184 are closed and 56 are open. Referrals were accepted and attended in 201 of 214 cases (94%), and appointments were attended in 412 of 429 (96%).
+Of 240 cases, 184 are closed and 56 are open. Among open cases, 9 are waiting because they are overdue and 5 because the message is not acknowledged. Referrals were accepted and attended in 201 of 214 cases (94%).
 
-Treatment started by the deadline rests on too few cases to report.
+Treatment started by the deadline, the closure reasons and some reasons for waiting rest on too few cases to report.
 
 Simulated on synthetic data; not evidence of real-world improvement.</p>
 <p class="brief-meta"><svg class="i"><use href="#i-spark"/></svg><span>Written by AI · Today, 09:00</span><span class="brief-refresh">Refresh</span><span class="brief-refresh">Show more</span></p>
 </div>
 <div class="kpis">
-<div class="card kpi"><span class="lbl">Next care step completed by the agreed deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">With escalation off: <b>61%</b> (122 of 200)</div></div>
-<div class="card kpi"><span class="lbl">Unresolved actionable results</span><div class="big">9</div><span class="of">Past the deadline, out of 56 open cases</span><div class="vs">With escalation off: <b>38</b></div></div>
-<div class="card kpi"><span class="lbl">Understood their next step</span><div class="big">91%</div><span class="of">208 of 228 said it back correctly the first time</span><div class="vs">With escalation off: not measured</div></div>
+<div class="card kpi"><span class="lbl">Next care step done by the deadline</span><div class="big">86%</div><span class="of">172 of 200 cases whose deadline has passed</span><div class="vs">Cases closed: 77% (184 of 240)</div></div>
+<div class="card kpi"><span class="lbl">Unresolved actionable results</span><div class="big">9</div><span class="of">Past the deadline, out of 56 open cases</span><div class="vs">Escalated: 4 · Need a new owner: 2</div></div>
+<div class="card kpi"><span class="lbl">Understood their next step</span><div class="big">91%</div><span class="of">208 of 228 who acknowledged said it back</span><div class="vs">Acknowledged the message: 97% (228 of 236 told)</div></div>
 </div>
 <div class="grid-even">
 <div class="card">
-<h3>Time to each step<span class="r small muted">Median working days from the result</span></h3>
-<table class="mini cmp"><thead><tr><th>Step</th><th class="num">With escalation</th><th class="num">Escalation off</th></tr></thead><tbody>
-<tr><td>Patient told the result</td><td class="num"><b>0.5</b></td><td class="num">3</td></tr>
-<tr><td>Consultation answered</td><td class="num"><b>1</b></td><td class="num">4</td></tr>
-<tr><td>Confirmatory tests done</td><td class="num"><b>5</b></td><td class="num">11</td></tr>
-<tr><td>Care started: treatment or surveillance</td><td class="num"><b>19</b></td><td class="num">31</td></tr>
+<h3>Time to each step<span class="r small muted">Median clock time from the result</span></h3>
+<table class="mini"><thead><tr><th>Step</th><th class="num">Median</th><th class="num">Cases</th></tr></thead><tbody>
+<tr><td>Patient acknowledged</td><td class="num">12 h</td><td class="num plain">228</td></tr>
+<tr><td>Consultation answered</td><td class="num">1 day</td><td class="num plain">221</td></tr>
+<tr><td>Appointment attended</td><td class="num">5 days</td><td class="num plain">214</td></tr>
+<tr><td>Care started: treatment or surveillance</td><td class="num">19 days</td><td class="num plain">25</td></tr>
+<tr><td>Case closed</td><td class="num">19 days</td><td class="num plain">184</td></tr>
 </tbody></table>
 </div>
 <div class="card">
-<h3>Steps completed<span class="r small muted">Each with its denominator</span></h3>
-<table class="mini cmp"><thead><tr><th>Measure</th><th class="num">With escalation</th><th class="num">Escalation off</th></tr></thead><tbody>
-<tr><td>Referral accepted and attended<span class="l2">201 of 214 referrals</span></td><td class="num"><b>94%</b></td><td class="num">78%</td></tr>
-<tr><td>Appointments attended<span class="l2">412 of 429 appointments</span></td><td class="num"><b>96%</b></td><td class="num">84%</td></tr>
-<tr><td>Treatment started by the deadline<span class="l2">22 of 25 people who needed treatment</span></td><td class="num"><b>88%</b></td><td class="num">64%</td></tr>
-<tr><td>Closed with signed evidence<span class="l2">184 of 184 closed cases</span></td><td class="num"><b>100%</b></td><td class="num">Not tracked</td></tr>
-<tr><td>Patient confidence, out of 5<span class="l2">196 answers</span></td><td class="num"><b>4.4</b></td><td class="num">Not measured</td></tr>
+<h3>Steps completed<span class="r small muted">Each with what it is out of</span></h3>
+<table class="mini"><thead><tr><th>Measure</th><th class="num">Rate</th></tr></thead><tbody>
+<tr><td>Patients who acknowledged the message<span class="l2">228 of 236 patients told</span></td><td class="num">97%</td></tr>
+<tr><td>Cases closed<span class="l2">184 of 240 cases</span></td><td class="num">77%</td></tr>
+<tr><td>Referral accepted and attended<span class="l2">201 of 214 referrals</span></td><td class="num">94%</td></tr>
+<tr><td>Appointments attended<span class="l2">412 of 429 appointments due</span></td><td class="num">96%</td></tr>
+<tr><td>Treatment started by the deadline<span class="l2">22 of 25 people who needed treatment</span></td><td class="num">88%</td></tr>
+<tr><td>Closed with signed evidence<span class="l2">184 of 184 closed cases</span></td><td class="num">100%</td></tr>
+<tr><td>Patient confidence, out of 5<span class="l2">196 answers from 236 patients told (83%)</span></td><td class="num">4.4</td></tr>
 </tbody></table>
 </div>
 </div>
-<div class="grid3">
+<div class="grid-even">
 <div class="card">
 <h3>Cases that reached each stage<span class="r small muted">Out of 240</span></h3>
 <ul class="bars">
-<li><span>1 Result received</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>2 Case opened</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>3 Owner assigned</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
-<li><span>4 Patient notified</span><span class="bar"><i style="width:98.3%"></i></span><span class="v">236</span></li>
-<li><span>5 Patient acknowledged</span><span class="bar"><i style="width:95%"></i></span><span class="v">228</span></li>
-<li><span>6 Consultation</span><span class="bar"><i style="width:92.1%"></i></span><span class="v">221</span></li>
-<li><span>7 Follow-up</span><span class="bar"><i style="width:89.2%"></i></span><span class="v">214</span></li>
-<li><span>8 Outcome recorded</span><span class="bar"><i style="width:82.5%"></i></span><span class="v">198</span></li>
-<li><span>9 Closure review</span><span class="bar"><i style="width:79.2%"></i></span><span class="v">190</span></li>
-<li><span>10 Closed</span><span class="bar"><i style="width:76.7%"></i></span><span class="v">184</span></li>
+<li><span>Result received</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>Case opened</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>Owner assigned</span><span class="bar"><i style="width:100%"></i></span><span class="v">240</span></li>
+<li><span>Patient notified</span><span class="bar"><i style="width:98.3%"></i></span><span class="v">236</span></li>
+<li><span>Patient acknowledged</span><span class="bar"><i style="width:95%"></i></span><span class="v">228</span></li>
+<li><span>Consultation</span><span class="bar"><i style="width:92.1%"></i></span><span class="v">221</span></li>
+<li><span>Follow-up</span><span class="bar"><i style="width:89.2%"></i></span><span class="v">214</span></li>
+<li><span>Outcome recorded</span><span class="bar"><i style="width:82.5%"></i></span><span class="v">198</span></li>
+<li><span>Closure review</span><span class="bar"><i style="width:79.2%"></i></span><span class="v">190</span></li>
+<li><span>Closed</span><span class="bar"><i style="width:76.7%"></i></span><span class="v">184</span></li>
 </ul>
-<p class="note" style="margin-top:12px">Still open and moving: 56 cases, each with a named owner.</p>
 </div>
-<div class="stack">
 <div class="card">
-<h3>Why cases were delayed<span class="r small muted">Exceptions raised</span></h3>
-<ul class="bars wide">
-<li><span>Declined: no capacity</span><span class="bar amberbar"><i style="width:100%"></i></span><span class="v">11</span></li>
-<li><span>Not reached</span><span class="bar amberbar"><i style="width:63.6%"></i></span><span class="v">7</span></li>
-<li><span>Appointment missed</span><span class="bar amberbar"><i style="width:54.5%"></i></span><span class="v">6</span></li>
-<li><span>Declined: missing information</span><span class="bar amberbar"><i style="width:36.4%"></i></span><span class="v">4</span></li>
-<li><span>Patient declined care</span><span class="bar amberbar"><i style="width:18.2%"></i></span><span class="v">2</span></li>
+<h3>Where open cases are now<span class="r small muted">Out of 56</span></h3>
+<ul class="bars">
+<li><span>Result received</span><span class="bar"><i style="width:0%"></i></span><span class="v">0</span></li>
+<li><span>Case opened</span><span class="bar"><i style="width:1.8%"></i></span><span class="v">1</span></li>
+<li><span>Owner assigned</span><span class="bar"><i style="width:5.4%"></i></span><span class="v">3</span></li>
+<li><span>Patient notified</span><span class="bar"><i style="width:14.3%"></i></span><span class="v">8</span></li>
+<li><span>Patient acknowledged</span><span class="bar"><i style="width:12.5%"></i></span><span class="v">7</span></li>
+<li><span>Consultation</span><span class="bar"><i style="width:12.5%"></i></span><span class="v">7</span></li>
+<li><span>Follow-up</span><span class="bar"><i style="width:28.6%"></i></span><span class="v">16</span></li>
+<li><span>Outcome recorded</span><span class="bar"><i style="width:14.3%"></i></span><span class="v">8</span></li>
+<li><span>Closure review</span><span class="bar"><i style="width:10.7%"></i></span><span class="v">6</span></li>
 </ul>
 </div>
 </div>
+<div class="grid-even">
+<div class="card">
+<h3>Why cases are waiting<span class="r small muted">Open cases with each reason</span></h3>
+<ul class="bars">
+<li><span>Overdue</span><span class="bar amberbar"><i style="width:100%"></i></span><span class="v">9</span></li>
+<li><span>Referral declined</span><span class="bar amberbar"><i style="width:44.4%"></i></span><span class="v">4</span></li>
+<li><span>Not reached</span><span class="bar amberbar"><i style="width:33.3%"></i></span><span class="v">3</span></li>
+<li><span>Not acknowledged</span><span class="bar amberbar"><i style="width:55.6%"></i></span><span class="v">5</span></li>
+<li><span>Needs a new owner</span><span class="bar amberbar"><i style="width:22.2%"></i></span><span class="v">2</span></li>
+</ul>
 </div>
-<p class="note">Simulated on synthetic data: "Escalation off" replays the same 240 cases with reminders and escalation switched off. These numbers show how the design works; they are not evidence of real-world improvement.</p>
+<div class="card">
+<h3>Closures by reason<span class="r small muted">Out of 184</span></h3>
+<ul class="bars wide">
+<li><span>Treated</span><span class="bar"><i style="width:33.2%"></i></span><span class="v">61</span></li>
+<li><span>On surveillance</span><span class="bar"><i style="width:21.7%"></i></span><span class="v">40</span></li>
+<li><span>Negative on confirmation</span><span class="bar"><i style="width:40.8%"></i></span><span class="v">75</span></li>
+<li><span>Declined by the patient</span><span class="bar"><i style="width:2.2%"></i></span><span class="v">4</span></li>
+<li><span>Transferred and accepted elsewhere</span><span class="bar"><i style="width:1.6%"></i></span><span class="v">3</span></li>
+<li><span>Untraceable after documented attempts</span><span class="bar"><i style="width:0.5%"></i></span><span class="v">1</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Declined, transferred and untraceable are documented exceptions, not care received.</p>
+</div>
+</div>
+<div class="card">
+<h3>What reminders and escalation change</h3>
+<table class="mini cmp2"><thead><tr><th>Measure</th><th class="num">With reminders and escalation</th><th class="num">Without them</th></tr></thead><tbody>
+<tr><td>Cases closed<span class="l2">Out of the same cases</span></td><td class="num"><b>184 of 240</b></td><td class="num plain">151 of 240</td></tr>
+<tr><td>Cases left waiting past their deadline<span class="l2">Nobody picked them up</span></td><td class="num"><b>9</b></td><td class="num plain">38</td></tr>
+<tr><td>Escalations raised</td><td class="num"><b>31</b></td><td class="num plain">0</td></tr>
+<tr><td>Typical time to close<span class="l2">The median: half closed sooner, half later</span></td><td class="num"><b>19 days</b></td><td class="num plain">31 days</td></tr>
+</tbody></table>
+<p class="disclose" style="margin-top:12px">How this is worked out<svg class="i"><use href="#i-down"/></svg></p>
+</div>
+<p class="note">These numbers show how CareLoop works. They are not evidence of real-world results.</p>
 </div>
 </div>
 </section>
-
 <section class="board" id="b04" data-file="04-programmes">
-<div class="cap"><span class="n">4</span><div><h2>Programmes</h2><p>Each screening programme is a list of steps, each with a deadline, the evidence it needs and an owner. Adding a programme or changing a deadline needs no new code, and a clinician approves every change before it is used.</p>
+<div class="cap"><span class="n">4</span><div><h2>Programmes</h2><p>Each screening programme is one pathway file: steps, each with a deadline, a reminder and an owner, and the evidence that closes a case. Adding a programme or changing a deadline needs no new code, and a clinical adviser approves every change. The prototype ships one example pathway, breast screening, and every deadline in it is a placeholder; the other four programmes here show how more are added.</p>
 <div class="meta"><span>For: programme coordinators and clinical advisers</span><span>Built in: CareLoop web app</span><span>Stories: US13, US14</span><span>Requirements: FR-03, FR-07</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span>Worklist</span><span>Impact</span><span class="on">Programmes</span></nav>
+<nav class="nav"><span>Worklist</span><span>Escalations<span class="navcount">1</span></span><span>Impact</span><span class="on">Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div></div>
+<div class="me"><span class="av">OS</span><div><b>Dr. Obaid Al Suwaidi</b><small>Programme coordinator</small></div><svg class="i chev"><use href="#i-down"/></svg></div>
 </div>
 <div class="page">
-<div class="head">
-<div><h1>Programmes</h1><p class="sub">Five programmes share the same ten stages. Each sets its own steps, deadlines and evidence, and the clinical adviser approves every change.</p></div>
-<div class="btns"><span class="btn">View change history</span></div>
-</div>
-<div class="grid2" style="grid-template-columns:320px minmax(0,1fr)">
-<div class="card" style="padding:0;overflow:hidden">
-<ul class="inbox">
-<li class="sel"><b>Breast screening</b><span>Mammogram, ages 40 to 75</span><span class="st green">Deadlines from the DoH standard</span></li>
-<li><b>Bowel screening</b><span>FIT test or colonoscopy, ages 40 to 75</span><span class="st amber">Deadlines waiting for approval</span></li>
-<li><b>Cervical screening</b><span>Pap smear 25 to 29, HPV test 30 to 65</span><span class="st amber">Deadlines waiting for approval</span></li>
-<li><b>Lung screening</b><span>Low-dose CT scan for heavy smokers</span><span class="st amber">Deadlines waiting for approval</span></li>
-<li><b>Heart, kidney and diabetes checks</b><span>Blood pressure, weight and blood tests, ages 18 to 75</span><span class="st amber">Deadlines waiting for approval</span></li>
+<div><h1>Programmes</h1><p class="lede">Each programme sets its own steps, deadlines and evidence, and a clinical adviser approves every change. Programmes: 5.</p></div>
+<div class="pgrid">
+<ul class="plist">
+<li><b>Bowel screening follow-up</b><span>Version 0.0.1-placeholder.</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li class="sel"><b>Breast screening follow-up</b><span>Version 0.0.1-placeholder.</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Cervical screening follow-up</b><span>Version 0.0.1-placeholder.</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Heart, kidney and diabetes check follow-up</b><span>Version 0.0.1-placeholder.</span><span class="st amber">Deadlines waiting for approval</span></li>
+<li><b>Lung screening follow-up</b><span>Version 0.0.1-placeholder.</span><span class="st amber">Deadlines waiting for approval</span></li>
 </ul>
-</div>
 <div class="stack">
 <div class="card">
-<h3>Breast screening<span class="r"><span class="badge green">In use</span></span></h3>
-<p class="note" style="margin-bottom:16px">Version 1, in use since Tuesday 1 September 2026. Deadlines come from the Department of Health (DoH) standard for breast cancer screening and diagnosis, 2025, unless marked as a placeholder.</p>
-<table class="mini cfg">
-<colgroup><col style="width:200px"><col><col style="width:220px"><col style="width:170px"></colgroup>
-<thead><tr><th>Step</th><th>Deadline</th><th>Evidence needed</th><th>Owner</th></tr></thead>
-<tbody>
-<tr><td>Report ready</td><td>At once, because the result needs more tests<span class="l2">DoH 3.8.1</span></td><td>Screening report</td><td>Screening physician</td></tr>
-<tr><td>Result given</td><td>1 working day after the report<span class="l2">Placeholder; DoH 3.7.1 sets 15 working days as the limit</span></td><td>Teach-back recorded</td><td>Nurse navigator</td></tr>
-<tr><td>Assessment offered</td><td>5 working days after the mammogram<span class="l2">DoH time intervals</span></td><td>Referral accepted and booked</td><td>Referring clinician</td></tr>
-<tr><td>Biopsy result ready</td><td>5 working days after the biopsy<span class="l2">DoH time intervals</span></td><td>Pathology report</td><td>Breast surgeon</td></tr>
-<tr><td>Assessment result given</td><td>5 working days after the assessment<span class="l2">DoH time intervals</span></td><td>Result explained in person</td><td>Breast surgeon</td></tr>
-<tr><td>Referral for treatment</td><td>10 working days after the diagnosis<span class="l2">DoH 3.9.11</span></td><td>Referral accepted</td><td>Breast surgeon</td></tr>
-<tr><td>Case closed</td><td>When treatment starts<span class="l2">Solution design</span></td><td>Treatment record and continuing care accepted</td><td>Authorised clinician</td></tr>
-</tbody>
-</table>
+<h3>Breast screening follow-up<span class="r"><span class="badge amber dot">Placeholder</span></span></h3>
+<p class="lede" style="margin:0 0 12px">Version 0.0.1-placeholder, from Fri 13 Nov. Deadlines are clock time. Every deadline here is a placeholder, waiting for a clinical adviser to approve it.</p>
+<table class="mini cfg2"><thead><tr><th>Step</th><th>Deadline</th><th>Reminder</th><th>Owner</th></tr></thead><tbody>
+<tr><td>Choose an owner</td><td>1 day</td><td>6 h before</td><td>Facility lead</td></tr>
+<tr><td>Review the result</td><td>1 day</td><td>6 h before</td><td>Clinician</td></tr>
+<tr><td>Make sure the patient has the message</td><td>1 day</td><td>6 h before</td><td>Nurse navigator</td></tr>
+<tr><td>Make sure the patient has the message<span class="l2">For routine results</span></td><td>1 day</td><td>6 h before</td><td>Nurse navigator</td></tr>
+<tr><td>Answer the consultation</td><td>1 day</td><td>6 h before</td><td>Receiving clinician</td></tr>
+<tr><td>Accept or decline the referral</td><td>4 h</td><td>1 h before</td><td>Receiving clinician</td></tr>
+<tr><td>Arrange the follow-up</td><td>1 day</td><td>6 h before</td><td>Clinician</td></tr>
+<tr><td>Call the patient back</td><td>2 h</td><td>30 min before</td><td>Nurse navigator</td></tr>
+<tr><td>Contact the patient another way</td><td>1 day</td><td>6 h before</td><td>Nurse navigator</td></tr>
+<tr><td>Find another clinician for the consultation</td><td>1 day</td><td>6 h before</td><td>Clinician</td></tr>
+<tr><td>Send a new referral</td><td>1 day</td><td>4 h before</td><td>Clinician</td></tr>
+<tr><td>Rebook the appointment</td><td>1 day</td><td>6 h before</td><td>Receiving clinician</td></tr>
+<tr><td>Start the treatment</td><td>1 day</td><td>6 h before</td><td>Receiving clinician</td></tr>
+<tr><td>Decide whether to close the case</td><td>1 day</td><td>6 h before</td><td>Receiving clinician</td></tr>
+</tbody></table>
+<p class="note" style="margin-top:12px">Source for every deadline: No clinical source yet; to be cited by the clinical adviser</p>
 </div>
 <div class="grid-even">
 <div class="card">
 <h3>When a step is late</h3>
-<div class="ladder vert" style="margin-top:0">
-<div><div class="k"><span class="num">1</span>Owner</div>Reminder before the deadline</div>
-<div><div class="k"><span class="num">2</span>Facility lead</div>At the deadline</div>
-<div><div class="k"><span class="num">3</span>Programme coordinator</div>If still open</div>
-</div>
-<p class="note" style="margin-top:12px">Urgent results skip the reminder and go straight to the facility lead.</p>
+<ul class="vladder">
+<li><span class="num">1</span><b>Owner</b><span class="r">Reminder before the deadline</span></li>
+<li><span class="num">2</span><b>Facility lead</b><span class="r">At the deadline</span></li>
+<li><span class="num">3</span><b>Programme coordinator</b><span class="r">1 day after the deadline</span></li>
+</ul>
+<p class="note" style="margin-top:12px">Escalating never changes who is responsible. Each level is told until the step is done. These times are placeholders, waiting for approval.</p>
 </div>
 <div class="card">
-<h3>Other deadlines<span class="r"><span class="badge amber">Placeholders</span></span></h3>
-<ul class="reach">
-<li><svg class="i"><use href="#i-clock"/></svg><span>Urgent steps: half the routine deadline.</span></li><li><svg class="i"><use href="#i-clock"/></svg><span>Referral replies: 4 working hours, or 2 hours if urgent.</span></li>
-<li><svg class="i"><use href="#i-clock"/></svg><span>Questions between clinicians: 1 working day, or 2 hours if urgent.</span></li>
-<li><svg class="i"><use href="#i-clock"/></svg><span>Patient call-backs and questions for a doctor: 2 working hours.</span></li>
+<h3>Evidence and closing<span class="r"><span class="badge amber dot">Waiting for approval</span></span></h3>
+<ul class="evid">
+<li><b>Diagnosis</b><span>A confirmed diagnosis was documented at the source</span></li>
+<li><b>Treatment plan</b><span>A treatment plan was documented; treatment must then start by the start-treatment deadline</span><span>Then: Start the treatment</span></li>
+<li><b>Treatment started</b><span>Treatment started; the case returns to closure review</span><span>Then: Decide whether to close the case</span></li>
+<li><b>Surveillance started</b><span>The patient was placed on surveillance; the case returns to closure review</span><span>Then: Decide whether to close the case</span></li>
 </ul>
-<p class="note" style="margin-top:12px">Used until the clinical adviser approves them. Each version is kept, so past cases show the rules they followed.</p>
+<p class="disclose" style="margin-top:12px">How a case closes (6 reasons)<svg class="i"><use href="#i-down"/></svg></p>
 </div>
 </div>
+<div class="endrow"><span class="btn">View change history</span></div>
 </div>
 </div>
-<p class="note">Read-only in the prototype. Each programme is one pathway file; the ten stages and the screens stay the same. The prototype ships breast screening as its example pathway; the other four show how more programmes are added.</p>
+<p class="note">Read-only. Each programme is one settings file; changes are approved outside CareLoop, and past cases keep the version they followed.</p>
 </div>
 </div>
 </section>
-
 <section class="board" id="b05" data-file="05-consultation">
 <div class="cap"><span class="n">5</span><div><h2>Consultation</h2><p>Clinicians answer questions from colleagues and from patients in one list, each with a reply deadline. Here Dr. Rekha asks a breast surgeon about an urgent result. A patient's request for a call goes to his nurse first, and she passes it on when it needs a doctor.</p>
 <div class="meta"><span>For: clinicians</span><span>Built in: HIS simulator</span><span>Stories: US05, US07</span><span>Requirements: FR-05</span><span>Hackathon: simulated</span></div></div></div>
@@ -1360,25 +1442,25 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <div class="states">
 <div class="state">
 <div class="state-head"><b>Nothing to do</b><span>1 Worklist</span></div>
-<div class="frag"><div class="empty"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><b>Nothing needs you right now</b><span>All 24 of your cases are on track. The next deadline is Fri 13 Nov, 17:00.</span><span class="linkrow" style="margin-top:4px">Show all cases</span></div></div>
-<p class="when">The worklist never shows an empty table. It says what is on track and when the next deadline is. If cases fail to load, it says so instead and shows when it last updated.</p>
+<div class="frag"><div class="empty"><span class="big"><svg class="i"><use href="#i-check"/></svg></span><b>Nothing needs you right now</b><span>No open case is waiting for you. Your team has 9 open cases, 2 overdue.</span><span class="linkrow" style="margin-top:4px">Show the whole team</span></div></div>
+<p class="when">The worklist never shows an empty table. When nothing is waiting for you, it says what your team has, or that every case is on track and when the next deadline is. If cases fail to load, it says so and offers "Try again".</p>
 </div>
 <div class="state">
 <div class="state-head"><b>Patient not reached</b><span>2 Case</span></div>
 <div class="frag">
-<div class="top" style="display:flex;gap:8px;align-items:center"><span class="lbl">Next action</span><span class="badge amber">Not reached</span></div>
-<b style="font-size:16px">Call Maricel between 13:00 and 14:00</b>
-<span class="note">Two calls not answered yesterday, at 10:15 and 16:40. She is free in her lunch break.</span>
-<ul class="reach"><li><svg class="i"><use href="#i-user"/></svg><span>Task for Huda Saleh, nurse navigator. Due today, 17:00.</span></li></ul>
+<div class="top" style="display:flex;gap:8px;align-items:center"><span class="lbl">Next action</span><span class="badge amber dot">Not reached</span></div>
+<b style="font-size:16px">Contact the patient another way</b>
+<span class="note">Every way of contacting the patient failed.</span>
+<p class="who-acts" style="margin-top:0"><svg class="i"><use href="#i-user"/></svg><span>Your step: call Maricel Reyes, then record it in "After a call with the patient".</span></p>
 </div>
-<p class="when">A failed or unanswered contact never ends silently. It becomes a task with an owner and a deadline.</p>
+<p class="when">A failed or unanswered contact never ends silently. It becomes the next action, with an owner and a deadline: here Huda Saleh, today by 17:00.</p>
 </div>
 <div class="state">
 <div class="state-head"><b>Same result received twice</b><span>2 Case</span></div>
 <div class="frag">
-<ul class="tl">
-<li><time>09:02</time><div><b>Same result received again</b><span class="by">Not added twice</span></div><span class="src">CareLoop</span></li>
-<li><time>09:00</time><div><b>Result received</b><span class="by">From the laboratory</span></div><span class="src">Hospital system</span></li>
+<p class="tlday">Tuesday 10 November</p>
+<ul class="tl2">
+<li><time>09:00</time><div><small>Result</small>Screening result needs further assessment. Owner named by the programme rules.<span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
 </ul>
 </div>
 <p class="when">Results are matched on their source and result number, so a resent result never opens a second case.</p>
@@ -1388,8 +1470,8 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <div class="frag">
 <span class="note">Thursday 12 November 2026, 09:00</span>
 <b style="font-size:16px">Good morning, Huda</b>
-<span class="note">24 open cases · 1 overdue · 5 due today</span>
-<div class="chips"><span class="chip on">All open <b>24</b></span><span class="chip"><i class="d red"></i>Urgent <b>1</b></span><span class="chip"><i class="d red"></i>Overdue <b>1</b></span></div>
+<span class="note">9 open cases · 2 overdue · 5 due today</span>
+<div class="chips"><span class="chip on">All open <b>9</b></span><span class="chip"><i class="d red"></i>Urgent <b>1</b></span><span class="chip"><i class="d red"></i>Overdue <b>2</b></span></div>
 </div>
 <p class="when">If AI is off or fails, the worklist and Impact show no summary at all, and nothing in its place. On a case, the message card says calmly that no draft can be written. Nothing else depends on AI, and every step still works.</p>
 </div>
@@ -1432,13 +1514,13 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <tr><td><b>Hessa Al Dhaheri</b><span class="l2">Patient, by text message on a basic phone. Amna, by email.</span><code class="role">recipient: patient</code></td><td>Her own next step, appointments and named nurse, by text message or email. A person gives her the result.</td><td>Reply 1 to say she got a message, or 2 for a call. On a call, say whether she will come, the next step back and how sure she feels. Name a family member to get her appointment details, or stop it.</td><td>See anyone else's information</td></tr>
 <tr><td><b>Saeed Al Dhaheri</b><span class="l2">Her son, named by Hessa in writing</span><code class="role">recipient: caregiver</code></td><td>The day, time and place of her appointments, by email</td><td>Help her get there. Nothing in CareLoop.</td><td>See results or the reason for the visit. Reply for her or change anything.</td></tr>
 <tr class="grp"><td colspan="4">Care team: notices come by email or text message, with only the case number to look for in CareLoop: no link and no patient details</td></tr>
-<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, how to reach her, the stage, the next step and deadline, who is responsible, and the result in plain words that the doctor wrote</td><td>Call patients and record what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
+<tr><td><b>Huda Saleh</b><span class="l2">Nurse navigator, Family Health Centre</span><code class="role">nurse-navigator</code></td><td>Her team's cases only: who the patient is, the stage, the next step and deadline, and who is responsible. How to reach the patient, and the result in plain words that the doctor wrote, are in the hospital system.</td><td>Call patients and record in CareLoop what they said: will come, said the next step back, and a 1 to 5 rating. Hand over tasks and ask a doctor to call a patient back, in the hospital system.</td><td>See reports, images, notes or other medical history. Open a case outside her team without giving a reason.</td></tr>
 <tr><td><b>Dr. Rekha Varghese</b><span class="l2">Screening doctor, Family Health Centre</span><code class="role">clinician</code></td><td>Her patients' full records in her hospital system, and their cases in CareLoop</td><td>Set urgency, ask a specialist and send referrals, in her hospital system. She stays responsible until a unit accepts.</td><td>See patients she does not care for</td></tr>
 <tr><td><b>Dr. Layla Haddad</b><span class="l2">Breast surgeon, General Hospital</span><code class="role">receiving-clinician</code></td><td>Referrals sent to her unit: the request, the referring doctor's note, the screening report and images</td><td>Accept or decline with a reason, book, record the outcome and close the case with evidence</td><td>See referrals sent to other units, or other cases at the Family Health Centre</td></tr>
-<tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span><code class="role">lab</code></td><td>Test requests sent to them, and what each test needs</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
-<tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span><code class="role">facility-lead</code></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, and acknowledge escalations</td><td>See reports, images or notes, or cases at other facilities</td></tr>
+<tr><td><b>Lab and test teams</b><span class="l2">At the hospital that does the test</span><code class="role">lab</code></td><td>Test requests sent to them, and what each test needs. Not built yet: today the lab reads its facility's cases like the rest of the team.</td><td>Accept a request, record that the test was done and send the report to the doctor who asked</td><td>See the rest of the patient's case</td></tr>
+<tr><td><b>Joy Bautista</b><span class="l2">Facility lead, Family Health Centre</span><code class="role">facility-lead</code></td><td>Every case at her facility, to cover gaps and escalations</td><td>Choose or change who is responsible, in the hospital system, and acknowledge escalations in CareLoop</td><td>See reports, images or notes, or cases at other facilities</td></tr>
 <tr class="grp"><td colspan="4">Oversight and systems</td></tr>
-<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Act on escalations</td><td>See named lists of patients</td></tr>
+<tr><td><b>Dr. Obaid Al Suwaidi</b><span class="l2">Programme coordinator</span><code class="role">coordinator</code></td><td>Totals for every programme, with no names. One case, by its case number only, when it is escalated to him.</td><td>Acknowledge escalations sent to him</td><td>See named lists of patients</td></tr>
 <tr><td><b>AI writing</b><span class="l2">Part of CareLoop</span></td><td>Only what each text needs, while writing it: never a person's name or contact details, or a result</td><td>Write three texts for staff to read: a briefing on the worklist, a summary on the Impact page and a draft of a message to a patient</td><td>Send, decide, set urgency or close anything. Keep data, or learn from it.</td></tr>
 <tr><td><b>Engineers and support</b><span class="l2">The CareLoop team</span></td><td>Synthetic data only</td><td>Build, test and fix CareLoop</td><td>See real patient data, unless it is approved and recorded</td></tr>
 </tbody></table>
@@ -1447,14 +1529,15 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <div class="card">
 <h3>Opening a case outside your team</h3>
 <div class="stack" style="gap:12px">
-<b>Fatima Al Zaabi is cared for by another team</b>
-<p class="note">Say why you need her case. Your reason and everything you open are recorded, and your facility lead checks them.</p>
+<b>This case is cared for by another team.</b>
+<p class="note">Say why you need it. Your reason and everything you open are recorded, and your facility lead checks them.</p>
+<b style="font-size:14px">Why do you need it?</b>
 <div class="opts" style="gap:8px">
-<div class="box"><span class="radio on"></span>She called me and needs help now</div>
-<div class="box"><span class="radio"></span>I am covering for her nurse today</div>
+<div class="box"><span class="radio on"></span>The patient called me and needs help now</div>
+<div class="box"><span class="radio"></span>I am covering for the patient's nurse today</div>
 <div class="box"><span class="radio"></span>Another reason, which I will write</div>
 </div>
-<div class="btns"><span class="btn">Cancel</span><span class="btn primary">Open her case</span></div>
+<div class="btns"><span class="btn">Cancel</span><span class="btn primary">Open the case</span></div>
 </div>
 </div>
 <div class="card">
@@ -1549,58 +1632,51 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 </div>
 </section>
 <section class="board" id="b17" data-file="17-escalation">
-<div class="cap"><span class="n">17</span><div><h2>Escalation</h2><p>When a step is late, CareLoop escalates it to a named person, who must acknowledge it. Here Joy, the facility lead, gets Hessa's late referral.</p>
-<div class="meta"><span>For: facility leads</span><span>Built in: CareLoop web app</span><span>Stories: US13</span></div></div></div>
+<div class="cap"><span class="n">17</span><div><h2>Escalation</h2><p>When a step is late, CareLoop escalates it up the ladder, and the person it reaches acknowledges it. Here Joy, the facility lead, gets Hessa's late referral. Acknowledging records that she has seen it; it never changes who is responsible or stops the clock.</p>
+<div class="meta"><span>For: facility leads and the programme coordinator</span><span>Built in: CareLoop web app</span><span>Stories: US13</span></div></div></div>
 <div class="frame">
 <div class="win"><i></i><i></i><i></i></div>
 <div class="appbar">
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
-<nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
+<nav class="nav"><span>Worklist</span><span class="on">Escalations<span class="navcount">2</span></span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
-<div class="me"><span class="av">JB</span><div><b>Joy Bautista</b><small>Facility lead · Family Health Centre</small></div></div>
+<div class="me"><span class="av">JB</span><div><b>Joy Bautista</b><small>Facility lead · Family Health Centre</small></div><svg class="i chev"><use href="#i-down"/></svg></div>
 </div>
 <div class="page">
-<div class="head"><div><h1>Escalated to you</h1><p class="sub">Thursday 12 November 2026, 08:30 · 1 escalation needs you</p></div></div>
+<div class="crumb"><svg class="i"><use href="#i-left"/></svg>Escalations</div>
+<div><h1>Escalated to you</h1><p class="lede">Hessa Al Dhaheri · MRN 100 245 891 · Breast screening</p></div>
 <div class="grid2">
-<div class="stack">
-<div class="card next">
-<div class="top"><span class="lbl">Escalation</span><span class="badge red">Overdue</span></div>
-<h2>Hessa Al Dhaheri's new referral is late</h2>
-<p class="why">Regional Hospital declined her referral on Tue 10 Nov: no capacity. Dr. Rekha Varghese had until Wed 11 Nov at 15:00 to send a new one.</p>
-<div class="kv">
-<div><small>Responsible</small><b>Dr. Rekha Varghese</b><span>Screening physician</span></div>
-<div><small>Was due</small><b class="red">Wed 11 Nov, 15:00</b><span>17 h 30 min late</span></div>
-<div><small>Target</small><b>Assessment by Mon 16 Nov</b><span>DoH: within 5 working days of screening</span></div>
+<div class="card hero next">
+<div class="top"><span class="lbl">Escalation</span><span class="badge red dot">Overdue</span><span class="badge grey">Level 1</span></div>
+<h2>Send a new referral</h2>
+<p class="why">A referral or handoff was declined, so another must be arranged.</p>
+<div class="facts">
+<div><small>Responsible</small><b>Dr. Rekha Varghese</b><span>Screening physician · Family Health Centre</span></div>
+<div><small>Was due</small><b class="red">Wed 11 Nov, 15:00</b><span>18 h late</span></div>
+<div><small>Escalated to</small><b>Facility lead, Family Health Centre</b><span>Since Wed 11 Nov, 15:00</span></div>
 </div>
 <div class="ladder">
-<div class="done"><div class="k"><span class="num">1</span>Reminder to Dr. Rekha</div>Sent Wed 11 Nov, 11:00</div>
-<div class="now"><div class="k"><span class="num">2</span>You, the facility lead</div>Escalated Wed, 15:00. Please acknowledge.</div>
-<div><div class="k"><span class="num">3</span>Dr. Obaid Al Suwaidi</div>Programme coordinator, at 12:00 today if still open</div>
+<div class="done"><div class="k"><span class="num">1</span>Reminder to Dr. Rekha Varghese</div>Sent Wed 11 Nov, 11:00</div>
+<div class="now"><div class="k"><span class="num">2</span>You, the facility lead</div>Escalated Wed 11 Nov, 15:00. Please acknowledge.</div>
+<div><div class="k"><span class="num">3</span>Programme coordinator</div>Today, 15:00, if still open</div>
+</div>
+</div>
+<div class="card">
+<h3>What acknowledging means</h3>
+<p style="font-size:15px;color:var(--ink2)">Dr. Rekha Varghese stays responsible. Acknowledging records that you have seen this escalation: it does not change who is responsible or stop the clock, and the case keeps escalating if the step stays late.</p>
+<div class="btns" style="margin-top:16px"><span class="btn primary">Acknowledge</span></div>
+<p class="note" style="margin-top:12px">To act on the case itself, use your hospital system. Reports, images and notes stay there.</p>
+<div class="btns" style="margin-top:12px"><span class="btn">Open the case</span></div>
 </div>
 </div>
 <div class="card">
 <h3>What happened<span class="r small muted">Newest first</span></h3>
-<ul class="tl">
-<li><time>Wed 11 Nov, 15:00</time><div><b>Escalated to you</b><span class="by">New referral not sent by the deadline</span></div><span class="src">CareLoop</span></li>
-<li><time>Wed 11 Nov, 11:00</time><div><b>Reminder sent to Dr. Rekha Varghese</b><span class="by">New referral due at 15:00</span></div><span class="src">CareLoop</span></li>
-<li><time>Tue 10 Nov, 15:00</time><div><b>Referral declined: no capacity</b><span class="by">Breast Clinic, Regional Hospital</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 12:00</time><div><b>Referral sent to Regional Hospital</b><span class="by">Dr. Rekha Varghese</span></div><span class="src">Hospital system</span></li>
-<li><time>Tue 10 Nov, 11:20</time><div><b>On a call, Hessa said the next step back</b><span class="by">Recorded by Huda Saleh</span></div><span class="src">CareLoop</span></li>
+<ul class="tl2 wide">
+<li><time>Wed 11 Nov, 15:00</time><div><small>Escalation</small>Escalated to the facility lead at Family Health Centre<span class="by">Level 1</span></div><span class="src">CareLoop</span></li>
+<li><time>Wed 11 Nov, 11:00</time><div><small>Deadline</small>Deadline reminder<span class="by">Reminder sent to Dr. Rekha Varghese: the new referral is due at 15:00.</span></div><span class="src">CareLoop</span></li>
 </ul>
 </div>
 </div>
-<div class="card">
-<h3>What you can do</h3>
-<div class="opts">
-<div class="opt sel"><span class="radio"></span><div><h4>Ask Dr. Rekha to refer by 10:00 today</h4><p>She stays responsible. You are told when it is sent.</p></div></div>
-<div class="opt"><span class="radio"></span><div><h4>Give it to another doctor</h4><p>Another screening doctor at the centre takes it on, and is told why.</p></div></div>
-</div>
-<p class="note" style="margin-top:12px">You see where the case stands and who must act. Reports, images and notes stay in the hospital system.</p>
-</div>
-</div>
-</div>
-<div class="actionbar"><span class="events">Sends to CareLoop:<span class="ev">Escalation acknowledged</span></span><div class="btns"><span class="btn primary">Acknowledge</span></div></div>
 </div>
 </section>
 <section class="board" id="b19" data-file="19-assessment">
@@ -1736,7 +1812,6 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <div class="brand"><svg><use href="#logo"/></svg>CareLoop</div>
 <nav class="nav"><span class="on">Worklist</span><span>Impact</span><span>Programmes</span></nav>
 <div class="grow"></div>
-<span class="pill">Synthetic data</span>
 <div class="me"><span class="av">MK</span><div><b>Mariam Al Kaabi</b><small>Cancer nurse navigator · Cancer Centre</small></div></div>
 </div>
 <div class="page">
@@ -1745,7 +1820,6 @@ Simulated on synthetic data; not evidence of real-world improvement.</p>
 <div class="who"><div class="nm">Hessa Al Dhaheri</div>
 <div class="id"><span>Female, 66</span><span>Born 3 Feb 1960</span><span>MRN 100 245 891</span></div>
 <div class="tags"><span class="tag">Speaks Arabic</span><span class="tag">Calls 10:00 to 12:00</span><span class="tag">Basic phone, no internet</span><span class="tag">Saeed (son) gets appointment details</span></div></div>
-<span class="pill">Synthetic record</span>
 </div>
 <div class="card">
 <div class="casebar"><span>Care plan: <b>Breast cancer treatment</b></span><span>Responsible: <b>Dr. Karim Nassar</b></span><span>Her contact: <b>Mariam Al Kaabi</b></span><span>Today: <b>Monday 15 March 2027</b></span></div>
