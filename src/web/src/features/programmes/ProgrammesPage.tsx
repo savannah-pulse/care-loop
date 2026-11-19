@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react'
 import { Badge, Dialog, Icon, ReadView } from '../../components'
 import { useProgramme, useProgrammes, type Programme } from '../../data'
-import { nextActionText, urgencyText } from '../../domain'
+import { nextActionText, urgencyInSentence } from '../../domain'
 import { formatDate, parseInstant } from '../../format'
 import { useDocumentTitle, useOverflowsSideways } from '../../hooks'
 import { roleLabel } from '../../identity'
@@ -152,7 +152,7 @@ function StepsCard({ programme }: { readonly programme: Programme }) {
                   {nextActionText(deadline.nextAction)}
                   {deadline.urgencyCode ? (
                     <span className="l2">
-                      {t('programmesPage.forUrgency', { urgency: urgencyText(deadline.urgencyCode) })}
+                      {t('programmesPage.forUrgency', { urgency: urgencyInSentence(deadline.urgencyCode) })}
                     </span>
                   ) : null}
                 </th>

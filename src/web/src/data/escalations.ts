@@ -68,14 +68,16 @@ export function useEscalationsVersion(): number {
 }
 
 /**
- * Reads how many open escalations the signed-in person's team has, for the navigation.
+ * Reads how many open escalations the signed-in person's team has, for the navigation, and keeps the
+ * number up to date.
  *
  * @returns The read of the number of cases with an open escalation, up to {@link PAGE_SIZE}.
  *
  * @remarks
  * Side effects: calls `GET /cases?escalated=true` on mount, when someone else signs in and after an
- * escalation is acknowledged. The facility lead sees their facility's escalated cases; the
- * programme coordinator sees the cases escalated to them.
+ * escalation is acknowledged, and polls: it reads again, quietly, every 30 seconds while the page is
+ * visible and when the page comes back into view (see `useApiRead`). The facility lead sees their
+ * facility's escalated cases; the programme coordinator sees the cases escalated to them.
  */
 export function useEscalationCount(): Read<number> {
   const changes = useEscalationsVersion()
@@ -83,7 +85,7 @@ export function useEscalationCount(): Read<number> {
     const outcome = await loadCaseList({ escalated: true }, { signal, limit: PAGE_SIZE })
     return outcome.ok ? { ok: true, data: outcome.data.cases.length } : outcome
   }, [])
-  return useApiRead(load, changes)
+  return useApiRead(load, changes, { live: true })
 }
 
 /** One escalated case: its list row and, when it could be read, the full case with its escalations. */
@@ -154,15 +156,17 @@ export async function loadEscalatedCases(
 }
 
 /**
- * Reads the escalated cases for the Escalations screen.
+ * Reads the escalated cases for the Escalations screen, and keeps them up to date.
  *
  * @returns The read of {@link loadEscalatedCases}.
  *
  * @remarks
- * Side effects: reads on mount, when someone else signs in and after an escalation is acknowledged.
+ * Side effects: reads on mount, when someone else signs in and after an escalation is acknowledged,
+ * and polls: it reads again, quietly, every 30 seconds while the page is visible and when the page
+ * comes back into view (see `useApiRead`).
  */
 export function useEscalatedCases(): Read<EscalatedCase[]> {
   const changes = useEscalationsVersion()
   const load = useCallback((signal: AbortSignal) => loadEscalatedCases(signal), [])
-  return useApiRead(load, changes)
+  return useApiRead(load, changes, { live: true })
 }

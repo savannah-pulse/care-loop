@@ -66,14 +66,16 @@ function TimelineItem({ entry, focusTarget = false }: ItemProps) {
 }
 
 function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] }) {
-  const [expanded, setExpanded] = useState(false)
+  // The first entry the button revealed, kept as it was when pressed, so an entry arriving with a later
+  // read never takes focus.
+  const [firstRevealed, setFirstRevealed] = useState<string>()
+  const expanded = firstRevealed !== undefined
   const ordered = newestFirst(entries)
   if (ordered.length === 0) {
     return <p className="note">{t('case.timelineEmpty')}</p>
   }
   const shown = expanded ? ordered : ordered.slice(0, TIMELINE_PAGE)
   const hidden = ordered.length - shown.length
-  const firstRevealed = expanded ? ordered[TIMELINE_PAGE]?.auditEventId : undefined
   return (
     <>
       <ol className="tl-days">
@@ -95,7 +97,11 @@ function TimelineList({ entries }: { readonly entries: readonly TimelineEntry[] 
         ))}
       </ol>
       {hidden > 0 ? (
-        <button type="button" className="linkbtn linkrow" onClick={() => setExpanded(true)}>
+        <button
+          type="button"
+          className="linkbtn linkrow"
+          onClick={() => setFirstRevealed(ordered[TIMELINE_PAGE].auditEventId)}
+        >
           {tp('case.showEarlier', hidden)}
         </button>
       ) : null}

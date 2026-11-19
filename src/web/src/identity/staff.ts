@@ -36,12 +36,14 @@ export interface StaffMember {
 }
 
 /**
- * The people the prototype can sign in as.
+ * The people the prototype can sign in as, listed by facility: the Family Health Centre, then the
+ * General Hospital, then the programme coordinator, who works across both.
  *
  * @remarks
  * Prototype identity scheme only, to be replaced by real sign-in. Every person here is invented.
  * Their references must match the owner and actor references the API reports, so the dashboard can
- * show names instead of references.
+ * show names instead of references. The nurse navigator comes first: she is who the dashboard signs
+ * in as until someone else is chosen.
  */
 export const STAFF: readonly StaffMember[] = [
   {
@@ -65,35 +67,6 @@ export const STAFF: readonly StaffMember[] = [
     facilityId: 'family-health-centre',
   },
   {
-    id: 'joy-bautista',
-    reference: 'joy-bautista',
-    name: 'Joy Bautista',
-    shortName: 'Joy',
-    initials: 'JB',
-    role: 'facility-lead',
-    titleKey: 'staffTitles.facilityLead',
-    facilityId: 'family-health-centre',
-  },
-  {
-    id: 'obaid-al-suwaidi',
-    reference: 'obaid-al-suwaidi',
-    name: 'Dr. Obaid Al Suwaidi',
-    shortName: 'Dr. Obaid',
-    initials: 'OS',
-    role: 'coordinator',
-    titleKey: 'staffTitles.programmeCoordinator',
-  },
-  {
-    id: 'layla-haddad',
-    reference: 'layla-haddad',
-    name: 'Dr. Layla Haddad',
-    shortName: 'Dr. Layla',
-    initials: 'LH',
-    role: 'receiving-clinician',
-    titleKey: 'staffTitles.breastSurgeon',
-    facilityId: 'general-hospital',
-  },
-  {
     id: 'sara-al-hammadi',
     reference: 'sara-al-hammadi',
     name: 'Dr. Sara Al Hammadi',
@@ -101,6 +74,16 @@ export const STAFF: readonly StaffMember[] = [
     initials: 'SH',
     role: 'clinician',
     titleKey: 'staffTitles.familyDoctor',
+    facilityId: 'family-health-centre',
+  },
+  {
+    id: 'joy-bautista',
+    reference: 'joy-bautista',
+    name: 'Joy Bautista',
+    shortName: 'Joy',
+    initials: 'JB',
+    role: 'facility-lead',
+    titleKey: 'staffTitles.facilityLead',
     facilityId: 'family-health-centre',
   },
   {
@@ -122,6 +105,45 @@ export const STAFF: readonly StaffMember[] = [
     role: 'nurse-navigator',
     titleKey: 'staffTitles.nurseNavigator',
     facilityId: 'general-hospital',
+  },
+  {
+    id: 'yusuf-al-mansoori',
+    reference: 'yusuf-al-mansoori',
+    name: 'Dr. Yusuf Al Mansoori',
+    shortName: 'Dr. Yusuf',
+    initials: 'YM',
+    role: 'clinician',
+    titleKey: 'staffTitles.screeningPhysician',
+    facilityId: 'general-hospital',
+  },
+  {
+    id: 'layla-haddad',
+    reference: 'layla-haddad',
+    name: 'Dr. Layla Haddad',
+    shortName: 'Dr. Layla',
+    initials: 'LH',
+    role: 'receiving-clinician',
+    titleKey: 'staffTitles.breastSurgeon',
+    facilityId: 'general-hospital',
+  },
+  {
+    id: 'anita-thomas',
+    reference: 'anita-thomas',
+    name: 'Anita Thomas',
+    shortName: 'Anita',
+    initials: 'AT',
+    role: 'facility-lead',
+    titleKey: 'staffTitles.facilityLead',
+    facilityId: 'general-hospital',
+  },
+  {
+    id: 'obaid-al-suwaidi',
+    reference: 'obaid-al-suwaidi',
+    name: 'Dr. Obaid Al Suwaidi',
+    shortName: 'Dr. Obaid',
+    initials: 'OS',
+    role: 'coordinator',
+    titleKey: 'staffTitles.programmeCoordinator',
   },
 ]
 

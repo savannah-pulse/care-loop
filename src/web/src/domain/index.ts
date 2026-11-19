@@ -1,12 +1,15 @@
 /**
  * Display rules: how the API's coordination data becomes plain words on screen. The ten display
  * stages, status words and their colours, next actions and why they are needed, tracks,
- * exceptions, urgency, programme names, patients, people, escalations and timeline entries.
+ * exceptions, urgency, programme names, patients, people, escalations and timeline entries, and
+ * which answer a screen shows after the person changes a case.
  *
  * @remarks
  * These rules only describe what the API reports. They never decide anything clinical.
  */
 
+export { latestCase } from './changes'
+export type { CaseChange } from './changes'
 export {
   canAcknowledge,
   currentEscalation,
@@ -57,5 +60,5 @@ export type { TimelineDay, TimelineSource } from './timeline'
 export type { Tone } from './tone'
 export { TRACK_KINDS, describeTrack } from './tracks'
 export type { TrackView } from './tracks'
-export { URGENCY_LEVELS, isUrgent, urgencyLevel, urgencyText } from './urgency'
+export { URGENCY_LEVELS, isUrgent, urgencyInSentence, urgencyLevel, urgencyText } from './urgency'
 export type { UrgencyLevel } from './urgency'
