@@ -46,6 +46,7 @@ Settings are environment variables you set in the shell before running the scrip
 | `export AZURE_LOCATION=<region>` | Always, unless `uaenorth` is what you want. |
 | `export ASSIGN_ROLES=false` | You are Contributor only. |
 | `export RESOURCE_GROUP=<name>` | You want everything inside a resource group that already exists. Otherwise `rg-careloop-dev` is created. |
+| `export API_AI_PROVIDER=Foundry AZURE_AI_PROJECT_ENDPOINT=<project endpoint> AZURE_AI_MODEL_DEPLOYMENT_NAME=<model deployment>` | You want AI on, and a Foundry project already holds a model deployment. Both values are needed. Add `AZURE_AI_FOUNDRY_ACCOUNT_ID=<account resource ID>` to have the deployment give the API's identity the Foundry User role; with `ASSIGN_ROLES=false` the account's owner grants it by hand. Leave all of these unset to keep AI off. See "AI and Foundry" in the [README](README.md). |
 | `export POSTGRES_LOCATION=northeurope` | Your subscription is a Visual Studio (or similar credit-based) subscription. These are refused the database in many regions; North Europe accepted it. Also use this when the script tells you PostgreSQL is not allowed in your region (it checks first). Only the database goes there. |
 
 The combination that worked on 18 November 2026:
@@ -124,7 +125,7 @@ Later runs skip the platform step. The API is stopped for a minute or two while 
 ## What you are deploying
 
 - Everything is **public** and nothing is restricted by address: the dashboard, the API and both simulators. This is deliberate for the prototype. Synthetic data only.
-- **AI:** no external AI workflow is deployed. The API uses `Ai:Provider = NoOp`, and no model calls are made.
+- **AI:** off unless you set `API_AI_PROVIDER=Foundry` in step 2. By default the API uses `Ai:Provider = NoOp`, its AI endpoints answer 409 ("AI is switched off"), and no model calls are made. Switched on, the API calls a model deployment in your Foundry project directly as its `apps` managed identity; there is no separate AI service. The model deployment must already exist in that project (or be created with `CREATE_FOUNDRY=true`), and the identity needs the Foundry User role on the Foundry account.
 - **Timing is the demo timing**: pathway deadlines last seconds, to match the simulators.
 
 ## If something goes wrong
@@ -141,6 +142,7 @@ Later runs skip the platform step. The API is stopped for a minute or two while 
 | "Environment dev already exists in …" | You changed `AZURE_LOCATION` or `RESOURCE_GROUP` after the first run. Go back to the original values, or remove the environment first. (`POSTGRES_LOCATION` may be changed: it creates a new, empty database in the new region, and you then delete the old server yourself.) |
 | A name is already in use by a soft-deleted Key Vault | You deleted this environment recently. Purge it (see "Removing it") or deploy under another prefix: add `NAME_PREFIX=<up to 8 letters>` to your settings. |
 | The script says a secret could not be read from Key Vault | Someone else deployed this environment. Ask them for the values, or set `POSTGRES_ADMIN_PASSWORD` and `SIMULATOR_INBOUND_SECRET` to new values to rotate them. |
+| An AI endpoint answers 503 "AI could not write this" | The API could not get an answer from the Foundry model. Check that the `apps` identity has the Foundry User role on the Foundry account, that `AZURE_AI_PROJECT_ENDPOINT` names the project, and that `AZURE_AI_MODEL_DEPLOYMENT_NAME` names a model deployment that exists there. The API log gives the reason. |
 | The dashboard loads but shows no data | Check the API: `az containerapp logs show -n api -g <resource group> --tail 100` (the CLI offers to install the `containerapp` extension the first time). |
 
 To see why a deployment failed, list the failed steps (use your resource group's name):

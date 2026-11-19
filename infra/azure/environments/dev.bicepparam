@@ -24,12 +24,14 @@ param deployMonitoring = true
 // days, so that open cases stay on time long enough to be looked at (see infra/demo/README.md).
 param demoTiming = toLower(readEnvironmentVariable('DEMO_TIMING', 'true')) == 'true'
 
-// Optional Foundry configuration for the future API-side provider. AI stays off by default.
+// Foundry: the project and model deployment the API calls. AI stays off (NoOp) unless
+// API_AI_PROVIDER=Foundry is set for the deployment and both values below are given.
 param aiProjectEndpoint = readEnvironmentVariable('AZURE_AI_PROJECT_ENDPOINT', '')
 param aiModelDeploymentName = readEnvironmentVariable('AZURE_AI_MODEL_DEPLOYMENT_NAME', '')
+param aiFoundryAccountId = readEnvironmentVariable('AZURE_AI_FOUNDRY_ACCOUNT_ID', '')
 param createFoundry = toLower(readEnvironmentVariable('CREATE_FOUNDRY', 'false')) == 'true'
 param foundryLocation = readEnvironmentVariable('AZURE_AI_LOCATION', readEnvironmentVariable('AZURE_LOCATION', 'uaenorth'))
-param apiAiProvider = 'NoOp'
+param apiAiProvider = readEnvironmentVariable('API_AI_PROVIDER', 'NoOp')
 
 // Set by scripts/deploy.sh and the Deploy workflow. Never write a value here.
 param imageTag = readEnvironmentVariable('IMAGE_TAG', '')

@@ -1,8 +1,6 @@
 using System.Text;
 using CareLoop.Api.Features.Fhir;
 using CareLoop.Api.Features.Fhir.Outbound;
-using CareLoop.Api.Infrastructure.Persistence.Summaries;
-using CareLoop.Contracts.Summaries;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events.DomainEvents;
 using CareLoop.Tests.Fakes;
@@ -12,7 +10,7 @@ using FhirTaskStatus = Hl7.Fhir.Model.Task.TaskStatus;
 namespace CareLoop.Tests.Api.Fhir;
 
 /// <summary>
-/// The outbound mappers: escalation and call-request notices, the handoff summary document and the case task.
+/// The outbound mappers: escalation and call-request notices and the case task.
 /// </summary>
 public sealed class OutboundMapperTests
 {
@@ -35,41 +33,6 @@ public sealed class OutboundMapperTests
         Assert.Equal("facility-lead", (task.Owner!.GetExtension(StatusMap.ActorRoleExtension)!.Value as Code)?.Value);
         Assert.Equal(At, new FhirDateTime(task.AuthoredOn).ToDateTimeOffset(TimeSpan.Zero));
         Assert.Null(task.For);
-    }
-
-    [Fact]
-    public void Approved_summary_maps_to_a_DocumentReference()
-    {
-        var summary = Summary(Guid.NewGuid(), HandoffSummaryStatus.Approved);
-        var approval = Approval(summary);
-
-        var document = new HandoffDocumentReferenceMapper().Map(approval, summary);
-
-        Assert.Equal($"handoff-{summary.Id:N}", document.Id);
-        Assert.Equal(DocumentReferenceStatus.Current, document.Status);
-        Assert.Equal("Practitioner/SYN-STAFF-0001", Assert.Single(document.Author).Reference);
-        Assert.Equal($"Task/{summary.CaseId:D}", Assert.Single(document.Context!.Related).Reference);
-        var attachment = Assert.Single(document.Content).Attachment;
-        Assert.Equal(summary.Text, Encoding.UTF8.GetString(attachment!.Data!));
-    }
-
-    [Theory]
-    [InlineData(HandoffSummaryStatus.Draft)]
-    [InlineData(HandoffSummaryStatus.Rejected)]
-    public void Draft_summary_is_never_published(HandoffSummaryStatus status)
-    {
-        var summary = Summary(Guid.NewGuid(), status);
-
-        Assert.Throws<InvalidOperationException>(() => new HandoffDocumentReferenceMapper().Map(Approval(summary), summary));
-    }
-
-    [Fact]
-    public void A_summary_other_than_the_one_approved_is_never_published()
-    {
-        var approved = Summary(Guid.NewGuid(), HandoffSummaryStatus.Approved);
-        var other = Summary(approved.CaseId, HandoffSummaryStatus.Approved);
-
-        Assert.Throws<InvalidOperationException>(() => new HandoffDocumentReferenceMapper().Map(Approval(approved), other));
     }
 
     [Fact]
@@ -168,24 +131,5 @@ public sealed class OutboundMapperTests
         CurrentOwner = TestData.Clinician(),
         RejectedBy = TestData.Clinician("SYN-STAFF-0002"),
         Reason = reason,
-    };
-
-    private static HandoffSummaryApproved Approval(HandoffSummaryRecord summary) => new()
-    {
-        EventId = Guid.NewGuid(),
-        CaseId = summary.CaseId,
-        OccurredAt = At,
-        SummaryId = summary.Id,
-        ApprovedBy = Envelopes.Clinician(),
-    };
-
-    private static HandoffSummaryRecord Summary(Guid caseId, HandoffSummaryStatus status) => new()
-    {
-        Id = Guid.NewGuid(),
-        CaseId = caseId,
-        Status = status,
-        Text = "PLACEHOLDER - synthetic handoff summary",
-        ApprovedBy = status == HandoffSummaryStatus.Approved ? "SYN-STAFF-0001" : null,
-        ApprovedAt = status == HandoffSummaryStatus.Approved ? At : null,
     };
 }

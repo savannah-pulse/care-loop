@@ -1,3 +1,5 @@
+using Azure.Identity;
+using CareLoop.Api.Features.Ai;
 using CareLoop.Api.Features.Events;
 using CareLoop.Api.Features.Events.Handlers;
 using CareLoop.Api.Features.Fhir;
@@ -5,7 +7,6 @@ using CareLoop.Api.Features.Fhir.Inbound;
 using CareLoop.Api.Features.Fhir.Outbound;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Features.Outbox;
-using CareLoop.Api.Features.Summaries;
 using CareLoop.Api.Infrastructure.Ai;
 using CareLoop.Api.Infrastructure.Fhir;
 using CareLoop.Api.Infrastructure.Notifications;
@@ -90,7 +91,6 @@ public static class DependencyInjection
         services.AddScoped<IFhirInboundMapper, ConsentMapper>();
 
         services.AddSingleton<EscalationTaskMapper>();
-        services.AddSingleton<HandoffDocumentReferenceMapper>();
         services.AddSingleton<CaseTaskMapper>();
 
         services.AddHttpClient<FhirHttpClient>();
@@ -178,43 +178,48 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// Registers the AI provider chosen by <c>Ai:Provider</c>, the drafting pipeline and, when it is
-    /// switched on, the subscriber that drafts a summary as soon as a handoff is proposed.
+    /// Registers the three AI texts (the role briefing, the impact summary and the patient message draft): the settings,
+    /// the prompt files and the AI client <c>Ai:Provider</c> chooses.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configuration">Application configuration; supplies the <c>Ai</c> section.</param>
     /// <returns>The same service collection, for chaining.</returns>
-    /// <exception cref="InvalidOperationException">The configured AI provider is not supported.</exception>
+    /// <exception cref="InvalidOperationException"><c>Ai:Provider</c> names no known provider, or <c>Foundry</c> is chosen without its settings.</exception>
     /// <remarks>
-    /// The no-op provider is the default, so the API runs with no AI service and no credential.
-    /// <c>FoundryDirect</c> is a deferred provider that calls a deployment from here instead.
-    /// Both sit behind <see cref="IAiProvider"/>, so nothing outside this method knows which is in use.
+    /// <c>NoOp</c> is the default, so the API runs with no AI service and no credential, and the AI endpoints answer 409.
+    /// To add a provider, write an <see cref="IAiClient"/> and add a case here; nothing else changes.
     /// </remarks>
-    public static IServiceCollection AddSummaries(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAi(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<AiOptions>(configuration.GetSection(AiOptions.SectionName));
+        var section = configuration.GetSection(AiOptions.SectionName);
+        services.Configure<AiOptions>(section);
+        var options = section.Get<AiOptions>() ?? new AiOptions();
 
-        var provider = configuration.GetValue<string>($"{AiOptions.SectionName}:{nameof(AiOptions.Provider)}");
-        if (string.Equals(provider, "FoundryDirect", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddHttpClient<IAiProvider, FoundryDirectProvider>();
-        }
-        else if (string.IsNullOrWhiteSpace(provider) || string.Equals(provider, "NoOp", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddSingleton<IAiProvider, NoOpAiProvider>();
-        }
-        else
-        {
-            throw new InvalidOperationException($"Unsupported AI provider '{provider}'. Configure NoOp or FoundryDirect.");
-        }
+        services.AddMemoryCache();
+        services.AddScoped<AiText>();
+        services.AddSingleton(sp => new AiPrompts(Path.IsPathRooted(options.PromptsDirectory)
+            ? options.PromptsDirectory
+            : Path.Combine(sp.GetRequiredService<IHostEnvironment>().ContentRootPath, options.PromptsDirectory)));
 
-        services.AddScoped<HandoffFactCollector>();
-        services.AddScoped<HandoffSummaryDrafter>();
-
-        if (configuration.GetValue<bool>($"{AiOptions.SectionName}:{nameof(AiOptions.AutoDraftOnHandoff)}"))
+        switch ((string.IsNullOrWhiteSpace(options.Provider) ? "NoOp" : options.Provider).Trim().ToUpperInvariant())
         {
-            // Off by default: an automatic draft spends a model call and sends facts out of CareLoop with nobody having asked.
-            services.AddScoped<IDomainEventSubscriber, AutoDraftOnHandoff>();
+            case "NOOP":
+                services.AddSingleton<IAiClient, NoOpAiClient>();
+                break;
+            case "FOUNDRY":
+                if (!Uri.TryCreate(options.Foundry.ProjectEndpoint, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttps
+                    || string.IsNullOrWhiteSpace(options.Foundry.Model))
+                {
+                    throw new InvalidOperationException("Ai:Provider is Foundry, which needs an https Ai:Foundry:ProjectEndpoint and an Ai:Foundry:Model.");
+                }
+
+                // DefaultAzureCredential: the managed identity in Azure, the developer's own sign-in locally.
+                services.AddSingleton<Azure.Core.TokenCredential>(new DefaultAzureCredential());
+                services.AddHttpClient<FoundryAiClient>();
+                services.AddSingleton<IAiClient>(sp => sp.GetRequiredService<FoundryAiClient>());
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported AI provider '{options.Provider}'. Configure NoOp or Foundry.");
         }
 
         return services;

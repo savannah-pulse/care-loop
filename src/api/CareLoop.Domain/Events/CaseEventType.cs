@@ -41,8 +41,7 @@ public enum CaseEventType
     /// <summary>Internal: a deadline was approaching or passed and the deadline worker warned or escalated.</summary>
     DeadlineElapsed = 100,
 
-    /// <summary>Internal: a person approved an AI-drafted handoff summary in the dashboard.</summary>
-    HandoffSummaryApproved = 101,
+    // 101 was HandoffSummaryApproved (the retired AI handoff summary). Retired: do not reuse the number.
 
     /// <summary>Internal: the role an escalation was addressed to acknowledged it in the dashboard. Oversight only: it changes no owner, exception or deadline.</summary>
     EscalationAcknowledged = 102,

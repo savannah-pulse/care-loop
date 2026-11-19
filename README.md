@@ -24,13 +24,15 @@ independently against common contracts. The rules every contributor follows are 
 - Delivery, patient acknowledgement, stated understanding, consent, referral acceptance, appointment booking, attendance, and care delivered are distinct facts.
 - Every open obligation has an accountable owner or is visible in an owned queue. Rejection, delay, missing evidence, and failed contact never silently complete work.
 - Only an authorized human can close a case, with pathway evidence or a documented exception.
-- AI output is a reviewable draft. It cannot change source facts, set urgency, close cases, or send messages.
+- AI output is a draft for staff, labelled as written by AI. It cannot change source facts, set urgency, close cases, or send messages.
 
 ## Implementation status
 
 WS1 to WS6 implement Domain rules, persistence/intake, FHIR, outbox/notifications, deadlines and the staff read
-APIs/dashboard. Simulator, AI-summary and end-to-end workstreams still have assigned stubs. Remaining stubs are tagged
-`TODO(WS-n)` with named skipped tests. Search for `TODO(WS-` and read [`docs/workstreams.md`](docs/workstreams.md)
+APIs/dashboard. WS9 adds three AI texts for staff (role briefing, impact summary, patient message draft); the API asks
+a model in a Microsoft Foundry project for them, and AI is off by default (`Ai:Provider` = `NoOp`). See
+[`docs/ai-design/integration.md`](docs/ai-design/integration.md). Simulator and end-to-end workstreams still have
+assigned stubs. Remaining stubs are tagged `TODO(WS-n)` with named skipped tests. Search for `TODO(WS-` and read [`docs/workstreams.md`](docs/workstreams.md)
 for ownership and validation. The dashboard reports unavailable capabilities explicitly.
 
 ## Repository map

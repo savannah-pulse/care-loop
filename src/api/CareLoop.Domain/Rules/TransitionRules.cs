@@ -58,7 +58,7 @@ public static class TransitionRules
     /// changing the stage, by the roles the pathway lets record an outcome, because the design
     /// records diagnosis, treatment plan and treatment started as separate outcomes.
     /// CareLoop's own internal events (<see cref="CaseEventType.DeadlineElapsed"/>,
-    /// <see cref="CaseEventType.HandoffSummaryApproved"/>, <see cref="CaseEventType.EscalationAcknowledged"/>) and a consent record
+    /// <see cref="CaseEventType.EscalationAcknowledged"/>) and a consent record
     /// (<see cref="CaseEventType.ConsentRecorded"/>) are allowed on any open case without
     /// changing the stage, because they are coordination, not pathway progress.
     /// </para>
@@ -138,7 +138,7 @@ public static class TransitionRules
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }
 
-        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.HandoffSummaryApproved or CaseEventType.EscalationAcknowledged or CaseEventType.ConsentRecorded)
+        if (eventType is CaseEventType.DeadlineElapsed or CaseEventType.EscalationAcknowledged or CaseEventType.ConsentRecorded)
         {
             return new TransitionResult { Verdict = RuleResult.Allow() };
         }

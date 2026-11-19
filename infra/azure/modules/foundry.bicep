@@ -1,7 +1,7 @@
 // Optional: a Microsoft Foundry account, project and one model deployment, with a guardrail that
 // blocks prompt attacks. Used only when createFoundry is true, for a subscription that has no
-// Foundry to use. Keys are disabled. The deployment does not grant model access to a runtime
-// identity; the account owner must authorize the intended caller when an AI provider is enabled.
+// Foundry to use. Keys are disabled: the API signs in with its managed identity, which is given the
+// Foundry User role here, and calls the model deployment created below.
 param location string
 param tags object
 param accountName string
@@ -10,6 +10,10 @@ param modelName string
 param modelVersion string
 param modelSku string
 param modelCapacity int
+param userPrincipalIds array
+
+// Foundry User (formerly Azure AI User): read the project and call its agents and models.
+var foundryUserRoleId = '53ca6127-db72-4b80-b1b0-d745d6d5456d'
 var guardrailName = 'careloop-prompt-shields'
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
@@ -82,6 +86,18 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01
     raiPolicyName: guardrail.name
   }
 }
+
+resource users 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for principalId in userPrincipalIds: {
+    scope: account
+    name: guid(account.id, principalId, foundryUserRoleId)
+    properties: {
+      principalId: principalId
+      principalType: 'ServicePrincipal'
+      roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', foundryUserRoleId)
+    }
+  }
+]
 
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
 output deploymentName string = deployment.name

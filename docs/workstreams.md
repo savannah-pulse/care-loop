@@ -33,7 +33,7 @@ Rules of the road:
 | 6 | Read endpoints and dashboard | WS2 (schema) | Done |
 | 7 | HIS simulator | WS3 (FHIR contract and codes) | Done |
 | 8 | Messaging simulator | WS3 (FHIR contract and codes), WS4 (notification delivery) | Done |
-| 9 | AI handoff summary | WS2, WS6 | Open |
+| 9 | AI texts: role briefing, impact summary, patient message draft | WS2, WS6 | Open |
 | 10 | Scenarios and end-to-end tests | all of the above | Open |
 
 **Status** is `Done` or `Open`. A workstream is `Done` when none of its `TODO(WS-n)` tags and none of its skipped
@@ -85,7 +85,7 @@ Because the contracts already exist, every workstream can start now against the 
 
 - `src/api/CareLoop.Api/Features/Events/**`
 - `src/api/CareLoop.Api/Contracts/Events/**`
-- `src/api/CareLoop.Api/Infrastructure/Persistence/**` (except `Summaries/` and `Configurations/HandoffSummaryRecordConfiguration.cs`)
+- `src/api/CareLoop.Api/Infrastructure/Persistence/**` (the WS9 exceptions, `Summaries/` and `Configurations/HandoffSummaryRecordConfiguration.cs`, were removed with the handoff summary on 19 November 2026)
 - `tests/api/CareLoop.Tests/Api/EventIngestorTests.cs`, `EventHandlerTests.cs`, `EfCaseRepositoryTests.cs`
 - `tests/api/CareLoop.Tests/Fakes/**`
 - `.config/dotnet-tools.json`
@@ -105,7 +105,7 @@ Because the contracts already exist, every workstream can start now against the 
 - C15: persist the escalation acknowledgement (migration). Done; saved under the internal event `EscalationAcknowledged`.
 - C20: `PatientDisplayName` and `PatientSecondaryIdentifier` on `ScreeningResultPayload`, copied to the case by `ScreeningResultHandler`; migration. Done.
 - C21: `OutcomeHandler` rejects an `EvidenceKind` the pathway does not declare (saved with `Disposition = Rejected`). Done; the case keeps the latest `OutcomeEvidenceKind`.
-- Migrations (14 November 2026): the migrations were squashed into a single `InitialCreate` holding the whole current schema, including the WS9 `HandoffSummaries` provenance columns and the outbox delivery lease (`OutboxDeliveries.LeaseOwner`, `LeasedUntil`, added for WS4 and regenerated into the same `InitialCreate`). Up and down were run against PostgreSQL 14 before the lease columns were added; the regenerated migration differs only by those two nullable columns. A database created from an earlier migration must be dropped and recreated (`docker compose down -v`); there is no upgrade path from the old history. Add later schema changes as new migrations after `InitialCreate`.
+- Migrations (14 November 2026): the migrations were squashed into a single `InitialCreate` holding the whole current schema, including the WS9 `HandoffSummaries` provenance columns and the outbox delivery lease (`OutboxDeliveries.LeaseOwner`, `LeasedUntil`, added for WS4 and regenerated into the same `InitialCreate`). Up and down were run against PostgreSQL 14 before the lease columns were added; the regenerated migration differs only by those two nullable columns. A database created from an earlier migration must be dropped and recreated (`docker compose down -v`); there is no upgrade path from the old history. Add later schema changes as new migrations after `InitialCreate`. The first is `RemoveHandoffSummaries` (19 November 2026): it only drops the `HandoffSummaries` table.
 - C13: `AppointmentUpdatePayload.Location` (`string?`); `AppointmentUpdateHandler` books and rebooks through `Case.ScheduleAppointment` with that place. Done.
 - C15: `Escalation.Id` persisted as a unique uuid column; the old int key stays as the primary key under the name `Sequence` so stored escalations keep their order. Done.
 - C4 and C19 (read audit storage): table `CaseReads`, entity `Infrastructure/Persistence/Audit/CaseReadRecord.cs` (`CaseId?`, actor reference, role and facility, `View`, `Query`, `OutsideTeam`, `Reason`, `ReadAt`), exposed as `CareLoopDbContext.CaseReads`. A read changes no case state, so it is not an `AuditEvent` and does not go through `SaveAsync`; WS6 appends a record per read. Done.
@@ -234,10 +234,10 @@ Because the contracts already exist, every workstream can start now against the 
 **Design gaps**
 
 - C1: `GET /programmes` and `GET /programmes/{pathwayId}` with a `ProgrammeResponse` contract (new `Features/Programmes/`, `Contracts/Programmes/`). Source: `IPathwayProvider.GetAll()` and `Get(id)`; the C2 fields (`citation`, `changeLog`, `ownerRole`, `clinicallyApproved`, evidence kinds) are already on `PathwayDefinition`. An unknown id is 404.
-- C3: `SourceSystem` on `TimelineEntryResponse`. The timeline reads `AuditEvents`, which do not hold the source system: join `AuditEvent.SourceEventId` to `SourceEvent.SourceSystem`; internal events (`DeadlineElapsed`, `EscalationAcknowledged`, `HandoffSummaryApproved`) show CareLoop as their source.
+- C3: `SourceSystem` on `TimelineEntryResponse`. The timeline reads `AuditEvents`, which do not hold the source system: join `AuditEvent.SourceEventId` to `SourceEvent.SourceSystem`; internal events (`DeadlineElapsed`, `EscalationAcknowledged`) show CareLoop as their source.
 - C4: `facilityId` filter on `GET /cases`, refusal of case reads outside the caller's facility, a read audit per read, and `X-Demo-Facility` in `DemoRoles` (shared file; agree first). Added (decision 12): a read outside the caller's team requires a `reason` query parameter, stored in the same audit entry as the view. Storage exists: append a `CaseReadRecord` to `CareLoopDbContext.CaseReads` (WS2) for `GET /cases/{id}`, `/timeline` and filtered lists, with `OutsideTeam` and `Reason`. Done when: tests cover an in-team read, a refused out-of-team read without a reason, an allowed one with a reason, and one record per read.
 - C5: the screen 3 measures on `MetricsResponse`, each with its denominator (with WS10 for `SimulationArmResponse`): time-to-step medians, understanding rate, closures by reason, cases reaching each display label (decision 19), referral accepted and attended, appointments attended, treatment started by its deadline and time to care started (both from the C21 evidence kinds: denominator is cases with a `treatment-plan` outcome, numerator a `treatment-started` outcome before the `start-treatment` due time).
-- C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the handoff summary screen drafts, edits on approval and rejects (decisions 4 and 10); the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
+- C9: build screens 1 to 4, 17 and 18 of the design in `src/web/` (decision 17), against the endpoints above. Read-only except: the escalation screen acknowledges (C15); the other-cases card for clinician roles (C19). Show the display label the API returns (decision 19); do not recompute it.
 - C10: `confidenceRate` on `MetricsResponse`.
 - C11: add `nurse-navigator`, `receiving-clinician` and `lab` to `DemoRoles.HumanRoles` (shared file; agree first).
 - C15 (decision 13): `POST /cases/{id}/escalations/{escalationId}/acknowledgement` (role from the demo headers) and the acknowledgement as a timeline entry and on `CaseDetailResponse`. `{escalationId}` is `Escalation.Id`; call `Case.AcknowledgeEscalation(escalationId, actor, at)` and map its refusals (wrong role, superseded, already acknowledged) to 409 or 403. The endpoint saves an `EscalationAcknowledged` internal event through `ICaseRepository.SaveAsync`, like `DeadlineElapsed`. `CaseDetailResponse` lists escalations with id, level, escalated-to role, raised at, acknowledged-by role and time, and resolved at. Only the role the escalation went to may acknowledge (the Domain enforces it), and a non-coordinator must also act in the facility it was escalated to: the endpoint refuses another facility's lead with 403 even when a cross-facility reason is given. (The Domain does not repeat the facility check because coordinators act without a facility; moving it into `Case` needs a rule for them first.) Acknowledging never clears an exception, changes the owner or stops the clock.
@@ -287,7 +287,9 @@ the `fetch` level) cover the handoff summary, escalation, case, worklist and ide
 for 181 Vitest tests in all. Lint, type-check, unit tests and build run in CI.
 Synthetic browser interception verified acknowledgement, role redaction, mobile layout, programmes/impact and exact
 edited-text approval. WS9 summary persistence/provider endpoints and WS10 real end-to-end/comparison remain Open;
-the completed summary UI explicitly shows backend 501/unavailable errors. Eight moderate development-only parser/
+the completed summary UI explicitly shows backend 501/unavailable errors. (Since 19 November 2026 the handoff summary
+screen and its tests are removed; showing the three AI texts on the dashboard is not built yet (see WS9). The
+counts above are from before that change.) Eight moderate development-only parser/
 documentation-tool dependency findings remain; production dependency audit has zero findings.
 
 ## WS7 HIS simulator
@@ -345,37 +347,52 @@ documentation-tool dependency findings remain; production dependency audit has z
 - Decision 2 (Done): "I will come" sends an `acknowledgement` `Communication` only. There is no appointment-confirmation reply.
 - Contract points (see the table below): WS8 has confirmed the `Communication.category` codes, the simulator provider wire format and the simulated marker, and sends no `PUT`.
 
-## WS9 AI handoff summary
+## WS9 AI texts: role briefing, impact summary, patient message draft
+
+> **Changed on 19 November 2026.** WS9 was the AI handoff summary (FR-11). That is removed: its endpoints, contracts, table, domain event and screen are gone. The API now calls a model deployment in a Microsoft Foundry project directly for three texts shown to staff, sending the whole prompt itself. The Python AI workflow service is retired and decision 8 is reversed. PR #49 is retired and will not be merged; nothing here was taken from it.
 
 **Owns**
 
-- `src/api/CareLoop.Api/Features/Summaries/**`
-- `src/api/CareLoop.Api/Contracts/Summaries/**`
+- `src/api/CareLoop.Api/Features/Ai/**`
+- `src/api/CareLoop.Api/Contracts/Ai/**`
 - `src/api/CareLoop.Api/Infrastructure/Ai/**`
-- `src/api/CareLoop.Api/Infrastructure/Persistence/Summaries/**`, `Infrastructure/Persistence/Configurations/HandoffSummaryRecordConfiguration.cs`
+- `src/api/CareLoop.Api/Prompts/**`
+- `tests/api/CareLoop.Tests/Api/Ai/**`
 
-When `ApproveSummary` and `RejectSummary` are built, their source event is CareLoop's own: set `Origin` to
-`EventOrigins.CareLoop` (decision 34) so the timeline shows it as CareLoop, not the hospital system.
-- `tests/api/CareLoop.Tests/Api/HandoffSummaryTests.cs`
+**Built**
 
-**Stubs to implement**
+- `GET /ai/role-briefing` (`RoleBriefing`, query `refresh`): the home page's summary of what the signed-in role has in front of them. It takes no list of cases; it reads the reader's own scope, the same open cases `GET /cases` gives them.
+- `GET /ai/impact-summary` (`ImpactSummary`, query `facilityId`, `reason`, `refresh`): a short reading of the numbers on the impact page, read through `GetMetrics.Handle`.
+- `GET /cases/{caseId}/patient-message-draft` (`PatientMessageDraft`, query `channel`, `reason`): a draft for a nurse navigator or a clinician to read. Nothing is sent; patients still receive approved templates.
+- Each returns `AiTextResponse` (`text`, `model`, `generatedAt`, `cached`). The model's text is returned trimmed; the API does not parse or check it.
+- The seam is `IAiClient` (`Features/Ai`: `Model`, `IsEnabled`, `CompleteAsync(prompt, ct)`). `Ai:Provider` chooses `NoOpAiClient` (default: AI off, the endpoints answer 409) or `FoundryAiClient`, which calls the model deployment `Ai:Foundry:Model` (default `gpt-6.1-sol`). Another provider is one more class implementing `IAiClient`, one more case in `DependencyInjection.AddAi` and a value for `Ai:Provider`. Any other value, including the retired `AiWorkflow`, `FoundryDirect` and `AzureOpenAi`, stops the host at start-up.
+- The hosted agents in the Foundry project (`role-briefing`, `impact-summary`, `patient-notification`) and `src/ai_agents/` are not used by the API.
+- No key: `DefaultAzureCredential` (the `apps` managed identity in Azure, `az login` locally). This added the NuGet package `Azure.Identity` 1.21.0, approved by the project owner.
+- `Prompts/`: one plain-text file per use (`role-briefing.md`, `impact-summary.md`, `patient-message.md`) holds the instructions and one `{{data}}` marker where the API puts the data. Edit and restart; a missing file, or one without exactly one `{{data}}`, stops the host (`AiPrompts`).
+- Reuse (`AiText`): a role briefing or impact summary is kept in memory under the model and the exact prompt (`Ai:CacheHours`, 6 by default, `0` switches it off; `?refresh=true` asks again). The patient message draft is never reused.
+- Read audit: the normal read audit runs on every request, reused answer or not. The views are `role-briefing`, `metrics` (the impact summary) and `patient-message-draft` or `patient-message-draft-denied`. `CaseReads` has no new columns. The migration `RemoveHandoffSummaries` only drops the `HandoffSummaries` table.
+- Showing the three texts on the dashboard is not built yet. It is WS6's work in `src/web`, against the three endpoints above (`AiTextResponse`, `refresh`, `cached`).
 
-- `Features/Summaries/DraftHandoffSummary.cs`, `ApproveSummary.cs`, `RejectSummary.cs`
-- `Features/Summaries/HandoffFactCollector.cs`: the single data boundary. Everything a model may write about passes through it
-- `Features/Summaries/HandoffSummaryDrafter.cs`: the single draft path, shared by both triggers, validating every cited fact before anything is stored
-- `Features/Summaries/AutoDraftOnHandoff.cs`: drafts when a handoff is proposed, behind `Ai:AutoDraftOnHandoff`, off by default
-- `Infrastructure/Ai/FoundryDirectProvider.cs`: calls a Foundry deployment from the API, the second route
-- `NoOpAiProvider` already works and stays the default, so everything runs with AI off
+**Removed**
 
-The external model-provider integration is deferred; the Python workflow service is no longer included. Implement the purpose-specific request contracts and API-supplied minimum-necessary data boundary before connecting Microsoft Foundry. The API-side direct Foundry route is also not built.
+`IAiProvider`, `NoOpAiProvider`, `FoundryDirectProvider`, `Features/Summaries/**`, `Contracts/Summaries/**`, `Infrastructure/Persistence/Summaries/**`, `HandoffSummaryRecordConfiguration`, `HandoffSummaryTests`, the setting `Ai:AutoDraftOnHandoff`, and the routes `POST /cases/{caseId}/handoff-summary`, `…/approval` and `…/rejection`. The FHIR publisher no longer sends a `DocumentReference`. The HIS simulator's own handoff-document inbox (`src/simulators`) is untouched.
 
-The `HandoffSummaries` table, provenance columns included, is in the `InitialCreate` migration. Further schema changes need a new migration in WS2's folder; agree who writes it.
+**Files of other workstreams this change touched (19 November 2026)**
 
-Since decision 15 (C20), the case holds `PatientDisplayName` and `PatientSecondaryIdentifier`. `HandoffFactCollector` must never turn them into facts: decision 9 keeps names and identifiers out of every prompt.
+| Owner | Files | What changed |
+|---|---|---|
+| Shared | `Program.cs`, `Infrastructure/DependencyInjection.cs`, `CareLoop.Api.csproj`, `appsettings.json` | Routes and `AddAi`; `Azure.Identity`; the `Ai` section |
+| Shared | `docker-compose.yml`, `.env.example`, `.github/workflows/deploy.yml` | AI settings; the stale `Ai:AzureOpenAi` section and API key settings are gone |
+| WS2 | `CareLoopDbContext`, migration `RemoveHandoffSummaries` and the model snapshot | `HandoffSummaries` dropped |
+| WS1 | `CaseEventType`, `SourceEvent`, `TransitionRules`; `HandoffSummaryApproved` removed | Event type 101 is retired and must not be reused |
+| WS3 | `FhirPublisher`; `HandoffDocumentReferenceMapper` removed | No `DocumentReference` is published |
+| WS4 | A comment in `RecipientResolver` | It no longer names `HandoffSummaryApproved` |
+| WS6 | A removed `using` in `RunSimulation`, `contracts/openapi/careloop.json`, `src/web/**` | The three AI routes replace the handoff summary routes in the OpenAPI document; the summary screen is removed from `src/web` (the display of the three texts is not built yet). `GetMetrics` is unchanged: the impact summary calls its handler |
+| Infra | `infra/azure/**` | `apiAiProvider` is `NoOp` or `Foundry`; the project endpoint and the model deployment name; the Foundry User role for the API's identity |
 
-Two contract points are still open for WS9 (see the table below): summary approver roles, and the removed `Ai:AzureOpenAi` section and API key setting that `appsettings.json` and `docker-compose.yml` still carry.
+Open contract points for WS9 are in the table below.
 
-**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. The AI provider produces source-grounded, human-reviewed drafts only; it does not coordinate stages, calculate metrics, mutate cases, or send messages. [`ai-design/integration.md`](ai-design/integration.md) is the contract: what AI may do, what it is sent, how a draft is validated and what happens when it fails. [`ai-design/ai-spec.md`](ai-design/ai-spec.md) is the design proposal behind it, superseded by decisions 8 to 11 where the two differ; its patient-facing drafts, Arabic translation and periodic insight narrative are deferred.
+**Scope boundary:** the backend owns workflow state, ownership, deadlines, escalations, and metric calculation. AI writes draft text for staff only; it does not coordinate stages, calculate metrics, mutate cases, or send messages, and it never discloses a result. [`ai-design/integration.md`](ai-design/integration.md) is the contract: what AI may do, what it is sent, how an answer is checked, reused and audited, and what happens when it fails. [`ai-design/ai-spec.md`](ai-design/ai-spec.md) is the earlier design proposal, superseded where the two differ; its handoff summary, Arabic translation, closure review pack and reply triage are not built.
 
 ## WS10 Scenarios and end-to-end tests
 
@@ -444,21 +461,27 @@ The scaffold made these choices or left them open. Settle each one before both s
 | Staff notification transport | WS4, WS7, WS8 | Settled under C22 (decisions 21, 27, 28): a staff notice is an email or text message to the address configured for the owner's role (`Notifications:StaffContacts`), shown in the messaging simulator's staff inbox. The `staff-notice` Task and its `PUT` to the HIS simulator are retired. |
 | Urgency on the review `Task` | WS3, WS7 | Settled and built: WS7 carries source-reviewed urgency unchanged in `https://careloop.invalid/fhir/StructureDefinition/reviewed-urgency` as `valueCode`, because placeholder codes do not fit FHIR priority. WS3 reads the extension first and retains its existing `Task.priority` fallback. |
 | Nine event types | WS2, WS3 | Delivery reports and patient responses share one event, `NotificationUpdated`. Caregiver consent is its own event, `ConsentRecorded` (C13), so there are exactly nine source events and handlers. |
-| Internal events | WS2, WS5, WS6, WS9 | `DeadlineElapsed`, `HandoffSummaryApproved` and `EscalationAcknowledged` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
+| Internal events | WS2, WS5, WS6 | `DeadlineElapsed` and `EscalationAcknowledged` are saved through `ICaseRepository.SaveAsync` directly, not through a handler. |
 | Contact point channel | WS3, WS4, WS7, WS8 | Settled under C22 (decision 21): `ContactPoint.system = sms` is a text message and `email` an email; every other system maps to nothing. WS7 sends `sms` for patients (or `email`, by configuration) and `email` for caregivers. Staff contacts are configuration, not FHIR. |
-| Publishing the approved summary | WS1, WS3, WS9 | Settled with this review: a new domain event, `HandoffSummaryApproved` (summary id and approver), is raised by `ApproveSummary` (WS9) and published by `FhirPublisher` as the `DocumentReference` for that summary only. `HandoffProposed` sends the case `Task` alone, so a summary approved after the proposal is still sent and an older one never is. |
+| Publishing the approved summary | WS1, WS3, WS9 | No longer applies (19 November 2026): the handoff summary is removed. `HandoffSummaryApproved` is gone, event type 101 is retired, and `FhirPublisher` sends no `DocumentReference`. `HandoffProposed` still sends the case `Task`. |
 | Repeated requests | WS2, WS3 | Settled with this review: the HIS sends a consultation or referral as a `ServiceRequest` plus a `Task`, and resends new versions. A request repeated while the consultation is already requested, or the referral already sent, is recorded but leaves the deadline alone; a request after a rejection restarts it. |
 | Rejected events | WS1, WS2 | A refused event is saved with `Disposition = Rejected`, so the attempt is audited through the same write path. |
 | Stage model | WS1, WS6 | Settled (decision 1): five stages in the Domain; the design's ten stages are display labels derived from stage plus track statuses, by the API since decision 19. |
 | Patient appointment confirmation | WS1, WS4, WS8 | Settled (decision 2): dropped. "I will come" is an acknowledgement; a patient reply never changes appointment status. |
 | Confidence rating | WS1, WS2, WS3, WS4, WS6, WS8, WS10 | Settled (decision 3, source changed by decisions 24 and 30): `NotificationUpdateKind.ConfidenceRated` with a 1 to 5 value, recorded by a nurse navigator after a call through `POST /cases/{caseId}/call-outcome`. No reply is a rating. |
-| Where the AI summary is approved | WS6, WS7, WS9 | Settled (decision 4): the CareLoop web app case screen drafts and approves; the HIS simulator receives the approved `DocumentReference` only. The case screen also rejects (decision 10). |
-| Where the model is called | WS9 | Decision 8 originally selected a Python AI workflow service and kept `FoundryDirect` as a second API route. The Python service has since been removed; external providers are deferred, and `NoOp` remains the only working provider. |
-| Clinical text in a prompt | WS2, WS9 | Settled (decision 9): clinician-finalized clinical facts may be summarized, as typed facts with a source reference and review status. They are read for one draft and never written to the coordination store. Patient names, contact details, images and unfinalized or conflicting readings are never sent. |
-| Draft shape and reviewer decision | WS6, WS9 | Settled (decision 10): sections cite the fact identifiers they rest on; the record keeps deployment, prompt and policy versions; `Rejected` is a stored status beside `Draft` and `Approved`. |
-| When a draft is produced | WS9 | Settled (decision 11): on request, and when a handoff is proposed behind `Ai:AutoDraftOnHandoff`, off by default. |
-| Summary approver roles | WS1, WS9 | Open. Proposed as `summaryApproverRoles` in the pathway definition, so the rule stays configuration like every other role rule, rather than a constant in `DemoRoles`. |
-| AI settings in the shared config files | WS9, plus whoever owns the file | Open. `appsettings.json`, `.env.example` and `docker-compose.yml` still carry the removed `Ai:AzureOpenAi` section and an API key setting. |
+| Where the AI summary is approved | WS6, WS7, WS9 | No longer applies (19 November 2026): the handoff summary and its screen are removed, and CareLoop sends the HIS simulator no `DocumentReference`. |
+| Where the model is called | WS9 | Settled: the API calls a model deployment in a Microsoft Foundry project directly, through `IAiClient` (decision 8 reversed, 19 November 2026). The Python AI workflow service is retired. `Ai:Provider` is `NoOp` (default) or `Foundry`. |
+| Clinical text in a prompt | WS2, WS9 | Decision 9 was written for the handoff summary, which is removed. Today no prompt carries a result, a name, an identifier, a contact detail or free text from the hospital system; what each of the three prompts carries and withholds is listed in `ai-design/integration.md`. |
+| Draft shape and reviewer decision | WS6, WS9 | No longer applies (19 November 2026): decision 10 described the stored handoff summary. The three AI texts are not stored and have no approval step; each request is recorded in the normal read audit. |
+| When a draft is produced | WS9 | No longer applies (19 November 2026): decision 11 and `Ai:AutoDraftOnHandoff` went with the handoff summary. An AI text is written only when a page asks for it. |
+| Summary approver roles | WS1, WS9 | Closed (19 November 2026): no longer needed, the handoff summary is removed. |
+| AI settings in the shared config files | WS9, plus whoever owns the file | Closed (19 November 2026): the `Ai:AzureOpenAi` section and the API key settings are gone from `appsettings.json`, `.env.example` and `docker-compose.yml`. The settings are `Ai:Provider`, `Ai:TimeoutSeconds`, `Ai:CacheHours`, `Ai:PromptsDirectory`, `Ai:Foundry:ProjectEndpoint` and `Ai:Foundry:Model`. |
+| AI text without an approval step | WS6, WS9 | Open. Staff-only AI text is shown with a label and no approval step today; record the decision. |
+| Sending an AI-drafted patient message | WS4, WS9 | Open. Today the draft is a preview and patients receive approved templates. Sending one would need a person's approval of the exact text, recorded as an event. |
+| Who may ask for a patient message draft | WS1, WS9 | Open. Today a nurse navigator or a clinician (`PatientMessageDraft.AllowedRoles`). |
+| Small numbers in the impact summary | WS6, WS9 | Open. The small-number threshold (5, the placeholder `ImpactSummary.SmallCount`). |
+| AI text is not checked | WS6, WS9 | Open. The model's text is returned as written and is not checked against the data. If a wrong summary is ever seen, add a check for that case rather than a general parser. |
+| Hosted agents and Python sample scripts | WS9 | Open. `src/ai_agents/` and the hosted agents in the Foundry project are no longer used by the API; decide whether to keep them. |
 | Roles | WS1, WS6, WS7 | Settled (decision 5): add `nurse-navigator`, `receiving-clinician` and `lab` (C11). `DemoRoles` is shared; WS6 edits it after announcing. |
 | Consultation reply deadline | WS1, WS2 | Settled (decision 6): `answer-consultation` and `respond-to-referral` replace `respond-to-handoff`; both placeholders (C12). |
 | Caregiver and consent | WS1, WS2, WS4, WS8 | Settled (decision 7): build it (C13). `RecipientKind.Caregiver`, a `Consent` record on the case, caregiver gets date, time and place only, shown in the messaging simulator; since C22 the caregiver's contact is an email address and real email delivery stays out of scope. |
@@ -496,7 +519,7 @@ withdrawn. C22 retired some earlier parts; those rows stay Done and say so.
 | C7 SMS reply codes | WS8 | `1` acknowledge, `2` call-me on the `Sms` inbox (read by CareLoop since C22) | Done |
 | C8 Exception-path and demo scenarios | WS10 | Six exception scenarios with `expect` entries; demo scenario for screens 15, 16, 19 to 21 | Open |
 | C8 | WS10 | Replace `PLACEHOLDER-EVIDENCE-KIND` in `happy-path.json` with a declared kind (C21) | Open |
-| C9 Dashboard | WS6 | Screens 1 to 4, 17, 18; summary draft, edit-on-approve, reject; escalation acknowledge; other-cases card | Done |
+| C9 Dashboard | WS6 | Screens 1 to 4, 17, 18; escalation acknowledge; other-cases card. The handoff summary screen (draft, edit-on-approve, reject) was built and then removed on 19 November 2026 | Done |
 | C10 Confidence rating | WS1, WS2, WS3 | Domain, payload, handler, `StatusMap` | Done |
 | C10 | WS4 | `SimulatorInboundNotificationHandler` maps `confidence-rating` (retired by C22) | Done |
 | C10 | WS6 | `confidenceRate` on `MetricsResponse` | Done |
@@ -535,5 +558,5 @@ withdrawn. C22 retired some earlier parts; those rows stay Done and say so.
 | Decision 19 Display labels | WS1 | `CaseDisplayLabels.From` | Done |
 | Decision 19 | WS6 | `DisplayLabel` on case reads and in metrics | Done |
 | Decision 19 | WS10 | Journey tests assert the label at each happy-path step | Open |
-| Summary approver roles | WS1, WS9 | `summaryApproverRoles` in the pathway (open contract point) | Open (decision needed) |
+| Summary approver roles | WS1, WS9 | `summaryApproverRoles` in the pathway | Dropped (the handoff summary is removed) |
 

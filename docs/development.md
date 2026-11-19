@@ -10,7 +10,7 @@ Run `dotnet build CareLoop.sln` and `dotnet test CareLoop.sln` for the API, the 
 
 `docker compose up --build` runs PostgreSQL on 5432, the API on port 8080, the dashboard on port 4173, the HIS simulator on 5081 and the messaging simulator on 5082 (ports come from `.env`, template in `.env.example`). nginx proxies the dashboard's `/api/` requests to the API. No production deployment environment is configured.
 
-AI handoff-summary contracts and design are retained, but no external AI workflow service is currently included or enabled. The API's `NoOp` provider keeps AI off.
+AI is off by default (`Ai:Provider` = `NoOp`), and everything runs without it. With `Ai:Provider` = `Foundry` the API asks a model deployment in a Microsoft Foundry project (`Ai:Foundry:ProjectEndpoint`, `Ai:Foundry:Model`) for three texts: the role briefing, the impact summary and the patient message draft. What the model is asked is in the plain-text files under `src/api/CareLoop.Api/Prompts/`. There is no separate AI service and no key: the API signs in with `az login` locally. A container has no `az login`, so a live check uses `dotnet run`; the commands are in `src/api/README.md`. The contract is `docs/ai-design/integration.md`.
 
 ## Working agreements
 

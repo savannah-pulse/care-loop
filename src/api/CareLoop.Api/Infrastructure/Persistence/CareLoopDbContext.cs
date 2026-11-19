@@ -1,6 +1,5 @@
 using CareLoop.Api.Infrastructure.Persistence.Audit;
 using CareLoop.Api.Infrastructure.Persistence.Outbox;
-using CareLoop.Api.Infrastructure.Persistence.Summaries;
 using CareLoop.Domain.Cases;
 using CareLoop.Domain.Events;
 using Microsoft.EntityFrameworkCore;
@@ -43,9 +42,6 @@ public sealed class CareLoopDbContext : DbContext
 
     /// <summary>Every staff read of case data (C4, C19). Append-only; the only table read slices write to.</summary>
     public DbSet<CaseReadRecord> CaseReads => Set<CaseReadRecord>();
-
-    /// <summary>AI-drafted and human-approved handoff summaries.</summary>
-    public DbSet<HandoffSummaryRecord> HandoffSummaries => Set<HandoffSummaryRecord>();
 
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)

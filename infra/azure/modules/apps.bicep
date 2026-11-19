@@ -126,11 +126,14 @@ var apiSimulatorEnv = deploySimulators
     ]
   : []
 
+// The API calls the model deployment with the apps identity (AZURE_CLIENT_ID above), which needs
+// Foundry User on the Foundry account. What the model is asked is in the API's prompt files
+// (src/api/CareLoop.Api/Prompts).
 var apiFoundryEnv = empty(aiProjectEndpoint) || empty(aiModelDeploymentName)
   ? []
   : [
-      { name: 'Ai__FoundryDirect__ProjectEndpoint', value: aiProjectEndpoint }
-      { name: 'Ai__FoundryDirect__DeploymentName', value: aiModelDeploymentName }
+      { name: 'Ai__Foundry__ProjectEndpoint', value: aiProjectEndpoint }
+      { name: 'Ai__Foundry__Model', value: aiModelDeploymentName }
     ]
 
 module api 'container-app.bicep' = {

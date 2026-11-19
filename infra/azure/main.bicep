@@ -66,8 +66,8 @@ param demoTiming bool = deploySimulators
 @description('Apply EF Core migrations when the API starts. Nothing else in this project applies them.')
 param migrateOnStartup bool = true
 
-@description('The API setting Ai:Provider. NoOp keeps AI off; FoundryDirect is a deferred API-side provider.')
-@allowed(['NoOp', 'FoundryDirect'])
+@description('The API setting Ai:Provider. NoOp keeps AI off; Foundry has the API call a model in the Foundry project (aiProjectEndpoint, aiModelDeploymentName) for the role briefing, the impact summary and the patient message draft.')
+@allowed(['NoOp', 'Foundry'])
 param apiAiProvider string = 'NoOp'
 
 @description('Time zone used in messages to patients and staff.')
@@ -143,14 +143,18 @@ param keyVaultPurgeProtection bool = false
 param registryPublicAccess bool = true
 
 // ---------------------------------------------------------------------------------------------------
-// Optional Foundry resources for a future direct API provider. The API remains on NoOp by default.
+// Foundry: the API calls a model deployment of a Foundry project with its own managed identity when
+// apiAiProvider is Foundry. The API remains on NoOp by default.
 // ---------------------------------------------------------------------------------------------------
 
 @description('Endpoint of an existing Foundry project, https://<account>.services.ai.azure.com/api/projects/<project>. Never write the value in a parameter file; it is read from the environment. Ignored when createFoundry is true.')
 param aiProjectEndpoint string = ''
 
-@description('Name of the model deployment in the existing project. Ignored when createFoundry is true.')
+@description('Name of the model deployment in the existing project that writes the texts. Ignored when createFoundry is true.')
 param aiModelDeploymentName string = ''
+
+@description('Resource ID of the existing Foundry account, /subscriptions/.../providers/Microsoft.CognitiveServices/accounts/<name>. When set (and assignRoles is true), the API identity is given the Foundry User role on it. Empty: someone who owns the account grants the role by hand.')
+param aiFoundryAccountId string = ''
 
 @description('Create a Foundry account, project, model deployment and Prompt Shields guardrail in this environment, for a subscription that has no Foundry to use. false, the default, creates nothing.')
 param createFoundry bool = false
@@ -319,6 +323,18 @@ module foundry 'modules/foundry.bicep' = if (useCreatedFoundry) {
     modelVersion: foundryModelVersion
     modelSku: foundryModelSku
     modelCapacity: foundryModelCapacity
+    userPrincipalIds: assignRoles ? [identity.outputs.appsPrincipalId] : []
+  }
+}
+
+var foundryIdParts = split(aiFoundryAccountId, '/')
+
+module foundryAccess 'modules/foundry-access.bicep' = if (assignRoles && !createFoundry && !empty(aiFoundryAccountId)) {
+  scope: resourceGroup(foundryIdParts[?2] ?? subscription().subscriptionId, foundryIdParts[?4] ?? targetGroupName)
+  name: 'foundry-access-${environmentName}'
+  params: {
+    accountName: last(foundryIdParts)!
+    principalId: identity.outputs.appsPrincipalId
   }
 }
 
