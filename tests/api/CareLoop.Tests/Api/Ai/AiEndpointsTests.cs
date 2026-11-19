@@ -98,12 +98,12 @@ public sealed class AiEndpointsTests : IDisposable
         var response = Value<AiTextResponse>(await BriefingAsync());
 
         // The API writes the opening, and puts the case number in where the model named a case by its token (most pressing first).
-        Assert.Equal($"1 case is overdue and 0 are due today. A result review is waiting for case {NotificationRouter.CaseReferenceFor(late.Id)}; "
+        Assert.Equal($"Across your team's 2 open cases, 1 is overdue and 0 are due today. A result review is waiting for case {NotificationRouter.CaseReferenceFor(late.Id)}; "
             + $"case {NotificationRouter.CaseReferenceFor(onTime.Id)} is upcoming and {{{{C-9}}}} is unknown.", response.Text);
         Assert.Equal(("Fake/role-briefing", _clock.UtcNow, false), (response.Model, response.GeneratedAt, response.Cached));
         var prompt = Assert.Single(_ai.Prompts);
         Assert.StartsWith("You are writing the short briefing", prompt);
-        Assert.Contains("\"opening\": \"1 case is overdue and 0 are due today.\"", prompt);
+        Assert.Contains("\"opening\": \"Across your team's 2 open cases, 1 is overdue and 0 are due today.\"", prompt);
         Assert.Contains("\"token\": \"C-1\"", prompt);
         var request = Assert.Single(_ai.Requests);
         Assert.Equal(AiPrompts.RoleBriefing, request.Use);
@@ -131,6 +131,17 @@ public sealed class AiEndpointsTests : IDisposable
 
         Assert.EndsWith($"Case {NotificationRouter.CaseReferenceFor(first.Id)} awaits a call. Case {NotificationRouter.CaseReferenceFor(second.Id)} is upcoming: "
             + $"case {NotificationRouter.CaseReferenceFor(first.Id)} first.", response.Text);
+    }
+
+    [Fact]
+    public void The_opening_names_its_scope_the_team_or_the_cases_escalated_to_the_coordinator()
+    {
+        var cases = new[] { NewCase("SYN-RESULT-1", overdue: true), NewCase("SYN-RESULT-2") };
+
+        Assert.Equal("Across your team's 2 open cases, 1 is overdue and 0 are due today.", RoleBriefing.Opening(cases, _format, _clock.UtcNow));
+        Assert.Equal("Of the 2 open cases escalated to you, 1 is overdue and 0 are due today.",
+            RoleBriefing.Opening(cases, _format, _clock.UtcNow, escalatedToReader: true));
+        Assert.Equal("Across your team's 1 open case, nothing is overdue or due today.", RoleBriefing.Opening(cases[1..], _format, _clock.UtcNow));
     }
 
     [Fact]

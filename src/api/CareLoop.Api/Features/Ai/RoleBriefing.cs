@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using CareLoop.Api.Features.Common;
 using CareLoop.Api.Features.Notifications;
 using CareLoop.Api.Infrastructure.Ai;
+using CareLoop.Api.Infrastructure.Auth;
 using CareLoop.Api.Infrastructure.Persistence;
 using CareLoop.Contracts.Ai;
 using CareLoop.Domain.Cases;
@@ -47,7 +48,7 @@ public static partial class RoleBriefing
         var cases = Order(await ReadAccess.FacilityScope(ReadAccess.RoleScope(db.Cases.AsNoTracking(), actor), actor, null)
             .Where(c => c.Stage != CaseStage.Closed).ToListAsync(ct), clock.UtcNow);
         await ReadAccess.AuditAsync(db, actor, clock, "role-briefing", null, false, null, null, ct);
-        var opening = Opening(cases, format, clock.UtcNow);
+        var opening = Opening(cases, format, clock.UtcNow, escalatedToReader: actor.Role == DemoRoles.Coordinator);
         // The model knows each case only as C-1, C-2, …; the case numbers are put in here and never leave CareLoop.
         return await ai.WriteAsync(AiPrompts.RoleBriefing, BuildData(actor, cases, opening, pathways, format, clock.UtcNow), refresh, reuse: true, ct,
             text => $"{opening} {WithCaseNumbers(text, cases)}");
@@ -57,12 +58,16 @@ public static partial class RoleBriefing
     /// <param name="cases">The open cases in the reader's scope.</param>
     /// <param name="format">Local dates.</param>
     /// <param name="now">The time now.</param>
-    /// <returns>For example <c>4 cases are overdue and 1 is due today.</c></returns>
-    internal static string Opening(IReadOnlyList<Case> cases, MessageFormat format, DateTimeOffset now)
+    /// <param name="escalatedToReader">Whether the scope is the cases escalated to the reader (the programme coordinator) rather than the reader's team.</param>
+    /// <returns>For example <c>Across your team's 18 open cases, 4 are overdue and 1 is due today.</c> It names its scope, because the
+    /// worklist under it opens on the reader's own cases, a smaller list.</returns>
+    internal static string Opening(IReadOnlyList<Case> cases, MessageFormat format, DateTimeOffset now, bool escalatedToReader = false)
     {
         int overdue = cases.Count(c => IsOverdue(c, now)), today = cases.Count(c => IsDueToday(c, format, now));
-        static string Count(int n) => n == 1 ? "1 case is" : $"{n} cases are";
-        return overdue == 0 && today == 0 ? "Nothing is overdue or due today." : $"{Count(overdue)} overdue and {(today == 1 ? "1 is" : $"{today} are")} due today.";
+        static string Are(int n) => n == 1 ? "1 is" : $"{n} are";
+        var cased = cases.Count == 1 ? "1 open case" : $"{cases.Count} open cases";
+        var scope = escalatedToReader ? $"Of the {cased} escalated to you" : $"Across your team's {cased}";
+        return overdue == 0 && today == 0 ? $"{scope}, nothing is overdue or due today." : $"{scope}, {Are(overdue)} overdue and {Are(today)} due today.";
     }
 
     /// <summary>Puts the dashboard's case number where the text names a case by its token.</summary>
