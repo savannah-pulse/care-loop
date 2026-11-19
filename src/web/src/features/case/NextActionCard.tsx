@@ -13,9 +13,10 @@ import {
   outcomeEvidenceText,
 } from '../../domain'
 import { describeDue, formatWhen, parseInstant } from '../../format'
-import { isEscalationRole, sameReference, useSignedInStaff } from '../../identity'
+import { isEscalationRole, useSignedInStaff } from '../../identity'
 import { t } from '../../i18n'
 import { routeHref } from '../../routing'
+import { whoActs } from './whoActs'
 
 /** Props for {@link NextActionCard}. */
 export interface NextActionCardProps {
@@ -77,8 +78,8 @@ function EscalationFact({ detail, now }: EscalationFactProps) {
  * exceptions and any pending transfer: until a proposed owner accepts, the current owner stays
  * responsible. Escalation brings in the facility lead, then the programme coordinator, but never
  * changes who is responsible; the card says who it went to and whether they acknowledged it, and
- * gives those roles a way into the escalation (screen 17). While the case is open it says who needs
- * to act.
+ * gives those roles a way into the escalation (screen 17). While the case is open it says who takes
+ * the next step and how, which is not always the person responsible (see {@link whoActs}).
  */
 export function NextActionCard({ detail, now, children }: NextActionCardProps) {
   const headingId = useId()
@@ -88,7 +89,6 @@ export function NextActionCard({ detail, now, children }: NextActionCardProps) {
   const dueAt = parseInstant(detail.dueAt)
   const due = dueAt ? describeDue(dueAt, now) : undefined
   const closed = detail.stage === 'Closed'
-  const mine = !detail.owner.isQueue && sameReference(detail.owner.reference, me.reference)
   return (
     <section className="card hero" aria-labelledby={headingId}>
       <div className="hero-top">
@@ -141,7 +141,7 @@ export function NextActionCard({ detail, now, children }: NextActionCardProps) {
       {closed ? null : (
         <p className="who-acts">
           <Icon name="user" />
-          <span>{mine ? t('case.youAct') : t('case.otherActs', { name: owner.subject })}</span>
+          <span>{whoActs(detail, me)}</span>
         </p>
       )}
     </section>
