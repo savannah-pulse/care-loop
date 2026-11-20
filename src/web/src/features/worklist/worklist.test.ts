@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { urgencyText } from '../../domain'
 import { TEST_NOW, caseSummary, leadQueue } from '../../testing/builders'
-import { countOpen, groupRows, matchesFilter, matchesSearch, toWorklistRows } from './worklist'
+import { countOpen, groupRows, isMine, matchesFilter, matchesSearch, toWorklistRows } from './worklist'
 
 const cases = [
   caseSummary({ caseId: 'later', dueAt: '2026-11-13T05:00:00Z' }),
@@ -63,5 +63,15 @@ describe('worklist', () => {
     const rows = toWorklistRows([cases[6]], 'nurse-navigator')
     expect(groupRows(rows, TEST_NOW)).toEqual([])
     expect(countOpen(rows, TEST_NOW)).toEqual({ open: 0, overdue: 0, dueToday: 0 })
+  })
+})
+
+describe('isMine', () => {
+  it("puts each of the nurse navigator's steps on the nurse's own list, whoever is responsible", () => {
+    const steps = ['call-patient', 'acknowledge-notification', 'contact-patient-another-way', 'arrange-follow-up']
+    const cases = steps.map((nextAction, i) => caseSummary({ caseId: `3f6b1c2a-8d4e-4f5a-9b7c-10024589100${i}`, nextAction }))
+    const nurse = { reference: 'huda-saleh', role: 'nurse-navigator' }
+    const mine = toWorklistRows(cases, nurse.role).filter((row) => isMine(row, nurse))
+    expect(mine.map((row) => row.summary.nextAction).sort()).toEqual(['acknowledge-notification', 'call-patient', 'contact-patient-another-way'])
   })
 })

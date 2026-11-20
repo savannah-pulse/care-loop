@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import { Icon, LoadingState, NotAvailableState, ReadView } from '../../components'
 import { useMetrics, useSimulation, type Metrics, type Read, type SimulationArm, type SimulationResult } from '../../data'
 import { DISPLAY_LABELS, EXCEPTION_NAMES, displayLabelText, exceptionLabel, isDisplayLabel } from '../../domain'
@@ -25,6 +25,7 @@ import {
   type BarItem,
   type MeasureKey,
 } from './impact'
+import { ImpactSummary } from './ImpactSummary'
 
 const CLOSURE_REASONS = [
   'Treated',
@@ -441,6 +442,8 @@ export function ImpactPage() {
   const simulation = useSimulation()
   const data = metrics.state.status === 'ready' ? metrics.state.data : undefined
   const generatedAt = data ? parseInstant(data.generatedAt) : undefined
+  // The figures are re-read in the background; without the time they were read, the same figures give the same text.
+  const figuresSnapshot = useMemo(() => (data ? JSON.stringify({ ...data, generatedAt: undefined }) : undefined), [data])
   const scope = me.facilityId ? facilityName(me.facilityId) : t('impact.allFacilities')
   return (
     <div className="page">
@@ -455,6 +458,8 @@ export function ImpactPage() {
             })}
           </p>
         ) : null}
+        {/* Only with cases to describe: with none, there is nothing to summarise. */}
+        {data && toCount(data.totalCases) > 0 ? <ImpactSummary snapshot={figuresSnapshot} /> : null}
       </div>
       <ReadView
         read={metrics}

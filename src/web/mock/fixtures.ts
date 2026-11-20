@@ -2,8 +2,7 @@
  * Fixtures for the local mock API: the eight worklist cases of UI design board 1 with the patients'
  * names and MRNs, Hessa's case, timeline and escalation from boards 2 and 17, a case escalated to the
  * programme coordinator, Hessa's earlier screening (board 18), two cases at the General Hospital,
- * the five programmes of board 4, loop-closure numbers from board 3 and the handoff summary draft
- * from board 18. References are written as the API stores them, without a FHIR type. Every person,
+ * the five programmes of board 4 and loop-closure numbers from board 3. References are written as the API stores them, without a FHIR type. Every person,
  * reference and number is invented. Typed against the generated API schema, so a contract change
  * that breaks them fails the type check.
  *
@@ -21,8 +20,6 @@ type Schemas = components['schemas']
 export type CaseDetail = Schemas['CaseDetailResponse']
 /** One timeline entry as `GET /cases/{caseId}/timeline` returns it. */
 export type TimelineEntry = Schemas['TimelineEntryResponse']
-/** A handoff summary as the summary endpoints return it. */
-export type HandoffSummary = Schemas['HandoffSummaryResponse']
 /** Loop-closure metrics as `GET /metrics` returns them. */
 export type Metrics = Schemas['MetricsResponse']
 /** A programme's settings as `GET /programmes` returns them. */
@@ -166,7 +163,7 @@ interface EntrySpec {
 }
 
 /** Event types a person records in CareLoop itself rather than in the hospital system. */
-const CARELOOP_EVENTS: ReadonlySet<EventType> = new Set<EventType>(['EscalationAcknowledged', 'NotificationUpdated', 'HandoffSummaryApproved'])
+const CARELOOP_EVENTS: ReadonlySet<EventType> = new Set<EventType>(['EscalationAcknowledged', 'NotificationUpdated'])
 
 /** Where an entry came from, as the API's `origin` says it. */
 function originOf(spec: EntrySpec): string {
@@ -200,7 +197,7 @@ function entries(caseId: string, specs: readonly EntrySpec[]): TimelineEntry[] {
   })
 }
 
-/** A case with its timeline. The mock changes both as people approve summaries. */
+/** A case with its timeline. The mock changes both as people acknowledge escalations and record calls. */
 export interface CaseFixture {
   /** The case. */
   detail: CaseDetail
@@ -1202,72 +1199,6 @@ export const WITHOUT_ESCALATION: SimulationArm = {
   stalledCases: 38,
   escalationsRaised: 0,
   medianTimeToClosure: '31.00:00:00',
-}
-
-const HESSA_SECTIONS: HandoffSummary['sections'] = [
-  {
-    heading: 'Situation',
-    text: 'Her screening mammogram on Mon 9 Nov 2026 needs further assessment.',
-    sourceFactIds: ['screening-report-2026-11-10'],
-  },
-  {
-    heading: 'Background',
-    text: 'A first referral to Regional Hospital was declined on Tue 10 Nov (no capacity). She speaks Arabic. With her written consent, her son gets her appointment details.',
-    sourceFactIds: ['referral-declined-2026-11-10', 'consent-form-2026-11-09'],
-  },
-  {
-    heading: 'Assessment',
-    text: 'See the screening report in the clinical record.',
-    sourceFactIds: [],
-  },
-  {
-    heading: 'Request',
-    text: 'Please accept her and offer an assessment by Mon 16 Nov.',
-    sourceFactIds: ['breast-screening-programme-v1'],
-  },
-]
-
-/**
- * Runs sections together the way the API stores a summary's text: each heading on its own line,
- * then its text, with a blank line between sections.
- *
- * @param sections - The sections, in reading order.
- * @returns The plain text.
- */
-export function flatten(sections: HandoffSummary['sections']): string {
-  return sections.map((section) => `${section.heading}\n${section.text}`).join('\n\n')
-}
-
-/**
- * Drafts the handoff summary of board 18 for Hessa's case.
- *
- * @param summaryId - The identifier to give the draft.
- * @returns A new draft, waiting for a person to review it.
- */
-export function draftHessaSummary(summaryId: string): HandoffSummary {
-  return {
-    summaryId,
-    caseId: HESSA_CASE_ID,
-    status: 'Draft',
-    sections: HESSA_SECTIONS.map((section) => ({ ...section, sourceFactIds: [...section.sourceFactIds] })),
-    text: flatten(HESSA_SECTIONS),
-    missingOrConflictingFacts: [
-      'Preferred appointment time: not in the facts. Add it if she told you.',
-      'Help to get there: not recorded.',
-    ],
-    humanReviewRequired: true,
-    draftedBy: 'careloop-ai',
-    modelDeployment: 'summary-drafter-2026-10',
-    promptVersion: 'fr11-v1',
-    trigger: 'Requested',
-    language: 'en',
-    draftedAt: mockNow().toISOString(),
-    approvedBy: null,
-    approvedAt: null,
-    rejectedBy: null,
-    rejectedAt: null,
-    rejectionReason: null,
-  }
 }
 
 const PLACEHOLDER_CITATION = 'PLACEHOLDER - no clinical source yet; to be cited by the clinical adviser'

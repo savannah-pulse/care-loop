@@ -32,6 +32,15 @@ public sealed class MessageFormatTests
         Assert.Equal("facility lead", MessageFormat.Role("facility-lead"));
     }
 
+    [Fact]
+    public void A_facility_has_its_configured_contact_or_none()
+    {
+        var format = new MessageFormat(new NotificationOptions { FacilityContacts = new(StringComparer.OrdinalIgnoreCase) { ["family-health-centre"] = " SYN-PHONE-A " } });
+
+        Assert.Equal("SYN-PHONE-A", format.FacilityContact("FAMILY-HEALTH-CENTRE"));
+        Assert.Null(format.FacilityContact("general-hospital"));
+    }
+
     [Theory]
     [InlineData("Asia/Dubai", true)]
     [InlineData(null, true)]

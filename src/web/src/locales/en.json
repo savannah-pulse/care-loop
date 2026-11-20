@@ -8,6 +8,32 @@
     "separator": " · ",
     "listSeparator": ", "
   },
+  "ai": {
+    "writtenByAi": "Written by AI",
+    "refresh": "Refresh",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "refreshing": "Writing a new summary…"
+  },
+  "patientMessage": {
+    "title": "Draft a message to the patient",
+    "lede": "AI writes a draft for you to read. Nothing is sent from here. The AI never sees the patient's name; CareLoop adds it.",
+    "channel": {
+      "legend": "Write it as",
+      "sms": "Text message",
+      "email": "Email"
+    },
+    "write": "Write a draft",
+    "again": "Write another draft",
+    "writing": "Writing…",
+    "draftLabel": "Draft message",
+    "notSent": "Draft, not sent",
+    "failed": {
+      "off": "AI is switched off here, so no draft can be written.",
+      "forbidden": "Your role cannot ask for a draft of this message.",
+      "other": "AI could not write a draft just now. Nothing else is affected. Try again later."
+    }
+  },
   "nav": {
     "label": "Main",
     "worklist": "Worklist",
@@ -63,10 +89,6 @@
     "hidden": "Name hidden for your role",
     "detail": "Reports, images and other details are in the hospital record.",
     "hiddenDetail": "Names, MRNs and hospital record numbers are hidden for your role. Everything else on the case is here."
-  },
-  "facts": {
-    "dated": "{name}, {date}",
-    "version": "{name}, version {version}"
   },
   "programmes": {
     "breast-screening": "Breast screening",
@@ -258,6 +280,10 @@
     "errorTitle": "We couldn't load your worklist",
     "forbiddenTitle": "This list is not open to your role",
     "forbiddenBody": "Your role can only see cases sent to you. If you think you should see this list, ask your facility lead.",
+    "briefing": {
+      "label": "Summary written by AI",
+      "loading": "Writing a summary of your cases…"
+    },
     "emptyTitle": "Nothing needs you right now",
     "emptyAllOnTrack": {
       "one": "The only open case is on track. The next deadline is {date}.",
@@ -318,7 +344,16 @@
     "noProblem": "Nothing is blocking this case.",
     "youAct": "You need to do this.",
     "otherActs": "{name} needs to do this.",
-    "reviewSummary": "Review the handoff summary",
+    "whoActs": {
+      "youCall": "Your step: call {patient}, then record it in \"{card}\".",
+      "nurseCalls": "A nurse navigator calls the patient and records the call here.",
+      "youInHospital": "You do this in the hospital system. CareLoop moves on once it is recorded there.",
+      "otherInHospital": "{name} does this in the hospital system. CareLoop moves on once it is recorded there.",
+      "roleInHospital": "The {role} does this in the hospital system. CareLoop moves on once it is recorded there.",
+      "youStayResponsible": "You stay responsible for the case.",
+      "staysResponsible": "{name} stays responsible for the case.",
+      "thePatient": "the patient"
+    },
     "tracksTitle": "How each part is going",
     "timelineTitle": "Timeline",
     "timelineOrder": "Newest first",
@@ -406,7 +441,6 @@
       "ClosureDecided": "Case closed",
       "ConsentRecorded": "Consent recorded",
       "DeadlineElapsed": "Deadline reached",
-      "HandoffSummaryApproved": "Handoff summary approved",
       "EscalationAcknowledged": "Escalation acknowledged"
     },
     "kinds": {
@@ -420,7 +454,6 @@
       "ClosureDecided": "Closure",
       "ConsentRecorded": "Consent",
       "DeadlineElapsed": "Deadline",
-      "HandoffSummaryApproved": "Summary",
       "EscalationAcknowledged": "Escalation"
     },
     "refused": "Refused",
@@ -441,81 +474,15 @@
       "ClosureDecided": "Closure refused",
       "ConsentRecorded": "Consent not accepted",
       "DeadlineElapsed": "Deadline check not applied",
-      "HandoffSummaryApproved": "Summary approval refused",
       "EscalationAcknowledged": "Acknowledgement refused"
     }
   },
-  "summary": {
-    "title": "Handoff summary",
-    "subtitle": "Check every line before the summary goes with a referral.",
-    "draftedAt": "AI draft from {date}",
-    "startTitle": "No draft yet",
-    "startBody": "AI can draft a summary from the facts in this case. You check every line, then approve or reject it. Nothing is used until you approve it.",
-    "draft": "Draft the summary",
-    "redraft": "Draft the summary again",
-    "drafting": "Drafting…",
-    "draftingLabel": "Drafting the summary",
-    "cardTitle": "Summary",
-    "aiDraft": "AI draft",
-    "editedByYou": "Edited by you",
-    "sources": "Sources",
-    "assessmentNote": "AI never writes this part.",
-    "aiNote": "AI used only the facts in this case. It cannot send anything, change urgency or edit the record.",
-    "checkTitle": "Check before you approve",
-    "checkNone": "The draft reported nothing missing or conflicting.",
-    "keptTitle": "Kept with your decision",
-    "keptWho": "Your name, the time, and whether you approved or rejected it",
-    "keptText": "The text you approve, with every change you make",
-    "keptFacts": "The facts each part cites",
-    "keptModel": "The AI version that drafted it: {model}, prompt {prompt}",
-    "keptNote": "Approving does not send a referral. You send it from your hospital system, with the approved summary attached.",
-    "actionsLabel": "Decide on this summary",
-    "edit": "Edit",
-    "stopEditing": "Done editing",
-    "reject": "Reject",
-    "approve": "Approve summary",
-    "approving": "Approving…",
-    "approveDialogTitle": "Approve this summary?",
-    "approveDialogBody": "It goes with the referral when you send it from your hospital system.",
-    "rejectDialogTitle": "Reject this draft?",
-    "rejectReasonLabel": "Why are you rejecting it?",
-    "rejectHelp": "Your reason is kept with the draft and helps the team improve what AI writes.",
-    "rejectReasonRequired": "Give a reason before rejecting.",
-    "rejectConfirm": "Reject draft",
-    "rejecting": "Rejecting…",
-    "cancel": "Cancel",
-    "approvedToast": "Summary approved.",
-    "rejectedToast": "Draft rejected. Your reason is kept with it.",
-    "anotherClinician": "another clinician",
-    "approvedByYou": "Approved by you, {date}",
-    "approvedBy": "Approved by {name}, {date}",
-    "approvedNext": "Send the referral from your hospital system, with this summary attached.",
-    "rejectedByYou": "Rejected by you, {date}",
-    "rejectedBy": "Rejected by {name}, {date}",
-    "rejectedReason": "Reason: {reason}",
-    "rejectedNext": "Write the summary yourself in your hospital system and attach it to the referral.",
-    "noDraftTitle": "No AI draft",
-    "noDraft": {
-      "notAvailable": "Drafting isn't ready yet.",
-      "conflict": "AI drafting is switched off, or this case already has an approved summary.",
-      "unavailable": "The AI service did not produce a draft it could check.",
-      "error": "The service is off or did not answer."
-    },
-    "noDraftBody": "CareLoop cannot take a summary you write yourself yet. Write it in your hospital system and attach it to the referral. Every other step still works.",
-    "decisionFailed": {
-      "forbidden": "Only a clinician can approve or reject this summary.",
-      "conflict": "This draft was already decided or replaced, so your decision was not saved.",
-      "notAvailable": "Saving a decision is not available yet.",
-      "notFound": "This draft no longer exists, so your decision was not saved.",
-      "invalid": "The decision could not be saved. Check the text and try again.",
-      "error": "Your decision could not be saved. Try again."
-    },
-    "clinicianOnlyTitle": "For clinicians",
-    "clinicianOnly": "Only clinicians approve handoff summaries. {name} is responsible for this case.",
-    "clinicianOnlyYou": "Only clinicians approve handoff summaries. You are responsible for this case."
-  },
   "impact": {
     "title": "Impact",
+    "summary": {
+      "label": "Summary of the figures, written by AI",
+      "loading": "Writing a summary of these figures…"
+    },
     "subtitle": "{scope} · Updated {date} · {count}",
     "allFacilities": "All facilities",
     "cases": {

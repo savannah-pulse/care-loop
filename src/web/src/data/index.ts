@@ -19,6 +19,7 @@ export {
 } from './client'
 export type { CareLoopClient, CareLoopClientOptions } from './client'
 export { recordCallOutcome } from './callOutcome'
+export { draftPatientMessage } from './patientMessage'
 export {
   DETAIL_READS_AT_ONCE,
   acknowledgeEscalation,
@@ -44,12 +45,13 @@ export {
   useCase,
   useCaseList,
   useCaseTimeline,
+  useImpactSummary,
   useMetrics,
   usePatientCases,
   useProgramme,
   useProgrammes,
+  useRoleBriefing,
   useSimulation,
 } from './reads'
 export type { CaseList, CaseListQuery, LoadCaseListOptions } from './reads'
-export { approveHandoffSummary, draftHandoffSummary, rejectHandoffSummary } from './summaries'
 export type * from './types'

@@ -2,12 +2,19 @@
 
 This specification is part of the [AI design set](README.md).
 
-**Status:** Design proposal for team and clinical review; not an implementation contract
+**Status:** Design proposal for team and clinical review
 **Primary requirement:** FR-11, human-reviewed AI coordination summary at handoff
 **Related work:** FR-04 (messaging simulator), FR-07 (deterministic deadline worker), FR-09 (read-only timeline and synthetic measures)
 **Alignment basis:** CareLoop AI Layer Engineering Design Specification v0.3; proposed extensions remain subject to team and clinical-adviser review.
 
-> **Implementation status:** The API has a clinician-handoff summary seam, but its collector, drafter, and route handlers are stubs; `NoOpAiProvider` is the default and `FoundryDirectProvider` is a stub. `src/ai_agents/` contains three standalone Foundry prompt-agent console clients: `role-briefing` v2, `patient-notification` v2, and `impact-summary` v4. They submit a hard-coded `"Hello"` and stream output; they are not called by the API and do not provide an HTTP service or a documented API wire contract. The prompts and tools are managed in Foundry. The detailed flows and six capabilities below are proposals unless stated otherwise.
+> **Status note (19 November 2026).** This document is the earlier design proposal and is kept for reference. It is superseded by [`integration.md`](integration.md), which describes what is built, wherever the two differ.
+>
+> - **Not built:** the clinician handoff summary (AG1, FR-11) and the Python AI service with its routes and contracts in §3 and §4. The API asks the agents in a Microsoft Foundry project itself, one agent per text, called by name (`role-briefing`, `impact-summary`, `patient-notification`); it never creates or changes an agent. The plain-text prompt files (`src/api/CareLoop.Api/Prompts/`) hold what each agent is asked (a `TASK:` with a `DATA:` section) and apply on Foundry for all three; the agents themselves hold only universal rules. AG2 (closure review pack), AG4 (translation) and AG5 (reply triage) are not built either.
+> - **Built, three texts:**
+>   - Role briefing (`role-briefing.md`): not in this document's AG1 to AG6 list; informally called AG7.
+>   - Impact summary (`impact-summary.md`): closest to AG6, the stage-insights narrative. It is asked for on demand from the impact page, not on a schedule.
+>   - Patient message draft (`patient-message.md`): closest to AG3. It is a preview for staff only; nothing AI writes is sent, and patients receive approved templates. The `patient-notification` agent fills one approved administrative template from `patient-message.md`, which the API chooses from recorded state, and returns that wording as the draft.
+> - **Role/view distinction:** the separate AG1–AG4 labels in the supplied v5 role/view document are a different taxonomy from this v0.3 proposal. Current code has one home-page role-briefing prompt, one impact-summary prompt for authorized programme/facility metrics, and one patient-message prompt. It does not implement the v5 clinician-consultation, referral-requests or facility-escalations prompts, a separate facility-impact prompt, or its optional referral-handoff agent. See the [integration contract](integration.md) for the exact current routing and proposal status.
 
 ## 1. Purpose and design boundary
 
@@ -17,14 +24,14 @@ Use a Microsoft Foundry-deployed large language model (LLM) to make already-reco
 |---|---|---|
 | Case state, event processing, ownership, deadlines, exceptions, referrals, appointments, and closure authorization | .NET orchestration API and deterministic worker | No AI decisions or independent writes |
 | Exact counts, rates, denominators, timing measures, overdue status, and cohort filters | Backend analytics/read model | AI receives precomputed aggregates only |
-| AG1 clinician handoff summary (FR-11, P0) | API summary pipeline with a selected provider/Foundry agent (target design; not wired) | Organize selected finalized facts with source references; draft only |
-| AG2 closure review pack (extension) | Proposed AI capability receiving the API's rule-based evidence checklist | Summarize present, missing, or stale evidence; cannot attach evidence, create exceptions, or close |
-| AG3 patient message drafting (P1 stretch) | Proposed AI capability using an API-selected, approved template | Fill supplied slots and adapt only approved spans; a person approves before the channel can send |
-| AG4 English-to-UAE-Arabic translation (extension) | Proposed AI capability | Translate approved English text; bilingual and clinical approval required before use |
-| AG5 reply triage (proposed extension) | Deterministic reply checks first; a future AI capability may add classifications or flags | Never answer the patient or remove a deterministic flag; a nurse confirms routing |
-| AG6 periodic stage insights (extension) | Backend computes measures; a future AI capability may draft a narrative | Describe pre-aggregated patterns and limitations; no causal claims or individual scoring |
+| AG1 clinician handoff summary (FR-11, P0) | Python AI service using a Microsoft Foundry deployment | Organize selected finalized facts with source references; draft only |
+| AG2 closure review pack (extension) | Python AI service, supplied the API's rule-based evidence checklist | Summarize present, missing, or stale evidence; cannot attach evidence, create exceptions, or close |
+| AG3 patient message drafting (P1 stretch) | Python AI service using an API-selected, approved template | Fill supplied slots and adapt only approved spans; a person approves before the channel can send |
+| AG4 English-to-UAE-Arabic translation (extension) | Python AI service | Translate approved English text; bilingual and clinical approval required before use |
+| AG5 reply triage (proposed extension) | Deterministic reply checks first; AI may add classifications or flags | Never answer the patient or remove a deterministic flag; a nurse confirms routing |
+| AG6 periodic stage insights (extension) | Backend computes measures; Python AI drafts a narrative | Describe pre-aggregated patterns and limitations; no causal claims or individual scoring |
 
-AG1 is the core FR-11 design target. The three checked-in Foundry agents are not documented as a one-to-one implementation of AG1–AG6: their names and versions are in code, but their Foundry-side instructions, tools, role coverage, and input/output schemas are not. The API currently supports only the `ClinicianHandoff` purpose in its summary contract; `PatientStageExplanation` is declared but not implemented. AG3–AG6 remain proposals, and the repository does not establish that AG5 is approved for implementation. Patient communications continue to use approved templates and the existing notification pipeline.
+AG1 is the core FR-11 deliverable. The other agents are extensions and must not delay it. AG3 may draft patient messages, but only the approved patient-channel provider dispatches text after a human approval event. The team approved AG5 for implementation; its deterministic clinical checks remain API-owned and must run before the AI service is called.
 
 ## 2. Intended users and outputs
 
@@ -146,13 +153,13 @@ AI attaches to backend-owned stages; it never advances a stage. A case advances 
 | L2: act within limits | A deterministic system acts and logs the action | Backend API and worker only; never AI |
 | L3: prohibited | Diagnosis, BI-RADS or urgency assignment, result disclosure without the responsible physician, clinical advice, provider/test choice, consent, closure, source/case mutation, or message dispatch | AI; no AI capability may do these |
 
-## 3. Proposed Microsoft Foundry integration
+## 3. Microsoft Foundry endpoint and Python integration
 
-The target architecture is for the API to select the authorized role, view/purpose, agent, and minimum facts, then invoke a provider adapter and validate a draft before persistence and human review. The current API does not call an AI service or a Foundry prompt agent. `IAiProvider` is defined for the handoff summary; `NoOpAiProvider` is the working default and `FoundryDirectProvider` is unfinished. The scripts under `src/ai_agents/` connect directly to hosted prompt agents for console demonstration; they do not form a stateless API service. No API-to-agent JSON contract or role/view mapping is implemented.
+The API is the only component that calls the AI service. It selects the purpose, facts, template, and access controls, then sends a typed JSON request to a stateless Python drafting service. The service validates the request, builds a versioned prompt, calls the configured provider, validates the response, and returns a draft. It has no database credentials, FHIR access, tools, messaging credentials, or write role. The API owns case and draft persistence, template selection, authorization, review events, outbox dispatch, and audit.
 
-The coordination store remains the system of coordination; FHIR is used at system boundaries only. Under the target boundary, an AI agent receives purpose-scoped input, not database access, FHIR resources, or credentials for workflow actions. Microsoft Foundry is the hosted prompt-agent platform in the current client scripts; the API integration and its provider adapter remain to be implemented.
+The coordination SQL store remains the system of coordination; FHIR is used at system boundaries only. The AI receives plain JSON and never reads SQL or receives FHIR resources. Microsoft Foundry is the first provider; a no-op provider supports AI-off operation. Provider/SDK changes stay isolated behind the Python service adapter.
 
-For the proposed service, deploy an approved model in the project's Microsoft Foundry environment and call that deployment from its Python runtime. The endpoint and model deployment are configuration, not constants in source code. The current agent scripts use a Foundry project endpoint and agent name/version; they are not this proposed service and are not API-callable.
+Deploy an approved model in the project's Microsoft Foundry environment and call that deployment from the Python AI service. The endpoint and model deployment are configuration, not constants in source code.
 
 For a current Foundry project, the Foundry project endpoint has the form:
 
@@ -164,7 +171,7 @@ Use the current Foundry SDK/endpoint path supported by the selected model deploy
 
 **Authentication:** Microsoft Entra ID. Use `DefaultAzureCredential` locally with the developer's approved identity and a managed identity in the hosted runtime, with the narrowest inference permissions supported by the selected deployment. Do not store Foundry API keys, tokens, patient data, or model credentials in the repository or container image.
 
-Proposed Python-service configuration (not an implemented API contract):
+Implemented configuration contract:
 
 | Setting | Purpose |
 |---|---|
@@ -177,11 +184,11 @@ Proposed Python-service configuration (not an implemented API contract):
 | `CARELOOP_AI_TIMEOUT_SECONDS` | Bounded inference timeout |
 | `CARELOOP_AI_PROMPT_VERSION` | Prompt version recorded with each returned draft |
 
-For the proposed service, the Foundry model deployment must have a guardrail assigned with Prompt Shields for user prompt attacks and indirect/document attacks at the user-input intervention point, using a blocking action. Verify the configuration in the Foundry guardrail playground before setting the attestation. The proposed Python service must fail closed when it is absent; the repository does not provision or remotely inspect the Foundry resource.
+The Foundry model deployment must have a guardrail assigned with Prompt Shields for user prompt attacks and indirect/document attacks at the user-input intervention point, using a blocking action. Verify the configuration in the Foundry guardrail playground before setting the attestation. The Python service fails closed when it is absent; the repository does not provision or remotely inspect the Foundry resource.
 
 Do not commit live endpoint values. Keep them in the hosting environment's secret/configuration service even when the endpoint URL itself is not confidential. Confirm the Foundry region, model availability, data-residency requirements, retention behavior, network path, and provider approval before any non-synthetic data is sent.
 
-In the proposed architecture, the API would call the Python service using a service identity that cannot write to cases, templates, messages, or closure endpoints. There is no such service identity or call in the current API implementation.
+The API calls the Python service using a service identity. That identity cannot write to cases, templates, messages, or closure endpoints.
 
 ```mermaid
 flowchart LR
@@ -240,10 +247,10 @@ Required fields:
 - `approved_contact_route`: optional reviewed contact information or template token; omit if not approved.
 - `template`: for `patient_message`, the API-selected approved template ID/version, class, language, channel, locked/adaptable spans, and explicit slot values. The model does not choose the template.
 - `closure_checklist`: for `closure_review_pack`, the API-produced checklist with configured requirements and evidence references/statuses.
-- `reply_text`: for proposed `reply_triage`, the minimum necessary inbound reply text; do not send it to an AI service before separate privacy and governance approval.
+- `reply_text`: for `reply_triage`, the minimum necessary inbound reply text; synthetic-only until a separate privacy and governance approval exists.
 - `policy_version`, `template_version`, and `prompt_version`.
 
-Only the content needed for the requested summary may be included. Repository fixtures, scenarios, and simulator environments use synthetic data; the API is designed to work with production systems and does not have a synthetic-data mode. Before any real patient data is sent to Foundry, separate privacy, security, clinical-governance, and DoH approvals must define whether and under what controls that processing is allowed.
+Only the content needed for the requested summary may be included. The current hackathon environment is synthetic-only. In a future regulated deployment, a separate privacy, security, clinical-governance, and DoH approval must define whether any patient-identifiable or clinical data may be transmitted to Foundry.
 
 ### 4.3 Aggregate insight request
 
@@ -258,7 +265,7 @@ Do not include case-level timelines, direct identifiers, free-text notes, report
 
 ### 4.4 Response envelope
 
-Proposed Python-service response envelope (not the output contract of the current console clients):
+Return structured JSON validated by the Python service:
 
 ```json
 {
@@ -301,7 +308,7 @@ Every purpose-specific response keeps the common request ID, draft status, langu
 - **Human governance:** No model output is sent to a patient, written as a clinical record, used to change a case state, or treated as a clinical decision without the responsible authorized human and backend gate.
 - **Source fidelity:** Summaries are extractive/organizational, not interpretive. The source record remains authoritative; report ambiguity rather than resolving it.
 - **Untrusted text:** Treat supplied report text and event content as data, not instructions. The model receives no tools or ability to execute instructions embedded in reports.
-- **Minimization:** Test, sample, and simulator inputs are synthetic. For an approved production integration, transmit only the minimum approved facts, use pseudonymous references where possible, and keep clinical records in source systems.
+- **Minimization:** Prototype inputs and outputs are synthetic. For production, transmit only the minimum approved facts, use pseudonymous references, and keep clinical records in source systems.
 - **No raw imaging:** Never send mammography images or ask this LLM to interpret imaging, pathology, or radiology findings.
 - **Language safety:** Class A logistics drafts require authorized coordinator/nurse review; Class B result-bearing drafts require physician review. Arabic additionally requires qualified local-language review before use, followed by physician review for result-bearing content.
 - **Access and audit:** Authorize requests at the API boundary. Audit request purpose, source references, deployment/prompt versions, and reviewer decision without copying unnecessary clinical content into logs.

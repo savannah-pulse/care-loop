@@ -10,7 +10,6 @@ import { useMemo, useSyncExternalStore } from 'react'
 export type Route =
   | { readonly name: 'worklist' }
   | { readonly name: 'case'; readonly caseId: string }
-  | { readonly name: 'summary'; readonly caseId: string }
   | { readonly name: 'escalation'; readonly caseId: string }
   | { readonly name: 'escalations' }
   | { readonly name: 'impact' }
@@ -34,7 +33,7 @@ function decodeSegments(path: string): string[] | undefined {
 /**
  * Works out which screen an address points to.
  *
- * @param hash - The URL hash, for example `#/cases/3f6b1c2a-8d4e-4f5a-9b7c-100245891000/summary`.
+ * @param hash - The URL hash, for example `#/cases/3f6b1c2a-8d4e-4f5a-9b7c-100245891000/escalation`.
  * @returns The matching route, or `notFound` when nothing matches.
  *
  * @example
@@ -59,9 +58,6 @@ export function parseRoute(hash: string): Route {
   if (first === 'cases' && second !== undefined) {
     if (third === undefined) {
       return { name: 'case', caseId: second }
-    }
-    if (third === 'summary') {
-      return { name: 'summary', caseId: second }
     }
     if (third === 'escalation') {
       return { name: 'escalation', caseId: second }
@@ -95,8 +91,6 @@ export function routeHref(route: AddressableRoute): string {
       return '#/'
     case 'case':
       return `#/cases/${encodeURIComponent(route.caseId)}`
-    case 'summary':
-      return `#/cases/${encodeURIComponent(route.caseId)}/summary`
     case 'escalation':
       return `#/cases/${encodeURIComponent(route.caseId)}/escalation`
     case 'escalations':

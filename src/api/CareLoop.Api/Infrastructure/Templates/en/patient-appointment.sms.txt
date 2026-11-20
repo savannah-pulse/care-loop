@@ -1,1 +1,1 @@
-[PLACEHOLDER] Your appointment has been booked. Date: {{appointmentDate}}. Time: {{appointmentTime}}. Place: {{place}}. Reply 1 to confirm you got this message. Reply 2 if you would like your care team to call you. Reference: {{caseReference}}
+Dear {{firstName}}, your appointment at {{place}} is on {{appointmentDate}} at {{appointmentTime}}. To change it, call {{facilityContact}} or reply 2 and we will call you. Reply 1 to tell us you got this message. Reference: {{caseReference}}

@@ -7,7 +7,7 @@ namespace CareLoop.Tests.Api.Notifications;
 /// </summary>
 public sealed class TemplateRendererTests
 {
-    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["hisLink"] = "Task/SYN" };
+    private static readonly Dictionary<string, string> Values = new() { ["caseReference"] = "AB12CD34", ["facility"] = "SYN Family Health Centre", ["facilityContact"] = "SYN-PHONE-A", ["firstName"] = "Hessa", ["hisLink"] = "Task/SYN" };
 
     [Fact]
     public void Renders_placeholders()
@@ -30,11 +30,45 @@ public sealed class TemplateRendererTests
 
         Assert.True(sms.IsSmsSafe);
         Assert.Null(sms.Subject);
-        Assert.StartsWith("[PLACEHOLDER] ", sms.Body);
+        Assert.DoesNotContain('\n', sms.Body);
         Assert.Contains("Reference: AB12CD34", sms.Body);
-        Assert.Equal("A follow-up step is waiting for you", standard.Subject);
+        Assert.Equal("Your care team would like to talk with you", standard.Subject);
         Assert.Contains("Reference: AB12CD34", standard.Body);
-        Assert.Contains("[PLACEHOLDER WORDING, NOT APPROVED]", standard.Body);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Patient_follow_up_greets_the_patient_by_first_name_and_says_what_happens_next(bool smsSafe)
+    {
+        var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
+
+        Assert.StartsWith("Dear Hessa,", body);
+        Assert.Contains("our care team at SYN Family Health Centre would like to talk with you about the next step in your care.", body);
+        Assert.Contains("Please call SYN-PHONE-A, or reply 2 and we will call you.", body);
+        Assert.DoesNotContain("PLACEHOLDER", body);
+    }
+
+    [Theory]
+    [InlineData("patient-appointment", "our appointment at SYN Clinic is on Tuesday 24 November 2026 at 13:30.", false)]
+    [InlineData("patient-appointment", "our appointment at SYN Clinic is on Tuesday 24 November 2026 at 13:30.", true)]
+    [InlineData("patient-appointment-place-tbc", "our appointment is on Tuesday 24 November 2026 at 13:30.", false)]
+    [InlineData("patient-appointment-place-tbc", "our appointment is on Tuesday 24 November 2026 at 13:30.", true)]
+    public void Patient_appointment_gives_the_place_date_and_time_and_how_to_change_it(string templateKey, string when, bool smsSafe)
+    {
+        var values = new Dictionary<string, string>(Values) { ["appointmentDate"] = "Tuesday 24 November 2026", ["appointmentTime"] = "13:30", ["place"] = "SYN Clinic" };
+
+        var body = ShippedTemplates().Render(templateKey, "en", smsSafe, values).Body;
+
+        Assert.StartsWith("Dear Hessa,", body);
+        Assert.Contains(when, body);
+        Assert.Equal(templateKey.EndsWith("-tbc", StringComparison.Ordinal), body.Contains("The place is to be confirmed.", StringComparison.Ordinal));
+        // The care team's clinic is never given as the appointment's place.
+        Assert.DoesNotContain("SYN Family Health Centre", body);
+        Assert.Contains("To change it, call SYN-PHONE-A or reply 2 and we will call you.", body);
+        Assert.Contains("Reply 1 to tell us you got this message.", body);
+        Assert.Contains("Reference: AB12CD34", body);
+        Assert.DoesNotContain("PLACEHOLDER", body);
     }
 
     [Theory]
@@ -44,9 +78,9 @@ public sealed class TemplateRendererTests
     {
         var body = ShippedTemplates().Render("patient-follow-up", "en", smsSafe, Values).Body;
 
-        Assert.Contains("Reply 1 to confirm you got this message", body);
+        Assert.Contains("Reply 1 to tell us you got this message", body);
         Assert.DoesNotContain("will come", body);
-        Assert.Contains("Reply 2 if you would like your care team to call you", body);
+        Assert.Contains("reply 2 and we will call you", body);
         foreach (var notThere in new[] { "patient channel", "health app", "the app", "your app", "portal", "http", "www.", "log in", "open " })
         {
             Assert.DoesNotContain(notThere, body, StringComparison.OrdinalIgnoreCase);

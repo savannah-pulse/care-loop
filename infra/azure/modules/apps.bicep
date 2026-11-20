@@ -30,7 +30,6 @@ param apiAiProvider string
 param apiExtraEnv array
 param webMaxReplicas int
 param aiProjectEndpoint string
-param aiModelDeploymentName string
 
 var appNames = {
   api: 'api'
@@ -111,6 +110,9 @@ var apiSimulatorEnv = deploySimulators
       { name: 'Notifications__FacilityNames__family-health-centre', value: 'Family Health Centre' }
       { name: 'Notifications__FacilityNames__general-hospital', value: 'General Hospital' }
       { name: 'Notifications__FacilityNames__regional-hospital', value: 'Regional Hospital' }
+      { name: 'Notifications__FacilityContacts__family-health-centre', value: '02 000 0000' }
+      { name: 'Notifications__FacilityContacts__general-hospital', value: '02 000 0001' }
+      { name: 'Notifications__FacilityContacts__regional-hospital', value: '02 000 0002' }
       { name: 'Notifications__StaffContacts__nurse-navigator__Channel', value: 'Email' }
       { name: 'Notifications__StaffContacts__nurse-navigator__Address', value: 'SYN-EMAIL-NURSE-NAVIGATORS' }
       { name: 'Notifications__StaffContacts__clinician__Channel', value: 'Email' }
@@ -126,11 +128,13 @@ var apiSimulatorEnv = deploySimulators
     ]
   : []
 
-var apiFoundryEnv = empty(aiProjectEndpoint) || empty(aiModelDeploymentName)
+// The API asks the project's agents (role-briefing, impact-summary, patient-notification) with the apps
+// identity (AZURE_CLIENT_ID above), which needs Foundry User on the Foundry account. The agents and their
+// models are owned in the Foundry project, not here.
+var apiFoundryEnv = empty(aiProjectEndpoint)
   ? []
   : [
-      { name: 'Ai__FoundryDirect__ProjectEndpoint', value: aiProjectEndpoint }
-      { name: 'Ai__FoundryDirect__DeploymentName', value: aiModelDeploymentName }
+      { name: 'Ai__Foundry__ProjectEndpoint', value: aiProjectEndpoint }
     ]
 
 module api 'container-app.bicep' = {

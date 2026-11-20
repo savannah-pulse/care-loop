@@ -6,6 +6,7 @@ import {
   displayLabelText,
   isUrgent,
   nextActionReason,
+  nextActionRole,
   programmeName,
   type CaseStatus,
   type PatientView,
@@ -74,9 +75,6 @@ export interface WorklistViewer {
   readonly reference: string
 }
 
-/** The next action that is a nurse navigator's to do: calling a patient who asked for a call. */
-const CALL_PATIENT_ACTION = 'call-patient'
-
 /** The next action a case has while its follow-up is under way and nothing else is in the way. */
 const ARRANGE_FOLLOW_UP_ACTION = 'arrange-follow-up'
 
@@ -97,8 +95,10 @@ export function hasOwnWorklist(role: string): boolean {
  *
  * @remarks
  * - A clinician: the cases they are responsible for.
- * - The nurse navigator: the patients waiting for a call back, whoever is responsible for the case,
- *   because the call is the navigator's to make.
+ * - The nurse navigator: the patients waiting for the navigator, whoever is responsible for the case:
+ *   a call back, a message the patient has not acknowledged, or a patient to reach another way. These
+ *   are the pathway's nurse navigator steps (`NEXT_ACTION_ROLES`), the same ones the case screen tells
+ *   a navigator to take.
  * - The facility lead: the cases escalated, and the cases with no named owner, which sit in the
  *   lead's queue.
  * - The lab: the cases whose follow-up is under way with no outcome recorded yet, since recording
@@ -117,7 +117,7 @@ export function isMine(row: WorklistRow, viewer: WorklistViewer): boolean {
     case 'receiving-clinician':
       return !owner.isQueue && sameReference(owner.reference, viewer.reference)
     case 'nurse-navigator':
-      return nextAction === CALL_PATIENT_ACTION
+      return nextActionRole(nextAction) === 'nurse-navigator'
     case 'facility-lead':
       return isEscalated || owner.isQueue
     case 'lab':

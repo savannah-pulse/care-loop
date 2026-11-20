@@ -48,6 +48,10 @@ services:
       Notifications__FacilityNames__family-health-centre: Family Health Centre
       Notifications__FacilityNames__general-hospital: General Hospital
       Notifications__FacilityNames__regional-hospital: Regional Hospital
+      # How a patient message says to contact each facility. Synthetic, like every address here.
+      Notifications__FacilityContacts__family-health-centre: 02 000 0000
+      Notifications__FacilityContacts__general-hospital: 02 000 0001
+      Notifications__FacilityContacts__regional-hospital: 02 000 0002
       # Where each staff role is notified. Synthetic addresses, one per role.
       Notifications__StaffContacts__nurse-navigator__Channel: Email
       Notifications__StaffContacts__nurse-navigator__Address: SYN-EMAIL-NURSE-NAVIGATORS
@@ -62,9 +66,12 @@ services:
       Notifications__StaffContacts__coordinator__Channel: Email
       Notifications__StaffContacts__coordinator__Address: SYN-EMAIL-COORDINATORS
       Ai__Provider: ${AI_PROVIDER:-NoOp}
-      Ai__AzureOpenAi__Endpoint: ${AZURE_OPENAI_ENDPOINT:-}
-      Ai__AzureOpenAi__Deployment: ${AZURE_OPENAI_DEPLOYMENT:-}
-      Ai__AzureOpenAi__ApiKey: ${AZURE_OPENAI_API_KEY:-}
+      # AI is off (NoOp) by default. Foundry has the API ask the agents in a Microsoft Foundry project with
+      # DefaultAzureCredential; no key or token is set here. A container has no `az login`, so for a live
+      # check use the opt-in test or `dotnet run` instead (see src/api/README.md).
+      Ai__Foundry__ProjectEndpoint: ${AZURE_AI_PROJECT_ENDPOINT:-}
+      Ai__TimeoutSeconds: ${AI_TIMEOUT_SECONDS:-30}
+      Ai__CacheHours: ${AI_CACHE_HOURS:-6}
     ports:
       - "${API_PORT:-8080}:8080"
     healthcheck:

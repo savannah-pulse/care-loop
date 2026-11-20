@@ -42,7 +42,7 @@ let generation = 0
  * Sets how the fake API answers a route from now on, replacing any earlier answer for it.
  *
  * @param route - The method and the path after `/api`, without the query: for example
- * `GET /cases/case-1` or `POST /cases/case-1/handoff-summary`.
+ * `GET /cases/case-1` or `POST /cases/case-1/call-outcome`.
  * @param response - The answer.
  */
 export function answer(route: string, response: Answer): void {
@@ -77,7 +77,7 @@ export function problem(status: number, title: string = 'Refused by the API'): R
 /**
  * Lists the requests the screens sent, oldest first.
  *
- * @param route - Only requests to this route, for example `POST /cases/case-1/handoff-summary`;
+ * @param route - Only requests to this route, for example `POST /cases/case-1/call-outcome`;
  * every request when absent.
  * @returns The requests.
  */

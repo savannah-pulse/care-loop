@@ -20,10 +20,12 @@ export {
   CLINICIAN_ROLES,
   ESCALATION_ROLES,
   NAMES_HIDDEN_ROLES,
+  PATIENT_MESSAGE_ROLES,
   ROLE_KEYS,
   isCallOutcomeRole,
   isClinicianRole,
   isEscalationRole,
+  isPatientMessageRole,
   namesHiddenFor,
   roleLabel,
 } from './roles'

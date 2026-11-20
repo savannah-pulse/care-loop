@@ -13,7 +13,14 @@ namespace CareLoop.Api.Features.Notifications;
 public sealed class MessageFormat
 {
     private readonly TimeZoneInfo _zone;
+    /// <summary>What a patient message says in place of a facility's contact when none is configured.</summary>
+    public const string NoFacilityContact = "the clinic";
+
+    /// <summary>What a patient message greets the patient with when the source gave no name: "Dear patient,".</summary>
+    public const string NoFirstName = "patient";
+
     private readonly IReadOnlyDictionary<string, string> _facilities;
+    private readonly IReadOnlyDictionary<string, string> _contacts;
 
     /// <summary>
     /// Creates the formatter.
@@ -25,6 +32,7 @@ public sealed class MessageFormat
         ArgumentNullException.ThrowIfNull(options);
         _zone = string.IsNullOrWhiteSpace(options.TimeZone) ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(options.TimeZone.Trim());
         _facilities = new Dictionary<string, string>(options.FacilityNames, StringComparer.OrdinalIgnoreCase);
+        _contacts = new Dictionary<string, string>(options.FacilityContacts, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>A formatter in UTC with no facility names, for tests and tools.</summary>
@@ -55,6 +63,22 @@ public sealed class MessageFormat
             ? name.Trim()
             : CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Words(facilityId));
     }
+
+    /// <summary>Gives how a patient contacts a facility.</summary>
+    /// <param name="facilityId">The facility identifier.</param>
+    /// <returns>Its configured contact (<see cref="NotificationOptions.FacilityContacts"/>), or <see langword="null"/> when none is configured.</returns>
+    public string? FacilityContact(string facilityId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(facilityId);
+        return _contacts.TryGetValue(facilityId.Trim(), out var contact) && !string.IsNullOrWhiteSpace(contact) ? contact.Trim() : null;
+    }
+
+    /// <summary>Gives the first name a patient message greets the patient with.</summary>
+    /// <param name="displayName">The patient's name as the source sent it: given names, then the family name.</param>
+    /// <returns>The first given name, for example <c>Hessa</c> for <c>Hessa Al Dhaheri</c>, or <see langword="null"/> when there is no name.</returns>
+    /// <remarks>Only the first name ever goes in a message: no surname, so a message seen by someone else says as little as possible.</remarks>
+    public static string? FirstName(string? displayName) =>
+        displayName?.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) is [var first, ..] ? first : null;
 
     /// <summary>Names a role in words, for the middle of a sentence.</summary>
     /// <param name="role">The role key, such as <c>facility-lead</c>.</param>

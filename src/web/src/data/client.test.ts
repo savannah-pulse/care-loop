@@ -6,7 +6,6 @@ import { createCareLoopClient } from './client'
 import { acknowledgeEscalation, loadEscalatedCases, mapAtMost } from './escalations'
 import { failureKindFor, type FailureKind } from './outcome'
 import { PAGE_SIZE, loadCaseList, readCase, reasonParameter } from './reads'
-import { approveHandoffSummary, draftHandoffSummary } from './summaries'
 
 const BASE_URL = 'http://careloop.test/api'
 
@@ -120,19 +119,19 @@ describe('failures', () => {
     [500, 'error'],
   ])('reports HTTP %i as a %s failure, never as a successful fallback', async (status, kind) => {
     const { client } = fakeApi(() => problem(status, { title: 'Refused by the API', status }))
-    const outcome = await draftHandoffSummary('case-1', client)
+    const outcome = await readCase('case-1', undefined, undefined, client)
     expect(outcome).toEqual({ ok: false, failure: { kind, status, detail: 'Refused by the API' } })
     expect(failureKindFor(status)).toBe(kind)
   })
 
   it('reads the message of a feature that is not built yet', async () => {
     const { client } = fakeApi(() =>
-      problem(501, { workstream: 'WS9', feature: 'handoff-summary', message: 'Handoff summaries are not available yet.' }),
+      problem(501, { workstream: 'WS10', feature: 'simulation', message: 'The comparison is not available yet.' }),
     )
-    const outcome = await draftHandoffSummary('case-1', client)
+    const outcome = await readCase('case-1', undefined, undefined, client)
     expect(outcome).toEqual({
       ok: false,
-      failure: { kind: 'notAvailable', status: 501, detail: 'Handoff summaries are not available yet.' },
+      failure: { kind: 'notAvailable', status: 501, detail: 'The comparison is not available yet.' },
     })
   })
 
@@ -163,17 +162,6 @@ describe('failures', () => {
     const pending = readCase('case-1', undefined, controller.signal, client)
     controller.abort()
     expect(await pending).toEqual({ ok: false, failure: { kind: 'aborted' } })
-  })
-})
-
-describe('handoff summary approval', () => {
-  it('approves exactly the edited text, including whitespace', async () => {
-    const { client, requests } = fakeApi(() => Response.json({}))
-    const text = '  Human-reviewed facts.\n\nNext action unchanged.  '
-    await approveHandoffSummary('case-1', 'draft-1', text, client)
-    expect(requests[0].method).toBe('POST')
-    expect(new URL(requests[0].url).pathname).toBe('/api/cases/case-1/handoff-summary/draft-1/approval')
-    expect(await requests[0].text()).toBe(JSON.stringify({ approvedText: text }))
   })
 })
 

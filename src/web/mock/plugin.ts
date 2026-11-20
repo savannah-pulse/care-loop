@@ -6,9 +6,8 @@
  * `fixtures.ts` and follows the API's read rules: the identity headers, the reader's facility as the
  * default scope, a recorded reason for anything outside it, the programme coordinator's view
  * (cases escalated to them only, without names), the clinician-only patient search, paging limits,
- * and who may acknowledge an escalation. Drafted, approved and rejected summaries and
- * acknowledgements last until the server stops. It is never part of the built app: the app knows
- * nothing about it.
+ * and who may acknowledge an escalation. Acknowledgements and recorded calls last until the server
+ * stops. It is never part of the built app: the app knows nothing about it.
  */
 
 import { randomUUID } from 'node:crypto'
@@ -17,26 +16,20 @@ import type { Connect, Plugin } from 'vite'
 import type { components } from '../src/api/schema.d.ts'
 import {
   COHORT_SEED,
-  HESSA_CASE_ID,
   WITHOUT_ESCALATION,
   WITH_ESCALATION,
   createCases,
   createMetrics,
   createProgrammes,
-  draftHessaSummary,
   mockNow,
   startScenarioClock,
   type CaseFixture,
-  type HandoffSummary,
   type Programme,
 } from './fixtures.ts'
 
 type Schemas = components['schemas']
 type Problem = Schemas['ProblemDetails']
 type CaseDetail = Schemas['CaseDetailResponse']
-
-/** Roles that may approve or reject a handoff summary in the mock, like the clinician roles in the app. */
-const SUMMARY_REVIEWER_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
 
 /** Roles allowed to search a patient's cases, as in the API. */
 const PATIENT_SEARCH_ROLES: readonly string[] = ['clinician', 'receiving-clinician']
@@ -53,7 +46,6 @@ const HUMAN_ROLES: readonly string[] = [
 
 interface MockState {
   readonly cases: CaseFixture[]
-  readonly summaries: Map<string, HandoffSummary>
   readonly programmes: Programme[]
 }
 
@@ -218,6 +210,96 @@ function listCases(state: MockState, who: Reader, query: URLSearchParams): CaseD
     .map((detail) => redacted(who, detail))
 }
 
+/** The briefings the mock has written, by reader, so a repeat request is answered as reused, like the API. */
+const briefings = new Map<string, { text: string; generatedAt: string }>()
+
+/**
+ * Stands in for `GET /ai/role-briefing`: a summary of the reader's open cases, built from the
+ * fixtures so the screen has realistic words to show without an AI provider.
+ *
+ * @param state - The mock's cases.
+ * @param who - The reader.
+ * @param refresh - `true` to write a new summary instead of reusing the one kept for this reader.
+ * @returns The text, when it was written and whether it was reused.
+ */
+function roleBriefing(state: MockState, who: Reader, refresh: boolean): Schemas['AiTextResponse'] {
+  const open = scoped(state, who, null).filter((detail) => detail.stage !== 'Closed')
+  const now = Date.now()
+  const overdue = open.filter((detail) => detail.exceptions.includes('Overdue') || (detail.dueAt && Date.parse(detail.dueAt) < now))
+  const actions = new Map<string, number>()
+  for (const detail of open) {
+    const action = (detail.nextAction ?? 'no next action').replaceAll('-', ' ')
+    actions.set(action, (actions.get(action) ?? 0) + 1)
+  }
+  const waiting = [...actions].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([action, count]) => `${action} (${count})`)
+  const text =
+    `${overdue.length === 1 ? '1 case is' : `${overdue.length} cases are`} overdue. ` +
+    (waiting.length > 0 ? `Waiting work is mostly: ${waiting.join(', ')}. ` : '') +
+    `${open.filter((detail) => detail.isEscalated).length} escalated. [Mock summary, not written by AI]`
+  const key = `${who.reference}|${who.role}|${who.facilityId ?? ''}`
+  const kept = briefings.get(key)
+  if (kept && kept.text === text && !refresh) {
+    return { ...kept, model: 'Mock/role-briefing', cached: true }
+  }
+  const written = { text, generatedAt: new Date().toISOString() }
+  briefings.set(key, written)
+  return { ...written, model: 'Mock/role-briefing', cached: false }
+}
+
+/** The impact summaries the mock has written, by reader, so a repeat request is answered as reused. */
+const impactSummaries = new Map<string, string>()
+
+/**
+ * Stands in for `GET /ai/impact-summary`: a few sentences built from the mock's metrics.
+ *
+ * @param who - The reader.
+ * @param refresh - `true` to write a new summary instead of reusing the one kept for this reader.
+ * @returns The text, when it was written and whether it was reused.
+ */
+function impactSummary(who: Reader, refresh: boolean): Schemas['AiTextResponse'] {
+  const metrics = createMetrics()
+  const text =
+    `${metrics.overdueCases} of ${metrics.openCases} open cases are past their deadline, and ${metrics.escalatedCases} are escalated. ` +
+    `${metrics.closedCases} of ${metrics.totalCases} cases are closed.\n\n[Mock summary, not written by AI]`
+  const key = `${who.reference}|${who.role}|${who.facilityId ?? ''}`
+  const kept = impactSummaries.get(key)
+  if (kept && !refresh) {
+    return { text, generatedAt: kept, model: 'Mock/impact-summary', cached: true }
+  }
+  const generatedAt = new Date().toISOString()
+  impactSummaries.set(key, generatedAt)
+  return { text, generatedAt, model: 'Mock/impact-summary', cached: false }
+}
+
+/** The roles the API lets ask for a patient message draft. */
+const PATIENT_MESSAGE_ROLES = ['nurse-navigator', 'clinician']
+
+/**
+ * Stands in for `GET /cases/{caseId}/patient-message-draft`: the administrative template the
+ * patient-notification agent fills, with placeholders where the patient's details are withheld.
+ *
+ * @param detail - The case.
+ * @param who - The reader.
+ * @param channel - `Sms` (the default) or `Email`.
+ * @returns The draft; never reused.
+ */
+function patientMessageDraft(detail: CaseDetail, who: Reader, channel: string | null): Schemas['AiTextResponse'] {
+  if (!PATIENT_MESSAGE_ROLES.includes(who.role)) {
+    throw new HttpError(403, 'Only a nurse navigator or a clinician may ask for a draft message to the patient.')
+  }
+  if (channel !== null && channel !== 'Sms' && channel !== 'Email') {
+    throw new HttpError(400, 'The channel must be Sms or Email.')
+  }
+  const firstName = detail.patientDisplayName?.trim().split(/\s+/)[0] ?? 'patient'
+  const text = [
+    `Dear ${firstName},`,
+    `Your care team at ${detail.facilityId.replaceAll('-', ' ')} would like to talk with you about the next step in your care.`,
+    'Please call {clinic contact}.',
+    'Thank you.',
+  ].join('\n')
+  return { text, generatedAt: new Date().toISOString(), model: 'Mock/patient-notification', cached: false }
+}
+
 function listExceptions(state: MockState, who: Reader, query: URLSearchParams): Schemas['ExceptionItemResponse'][] {
   const facilityId = query.get('facilityId')
   const owner = query.get('ownerReference')
@@ -302,83 +384,6 @@ function acknowledge(fixture: CaseFixture, escalationId: string, who: Reader, re
   }
   record()
   return redacted(who, fixture.detail)
-}
-
-function draftSummary(state: MockState, fixture: CaseFixture): HandoffSummary {
-  const existing = [...state.summaries.values()].find(
-    (summary) => summary.caseId === fixture.detail.caseId && summary.status === 'Approved',
-  )
-  if (existing) {
-    throw new HttpError(409, 'This case already has an approved summary.')
-  }
-  if (fixture.detail.caseId !== HESSA_CASE_ID) {
-    throw new HttpError(503, 'The AI service did not produce a draft that passed its checks.')
-  }
-  for (const [id, summary] of state.summaries) {
-    if (summary.caseId === fixture.detail.caseId && summary.status === 'Draft') {
-      state.summaries.delete(id)
-    }
-  }
-  const draft = draftHessaSummary(randomUUID())
-  state.summaries.set(draft.summaryId, draft)
-  return draft
-}
-
-function openDraft(state: MockState, caseId: string, summaryId: string, who: Reader): HandoffSummary {
-  if (!SUMMARY_REVIEWER_ROLES.includes(who.role)) {
-    throw new HttpError(403, '')
-  }
-  const summary = state.summaries.get(summaryId)
-  if (!summary || summary.caseId !== caseId) {
-    throw new HttpError(404, 'Summary not found.')
-  }
-  if (summary.status !== 'Draft') {
-    throw new HttpError(409, 'This summary has already been decided.')
-  }
-  return summary
-}
-
-function approve(state: MockState, fixture: CaseFixture, summary: HandoffSummary, who: Reader, text: string): HandoffSummary {
-  const now = mockNow().toISOString()
-  const approved: HandoffSummary = {
-    ...summary,
-    status: 'Approved',
-    text,
-    humanReviewRequired: false,
-    approvedBy: who.reference,
-    approvedAt: now,
-  }
-  state.summaries.set(summary.summaryId, approved)
-  const detail = fixture.detail
-  fixture.timeline.push({
-    auditEventId: randomUUID(),
-    sourceSystem: 'careloop',
-    origin: 'careloop',
-    eventType: 'HandoffSummaryApproved',
-    disposition: 'Applied',
-    actorReference: who.reference,
-    actorRole: who.role,
-    sourceTimestamp: now,
-    receivedTimestamp: now,
-    priorStage: detail.stage,
-    newStage: detail.stage,
-    reason: 'Handoff summary approved.',
-    evidenceReference: `DocumentReference/${summary.summaryId}`,
-  })
-  fixture.detail = { ...detail, updatedAt: now }
-  return approved
-}
-
-function reject(state: MockState, summary: HandoffSummary, who: Reader, reason: string): HandoffSummary {
-  const rejected: HandoffSummary = {
-    ...summary,
-    status: 'Rejected',
-    rejectedBy: who.reference,
-    rejectedAt: mockNow().toISOString(),
-    rejectionReason: reason,
-  }
-  state.summaries.set(summary.summaryId, rejected)
-  return rejected
 }
 
 /** How far the patient-contact track has come, so a call outcome never moves it backwards. */
@@ -498,6 +503,17 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     send(res, 200, listExceptions(state, who, query))
     return true
   }
+  if (path === '/ai/role-briefing') {
+    expect('GET')
+    send(res, 200, roleBriefing(state, who, query.get('refresh') === 'true'))
+    return true
+  }
+  if (path === '/ai/impact-summary') {
+    expect('GET')
+    checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
+    send(res, 200, impactSummary(who, query.get('refresh') === 'true'))
+    return true
+  }
   if (path === '/metrics') {
     expect('GET')
     checkOutsideTeam(who, query.get('facilityId'), query.get('reason'))
@@ -529,6 +545,12 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
     send(res, 200, redacted(who, fixture.detail))
     return true
   }
+  if (third === 'patient-message-draft' && fourth === undefined) {
+    expect('GET')
+    checkCase(who, fixture.detail, reason)
+    send(res, 200, patientMessageDraft(fixture.detail, who, query.get('channel')))
+    return true
+  }
   if (third === 'timeline' && fourth === undefined) {
     expect('GET')
     checkCase(who, fixture.detail, reason)
@@ -543,27 +565,6 @@ async function route(state: MockState, req: IncomingMessage, res: ServerResponse
   if (third === 'escalations' && fourth !== undefined && fifth === 'acknowledgement') {
     expect('POST')
     send(res, 200, acknowledge(fixture, fourth, who, reason))
-    return true
-  }
-  if (third !== 'handoff-summary') {
-    return false
-  }
-  if (fourth === undefined) {
-    expect('POST')
-    send(res, 201, draftSummary(state, fixture))
-    return true
-  }
-  if (fifth === 'approval' || fifth === 'rejection') {
-    expect('POST')
-    const body = await readJson(req)
-    const summary = openDraft(state, caseId, fourth, who)
-    send(
-      res,
-      200,
-      fifth === 'approval'
-        ? approve(state, fixture, summary, who, requireText(body, 'approvedText'))
-        : reject(state, summary, who, requireText(body, 'reason').trim()),
-    )
     return true
   }
   return false
@@ -583,7 +584,7 @@ export interface MockApiOptions {
  */
 export function careLoopMockApi(options: MockApiOptions = {}): Plugin {
   startScenarioClock(options.now)
-  const state: MockState = { cases: createCases(), summaries: new Map(), programmes: createProgrammes() }
+  const state: MockState = { cases: createCases(), programmes: createProgrammes() }
 
   const handler: Connect.NextHandleFunction = (req, res) => {
     route(state, req, res)
