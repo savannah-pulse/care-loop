@@ -6,6 +6,10 @@ A minimal Python console app that runs a **prompt agent** hosted in [Microsoft F
 
 This project connects to a **pre-configured prompt agent** in Microsoft Foundry. The agent's instruction, tools, and model configuration are all managed server-side in the Foundry portal — none of that logic lives in this codebase. The code simply authenticates, connects to the agent by name, sends user messages, and streams back responses (including any tool call outputs).
 
+## How this sample relates to the CareLoop API
+
+This Python console app is a standalone quick start, not a service called by CareLoop. The .NET API invokes the configured `patient-notification` agent directly through `FoundryAiClient` for `GET /cases/{caseId}/patient-message-draft`. The API authorizes the staff member, selects one of four approved administrative templates from recorded case state, and sends the template and allowed values for a staff-reviewed draft. The agent does not send messages; exact template preservation is a prompt requirement, not a post-validation enforced by the API. See the [AI integration contract](../../../docs/ai-design/integration.md).
+
 ```
 +------------------------+              +----------------------------------+
 |                        |    HTTP      |  Microsoft Foundry               |

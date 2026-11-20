@@ -41,7 +41,7 @@ Which data is sent is in code (`Features/Ai`), so editing a prompt cannot send s
 
 ## The patient message templates
 
-`patient-message.md` holds the approved administrative templates. The model fills the one named in `template` with `values` and changes no other wording.
+`patient-message.md` holds the approved administrative templates. The prompt asks the model to fill the one named in `template` with `values` and change no other wording. The API does not post-validate that the returned draft preserves every word or placeholder, so a staff member must review it. Deterministic backend substitution, recommended in the v5 prompt document, is not the current implementation.
 
 The API chooses the template in code, from what is recorded on the case (`PatientMessageDraft.TemplateFor` in `Features/Ai/PatientMessageDraft.cs`). The first rule that fits wins:
 
@@ -69,4 +69,4 @@ With `Ai:Provider` set to `Foundry`, each use goes to its own agent in the Found
 | `impact-summary.md` | `impact-summary` | Yes |
 | `patient-message.md` | `patient-notification` | Yes |
 
-So editing a file changes what its agent is asked. The agent's owner changes only the universal rules. Any other provider is sent the same prompt. [`docs/ai-design/integration.md`](../../../../docs/ai-design/integration.md) has the details.
+So editing a file changes what its agent is asked. The agent's owner changes only the universal rules. Any other provider is sent the same prompt. These are three use-level prompts, not the full set of separate role/view prompts described in v5; the [AI integration contract](../../../../docs/ai-design/integration.md) details what is current and what remains proposed.

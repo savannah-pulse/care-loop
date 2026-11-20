@@ -14,6 +14,7 @@ This specification is part of the [AI design set](README.md).
 >   - Role briefing (`role-briefing.md`): not in this document's AG1 to AG6 list; informally called AG7.
 >   - Impact summary (`impact-summary.md`): closest to AG6, the stage-insights narrative. It is asked for on demand from the impact page, not on a schedule.
 >   - Patient message draft (`patient-message.md`): closest to AG3. It is a preview for staff only; nothing AI writes is sent, and patients receive approved templates. The `patient-notification` agent fills one approved administrative template from `patient-message.md`, which the API chooses from recorded state, and returns that wording as the draft.
+> - **Role/view distinction:** the separate AG1–AG4 labels in the supplied v5 role/view document are a different taxonomy from this v0.3 proposal. Current code has one home-page role-briefing prompt, one impact-summary prompt for authorized programme/facility metrics, and one patient-message prompt. It does not implement the v5 clinician-consultation, referral-requests or facility-escalations prompts, a separate facility-impact prompt, or its optional referral-handoff agent. See the [integration contract](integration.md) for the exact current routing and proposal status.
 
 ## 1. Purpose and design boundary
 

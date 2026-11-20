@@ -220,6 +220,29 @@ The prompt files follow the agents' owner's "Optimized Agent Instructions and Ro
 - A greeting written by the backend: the dashboard already shows the greeting, and the API's opening is the count sentence.
 - Caps on output tokens, skipping the model for an empty view, and the document's fourth agent (AG4, a referral handoff), which CareLoop has no endpoint for.
 
+#### Current API uses versus the v5 role/view design
+
+The v5 document's central flow is implemented at the use level: the API applies access rules, builds a compact payload, renders a backend-managed task prompt, calls the configured Foundry agent for that use, and returns generated text to the UI. Permanent instructions are owned in Foundry; the task and view wording is in `src/api/CareLoop.Api/Prompts/`. The response is **not** returned with the page's view data: each AI route returns only `AiTextResponse`, and the UI loads the underlying view separately.
+
+The implemented routing is one prompt and agent per API use, not a versioned role/view prompt registry:
+
+| API use | Implemented route and scope | Prompt and agent | Relationship to the v5 matrix |
+|---|---|---|---|
+| Role briefing | `GET /ai/role-briefing`; authenticated role and facility access rules select the reader's open-case scope. | One `role-briefing.md` prompt and `role-briefing` agent for all roles. The payload includes the reader role and role-scoped worklist facts. | The nurse worklist is the closest match, but there are no separate nurse/worklist, clinician/consultation, clinician/referral-requests, or facility-lead/escalations prompts. Facility leads can receive an authorized worklist scope; it is not the proposed dedicated escalation-view summary. |
+| Impact summary | `GET /ai/impact-summary`; reuses the metrics endpoint's authorization and data, for all facilities or an authorized facility scope. | One `impact-summary.md` prompt and `impact-summary` agent; the facility scope is data, not a separate prompt. | Programme and facility summaries use the same prompt. A separate facility-impact prompt remains provisional and is not implemented. |
+| Patient message draft | `GET /cases/{caseId}/patient-message-draft`; only a nurse navigator or clinician with case access may request it. | `patient-message.md` and `patient-notification` agent. The API selects one of `T02`, `T03`, `T05`, or `T06` from recorded case state and supplies values. | The API chooses the scenario/template; the model is prompted to fill it without changing wording. Only these four administrative templates are wired, not all twelve scenarios in v5. The draft is a staff preview, not sent or stored. |
+| Referral handoff | No route or use is present. | No prompt/agent mapping. | AG4 is an optional proposal only; it is not the retired FR-11 handoff summary or an implemented agent. |
+
+`Ai:Foundry:Agents` maps the three use keys to agent **names**. `FoundryAiClient` sends the rendered prompt as one user message and refers to the agent by name, so Foundry's latest version answers; the API does not choose an agent version per view. Prompt files are versioned through source control history, but the request/response contract has no prompt-version field.
+
+For impact summaries, the API computes the aggregates, withholds small values before the model call, and sends scope and period along with them. The prompt forbids calculating or estimating withheld values, ranking/differencing measures, causal claims, and action recommendations; it asks the model to describe measurement limitations and missing information. No individual case is sent. When `Ai:SyntheticData` is enabled, .NET appends the fixed synthetic-data caveat after the model response.
+
+Validation is intentionally limited in the current code. The Foundry client rejects a non-success response, a present response status other than `completed`, empty text, and text starting with `CANNOT_COMPLY`. `AiText` reports unavailable output as 503 and does not cache failures. The API does not validate factual claims against input fields or enforce that the patient-message output exactly preserves the template/slots. Human review remains necessary; exact template substitution is a v5 recommendation for production, not a behavior to assume from the current model call.
+
+The v5 operational recommendations are not all implemented: there are no output-token caps, role/view-specific empty-view skips, queued rate-limit-aware retries, or concurrent-request deduplication. Role briefings and impact summaries are reused in in-memory cache by writer identity and exact rendered prompt for `Ai:CacheHours`; `refresh=true` requests a new result. Patient message drafts are not reused. On enabled requests, the normal access checks and read audit still run on cache hits; with `NoOp`, the API returns 409 before reading data.
+
+The v5 document calls its proposed roles AG1 (role briefing), AG2 (patient notification), AG3 (impact summary), and AG4 (optional referral handoff). Those labels are specific to that document and do not match the AG1–AG6 numbering in the earlier v0.3 proposal in [`ai-spec.md`](ai-spec.md).
+
 ## Failure
 
 | Situation | Answer |
