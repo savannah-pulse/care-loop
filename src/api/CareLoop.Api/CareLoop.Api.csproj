@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" Version="1.21.0" />
-    <PackageReference Include="Hl7.Fhir.R4" Version="6.8.0" />
+    <PackageReference Include="Hl7.Fhir.R4" Version="6.9.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.15">
       <PrivateAssets>all</PrivateAssets>
@@ -26,7 +26,7 @@
     </PackageReference>
     <!-- Pinned explicitly so the EF Core version is the same for the provider, the design tools and the test project. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.15" />
-    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.4" />
   </ItemGroup>
 
   <!-- Pathway definitions and approved message templates ship with the API. -->
